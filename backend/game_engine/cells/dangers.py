@@ -33,7 +33,7 @@ class AmbushCell(BaseCell):
                 Decision(
                     DecisionType.YES_NO, player.id,
                     f"Капиталист: заплатить выкуп {ransom}$ и не идти в Больницу?",
-                    [DecisionOption("pay", f"Заплатить {ransom}$"), DecisionOption("hospital", "В Больницу")],
+                    [DecisionOption("pay", f"Заплатить {ransom}$", role="capitalist"), DecisionOption("hospital", "В Больницу")],
                     handler=cell.type, cell_id=cell.id, context={"kind": "capitalist", "ransom": ransom},
                 )
             )
@@ -60,8 +60,8 @@ class AmbushCell(BaseCell):
                     DecisionType.CHOOSE_OPTION, player.id,
                     "Военный: потерять Крышу или бросить кубик (1-2 Больница)?",
                     [
-                        DecisionOption("roof", "Потерять Крышу", hint="Потратить одну Крышу и избежать риска."),
-                        DecisionOption("roll", "Бросить кубик", rolls_dice=True, hint="1-2 → Больница."),
+                        DecisionOption("roof", "Потерять Крышу", hint="Потратить одну Крышу и избежать риска.", role="military"),
+                        DecisionOption("roll", "Бросить кубик", rolls_dice=True, hint="1-2 → Больница.", role="military"),
                     ],
                     handler=cell.type, cell_id=cell.id, context={"kind": "military"},
                 )

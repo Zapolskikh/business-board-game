@@ -38,9 +38,11 @@ export interface DecisionOption {
   id: string;
   label: string;
   data: Record<string, unknown>;
-  // UI hints from the backend: rolls_dice shows a 🎲 badge; hint is a tooltip.
+  // UI hints from the backend: rolls_dice shows a 🎲 badge; hint is a tooltip;
+  // role is the role id when the option is exclusive to a specific role.
   rolls_dice?: boolean;
   hint?: string;
+  role?: string;
 }
 
 export interface Decision {

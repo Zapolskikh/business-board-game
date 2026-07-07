@@ -154,6 +154,9 @@ class DecisionOption:
     # ``hint`` is a short tooltip describing the consequences of the option.
     rolls_dice: bool = False
     hint: str = ""
+    # If non-empty, the option is only available to a specific role; the UI
+    # shows the role name in the button so players understand why it appears.
+    role: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -162,6 +165,7 @@ class DecisionOption:
             "data": self.data,
             "rolls_dice": self.rolls_dice,
             "hint": self.hint,
+            "role": self.role,
         }
 
 

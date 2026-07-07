@@ -71,14 +71,14 @@ class BusinessSchoolCell(BaseCell):
         context = {"cost": cost, "exp": exp}
 
         if self.has_role(player, Role.CAPITALIST):
-            options.insert(0, DecisionOption("pay2", f"Заплатить {cost * 2}$ → {exp * 2} опыта"))
+            options.insert(0, DecisionOption("pay2", f"Заплатить {cost * 2}$ → {exp * 2} опыта", role="capitalist"))
             options.insert(0, DecisionOption("pay", f"Заплатить {cost}$ → {exp} опыта"))
         elif self.has_role(player, Role.POLITICIAN):
-            options.insert(0, DecisionOption("free_scandal", f"Бесплатно {exp} опыта (+1 скандал)"))
+            options.insert(0, DecisionOption("free_scandal", f"Бесплатно {exp} опыта (+1 скандал)", role="politician"))
         elif self.has_role(player, Role.FRAUDSTER):
             options.insert(0, DecisionOption(
                 "fake", "Фальшивый диплом (1-2 Тюрьма, 3-6 опыт даром)",
-                rolls_dice=True, hint="Риск: бросок 1-2 → Тюрьма, 3-6 → опыт бесплатно.",
+                rolls_dice=True, hint="Риск: бросок 1-2 → Тюрьма, 3-6 → опыт бесплатно.", role="fraudster",
             ))
             options.insert(0, DecisionOption("pay", f"Заплатить {cost}$ → {exp} опыта"))
         else:
@@ -143,8 +143,8 @@ class GovernmentCell(BaseCell):
                     DecisionType.CHOOSE_OPTION, player.id,
                     "Политик: выбрать одно",
                     [
-                        DecisionOption("subsidy", f"Субсидия +{subsidy}$"),
-                        DecisionOption("scandal", "Снять 1 скандал"),
+                        DecisionOption("subsidy", f"Субсидия +{subsidy}$", role="politician"),
+                        DecisionOption("scandal", "Снять 1 скандал", role="politician"),
                     ],
                     handler=cell.type, cell_id=cell.id, context={**context, "kind": "politician"},
                 )
@@ -155,8 +155,8 @@ class GovernmentCell(BaseCell):
                     DecisionType.CHOOSE_OPTION, player.id,
                     f"Капиталист: заплати {fee}$ и выбери одно",
                     [
-                        DecisionOption("roof", "Легальная защита (Крыша)"),
-                        DecisionOption("scandal", "Снять 1 скандал"),
+                        DecisionOption("roof", "Легальная защита (Крыша)", role="capitalist"),
+                        DecisionOption("scandal", "Снять 1 скандал", role="capitalist"),
                     ],
                     handler=cell.type, cell_id=cell.id, context={**context, "kind": "capitalist"},
                 )
@@ -167,10 +167,10 @@ class GovernmentCell(BaseCell):
                     DecisionType.CHOOSE_OPTION, player.id,
                     "Аферист: пройти проверку или притвориться Политиком?",
                     [
-                        DecisionOption("base", f"Заплатить сбор {fee}$"),
+                        DecisionOption("base", f"Заплатить сбор {fee}$", role="fraudster"),
                         DecisionOption(
                             "pretend", "Притвориться (1-2 Тюрьма, 3-6 субсидия)",
-                            rolls_dice=True, hint="Риск: бросок 1-2 → Тюрьма, 3-6 → субсидия.",
+                            rolls_dice=True, hint="Риск: бросок 1-2 → Тюрьма, 3-6 → субсидия.", role="fraudster",
                         ),
                     ],
                     handler=cell.type, cell_id=cell.id, context={**context, "kind": "fraudster"},
@@ -182,8 +182,8 @@ class GovernmentCell(BaseCell):
                     DecisionType.CHOOSE_OPTION, player.id,
                     f"Мафиози: заплати штраф {mafia_fine}$ или Тюрьма",
                     [
-                        DecisionOption("pay", f"Заплатить {mafia_fine}$"),
-                        DecisionOption("jail", "В Тюрьму"),
+                        DecisionOption("pay", f"Заплатить {mafia_fine}$", role="mafia"),
+                        DecisionOption("jail", "В Тюрьму", role="mafia"),
                     ],
                     handler=cell.type, cell_id=cell.id, context={**context, "kind": "mafia"},
                 )
@@ -254,7 +254,7 @@ class SecurityAgencyCell(BaseCell):
                 engine.request_decision(
                     Decision(
                         DecisionType.CHOOSE_OPTION, player.id, "Капиталист: какой объект застраховать?",
-                        [DecisionOption(c.id, c.title, {"cell_id": c.id}) for c in owned]
+                        [DecisionOption(c.id, c.title, {"cell_id": c.id}, role="capitalist") for c in owned]
                         + [DecisionOption("skip", "Не страховать")],
                         handler=cell.type, cell_id=cell.id, context={"kind": "insure"},
                     )
@@ -278,11 +278,11 @@ class SecurityAgencyCell(BaseCell):
         price = int(engine.balance.ring_value("roof_price", cell.ring))
         targets = [p for p in other_players(engine.state, player) if p.roofs > 0]
         options: list[DecisionOption] = [
-            DecisionOption(f"remove:{p.id}", f"Снять Крышу с {p.name}", {"player_id": p.id})
+            DecisionOption(f"remove:{p.id}", f"Снять Крышу с {p.name}", {"player_id": p.id}, role="military")
             for p in targets
         ]
         if player.money >= price:
-            options.append(DecisionOption("buy", f"Купить свою Крышу за {price}$"))
+            options.append(DecisionOption("buy", f"Купить свою Крышу за {price}$", role="military"))
         options.append(DecisionOption("skip", "Отказаться"))
         engine.request_decision(
             Decision(

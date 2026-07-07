@@ -1,83 +1,83 @@
 {
-  "starting_money": 300,
+  "starting_money": 500,
   "starting_experience": 0,
   "dice_sides": 6,
   "board_name": "board_72",
   "starting_roles_mode": "none",
 
-  "start_bonus": [200, 350, 550],
+  "start_bonus": [250, 420, 650],
   "start_experience": [1, 2, 3],
-  "bank_bonus": [120, 200, 320],
-  "roof_price": [100, 160, 240],
+  "bank_bonus": [150, 240, 380],
+  "roof_price": [80, 130, 190],
 
   "prices": {
-    "newspaper": [150, 220, 320],
-    "casino": [220, 320, 460],
-    "station": [120, 180, 240],
-    "food": [140, 220, 340],
-    "dormitory": [160, 260, 400]
+    "newspaper": [120, 180, 260],
+    "casino": [180, 260, 380],
+    "station": [100, 150, 200],
+    "food": [110, 180, 280],
+    "dormitory": [130, 210, 330]
   },
 
   "rent": {
-    "food": [40, 70, 110],
-    "dormitory": [50, 90, 140]
+    "food": [30, 55, 85],
+    "dormitory": [40, 70, 110]
   },
 
   "casino": {
-    "base_bet": [60, 100, 160],
-    "mafia_loss_multiplier": 0.5
+    "base_bet": [50, 80, 130],
+    "mafia_loss_multiplier": 0.4
   },
   "station": {
-    "fare": [40, 70, 110],
+    "fare": [30, 55, 85],
     "capitalist_buyout_multiplier": 2
   },
   "newspaper": {
-    "capitalist_pay_owner": [50, 80, 120]
+    "capitalist_pay_owner": [40, 65, 100]
   },
   "business_school": {
-    "cost": [80, 120, 180],
+    "cost": [60, 90, 140],
     "exp_gain": [2, 3, 4]
   },
   "government": {
-    "fee": [50, 80, 120],
-    "subsidy": [120, 200, 300],
-    "mafia_fine": [150, 240, 360]
+    "fee": [35, 55, 85],
+    "subsidy": [150, 240, 360],
+    "mafia_fine": [100, 160, 240]
   },
   "checkpoint": {
-    "fine_base": [40, 70, 110],
-    "fine_big": [150, 240, 360]
+    "fine_base": [25, 45, 70],
+    "fine_big": [100, 160, 240]
   },
   "ambush": {
-    "capitalist_ransom": [120, 200, 320]
+    "capitalist_ransom": [80, 130, 210]
   },
   "auction": {
-    "min_bid": [50, 80, 120],
+    "min_bid": [40, 65, 100],
     "start_fraction": 0.5,
     "increment_fraction": 0.25,
     "bid_step": 25
   },
   "taxi": {
-    "price": [60, 90, 130]
+    "price": [45, 70, 100]
   },
   "jail": {
-    "experience_loss": [2, 3, 4]
+    "experience_loss": [1, 2, 3]
   },
 
   "fillers": {
-    "money_plus": [90, 150, 240],
-    "money_minus": [70, 120, 190],
-    "windfall": [180, 300, 480],
+    "money_plus": [100, 170, 270],
+    "money_minus": [50, 90, 140],
+    "windfall": [200, 340, 540],
     "experience": [1, 2, 3],
-    "experience_loss": [1, 2, 3],
+    "experience_loss": [1, 1, 2],
     "move_forward_max": 4,
-    "move_back_max": 4,
-    "question_bonus": [90, 150, 240],
-    "question_fine": [90, 150, 240]
+    "move_back_max": 3,
+    "question_bonus": [100, 170, 270],
+    "question_fine": [60, 100, 160]
   },
 
   "victory": {
-    "max_turns": 60,
-    "target_net_worth": 4000,
+    "max_turns": 70,
+    "target_net_worth": 3500,
     "experience_weight": 25
   },
   "promotion": {

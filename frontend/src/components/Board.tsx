@@ -25,8 +25,10 @@ interface Props {
   candidates?: Record<string, MapCandidateInfo> | null;
   // The latest token move — drives the step-by-step walk animation around a ring.
   recentMove?: PlayerMovedData | null;
-  // The cell currently under auction — it blinks to draw attention.
+  // The cell currently requiring interaction — it blinks to draw attention.
   blinkingCellId?: string | null;
+  // Last meaningful event to display in the board center.
+  centerEvent?: { message: string; player_id: string | null } | null;
 }
 
 // Cells are wider than they are tall — that extra width leaves room for full cell
@@ -65,6 +67,7 @@ function perimeterCoords(cols: number, rows: number): { gx: number; gy: number }
 
 interface Seg {
   cellId: string;
+  cellType: string;
   ring: number;
   slot: number;
   x: number;
@@ -86,6 +89,14 @@ interface StartMarker {
   xp: number;
 }
 
+// Animated token state: full path to walk + which step we are on.
+type AnimState = {
+  seq: number;
+  id: string;
+  path: { x: number; y: number }[];
+  step: number;
+};
+
 
 export function Board({
   board,
@@ -98,6 +109,7 @@ export function Board({
   candidates,
   recentMove,
   blinkingCellId,
+  centerEvent,
 }: Props) {
   const { segments, startMarkers, width, height, cx, cy, outer } = useMemo(() => {
     const numRings = board.rings.length;
@@ -123,6 +135,7 @@ export function Board({
         const cellMeta = meta[cell.type];
         segs.push({
           cellId: cell.id,
+          cellType: cell.type,
           ring: ringIdx,
           slot,
           x,
@@ -154,30 +167,24 @@ export function Board({
     return m;
   }, [segments]);
 
-  // ---- token walk animation -------------------------------------------------
-  // On a "walk"/"back" move the token hops through each intermediate cell along
-  // the ring (like a real board game); "teleport" and ring changes snap instantly.
-  // While animating, the moving token is drawn at `animPos` instead of its final
-  // slot. `byCell` is read via a ref so the effect only fires on a *new* move
-  // (its `seq`), not on every unrelated state update.
-  const [animPos, setAnimPos] = useState<{ id: string; x: number; y: number } | null>(null);
+  // ---- token hop animation -----------------------------------------------
+  // Two effects cooperate: the first builds the path on a new move; the
+  // second advances one step every 300 ms until the path is exhausted.
+  // Splitting into two effects avoids cancelled-closure bugs in Strict Mode.
+  const [animState, setAnimState] = useState<AnimState | null>(null);
   const byCellRef = useRef(byCell);
   byCellRef.current = byCell;
   const ringSizesRef = useRef(board.ring_sizes);
   ringSizesRef.current = board.ring_sizes;
-  const rafRef = useRef<number | null>(null);
 
+  // Effect 1 — triggered by a new move: build the hop path.
   useEffect(() => {
-    if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
-    if (!recentMove) return;
+    if (!recentMove) { setAnimState(null); return; }
     const { player_id, from_ring, from_slot, to_ring, to_slot, mode } = recentMove;
-    if (mode === "teleport" || from_ring !== to_ring) {
-      setAnimPos(null); // snap for hospital/jail/promotion (and any cross-ring)
-      return;
-    }
+    if (mode === "teleport" || from_ring !== to_ring) { setAnimState(null); return; }
     const cells = byCellRef.current;
     const size = ringSizesRef.current[from_ring] ?? 0;
-    if (!size) return;
+    if (!size) { setAnimState(null); return; }
     const path: { x: number; y: number }[] = [];
     const start = cells[`r${from_ring}s${from_slot}`];
     if (start) path.push(start);
@@ -188,31 +195,26 @@ export function Board({
       const p = cells[`r${from_ring}s${slot}`];
       if (p) path.push(p);
     }
-    if (path.length < 2) {
-      setAnimPos(null);
-      return;
-    }
-    const perStep = 95; // ms spent crossing each cell
-    const total = perStep * (path.length - 1);
-    const t0 = performance.now();
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - t0) / total);
-      const f = t * (path.length - 1);
-      const i = Math.min(path.length - 2, Math.floor(f));
-      const frac = f - i;
-      const a = path[i];
-      const b = path[i + 1];
-      setAnimPos({ id: player_id, x: a.x + (b.x - a.x) * frac, y: a.y + (b.y - a.y) * frac });
-      if (t < 1) rafRef.current = requestAnimationFrame(tick);
-      else setAnimPos(null);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
-    };
-    // Only re-run for a genuinely new move (identified by its event index).
+    if (path.length < 2) { setAnimState(null); return; }
+    setAnimState({ seq: recentMove.seq, id: player_id, path, step: 0 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recentMove?.seq]);
+
+  // Effect 2 — triggered by each step change: schedule the next hop.
+  useEffect(() => {
+    if (!animState) return;
+    if (animState.step >= animState.path.length) {
+      setAnimState(null);
+      return;
+    }
+    const seq = animState.seq;
+    const t = window.setTimeout(() => {
+      setAnimState((prev) =>
+        prev && prev.seq === seq ? { ...prev, step: prev.step + 1 } : prev
+      );
+    }, 300);
+    return () => clearTimeout(t);
+  }, [animState]);
 
   // Faint graph-paper gridlines behind the cells, aligned to the cell grid.
   const gridLines = useMemo(() => {
@@ -232,6 +234,13 @@ export function Board({
 
   const pickMode = !!candidates;
 
+  // Same-type highlight: find the type of the selected cell, then mark all
+  // cells that share it (except the selected one itself).
+  const selectedType = useMemo(() => {
+    if (!selectedCellId) return null;
+    return segments.find((s) => s.cellId === selectedCellId)?.cellType ?? null;
+  }, [selectedCellId, segments]);
+
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="board-svg" role="img" aria-label="Игровое поле">
       <g className="grid">
@@ -247,8 +256,20 @@ export function Board({
         const dimmed = pickMode && !isCandidate;
         const isBlinking = s.cellId === blinkingCellId;
         const isStart = s.slot === 0;
+        // Highlight cells that share the type of the selected cell (but are not
+        // start/filler cells, and not the selected cell itself).
+        const isSameType =
+          !isSelected &&
+          !!selectedType &&
+          s.cellType === selectedType &&
+          s.cellType !== "start" &&
+          s.cellType !== "empty";
         let stroke = "#0d1117";
         let strokeWidth = 1;
+        if (isSameType) {
+          stroke = "#ffa657";
+          strokeWidth = 2;
+        }
         if (isCandidate) {
           stroke = cand!.affordable ? "#58a6ff" : "#f85149";
           strokeWidth = 3;
@@ -262,7 +283,7 @@ export function Board({
         return (
           <g
             key={s.cellId}
-            className={`cell-seg${isBlinking ? " blinking" : ""}`}
+            className={`cell-seg${isBlinking ? " blinking" : ""}${isSameType ? " same-type" : ""}`}
             onClick={() => onSelectCell(s.cellId)}
           >
             <rect
@@ -317,26 +338,44 @@ export function Board({
         );
       })}
 
-      {/* Player tokens, fanned out when several share a cell. The token that is
-          currently walking is drawn at its animated position (no fan offset). */}
+      {/* Player tokens — hop frame-by-frame during animation, fan out when idle. */}
       {players.map((p, i) => {
-        const animating = animPos?.id === p.id;
-        const pos = animating ? animPos! : byCell[`r${p.ring}s${p.position}`];
-        if (!pos) return null;
+        const animating =
+          !!animState && animState.id === p.id && animState.step < animState.path.length;
+        const curPos = animating
+          ? animState!.path[animState!.step]
+          : byCell[`r${p.ring}s${p.position}`];
+        if (!curPos) return null;
         const offset = animating ? 0 : (i - (players.length - 1) / 2) * 9;
+        const tx = curPos.x + offset;
+        const ty = curPos.y + 13;
+        // Direction arrow points toward the next cell in the hop path.
+        const nextPos =
+          animating && animState!.step < animState!.path.length - 1
+            ? animState!.path[animState!.step + 1]
+            : null;
         return (
-          <circle
-            key={p.id}
-            className={animating ? "token moving" : "token"}
-            cx={pos.x + offset}
-            cy={pos.y + 13}
-            r={animating ? 8 : 7}
-            fill={playerColors[p.id]}
-            stroke={animating ? "#f0f6fc" : "#0d1117"}
-            strokeWidth={2}
-          >
-            <title>{p.name}</title>
-          </circle>
+          <g key={p.id}>
+            {nextPos && (
+              <polygon
+                points={arrowPoints(tx, ty, nextPos.x - curPos.x, nextPos.y - curPos.y)}
+                fill="#f0f6fc"
+                stroke="#0d1117"
+                strokeWidth={1}
+              />
+            )}
+            <circle
+              className={animating ? "token moving" : "token"}
+              cx={tx}
+              cy={ty}
+              r={animating ? 8 : 7}
+              fill={playerColors[p.id]}
+              stroke={animating ? "#f0f6fc" : "#0d1117"}
+              strokeWidth={2}
+            >
+              <title>{p.name}</title>
+            </circle>
+          </g>
         );
       })}
 
@@ -353,14 +392,57 @@ export function Board({
         ))}
       </g>
 
-      <text x={cx} y={cy} textAnchor="middle" className="board-center">
-        {pickMode ? "выберите клетку" : "3 круга"}
-      </text>
+      {/* Board center: "pick a cell" prompt, or last event with player in colour. */}
+      {pickMode ? (
+        <text x={cx} y={cy} textAnchor="middle" className="board-center">
+          выберите клетку
+        </text>
+      ) : (() => {
+        const player = centerEvent?.player_id
+          ? players.find((p) => p.id === centerEvent!.player_id)
+          : null;
+        const color = player ? playerColors[player.id] : undefined;
+        const msg = centerEvent?.message ?? "";
+        const pidx = player ? msg.indexOf(player.name) : -1;
+        if (!msg) {
+          return <text x={cx} y={cy} textAnchor="middle" className="board-center">3 круга</text>;
+        }
+        if (pidx > -1) {
+          const before = msg.slice(0, pidx);
+          const after = msg.slice(pidx + player!.name.length);
+          return (
+            <text x={cx} y={cy - 7} textAnchor="middle" className="board-center">
+              <tspan x={cx} dy="0">{before}<tspan fill={color} fontWeight="bold">{player!.name}</tspan></tspan>
+              <tspan x={cx} dy="17" opacity="0.8" fontSize="11">{after}</tspan>
+            </text>
+          );
+        }
+        return (
+          <text x={cx} y={cy} textAnchor="middle" className="board-center">
+            {msg}
+          </text>
+        );
+      })()}
     </svg>
   );
 }
 
 function shortTitle(title: string): string {
   return title.length > 12 ? title.slice(0, 11) + "…" : title;
+}
+
+function truncCenter(s: string, max = 32): string {
+  return s.length > max ? s.slice(0, max - 1) + "…" : s;
+}
+
+// Small triangle arrow pointing from (cx, cy) in direction (dx, dy).
+function arrowPoints(cx: number, cy: number, dx: number, dy: number): string {
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len === 0) return "";
+  const nx = dx / len, ny = dy / len;
+  const tipX = cx + nx * 17, tipY = cy + ny * 17;
+  const px = -ny * 4, py = nx * 4;
+  const baseX = cx + nx * 10, baseY = cy + ny * 10;
+  return `${tipX},${tipY} ${baseX + px},${baseY + py} ${baseX - px},${baseY - py}`;
 }
 

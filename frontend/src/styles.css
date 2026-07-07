@@ -50,7 +50,11 @@ h2 {
 .app.game {
   max-width: none;
   margin: 0;
-  padding: 10px 12px;
+  padding: 4px 10px 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 /* ---- setup screen ---- */
@@ -156,25 +160,41 @@ select {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 6px;
+  flex: 0 0 auto;
 }
 .layout {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 320px;
-  gap: 16px;
-  align-items: start;
+  grid-template-columns: 240px minmax(0, 1fr) 300px;
+  gap: 10px;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
-.col-left,
+.col-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+  min-height: 0;
+}
 .col-right {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  overflow-y: auto;
+  min-height: 0;
 }
 .col-center {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 12px;
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
 }
 
 .panel {
@@ -221,17 +241,46 @@ select {
 }
 
 /* ---- player cards ---- */
+/* Auto-scales font/padding when more players are present */
+.players-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 0 0 auto;
+}
 .player-card {
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-left: 4px solid var(--border);
   border-radius: 8px;
-  padding: 10px;
-  margin-bottom: 8px;
+  padding: 8px;
+  transition: box-shadow 0.2s;
+}
+@keyframes card-border-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px var(--accent), 0 0 6px rgba(88,166,255,0.3); }
+  50%       { box-shadow: 0 0 0 2px var(--accent), 0 0 14px rgba(88,166,255,0.6); }
 }
 .player-card.current {
-  box-shadow: 0 0 0 1px var(--accent);
+  animation: card-border-pulse 1.1s ease-in-out infinite;
 }
+/* 3-4 players: slightly smaller */
+[data-count="3"] .player-card,
+[data-count="4"] .player-card { padding: 6px 8px; }
+[data-count="3"] .player-head,
+[data-count="4"] .player-head { margin-bottom: 3px; }
+[data-count="3"] .player-stats,
+[data-count="4"] .player-stats { font-size: 12px; gap: 6px; }
+[data-count="3"] .player-stats.secondary,
+[data-count="4"] .player-stats.secondary { font-size: 10px; }
+/* 5-6 players: compact */
+[data-count="5"] .player-card,
+[data-count="6"] .player-card { padding: 4px 6px; }
+[data-count="5"] .player-head,
+[data-count="6"] .player-head { margin-bottom: 2px; font-size: 12px; }
+[data-count="5"] .player-stats,
+[data-count="6"] .player-stats { font-size: 11px; gap: 5px; }
+[data-count="5"] .player-stats.secondary,
+[data-count="6"] .player-stats.secondary { font-size: 9px; }
 .player-head {
   display: flex;
   align-items: center;
@@ -266,10 +315,51 @@ select {
   font-size: 12px;
 }
 
-/* ---- action panel ---- */
-.turn-info {
+/* ---- last dice roll indicator (left column) ---- */
+.last-die-panel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
+  border-radius: 8px;
+  flex: 0 0 auto;
+}
+.die-face {
+  font-size: 22px;
+  line-height: 1;
+}
+.die-info {
+  font-size: 12px;
   color: var(--text-dim);
-  line-height: 1.5;
+}
+.die-info strong {
+  color: var(--text);
+}
+
+/* ---- action panel (compact, lives in left column) ---- */
+.action-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.winner {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+.winner-sub {
+  color: var(--text-dim);
+}
+.btn.full-width {
+  width: 100%;
 }
 .decision .prompt {
   font-weight: 600;
@@ -289,14 +379,55 @@ select {
   color: var(--accent);
 }
 
-/* ---- event log ---- */
+/* ---- event log (bottom of board column, expands upward as overlay) ---- */
+.log-panel-wrap {
+  position: absolute;
+  left: 4px; right: 4px; bottom: 4px;
+  background: rgba(22, 27, 34, 0.97);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: height 0.25s ease;
+  height: 36px;
+  z-index: 10;
+}
+.log-panel-wrap.expanded {
+  height: 280px;
+}
+.log-toggle-btn {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+  flex: 0 0 auto;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.log-toggle-btn:hover { color: var(--text); }
+.log-peek {
+  font-size: 11px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  opacity: 0.7;
+}
 .log {
-  max-height: 320px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 13px;
+  font-size: 12px;
+  padding: 0 8px 8px;
 }
 .log-line {
   display: flex;
@@ -464,9 +595,11 @@ select {
   margin: 4px 0 8px;
 }
 
-/* ---- detailed cell info (below the board) ---- */
-.col-center .cell-info {
-  margin-top: 12px;
+/* ---- cell info (right column, full height) ---- */
+.col-right .cell-info {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 .ci-head {
   display: flex;
@@ -754,12 +887,13 @@ select {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 12px;
-  margin-bottom: 10px;
+  padding: 3px 8px;
+  margin-bottom: 4px;
+  flex: 0 0 auto;
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text-dim);
 }
 .turn-indicator strong {
@@ -789,6 +923,11 @@ select {
   color: var(--text-dim);
   font-weight: 400;
 }
+.opt-role-badge {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.9;
+}
 .btn.option:hover .opt-hint {
   color: var(--text);
 }
@@ -798,20 +937,28 @@ select {
   margin: 4px 0 8px;
 }
 
-/* ---- auction: blinking cell under the hammer ---- */
+/* ---- interaction: blink the cell requiring player action ---- */
 .cell-seg.blinking rect {
-  animation: cell-blink 0.8s ease-in-out infinite;
+  animation: cell-blink 0.6s ease-in-out infinite;
 }
 @keyframes cell-blink {
   0%,
   100% {
-    stroke: #f0f6fc;
-    stroke-width: 2;
+    stroke: #ffa657;
+    stroke-width: 3;
+    filter: brightness(1.05);
   }
   50% {
-    stroke: #e3b341;
-    stroke-width: 5;
+    stroke: #ffffff;
+    stroke-width: 6;
+    filter: brightness(1.5);
   }
+}
+
+/* ---- same-type highlight: cells matching the selected cell's type ---- */
+/* Static amber border only — no pulse, so it never looks like "the" interaction cell. */
+.cell-seg.same-type rect {
+  filter: brightness(1.12);
 }
 
 /* ---- Start cell: bonus/XP inside the cell, title lowered ---- */

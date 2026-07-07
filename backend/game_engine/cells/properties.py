@@ -153,9 +153,9 @@ class CasinoCell(BaseCell):
                     prompt="Капиталист: сыграть в чужом Казино?",
                     options=[
                         DecisionOption("double", "Играть, удвоив ставку", rolls_dice=True,
-                                       hint="Удвоить ставку и бросить кубик."),
+                                       hint="Удвоить ставку и бросить кубик.", role="capitalist"),
                         DecisionOption("single", "Играть обычной ставкой", rolls_dice=True,
-                                       hint="Обычная ставка, бросок кубика."),
+                                       hint="Обычная ставка, бросок кубика.", role="capitalist"),
                         DecisionOption("skip", "Не играть"),
                     ],
                     handler=cell.type,
@@ -276,7 +276,8 @@ class StationCell(BaseCell):
         can_travel = not chained and bool(self._other_stations(engine, cell)) and player.money >= cost
         if can_travel:
             label = "Поехать бесплатно" if cost == 0 else f"Поехать на другой вокзал (проезд {cost}$)"
-            options.append(DecisionOption("travel", label))
+            travel_role = "fraudster" if cost == 0 and self.has_role(player, Role.FRAUDSTER) else ""
+            options.append(DecisionOption("travel", label, role=travel_role))
         options.append(DecisionOption("stay", "Остаться"))
         engine.request_decision(
             Decision(

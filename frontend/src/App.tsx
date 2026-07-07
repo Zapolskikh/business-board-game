@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import { api, type PlayerInput } from "./api";
 import { Board } from "./components/Board";
 import { PlayerPanel } from "./components/PlayerPanel";
-import { TurnStatus } from "./components/TurnStatus";
 import { ActionPanel } from "./components/ActionPanel";
 import { CellInfo } from "./components/CellInfo";
 import { EventLog } from "./components/EventLog";
@@ -13,6 +12,7 @@ import { GameSetup } from "./components/GameSetup";
 import { SimPanel } from "./components/SimPanel";
 import { Faq } from "./components/Faq";
 import {
+  CANCEL_OPTION,
   MAP_PICK,
   type GameEvent,
   type GameState,
@@ -24,6 +24,11 @@ import {
 
 // Distinct token colours for up to 6 players.
 const PLAYER_PALETTE = ["#58a6ff", "#f778ba", "#3fb950", "#e3b341", "#bc8cff", "#ff7b72"];
+
+// Cell types the bot avoids when making map-pick choices (taxi, station travel).
+const NEGATIVE_CELL_TYPES = new Set([
+  "checkpoint", "ambush", "money_minus", "scandal_plus", "role_loss", "experience_loss",
+]);
 
 export default function App() {
   const [meta, setMeta] = useState<Meta | null>(null);
@@ -70,27 +75,58 @@ export default function App() {
     return null;
   }, [events]);
 
-  // The object currently under the hammer — its board cell blinks during bidding.
+  // Blink the cell that requires interaction: the auction object, or the cell
+  // the current player is standing on while making a decision.
   const blinkCellId: string | null = useMemo(() => {
     const pd = state?.pending_decision;
-    if (pd?.handler === "auction" && typeof pd.context?.object_id === "string") {
+    if (!pd) return null;
+    if (pd.handler === "auction" && typeof pd.context?.object_id === "string") {
       return pd.context.object_id as string;
     }
+    if (pd.cell_id) return pd.cell_id;
     return null;
   }, [state]);
 
-  // Apply an action result: update state + log, and (task 7) auto-select the cell
+  // Last meaningful event shown in the board center (skip raw movement noise).
+  const centerEvent = useMemo(() => {
+    for (let i = events.length - 1; i >= 0; i--) {
+      const e = events[i];
+      if (e.type !== "player_moved" && e.message) {
+        return { message: e.message, player_id: e.player_id };
+      }
+    }
+    return null;
+  }, [events]);
+
+  // Apply an action result: update state + log, and auto-select the cell
   // a token just landed on so its details show below the board without a click.
-  // Skipped during a map-pick, where selection is driven by the user's clicks.
+  // When the result includes movement, we update events FIRST so the Board
+  // animation effect can start from the OLD player position, then we commit the
+  // new game state one frame later so the token never snaps to the destination
+  // before the hop animation gets a chance to run.
   const applyResult = (res: { events: GameEvent[]; state: GameState }) => {
-    setState(res.state);
-    setEvents((prev) => [...prev, ...res.events]);
-    if (res.state.pending_decision?.type !== MAP_PICK) {
-      for (let i = res.events.length - 1; i >= 0; i--) {
-        const e = res.events[i];
-        if (e.type === "player_moved") {
-          setSelectedCell(`r${e.data.to_ring}s${e.data.to_slot}`);
-          break;
+    const moveEvent = [...res.events].reverse().find((e) => e.type === "player_moved");
+    if (moveEvent) {
+      // Step 1 – add the events so recentMove.seq changes and animation starts.
+      setEvents((prev) => [...prev, ...res.events]);
+      // Step 2 – one frame later, commit the new positions and pending decisions.
+      window.requestAnimationFrame(() => {
+        setState(res.state);
+        if (res.state.pending_decision?.type !== MAP_PICK) {
+          setSelectedCell(`r${moveEvent.data.to_ring}s${moveEvent.data.to_slot}`);
+        }
+      });
+    } else {
+      // No movement – apply everything atomically.
+      setState(res.state);
+      setEvents((prev) => [...prev, ...res.events]);
+      if (res.state.pending_decision?.type !== MAP_PICK) {
+        for (let i = res.events.length - 1; i >= 0; i--) {
+          const e = res.events[i];
+          if (e.type === "player_moved") {
+            setSelectedCell(`r${e.data.to_ring}s${e.data.to_slot}`);
+            break;
+          }
         }
       }
     }
@@ -158,20 +194,24 @@ export default function App() {
         action = "roll_dice";
       } else if (s.phase === "await_decision" && s.pending_decision) {
         action = "resolve_decision";
-        payload = { option_id: pickBotOption(s.pending_decision.options.map((o) => o.id)) };
+        const isMapPick = s.pending_decision.type === MAP_PICK;
+        payload = { option_id: pickBotOption(s.pending_decision.options.map((o) => o.id), s, isMapPick) };
       } else {
         return;
       }
       setBusy(true);
       try {
         const res = await api.action(s.game_id, actor.id, action, payload);
+        // Extra pause after the action so the player can read what happened
+        // before the board updates to the next bot turn.
+        await new Promise((r) => window.setTimeout(r, 900));
         applyResult(res);
       } catch (e) {
         setError((e as Error).message);
       } finally {
         setBusy(false);
       }
-    }, 650);
+    }, 1400);
     return () => {
       cancelled = true;
       clearTimeout(timer);
@@ -214,7 +254,24 @@ export default function App() {
       <div className="layout">
         <aside className="col-left">
           <PlayerPanel state={state} roles={meta.roles} playerColors={playerColors} />
-          <TurnStatus state={state} roles={meta.roles} playerColors={playerColors} />
+          {state.last_die != null && (() => {
+            const roller = state.players.find((p) => p.id === state.last_die_player_id);
+            const faces = ["·", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
+            return (
+              <div className="last-die-panel" style={{ borderLeftColor: roller ? playerColors[roller.id] : "var(--border)" }}>
+                <span className="die-face">{faces[state.last_die] ?? state.last_die}</span>
+                <span className="die-info">{roller?.name} → <strong>{state.last_die}</strong></span>
+              </div>
+            );
+          })()}
+          <ActionPanel
+            state={state}
+            roles={meta.roles}
+            busy={busy}
+            selectedCell={selectedCell}
+            onRoll={() => send("roll_dice")}
+            onResolve={(optionId) => send("resolve_decision", { option_id: optionId })}
+          />
         </aside>
 
         <main className="col-center">
@@ -238,33 +295,36 @@ export default function App() {
             candidates={candidates}
             recentMove={recentMove}
             blinkingCellId={blinkCellId}
+            centerEvent={centerEvent}
           />
+          <EventLog events={events} />
+        </main>
+
+        <aside className="col-right">
           <CellInfo
             state={state}
             meta={meta}
             selectedCell={selectedCell}
             candidate={selectedCandidate}
           />
-        </main>
-
-        <aside className="col-right">
-          <ActionPanel
-            state={state}
-            roles={meta.roles}
-            busy={busy}
-            selectedCell={selectedCell}
-            onRoll={() => send("roll_dice")}
-            onResolve={(optionId) => send("resolve_decision", { option_id: optionId })}
-          />
-          <EventLog events={events} />
         </aside>
       </div>
     </div>
   );
 }
 
-// A tiny inline detail panel for the selected cell (kept here to avoid a file for
-// a 20-line component).
-function pickBotOption(ids: string[]): string {
-  return ids[Math.floor(Math.random() * ids.length)];
+// For regular decisions, pick at random. For MAP_PICK decisions, prefer cells
+// that are not in the known-negative list (checkpoint, ambush, etc.).
+function pickBotOption(ids: string[], state?: GameState, isMapPick?: boolean): string {
+  if (!state || !isMapPick || ids.length <= 1) {
+    return ids[Math.floor(Math.random() * ids.length)];
+  }
+  // Build cell-type index from the board.
+  const cellType: Record<string, string> = {};
+  state.board.rings.flat().forEach((c) => (cellType[c.id] = c.type));
+  // Prefer cells that are not negative (keep "cancel" available as last resort).
+  const good = ids.filter((id) => id !== CANCEL_OPTION && !NEGATIVE_CELL_TYPES.has(cellType[id] ?? ""));
+  const pool = good.length > 0 ? good : ids.filter((id) => id !== CANCEL_OPTION);
+  const final = pool.length > 0 ? pool : ids;
+  return final[Math.floor(Math.random() * final.length)];
 }

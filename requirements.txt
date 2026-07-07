@@ -1,0 +1,4 @@
+# Python dependencies for Vercel serverless functions (api/).
+fastapi>=0.110,<1.0
+pydantic>=2.6,<3.0
+mangum>=0.17,<1.0

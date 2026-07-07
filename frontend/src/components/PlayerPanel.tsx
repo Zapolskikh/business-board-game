@@ -1,4 +1,5 @@
-// Left panel: one card per player showing money, experience, role, status.
+// Left panel: one card per player. Auto-scales to fit up to 6 players in a fixed
+// area. Current player is indicated by a pulsing border — no separate turn panel.
 import type { GameState, PlayerState, RoleMeta } from "../types";
 
 interface Props {
@@ -10,10 +11,10 @@ interface Props {
 export function PlayerPanel({ state, roles, playerColors }: Props) {
   const roleTitle = (roleId: string | null) =>
     roles.find((r) => r.id === roleId)?.title ?? "без роли";
+  const n = state.players.length;
 
   return (
-    <div className="panel">
-      <h2>Игроки</h2>
+    <div className="players-panel" data-count={n}>
       {state.players.map((p: PlayerState) => {
         const isCurrent = p.id === state.current_player_id;
         return (
@@ -26,7 +27,6 @@ export function PlayerPanel({ state, roles, playerColors }: Props) {
               <span className="dot" style={{ background: playerColors[p.id] }} />
               <strong>{p.name}</strong>
               {p.is_bot && <span className="badge">бот</span>}
-              {isCurrent && <span className="badge current-badge">ход</span>}
             </div>
             <div className="player-stats">
               <span>💰 {p.money}$</span>
@@ -36,9 +36,7 @@ export function PlayerPanel({ state, roles, playerColors }: Props) {
             <div className="player-stats secondary">
               <span>Круг {p.ring + 1}</span>
               <span>Скандалы: {p.scandals}</span>
-              <span title={`Крыша: ${p.roofs}`}>
-                Крыша: {p.roofs > 0 ? "🎖️".repeat(p.roofs) : "—"}
-              </span>
+              <span>Крыша: {p.roofs > 0 ? "🎖️".repeat(p.roofs) : "—"}</span>
               <span>Капитал: {state.net_worth[p.id]}</span>
             </div>
           </div>

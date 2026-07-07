@@ -1,13 +1,12 @@
-// Scrolling event log — the narrative of the game. Newest events at the bottom;
-// auto-scrolls as events arrive.
-import { useEffect, useRef } from "react";
+// Event log pinned to the bottom of the board column. Collapsed by default
+// (shows last 3 events); expands upward to overlay the board on demand.
+import { useEffect, useRef, useState } from "react";
 import type { GameEvent } from "../types";
 
 interface Props {
   events: GameEvent[];
 }
 
-// A few event types get an icon for quick scanning.
 const ICONS: Record<string, string> = {
   dice_rolled: "🎲",
   money_gained: "💰",
@@ -24,24 +23,30 @@ const ICONS: Record<string, string> = {
 };
 
 export function EventLog({ events }: Props) {
+  const [expanded, setExpanded] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [events.length]);
 
+  const filtered = events.filter((e) => e.type !== "player_moved" && e.message);
+
   return (
-    <div className="panel log-panel">
-      <h2>Лог событий</h2>
+    <div className={`log-panel-wrap${expanded ? " expanded" : ""}`}>
+      <button className="log-toggle-btn" onClick={() => setExpanded((v) => !v)}>
+        {expanded ? "▼ Скрыть лог" : "▲ Лог событий"}
+        {!expanded && filtered.length > 0 && (
+          <span className="log-peek">{filtered[filtered.length - 1]?.message}</span>
+        )}
+      </button>
       <div className="log">
-        {events
-          .filter((e) => e.type !== "player_moved" && e.message)
-          .map((e, i) => (
-            <div key={i} className={`log-line ev-${e.type}`}>
-              <span className="log-icon">{ICONS[e.type] ?? "•"}</span>
-              <span>{e.message}</span>
-            </div>
-          ))}
+        {filtered.map((e, i) => (
+          <div key={i} className={`log-line ev-${e.type}`}>
+            <span className="log-icon">{ICONS[e.type] ?? "•"}</span>
+            <span>{e.message}</span>
+          </div>
+        ))}
         <div ref={bottomRef} />
       </div>
     </div>

@@ -18,6 +18,14 @@ coverage.xml
 
 # Simulation output
 backend/out/
+
+# Vercel
+.vercel/
+
+# Frontend build
+frontend/dist/
+frontend/node_modules/
+
 *.sim.json
 *.sim.csv
 
