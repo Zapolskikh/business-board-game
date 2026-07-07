@@ -23,13 +23,15 @@ app = FastAPI(
     description="REST-интерфейс поверх игрового движка и симулятора.",
 )
 
-_default_origins = "http://localhost:5173,http://127.0.0.1:5173"
-_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", _default_origins).split(",") if o.strip()]
+_raw = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+_origins = [o.strip() for o in _raw.split(",") if o.strip()]
+_wildcard = "*" in _origins
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_origins,
-    allow_credentials=True,
+    allow_origins=["*"] if _wildcard else _origins,
+    # credentials (cookies) cannot be used with a wildcard origin
+    allow_credentials=not _wildcard,
     allow_methods=["*"],
     allow_headers=["*"],
 )
