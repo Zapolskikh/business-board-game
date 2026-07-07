@@ -431,10 +431,6 @@ function shortTitle(title: string): string {
   return title.length > 12 ? title.slice(0, 11) + "…" : title;
 }
 
-function truncCenter(s: string, max = 32): string {
-  return s.length > max ? s.slice(0, max - 1) + "…" : s;
-}
-
 // Small triangle arrow pointing from (cx, cy) in direction (dx, dy).
 function arrowPoints(cx: number, cy: number, dx: number, dy: number): string {
   const len = Math.sqrt(dx * dx + dy * dy);
