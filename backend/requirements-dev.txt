@@ -1,0 +1,4 @@
+# Development / test dependencies.
+pytest>=8.0,<9.0
+httpx>=0.27,<1.0        # used by FastAPI TestClient
+ruff>=0.4,<1.0          # optional linter/formatter

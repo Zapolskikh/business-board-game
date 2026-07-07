@@ -1,0 +1,87 @@
+{
+  "starting_money": 300,
+  "starting_experience": 0,
+  "dice_sides": 6,
+  "board_name": "board_72",
+  "starting_roles_mode": "none",
+
+  "start_bonus": [200, 350, 550],
+  "start_experience": [1, 2, 3],
+  "bank_bonus": [120, 200, 320],
+  "roof_price": [100, 160, 240],
+
+  "prices": {
+    "newspaper": [150, 220, 320],
+    "casino": [220, 320, 460],
+    "station": [120, 180, 240],
+    "food": [140, 220, 340],
+    "dormitory": [160, 260, 400]
+  },
+
+  "rent": {
+    "food": [40, 70, 110],
+    "dormitory": [50, 90, 140]
+  },
+
+  "casino": {
+    "base_bet": [60, 100, 160],
+    "mafia_loss_multiplier": 0.5
+  },
+  "station": {
+    "fare": [40, 70, 110],
+    "capitalist_buyout_multiplier": 2
+  },
+  "newspaper": {
+    "capitalist_pay_owner": [50, 80, 120]
+  },
+  "business_school": {
+    "cost": [80, 120, 180],
+    "exp_gain": [2, 3, 4]
+  },
+  "government": {
+    "fee": [50, 80, 120],
+    "subsidy": [120, 200, 300],
+    "mafia_fine": [150, 240, 360]
+  },
+  "checkpoint": {
+    "fine_base": [40, 70, 110],
+    "fine_big": [150, 240, 360]
+  },
+  "ambush": {
+    "capitalist_ransom": [120, 200, 320]
+  },
+  "auction": {
+    "min_bid": [50, 80, 120],
+    "start_fraction": 0.5,
+    "increment_fraction": 0.25,
+    "bid_step": 25
+  },
+  "taxi": {
+    "price": [60, 90, 130]
+  },
+  "jail": {
+    "experience_loss": [2, 3, 4]
+  },
+
+  "fillers": {
+    "money_plus": [90, 150, 240],
+    "money_minus": [70, 120, 190],
+    "windfall": [180, 300, 480],
+    "experience": [1, 2, 3],
+    "experience_loss": [1, 2, 3],
+    "move_forward_max": 4,
+    "move_back_max": 4,
+    "question_bonus": [90, 150, 240],
+    "question_fine": [90, 150, 240]
+  },
+
+  "victory": {
+    "max_turns": 60,
+    "target_net_worth": 4000,
+    "experience_weight": 25
+  },
+  "promotion": {
+    "enabled": true,
+    "experience_required": [0, 10, 30]
+  }
+}

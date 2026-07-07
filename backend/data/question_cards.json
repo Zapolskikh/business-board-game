@@ -1,0 +1,47 @@
+{
+  "_comment": "Data-driven '?' cards. The QuestionCell draws one at random (by weight) after a dedicated dice roll; the FAQ lists them. Effect kinds map to game_engine/cells/effects.py:apply_simple_effect. `key` reads a per-ring array from balance.json; `amount` is a flat value.",
+  "cards": [
+    {
+      "id": "windfall",
+      "title": "Нежданная прибыль",
+      "text": "Небольшая денежная премия.",
+      "weight": 2,
+      "effect": { "kind": "money_plus", "key": "fillers.question_bonus" }
+    },
+    {
+      "id": "fine",
+      "title": "Штраф",
+      "text": "Небольшой денежный штраф.",
+      "weight": 2,
+      "effect": { "kind": "money_minus", "key": "fillers.question_fine" }
+    },
+    {
+      "id": "insight",
+      "title": "Инсайт",
+      "text": "+1 опыт.",
+      "weight": 1,
+      "effect": { "kind": "exp_plus", "amount": 1 }
+    },
+    {
+      "id": "second_wind",
+      "title": "Второй шанс",
+      "text": "Дополнительный бросок кубика.",
+      "weight": 1,
+      "effect": { "kind": "extra_roll" }
+    },
+    {
+      "id": "rumor",
+      "title": "Слух",
+      "text": "+1 скандал.",
+      "weight": 1,
+      "effect": { "kind": "scandal_plus" }
+    },
+    {
+      "id": "protection",
+      "title": "Полезное знакомство",
+      "text": "Бесплатный заряд Крыши.",
+      "weight": 1,
+      "effect": { "kind": "roof_gift" }
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "business-board-game-backend"
+version = "0.1.0"
+description = "Backend, game engine and simulation for the satirical business board game prototype."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110,<1.0",
+    "uvicorn[standard]>=0.29,<1.0",
+    "pydantic>=2.6,<3.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0,<9.0", "httpx>=0.27,<1.0", "ruff>=0.4,<1.0"]
+
+[project.scripts]
+bbg-sim = "simulation.cli:main"
+
+[tool.setuptools]
+packages = ["game_engine", "simulation", "app"]
+
+[tool.setuptools.package-data]
+# Data files live outside the packages (backend/data), loaded via config_loader
+# using paths relative to the backend root, so no package-data is required here.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["B008"]  # FastAPI Depends() in defaults is idiomatic
