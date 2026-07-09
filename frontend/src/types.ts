@@ -94,6 +94,10 @@ export interface GameState {
   last_die_player_id: string | null;
   // Victory rules, used for the "round X / max" indicator above the board.
   victory: { max_turns: number; target_net_worth: number };
+  // Bounded tail of the event log (multiplayer pollers read the narrative here);
+  // `log_size` is the total event count so `event.seq` stays absolute/stable.
+  log?: GameEvent[];
+  log_size?: number;
 }
 
 export interface GameEvent {
@@ -101,6 +105,9 @@ export interface GameEvent {
   message: string;
   player_id: string | null;
   data: Record<string, unknown>;
+  // Absolute index of this event in the full server log. Stable across polls, so
+  // the UI can tell a genuinely new move from a repeated one when observing.
+  seq?: number;
 }
 
 // Payload of a "player_moved" event — drives the token animation on the board.

@@ -1,7 +1,7 @@
 // Root component. Owns the game state, loads static meta, and orchestrates the
 // board + panels. Keeps logic thin: every rule lives on the backend; this just
 // sends actions and re-renders the returned state.
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type PlayerInput } from "./api";
 import { Board } from "./components/Board";
 import { PlayerPanel } from "./components/PlayerPanel";
@@ -30,6 +30,11 @@ const NEGATIVE_CELL_TYPES = new Set([
   "checkpoint", "ambush", "money_minus", "scandal_plus", "role_loss", "experience_loss",
 ]);
 
+// Per-room identity is remembered in localStorage so a refresh keeps your seat
+// (keyed by game id, so a new room always asks again).
+const seatKey = (gameId: string) => `bbg:seat:${gameId}`;
+const hostKey = (gameId: string) => `bbg:host:${gameId}`;
+
 export default function App() {
   const [meta, setMeta] = useState<Meta | null>(null);
   const [state, setState] = useState<GameState | null>(null);
@@ -39,6 +44,18 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [board, setBoard] = useState("board_72");
   const [showFaq, setShowFaq] = useState(false);
+  // Multiplayer identity for the single shared room. `mySeat`: undefined = not
+  // yet decided (show the seat picker), null = spectator, string = the player id
+  // I control. `isHost`: I created the room, so this browser drives the bots.
+  const [mySeat, setMySeat] = useState<string | null | undefined>(undefined);
+  const [isHost, setIsHost] = useState(false);
+  // Host clicked "new game": suppress room auto-join so the setup screen shows.
+  const [forceSetup, setForceSetup] = useState(false);
+  // Whether the backend has a shared KV store (multiplayer works across devices).
+  const [persistent, setPersistent] = useState(true);
+  // Seq of the most recent move we already animated — stops polling from
+  // re-triggering the same walk animation on every refresh.
+  const lastAnimatedSeq = useRef<number>(-1);
 
   useEffect(() => {
     api.getMeta().then(setMeta).catch((e) => setError(e.message));
@@ -69,7 +86,7 @@ export default function App() {
   const recentMove: PlayerMovedData | null = useMemo(() => {
     for (let i = events.length - 1; i >= 0; i--) {
       if (events[i].type === "player_moved") {
-        return { seq: i, ...(events[i].data as Omit<PlayerMovedData, "seq">) };
+        return { seq: events[i].seq ?? i, ...(events[i].data as Omit<PlayerMovedData, "seq">) };
       }
     }
     return null;
@@ -98,38 +115,53 @@ export default function App() {
     return null;
   }, [events]);
 
-  // Apply an action result: update state + log, and auto-select the cell
-  // a token just landed on so its details show below the board without a click.
-  // When the result includes movement, we update events FIRST so the Board
-  // animation effect can start from the OLD player position, then we commit the
-  // new game state one frame later so the token never snaps to the destination
-  // before the hop animation gets a chance to run.
-  const applyResult = (res: { events: GameEvent[]; state: GameState }) => {
-    const moveEvent = [...res.events].reverse().find((e) => e.type === "player_moved");
-    if (moveEvent) {
-      // Step 1 – add the events so recentMove.seq changes and animation starts.
-      setEvents((prev) => [...prev, ...res.events]);
-      // Step 2 – one frame later, commit the new positions and pending decisions.
+  // Adopt a fresh authoritative state — from our own action OR from polling.
+  // Events come from the server log tail (state.log) so every client (the actor,
+  // other players, spectators) shows the same narrative and animates each token
+  // move exactly once. We commit positions one frame after the events so the walk
+  // animation starts from the OLD position instead of snapping to the target.
+  const adopt = useCallback((s: GameState) => {
+    const log = s.log && s.log.length ? s.log : null;
+    const nextEvents: GameEvent[] = log ?? [
+      { type: "game_start", message: "Игра создана. Ждём ходов…", player_id: null, data: {} },
+    ];
+    let move: GameEvent | null = null;
+    for (let i = nextEvents.length - 1; i >= 0; i--) {
+      if (nextEvents[i].type === "player_moved") {
+        move = nextEvents[i];
+        break;
+      }
+    }
+    const moveSeq = move?.seq ?? -1;
+    const isNewMove = !!move && moveSeq !== lastAnimatedSeq.current;
+
+    setEvents(nextEvents);
+    if (isNewMove && move) {
+      lastAnimatedSeq.current = moveSeq;
       window.requestAnimationFrame(() => {
-        setState(res.state);
-        if (res.state.pending_decision?.type !== MAP_PICK) {
-          setSelectedCell(`r${moveEvent.data.to_ring}s${moveEvent.data.to_slot}`);
+        setState(s);
+        if (s.pending_decision?.type !== MAP_PICK) {
+          const d = move!.data as unknown as PlayerMovedData;
+          setSelectedCell(`r${d.to_ring}s${d.to_slot}`);
         }
       });
     } else {
-      // No movement – apply everything atomically.
-      setState(res.state);
-      setEvents((prev) => [...prev, ...res.events]);
-      if (res.state.pending_decision?.type !== MAP_PICK) {
-        for (let i = res.events.length - 1; i >= 0; i--) {
-          const e = res.events[i];
-          if (e.type === "player_moved") {
-            setSelectedCell(`r${e.data.to_ring}s${e.data.to_slot}`);
-            break;
-          }
-        }
-      }
+      setState(s);
     }
+  }, []);
+
+  // Load my saved identity (seat + host flag) for a given room from localStorage.
+  const loadSeatFor = useCallback((gameId: string) => {
+    setIsHost(localStorage.getItem(hostKey(gameId)) === "1");
+    const seat = localStorage.getItem(seatKey(gameId));
+    setMySeat(seat === null ? undefined : seat === "spectator" ? null : seat);
+  }, []);
+
+  // Claim a seat (or choose to spectate) and remember it for this room.
+  const chooseSeat = (playerId: string | null) => {
+    if (!state) return;
+    localStorage.setItem(seatKey(state.game_id), playerId ?? "spectator");
+    setMySeat(playerId);
   };
 
   const startGame = async (
@@ -142,10 +174,17 @@ export default function App() {
     setError(null);
     setBoard(boardName);
     try {
-      const s = await api.createGame(players, boardName, seed, config);
-      setState(s);
-      // Seed the log with a start banner; subsequent events come from actions.
-      setEvents([{ type: "game_start", message: "Игра создана.", player_id: null, data: {} }]);
+      const s = await api.createRoom(players, boardName, seed, config);
+      // I created the room: become host (drive the bots) and take the first human
+      // seat automatically. Everyone else who opens the site joins this same room.
+      localStorage.setItem(hostKey(s.game_id), "1");
+      const firstHuman = s.players.find((p) => !p.is_bot);
+      localStorage.setItem(seatKey(s.game_id), firstHuman ? firstHuman.id : "spectator");
+      setIsHost(true);
+      setMySeat(firstHuman ? firstHuman.id : null);
+      setForceSetup(false);
+      lastAnimatedSeq.current = -1;
+      adopt(s);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -154,19 +193,16 @@ export default function App() {
   };
 
   const send = async (action: string, payload?: Record<string, unknown>) => {
-    if (!state) return;
-    // A decision is answered by the player it is addressed to (during an auction
-    // that is often NOT the current player); everything else is the current turn.
-    const actor =
-      action === "resolve_decision" && state.pending_decision
-        ? state.pending_decision.player_id
-        : state.current_player_id;
-    if (!actor) return;
+    // Only the player a turn/decision is addressed to may act; spectators never.
+    if (!state || !mySeat) return;
+    const pd = state.pending_decision;
+    const actorId = pd ? pd.player_id : state.current_player_id;
+    if (actorId !== mySeat) return;
     setBusy(true);
     setError(null);
     try {
-      const res = await api.action(state.game_id, actor, action, payload);
-      applyResult(res);
+      const res = await api.action(state.game_id, mySeat, action, payload);
+      adopt(res.state);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -174,17 +210,93 @@ export default function App() {
     }
   };
 
+  // Who is expected to act right now, and whether that is me or a bot.
+  const actorId = state?.pending_decision
+    ? state.pending_decision.player_id
+    : state?.current_player_id ?? null;
+  const actorPlayer = state?.players.find((p) => p.id === actorId) ?? null;
+  const isBotTurn = !!actorPlayer?.is_bot;
+  const isMyTurn = !!mySeat && actorId === mySeat && !isBotTurn;
+
+  // While NOT in a game, watch the shared room: as soon as the host creates it,
+  // everyone already on the page is pulled into that same game automatically.
+  useEffect(() => {
+    if (state || forceSetup) return;
+    let stop = false;
+    const check = async () => {
+      try {
+        const room = await api.getRoom();
+        if (stop) return;
+        setPersistent(room.persistent);
+        if (room.game_id) {
+          loadSeatFor(room.game_id);
+          const s = await api.getGame(room.game_id);
+          if (!stop) {
+            lastAnimatedSeq.current = -1;
+            adopt(s);
+          }
+        }
+      } catch {
+        /* ignore transient errors — keep showing setup */
+      }
+    };
+    check();
+    const timer = window.setInterval(check, 2500);
+    return () => {
+      stop = true;
+      window.clearInterval(timer);
+    };
+  }, [state, forceSetup, adopt, loadSeatFor]);
+
+  // Poll the shared state so all clients stay in sync. The party that must act
+  // (me on my turn, the host for a bot turn) is deliberately NOT polled, so the
+  // refresh never resets the bot timer or clobbers an optimistic update. Also
+  // detects a room change (host started a new game) and switches to it.
+  useEffect(() => {
+    if (!state) return;
+    const gameId = state.game_id;
+    const gameOver = state.phase === "game_over";
+    const iAmDriving = isMyTurn || (isHost && isBotTurn);
+    if (iAmDriving || gameOver || busy) return;
+    let stop = false;
+    const tick = async () => {
+      try {
+        const room = await api.getRoom();
+        if (stop) return;
+        const targetId = room.game_id && room.game_id !== gameId ? room.game_id : gameId;
+        if (targetId !== gameId) {
+          loadSeatFor(targetId);
+          lastAnimatedSeq.current = -1;
+        }
+        const s = await api.getGame(targetId);
+        if (!stop) adopt(s);
+      } catch {
+        /* ignore transient errors */
+      }
+    };
+    const timer = window.setInterval(tick, 1500);
+    return () => {
+      stop = true;
+      window.clearInterval(timer);
+    };
+  }, [state, isMyTurn, isBotTurn, isHost, busy, adopt, loadSeatFor]);
+
   // Bots play automatically: whenever the actor whose turn/decision it is happens
   // to be a bot, schedule its single next action after a short, watchable delay
   // (so token movement and dice rolls are visible). The effect re-runs after each
   // state change, stepping the bot forward until a human must act. Add a second
   // human player in setup if you want to control more than one seat.
+  // Bots play automatically, but only the HOST browser drives them (otherwise
+  // every open tab would try to make the same bot move and race each other).
+  // Non-host clients simply observe the result via polling. If the host leaves,
+  // the bots stop — an acceptable trade-off for this prototype.
   useEffect(() => {
+    if (!isHost) return;
     if (!state || busy || state.phase === "game_over") return;
     const s = state;
-    const actorId = s.pending_decision ? s.pending_decision.player_id : s.current_player_id;
-    const actor = s.players.find((p) => p.id === actorId);
-    if (!actor?.is_bot) return;
+    const botActorId = s.pending_decision ? s.pending_decision.player_id : s.current_player_id;
+    const botActor = s.players.find((p) => p.id === botActorId);
+    if (!botActor?.is_bot) return;
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       if (cancelled) return;
@@ -201,11 +313,11 @@ export default function App() {
       }
       setBusy(true);
       try {
-        const res = await api.action(s.game_id, actor.id, action, payload);
+        const res = await api.action(s.game_id, botActor.id, action, payload);
         // Extra pause after the action so the player can read what happened
         // before the board updates to the next bot turn.
         await new Promise((r) => window.setTimeout(r, 900));
-        applyResult(res);
+        adopt(res.state);
       } catch (e) {
         setError((e as Error).message);
       } finally {
@@ -217,7 +329,7 @@ export default function App() {
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, busy]);
+  }, [state, busy, isHost]);
 
   if (!meta) {
     return <div className="loading">{error ? `Ошибка: ${error}` : "Загрузка…"}</div>;
@@ -226,6 +338,10 @@ export default function App() {
   if (!state) {
     return (
       <div className="app">
+        <p className="room-hint">
+          🟢 Общая комната: все, кто откроют этот адрес, попадут в одну игру.
+          {!persistent && " (локальный режим — общая память только внутри одного процесса)"}
+        </p>
         <GameSetup busy={busy} onStart={startGame} />
         <SimPanel board={board} />
         {error && <p className="error banner">{error}</p>}
@@ -238,22 +354,41 @@ export default function App() {
       <header className="topbar">
         <h1>Сатирическая бизнес-игра</h1>
         <div className="topbar-actions">
+          <IdentityBadge
+            state={state}
+            mySeat={mySeat}
+            isHost={isHost}
+            color={mySeat ? playerColors[mySeat] : undefined}
+            onChange={() => setMySeat(undefined)}
+          />
           <button className="btn small ghost" onClick={() => setShowFaq(true)}>
             📖 Справочник
           </button>
-          <button className="btn small" onClick={() => setState(null)}>
-            ← Новая игра
-          </button>
+          {isHost && (
+            <button
+              className="btn small"
+              onClick={() => {
+                setForceSetup(true);
+                setState(null);
+              }}
+            >
+              ← Новая игра
+            </button>
+          )}
         </div>
       </header>
 
       {showFaq && <Faq meta={meta} onClose={() => setShowFaq(false)} />}
 
+      {mySeat === undefined && (
+        <SeatPicker state={state} colors={playerColors} onPick={chooseSeat} />
+      )}
+
       {error && <p className="error banner">{error}</p>}
 
       <div className="layout">
         <aside className="col-left">
-          <PlayerPanel state={state} roles={meta.roles} playerColors={playerColors} />
+          <PlayerPanel state={state} roles={meta.roles} playerColors={playerColors} mySeat={mySeat ?? null} />
           {state.last_die != null && (() => {
             const roller = state.players.find((p) => p.id === state.last_die_player_id);
             const faces = ["·", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
@@ -268,6 +403,7 @@ export default function App() {
             state={state}
             roles={meta.roles}
             busy={busy}
+            canAct={isMyTurn}
             selectedCell={selectedCell}
             onRoll={() => send("roll_dice")}
             onResolve={(optionId) => send("resolve_decision", { option_id: optionId })}
@@ -328,3 +464,78 @@ function pickBotOption(ids: string[], state?: GameState, isMapPick?: boolean): s
   const final = pool.length > 0 ? pool : ids;
   return final[Math.floor(Math.random() * final.length)];
 }
+
+// Small badge in the top bar showing which player you control in the shared room
+// (or that you are a spectator), with a "change" button to reopen the picker.
+function IdentityBadge({
+  state,
+  mySeat,
+  isHost,
+  color,
+  onChange,
+}: {
+  state: GameState;
+  mySeat: string | null | undefined;
+  isHost: boolean;
+  color?: string;
+  onChange: () => void;
+}) {
+  const me = mySeat ? state.players.find((p) => p.id === mySeat) : null;
+  return (
+    <span className="identity-badge" title="Кем вы играете в этой комнате">
+      {me ? (
+        <>
+          <span className="dot" style={{ background: color }} />
+          Вы: <strong>{me.name}</strong>
+        </>
+      ) : (
+        <>👁️ Наблюдатель</>
+      )}
+      {isHost && <span className="badge host-badge">хост</span>}
+      <button className="btn tiny ghost" onClick={onChange}>
+        сменить
+      </button>
+    </span>
+  );
+}
+
+// Full-screen overlay for picking which player you control when joining a room.
+// Seats are not reserved server-side (trusted test group), so players just agree
+// who takes which — the engine still blocks acting out of turn either way.
+function SeatPicker({
+  state,
+  colors,
+  onPick,
+}: {
+  state: GameState;
+  colors: Record<string, string>;
+  onPick: (playerId: string | null) => void;
+}) {
+  const humans = state.players.filter((p) => !p.is_bot);
+  return (
+    <div className="seat-overlay">
+      <div className="seat-picker">
+        <h2>Выберите игрока</h2>
+        <p className="hint">
+          Это общая комната. Займите свободное место или смотрите со стороны.
+          Договоритесь, кто за кого — одно место могут занять двое.
+        </p>
+        <div className="seat-list">
+          {humans.map((p) => (
+            <button key={p.id} className="btn seat" onClick={() => onPick(p.id)}>
+              <span className="dot" style={{ background: colors[p.id] }} />
+              {p.name}
+            </button>
+          ))}
+          {humans.length === 0 && (
+            <p className="hint">В этой игре нет мест для людей — только боты.</p>
+          )}
+        </div>
+        <button className="btn ghost full-width" onClick={() => onPick(null)}>
+          👁️ Наблюдать
+        </button>
+      </div>
+    </div>
+  );
+}
+

@@ -251,7 +251,16 @@ class GameState:
         exp = player.experience * self.config.victory.experience_weight
         return player.money + owned + exp
 
-    def to_dict(self, include_board: bool = True) -> dict[str, Any]:
+    def to_dict(self, include_board: bool = True, log_tail: int = 80) -> dict[str, Any]:
+        # Include a bounded tail of the event log so clients that only *poll* the
+        # state (other players / spectators in multiplayer) still get the
+        # narrative and can drive the token-move animation. ``seq`` is the
+        # event's absolute index in the full log so it stays stable across polls
+        # even once the tail starts dropping old events; ``log_size`` is the
+        # total count. The acting client no longer needs the per-action delta.
+        events = self.log.events
+        base = max(0, len(events) - log_tail)
+        log = [{**e.to_dict(), "seq": base + i} for i, e in enumerate(events[base:])]
         data: dict[str, Any] = {
             "game_id": self.game_id,
             "players": [p.to_dict() for p in self.players],
@@ -267,6 +276,8 @@ class GameState:
             "net_worth": {p.id: self.net_worth(p) for p in self.players},
             "last_die": self.last_die,
             "last_die_player_id": self.last_die_player_id,
+            "log": log,
+            "log_size": len(events),
             "victory": {
                 "max_turns": self.config.victory.max_turns,
                 "target_net_worth": self.config.victory.target_net_worth,

@@ -30,6 +30,21 @@ export interface PlayerInput {
 export const api = {
   getMeta: () => request<Meta>("/meta"),
 
+  // The single shared room everyone joins. `game_id` is null when no game exists
+  // yet; `persistent` is false on a local dev backend without KV configured.
+  getRoom: () => request<{ game_id: string | null; persistent: boolean }>("/room"),
+
+  createRoom: (
+    players: PlayerInput[],
+    board: string,
+    seed?: number,
+    config?: Record<string, unknown>,
+  ) =>
+    request<{ state: GameState }>("/room", {
+      method: "POST",
+      body: JSON.stringify({ players, board, seed, config }),
+    }).then((r) => r.state),
+
   createGame: (
     players: PlayerInput[],
     board: string,

@@ -6,9 +6,11 @@ interface Props {
   state: GameState;
   roles: RoleMeta[];
   playerColors: Record<string, string>;
+  // The seat this browser controls in a shared game (marked with a "вы" badge).
+  mySeat?: string | null;
 }
 
-export function PlayerPanel({ state, roles, playerColors }: Props) {
+export function PlayerPanel({ state, roles, playerColors, mySeat }: Props) {
   const roleTitle = (roleId: string | null) =>
     roles.find((r) => r.id === roleId)?.title ?? "без роли";
   const n = state.players.length;
@@ -27,6 +29,7 @@ export function PlayerPanel({ state, roles, playerColors }: Props) {
               <span className="dot" style={{ background: playerColors[p.id] }} />
               <strong>{p.name}</strong>
               {p.is_bot && <span className="badge">бот</span>}
+              {p.id === mySeat && <span className="badge you-badge">вы</span>}
             </div>
             <div className="player-stats">
               <span>💰 {p.money}$</span>

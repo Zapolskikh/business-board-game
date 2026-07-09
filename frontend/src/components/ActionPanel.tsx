@@ -7,12 +7,15 @@ interface Props {
   state: GameState;
   roles: RoleMeta[];
   busy: boolean;
+  // True only when it is THIS browser's seat to act (roll or resolve). Spectators
+  // and players waiting for their turn get disabled controls.
+  canAct: boolean;
   selectedCell: string | null;
   onRoll: () => void;
   onResolve: (optionId: string) => void;
 }
 
-export function ActionPanel({ state, roles, busy, selectedCell, onRoll, onResolve }: Props) {
+export function ActionPanel({ state, roles, busy, canAct, selectedCell, onRoll, onResolve }: Props) {
   if (state.phase === "game_over") {
     const winner = state.players.find((p) => p.id === state.winner_id);
     return (
@@ -43,7 +46,7 @@ export function ActionPanel({ state, roles, busy, selectedCell, onRoll, onResolv
       )}
 
       {state.phase === "await_roll" && (
-        <button className="btn primary full-width" onClick={onRoll} disabled={busy || !!actor?.is_bot}>
+        <button className="btn primary full-width" onClick={onRoll} disabled={busy || !canAct}>
           🎲 Бросить кубик
         </button>
       )}
@@ -59,7 +62,7 @@ export function ActionPanel({ state, roles, busy, selectedCell, onRoll, onResolv
                   key={opt.id}
                   className="btn option"
                   onClick={() => onResolve(opt.id)}
-                  disabled={busy || !!actor?.is_bot}
+                  disabled={busy || !canAct}
                   title={opt.hint || undefined}
                 >
                   {opt.rolls_dice && <span className="dice-badge">🎲</span>}
@@ -81,7 +84,7 @@ export function ActionPanel({ state, roles, busy, selectedCell, onRoll, onResolv
           prompt={pd.prompt}
           selectedCell={selectedCell}
           busy={busy}
-          isBot={!!actor?.is_bot}
+          canAct={canAct}
           onResolve={onResolve}
         />
       )}
@@ -95,14 +98,14 @@ function MapPickControls({
   prompt,
   selectedCell,
   busy,
-  isBot,
+  canAct,
   onResolve,
 }: {
   ctx: MapPickContext;
   prompt: string;
   selectedCell: string | null;
   busy: boolean;
-  isBot: boolean;
+  canAct: boolean;
   onResolve: (optionId: string) => void;
 }) {
   const candidates = ctx.candidates ?? {};
@@ -111,8 +114,8 @@ function MapPickControls({
   let confirmLabel = ctx.confirm_label ?? "Подтвердить";
   let confirmClass = "btn primary";
   let confirmDisabled = true;
-  if (isBot) {
-    confirmLabel = "Ход бота — играет автоматически…";
+  if (!canAct) {
+    confirmLabel = "Сейчас не ваш ход";
     confirmClass = "btn";
   } else if (!selectedCell) {
     confirmLabel = "Выберите клетку на карте";
@@ -140,7 +143,7 @@ function MapPickControls({
         >
           {confirmLabel}
         </button>
-        <button className="btn option" disabled={busy} onClick={() => onResolve(CANCEL_OPTION)}>
+        <button className="btn option" disabled={busy || !canAct} onClick={() => onResolve(CANCEL_OPTION)}>
           {ctx.cancel_label ?? "Отмена"}
         </button>
       </div>

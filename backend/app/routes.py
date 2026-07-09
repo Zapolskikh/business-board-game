@@ -59,6 +59,27 @@ def create_game(body: CreateGameIn) -> GameStateResponse:
     return GameStateResponse(state=state.to_dict())
 
 
+@router.get("/room")
+def get_room() -> dict:
+    """Return the id of the single shared game everyone joins (or ``None``).
+
+    ``persistent`` tells the UI whether a shared KV backend is configured; when
+    it is false (local dev without KV) the room still works within one process.
+    """
+    return {"game_id": manager.get_room(), "persistent": manager.persistent}
+
+
+@router.post("/room", response_model=GameStateResponse)
+def create_room(body: CreateGameIn) -> GameStateResponse:
+    """Create the shared game and make it the active room (overwrites any old one)."""
+    players = [p.model_dump() for p in body.players]
+    state = manager.create(
+        players, board=body.board, seed=body.seed, config_overrides=body.config
+    )
+    manager.set_room(state.game_id)
+    return GameStateResponse(state=state.to_dict())
+
+
 @router.get("/games/{game_id}", response_model=GameStateResponse)
 def get_game(game_id: str) -> GameStateResponse:
     try:
@@ -78,6 +99,8 @@ def post_action(game_id: str, body: ActionIn) -> ActionResult:
         events = engine.apply_action(body.player_id, body.action, body.payload)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    # In KV mode the engine mutated a freshly-unpickled copy, so persist it back.
+    manager.save(engine.state)
     return ActionResult(
         events=[e.to_dict() for e in events],
         state=engine.state.to_dict(),
