@@ -113,6 +113,7 @@ export function CellInfo({ state, meta, selectedCell, candidate }: Props) {
         <span>{cell.buyable ? "покупаемая" : "не покупается"}</span>
         {cell.buyable && <span>Цена: {cell.price}$</span>}
         {cell.buyable && <span>Владелец: {owner?.name ?? "свободно"}</span>}
+        {cell.buyable && <span>{cell.upgraded ? "Улучшена" : "Без улучшения"}</span>}
       </div>
 
       {cellMeta?.ring_titles?.length ? (

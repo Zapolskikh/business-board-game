@@ -21,6 +21,8 @@ from __future__ import annotations
 
 # Importing the cells package registers all cell behaviours via decorators.
 import game_engine.cells  # noqa: F401
+from game_engine.cells.cards import CardSystem
+from game_engine.cells.common import upgrade_cost
 from game_engine.config import Balance, GameConfig
 from game_engine.enums import ActionType, Phase, Role
 from game_engine.events import GameEvent
@@ -75,6 +77,8 @@ class GameEngine:
         elif action_type == ActionType.RESOLVE_DECISION:
             self._require_phase(Phase.AWAIT_DECISION)
             self._do_resolve(payload.get("option_id"))
+        elif action_type == ActionType.USE_CARD:
+            self._do_use_card(player_id, str(payload.get("card_id", "")))
         else:
             raise ValueError(f"Неизвестное действие: {action_type}")
 
@@ -87,6 +91,12 @@ class GameEngine:
     # ---- turn flow -------------------------------------------------------
     def _do_roll(self, player: Player) -> None:
         die = self.rng.roll_die(self.config.dice_sides)
+        if player.flags.get("navigator"):
+            player.flags["navigator"] -= 1
+            if player.flags["navigator"] <= 0:
+                player.flags.pop("navigator", None)
+            die = min(self.config.dice_sides, die + 1)
+            self.log_event("card", f"{player.name}: Навигатор меняет бросок на {die}.", player.id, die=die)
         self.state.last_die = die
         self.state.last_die_player_id = player.id
         self.log_event("dice_rolled", f"{player.name} бросает кубик: {die}", player.id, die=die)
@@ -118,7 +128,23 @@ class GameEngine:
         cell = self.state.board.by_id(decision.cell_id) if decision.cell_id else None
         behaviour = get_cell_behaviour(decision.handler)
         behaviour.on_resolve(self, actor, cell, decision, option)
+        if decision.handler == "cards" and self.state.pending_decision is None:
+            self.state.phase = Phase.AWAIT_ROLL
+            return
         self._finish_step()
+
+    def _do_use_card(self, player_id: str, card_id: str) -> None:
+        self._require_phase(Phase.AWAIT_ROLL)
+        player = self.state.player_by_id(player_id)
+        if player.id != self.state.current_player.id:
+            raise ValueError("Карту можно применить только в свой ход перед броском.")
+        if card_id not in player.cards:
+            raise ValueError("Такой карты нет в руке.")
+        CardSystem().start_card(self, player, card_id, from_hand=True)
+        if self.state.pending_decision is not None:
+            self.state.phase = Phase.AWAIT_DECISION
+        else:
+            self.state.phase = Phase.AWAIT_ROLL
 
     def _activate_landing(self, player: Player) -> None:
         cell = self.state.board.cell_at(player.ring, player.position)
@@ -193,11 +219,16 @@ class GameEngine:
             crossings, final = divmod(player.position + steps, size)
             player.position = final
             for _ in range(crossings):
-                self.grant_money(
-                    player,
-                    self.balance.ring_value("start_bonus", player.ring),
-                    reason="Проход через Старт",
-                )
+                start_bonus = self.balance.ring_value("start_bonus", player.ring)
+                if player.loan_payments_left > 0:
+                    player.loan_payments_left -= 1
+                    self.log_event(
+                        "loan_payment",
+                        f"{player.name}: доход за Старт ({start_bonus}$) уходит в банк по кредиту. Осталось: {player.loan_payments_left}.",
+                        player.id,
+                    )
+                else:
+                    self.grant_money(player, start_bonus, reason="Проход через Старт")
                 exp = int(self.balance.ring_value("start_experience", player.ring))
                 self.grant_experience(player, exp, reason="Проход через Старт")
                 player.bump("start_passes")
@@ -314,6 +345,12 @@ class GameEngine:
         amount = int(amount)
         if amount <= 0:
             return
+        if player.flags.get("next_income_x2"):
+            player.flags["next_income_x2"] -= 1
+            if player.flags["next_income_x2"] <= 0:
+                player.flags.pop("next_income_x2", None)
+            amount *= 2
+            reason = f"{reason}, Черная бухгалтерия x2"
         player.money += amount
         self.log_event(
             "money_gained", f"{player.name}: +{amount}$ ({reason})", player.id, amount=amount
@@ -329,6 +366,12 @@ class GameEngine:
         """
         amount = int(amount)
         if amount <= 0:
+            return True
+        if player.flags.get("payment_shield"):
+            player.flags["payment_shield"] -= 1
+            if player.flags["payment_shield"] <= 0:
+                player.flags.pop("payment_shield", None)
+            self.log_event("payment_blocked", f"{player.name}: платеж {amount}$ отменен картой.", player.id, amount=amount)
             return True
         if player.money >= amount:
             player.money -= amount
@@ -375,17 +418,43 @@ class GameEngine:
             if c.id not in player.insured_cells
         ]
         if owned:
-            cheapest = min(owned, key=lambda c: c.price)
-            cheapest.owner_id = None
-            refund = cheapest.price // 2
-            player.money += refund
-            self.log_event(
-                "bankruptcy",
-                f"{player.name} теряет «{cheapest.title}» и получает {refund}$ отката.",
-                player.id,
-                cell_id=cheapest.id,
-                refund=refund,
-            )
+            upgraded = [c for c in owned if c.state.get("upgraded")]
+            full_refund = bool(player.flags.get("bankruptcy_full_refund"))
+            if full_refund:
+                player.flags["bankruptcy_full_refund"] -= 1
+                if player.flags["bankruptcy_full_refund"] <= 0:
+                    player.flags.pop("bankruptcy_full_refund", None)
+            if upgraded:
+                cheapest = min(upgraded, key=lambda c: c.price + int(c.state.get("upgrade_cost", c.price)))
+                value = cheapest.price + int(cheapest.state.get("upgrade_cost", cheapest.price))
+                cheapest.state.pop("upgraded", None)
+                cheapest.state.pop("upgrade_cost", None)
+                refund = value if full_refund else value // 2
+                player.money += refund
+                self.log_event(
+                    "bankruptcy",
+                    f"{player.name} теряет улучшение «{cheapest.title}» и получает {refund}$ отката.",
+                    player.id,
+                    cell_id=cheapest.id,
+                    refund=refund,
+                )
+            else:
+                cheapest = min(owned, key=lambda c: c.price)
+                cheapest.owner_id = None
+                value = cheapest.price
+                refund = value if full_refund else value // 2
+                player.money += refund
+                self.log_event(
+                    "bankruptcy",
+                    f"{player.name} теряет «{cheapest.title}» и получает {refund}$ отката.",
+                    player.id,
+                    cell_id=cheapest.id,
+                    refund=refund,
+                )
+        elif player.loan_payments_left > 0:
+            player.scandals += 1
+            player.bump("scandals_received")
+            self.log_event("scandal", f"{player.name} получает 1 скандал (банкротство с кредитом).", player.id, count=1)
         if player.experience > 0:
             player.experience -= 1
         self.log_event("bankruptcy", f"{player.name} проходит банкротство.", player.id)
@@ -472,15 +541,25 @@ class GameEngine:
         holder = self.state.role_holder(role_id)
         if holder is not None and holder.id != player.id:
             return False
+        old_role = player.role
         if player.role and player.role != role_id:
             self.remove_role(player, reason="смена роли")
         player.role = role_id
         player.bump("roles_taken")
         self.log_event("role_taken", f"{player.name} берёт роль: {role_id}.", player.id, role=role_id)
+        if old_role != role_id:
+            from game_engine.cells.role_power import start_role_power
+            start_role_power(self, player, role_id)
         return True
 
     def remove_role(self, player: Player, reason: str = "") -> None:
         if not player.role:
+            return
+        if player.flags.get("lawyers"):
+            player.flags["lawyers"] -= 1
+            if player.flags["lawyers"] <= 0:
+                player.flags.pop("lawyers", None)
+            self.log_event("role_saved", f"{player.name}: Юристы отменяют потерю роли.", player.id, role=player.role)
             return
         lost = player.role
         player.role = None

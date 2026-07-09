@@ -1,7 +1,7 @@
 // Left panel (action area): shows roll-dice / decision options / game-over.
 // Redundant turn info (player name, round) is removed — the blinking player card
 // in PlayerPanel already shows whose turn it is.
-import { CANCEL_OPTION, MAP_PICK, type GameState, type MapPickContext, type RoleMeta } from "../types";
+import { CANCEL_OPTION, MAP_PICK, type GameState, type MapPickContext, type QuestionCard, type RoleMeta } from "../types";
 
 interface Props {
   state: GameState;
@@ -11,11 +11,13 @@ interface Props {
   // and players waiting for their turn get disabled controls.
   canAct: boolean;
   selectedCell: string | null;
+  cards: QuestionCard[];
   onRoll: () => void;
   onResolve: (optionId: string) => void;
+  onUseCard: (cardId: string) => void;
 }
 
-export function ActionPanel({ state, roles, busy, canAct, selectedCell, onRoll, onResolve }: Props) {
+export function ActionPanel({ state, roles, busy, canAct, selectedCell, cards, onRoll, onResolve, onUseCard }: Props) {
   if (state.phase === "game_over") {
     const winner = state.players.find((p) => p.id === state.winner_id);
     return (
@@ -30,6 +32,8 @@ export function ActionPanel({ state, roles, busy, canAct, selectedCell, onRoll, 
   const isMapPick = pd?.type === MAP_PICK;
   const actorId = pd ? pd.player_id : state.current_player_id;
   const actor = state.players.find((p) => p.id === actorId);
+  const currentHand = actor?.cards ?? [];
+  const cardById = Object.fromEntries(cards.map((c) => [c.id, c]));
   // During auctions the bid request goes to a different player than the active one.
   const addressedElsewhere = !!pd && pd.player_id !== state.current_player_id;
 
@@ -46,9 +50,31 @@ export function ActionPanel({ state, roles, busy, canAct, selectedCell, onRoll, 
       )}
 
       {state.phase === "await_roll" && (
-        <button className="btn primary full-width" onClick={onRoll} disabled={busy || !canAct}>
-          🎲 Бросить кубик
-        </button>
+        <>
+          {currentHand.length > 0 && (
+            <div className="hand-panel">
+              <div className="hand-title">Карты в руке</div>
+              {currentHand.map((cardId, idx) => {
+                const card = cardById[cardId];
+                return (
+                  <button
+                    key={`${cardId}-${idx}`}
+                    className="btn option card-btn"
+                    onClick={() => onUseCard(cardId)}
+                    disabled={busy || !canAct}
+                    title={card?.text}
+                  >
+                    {card?.title ?? cardId}
+                    {card?.text && <span className="opt-hint">{card.text}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <button className="btn primary full-width" onClick={onRoll} disabled={busy || !canAct}>
+            🎲 Бросить кубик
+          </button>
+        </>
       )}
 
       {state.phase === "await_decision" && pd && !isMapPick && (

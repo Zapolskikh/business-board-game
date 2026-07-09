@@ -3,7 +3,7 @@
   "cells": {
     "start": { "title": "Старт", "buyable": false, "tags": [], "color": "#2ea043" },
     "bank": { "title": "Банк", "buyable": false, "tags": ["capitalist", "politician", "fraudster"], "color": "#3fb950" },
-    "casino": { "title": "Казино", "buyable": true, "price_key": "prices.casino", "tags": ["fraudster", "mafia", "capitalist"], "color": "#db61a2" },
+    "casino": { "title": "Казино", "buyable": true, "price_key": "prices.casino", "ring_titles": ["Лотерея", "Игровые автоматы", "Казино"], "tags": ["fraudster", "mafia", "capitalist"], "color": "#db61a2" },
     "newspaper": { "title": "Газета", "buyable": true, "price_key": "prices.newspaper", "tags": ["journalist", "capitalist"], "color": "#8957e5" },
     "station": { "title": "Вокзал", "buyable": true, "price_key": "prices.station", "tags": ["fraudster", "capitalist", "mafia"], "color": "#1f6feb" },
     "food": { "title": "Еда", "buyable": true, "price_key": "prices.food", "ring_titles": ["Кофейня", "Забегаловка", "Ресторан"], "tags": [], "color": "#e8833a" },
@@ -30,6 +30,7 @@
     "roll_again": { "title": "Ещё бросок", "buyable": false, "tags": [], "color": "#3fb950" },
     "move_forward": { "title": "Вперёд на N", "buyable": false, "tags": [], "color": "#56d364" },
     "move_back": { "title": "Назад на N", "buyable": false, "tags": [], "color": "#e0823d" },
-    "question": { "title": "Карта ?", "buyable": false, "tags": [], "color": "#a371f7" }
+    "question": { "title": "Карта в руку", "buyable": false, "tags": [], "color": "#a371f7" },
+    "question_instant": { "title": "Событие ?", "buyable": false, "tags": [], "color": "#f0883e" }
   }
 }

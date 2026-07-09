@@ -13,6 +13,7 @@ from game_engine.cells.common import (
     MapCandidate,
     buy_options,
     do_buy,
+    do_upgrade,
     map_pick_decision,
     other_players,
     player_options,
@@ -27,6 +28,11 @@ if TYPE_CHECKING:
     from game_engine.models import BoardCell, Player
 
 
+def _has_vertical_set(engine: GameEngine, player: Player, type_key: str) -> bool:
+    rings = {c.ring for c in engine.state.board.cells_owned_by(player.id) if c.type == type_key}
+    return len(rings) >= engine.state.board.ring_count
+
+
 # ---------------------------------------------------------------------------
 # Newspaper (Газета)
 # ---------------------------------------------------------------------------
@@ -38,6 +44,16 @@ class NewspaperCell(BaseCell):
             return
         if cell.owner_id == player.id:
             self._reduce_scandal(engine, player)
+            if not player.is_bot and not cell.state.get("upgraded"):
+                engine.request_decision(Decision(
+                    DecisionType.YES_NO,
+                    player.id,
+                    f"Улучшить «{cell.title}»?",
+                    [DecisionOption("upgrade", "Улучшить"), DecisionOption("skip", "Не улучшать")],
+                    handler=cell.type,
+                    cell_id=cell.id,
+                    context={"kind": "upgrade"},
+                ))
             return
 
         owner = engine.state.player_by_id(cell.owner_id)
@@ -80,6 +96,9 @@ class NewspaperCell(BaseCell):
         if kind == "buy":
             if option.id == "buy":
                 do_buy(engine, player, cell)
+        elif kind == "upgrade":
+            if option.id == "upgrade":
+                do_upgrade(engine, player, cell)
         elif kind == "journalist":
             target = engine.state.player_by_id(option.data["player_id"])
             engine.add_scandal(target, 1, reason="Журналист")
@@ -143,6 +162,16 @@ class CasinoCell(BaseCell):
             )
             return
         if cell.owner_id == player.id:
+            if not player.is_bot and not cell.state.get("upgraded"):
+                engine.request_decision(Decision(
+                    DecisionType.YES_NO,
+                    player.id,
+                    f"Улучшить «{cell.title}»?",
+                    [DecisionOption("upgrade", "Улучшить"), DecisionOption("skip", "Не улучшать")],
+                    handler=cell.type,
+                    cell_id=cell.id,
+                    context={"kind": "upgrade"},
+                ))
             return
 
         if self.has_role(player, Role.CAPITALIST):
@@ -156,7 +185,6 @@ class CasinoCell(BaseCell):
                                        hint="Удвоить ставку и бросить кубик.", role="capitalist"),
                         DecisionOption("single", "Играть обычной ставкой", rolls_dice=True,
                                        hint="Обычная ставка, бросок кубика.", role="capitalist"),
-                        DecisionOption("skip", "Не играть"),
                     ],
                     handler=cell.type,
                     cell_id=cell.id,
@@ -164,16 +192,18 @@ class CasinoCell(BaseCell):
                 )
             )
         else:
+            options = [
+                DecisionOption("play", "Играть", rolls_dice=True,
+                               hint="Нужен бросок 5-6 (Аферист 3-6), чтобы выиграть.")
+            ]
+            if self.has_role(player, Role.POLITICIAN) or self.has_role(player, Role.MILITARY):
+                options.append(DecisionOption("skip", "Отказаться от игры", role=player.role or ""))
             engine.request_decision(
                 Decision(
                     type=DecisionType.CHOOSE_OPTION,
                     player_id=player.id,
-                    prompt="Сыграть в чужом Казино?",
-                    options=[
-                        DecisionOption("play", "Играть", rolls_dice=True,
-                                       hint="Нужен бросок 5-6 (Аферист 3-6), чтобы выиграть."),
-                        DecisionOption("skip", "Не играть"),
-                    ],
+                    prompt="Чужая игровая клетка: игра обязательна (Политик/Военный могут отказаться).",
+                    options=options,
                     handler=cell.type,
                     cell_id=cell.id,
                     context={"kind": "play", "owner_id": cell.owner_id},
@@ -188,6 +218,9 @@ class CasinoCell(BaseCell):
             elif option.id == "play_bank":
                 self._offer_roll(engine, player, cell, owner_id=None, multiplier=1)
             # "skip" -> nothing
+        elif kind == "upgrade":
+            if option.id == "upgrade":
+                do_upgrade(engine, player, cell)
         elif kind == "play":
             if option.id == "play":
                 self._offer_roll(engine, player, cell, decision.context["owner_id"], multiplier=1)
@@ -234,6 +267,10 @@ class CasinoCell(BaseCell):
             loss = bet
             if self.has_role(player, Role.MAFIA):
                 loss = int(bet * engine.balance.get("casino.mafia_loss_multiplier", 0.5))
+            if owner is not None and cell.state.get("upgraded"):
+                loss *= 2
+            if owner is not None and _has_vertical_set(engine, owner, "casino"):
+                loss *= 2
             engine.charge_money(player, loss, reason="проигрыш в Казино", to_player=owner)
 
 
@@ -270,6 +307,8 @@ class StationCell(BaseCell):
             options.append(
                 DecisionOption("buy", f"Купить «{cell.title}» за {cell.price}$", {"cell_id": cell.id})
             )
+        if not player.is_bot and cell.owner_id == player.id and not cell.state.get("upgraded"):
+            options.append(DecisionOption("upgrade", "Улучшить Вокзал"))
         # After arriving via station-travel this turn, you may act on the cell but
         # not immediately hop again (prevents infinite station->station chaining).
         chained = bool(player.flags.get("no_station"))
@@ -339,6 +378,8 @@ class StationCell(BaseCell):
         if kind == "menu":
             if option.id == "buy":
                 do_buy(engine, player, cell)
+            elif option.id == "upgrade":
+                do_upgrade(engine, player, cell)
             elif option.id == "travel":
                 self._offer_travel(engine, player, cell, decision.context["cost"])
             # "stay" -> nothing happens
@@ -365,14 +406,30 @@ class RentCell(BaseCell):
             self._offer_buy(engine, player, cell)
             return
         if cell.owner_id == player.id:
+            if not player.is_bot and not cell.state.get("upgraded"):
+                engine.request_decision(Decision(
+                    DecisionType.YES_NO,
+                    player.id,
+                    f"Улучшить «{cell.title}»?",
+                    [DecisionOption("upgrade", "Улучшить"), DecisionOption("skip", "Не улучшать")],
+                    handler=cell.type,
+                    cell_id=cell.id,
+                    context={"kind": "upgrade"},
+                ))
             return
         owner = engine.state.player_by_id(cell.owner_id)
         rent = int(engine.balance.ring_value(self.rent_key, cell.ring))
+        if cell.state.get("upgraded"):
+            rent *= int(engine.balance.get("upgrades.rent_multiplier", 2))
+        if _has_vertical_set(engine, owner, cell.type):
+            rent *= int(engine.balance.get("portfolio.rent_multiplier", 2))
         engine.transfer_money(player, owner, rent, reason=f"аренда «{cell.title}»")
 
     def on_resolve(self, engine, player, cell, decision, option) -> None:
         if option.id == "buy":
             do_buy(engine, player, cell)
+        elif option.id == "upgrade":
+            do_upgrade(engine, player, cell)
 
     def _offer_buy(self, engine: GameEngine, player: Player, cell: BoardCell) -> None:
         rent = int(engine.balance.ring_value(self.rent_key, cell.ring))

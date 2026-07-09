@@ -31,6 +31,17 @@
     "fare": [30, 55, 85],
     "capitalist_buyout_multiplier": 2
   },
+  "upgrades": {
+    "cost_multiplier": 1.0,
+    "rent_multiplier": 2
+  },
+  "portfolio": {
+    "rent_multiplier": 2
+  },
+  "loan": {
+    "start_multiplier": 4,
+    "term_starts": 4
+  },
   "newspaper": {
     "capitalist_pay_owner": [40, 65, 100]
   },

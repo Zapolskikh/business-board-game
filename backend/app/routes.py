@@ -47,6 +47,9 @@ def get_meta() -> dict:
             "taxi": balance.get("taxi", {}),
             "station": balance.get("station", {}),
             "auction": balance.get("auction", {}),
+            "upgrades": balance.get("upgrades", {}),
+            "portfolio": balance.get("portfolio", {}),
+            "loan": balance.get("loan", {}),
         },
     }
 

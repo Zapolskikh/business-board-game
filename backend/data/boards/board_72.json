@@ -52,6 +52,7 @@
       "roof_gift": 1,
       "windfall": 1,
       "experience": 1,
+      "question_instant": 1,
       "roll_again": 1
     },
     {
@@ -75,7 +76,8 @@
       "scandal_minus": 1,
       "role_loss": 1,
       "roof_gift": 1,
-      "experience": 1
+      "experience": 1,
+      "question_instant": 1
     },
     {
       "start": 1,
@@ -91,7 +93,8 @@
       "ambush": 2,
       "checkpoint": 1,
       "role": 2,
-      "windfall": 1
+      "windfall": 1,
+      "question_instant": 1
     }
   ]
 }

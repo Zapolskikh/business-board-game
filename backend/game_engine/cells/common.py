@@ -20,26 +20,55 @@ def buy_options(cell: BoardCell, skip_label: str = "Пропустить") -> li
     ]
 
 
+def upgrade_cost(engine: GameEngine, cell: BoardCell) -> int:
+    multiplier = float(engine.balance.get("upgrades.cost_multiplier", 1.0))
+    return max(1, int(round(cell.price * multiplier)))
+
+
+def upgraded_value(engine: GameEngine, cell: BoardCell) -> int:
+    return cell.price + (upgrade_cost(engine, cell) if cell.state.get("upgraded") else 0)
+
+
 def do_buy(engine: GameEngine, player: Player, cell: BoardCell) -> bool:
     """Purchase ``cell`` from the bank. Returns ``True`` on success."""
     if cell.owner_id is not None:
         return False
-    if player.money < cell.price:
+    price = cell.price
+    discount = float(player.flags.pop("next_purchase_discount", 0) or 0)
+    if discount > 0:
+        price = max(1, int(round(price * (1 - discount))))
+    if player.money < price:
         engine.log_event(
             "buy_failed",
-            f"{player.name} не может купить «{cell.title}» (нужно {cell.price}$).",
+            f"{player.name} не может купить «{cell.title}» (нужно {price}$).",
             player.id,
         )
         return False
-    engine.charge_money(player, cell.price, reason=f"покупка «{cell.title}»")
+    engine.charge_money(player, price, reason=f"покупка «{cell.title}»")
     cell.owner_id = player.id
     player.bump("properties_bought")
     engine.log_event(
         "property_bought",
-        f"{player.name} покупает «{cell.title}» за {cell.price}$.",
+        f"{player.name} покупает «{cell.title}» за {price}$.",
         player.id,
         cell_id=cell.id,
     )
+    if player.flags.get("family_business") and cell.type in {"food", "dormitory"}:
+        engine.grant_experience(player, 1, reason="Семейный бизнес")
+    return True
+
+
+def do_upgrade(engine: GameEngine, player: Player, cell: BoardCell, *, free: bool = False) -> bool:
+    if not cell.buyable or cell.owner_id != player.id or cell.state.get("upgraded"):
+        return False
+    cost = upgrade_cost(engine, cell)
+    if not free and not engine.charge_money(player, cost, reason=f"улучшение «{cell.title}»"):
+        return False
+    cell.state["upgraded"] = True
+    cell.state["upgrade_cost"] = cost
+    player.bump("properties_upgraded")
+    label = "бесплатно" if free else f"за {cost}$"
+    engine.log_event("property_upgraded", f"{player.name} улучшает «{cell.title}» {label}.", player.id, cell_id=cell.id)
     return True
 
 

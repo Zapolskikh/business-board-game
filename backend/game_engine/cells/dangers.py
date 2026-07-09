@@ -21,6 +21,12 @@ if TYPE_CHECKING:
 @register_cell("ambush")
 class AmbushCell(BaseCell):
     def on_land(self, engine: GameEngine, player: Player, cell: BoardCell) -> None:
+        if player.flags.get("detour"):
+            player.flags["detour"] -= 1
+            if player.flags["detour"] <= 0:
+                player.flags.pop("detour", None)
+            engine.log_event("card", f"{player.name} объезжает Засаду.", player.id)
+            return
         # Roof always saves you first (except Military/Capitalist who get a choice).
         if self.has_role(player, Role.MILITARY):
             self._military(engine, player, cell)
@@ -99,6 +105,12 @@ class CheckpointCell(BaseCell):
     """Rare, harsh force check. Roof is consumed instead of losing a role."""
 
     def on_land(self, engine: GameEngine, player: Player, cell: BoardCell) -> None:
+        if player.flags.get("detour"):
+            player.flags["detour"] -= 1
+            if player.flags["detour"] <= 0:
+                player.flags.pop("detour", None)
+            engine.log_event("card", f"{player.name} объезжает Блокпост.", player.id)
+            return
         fine_base = int(engine.balance.ring_value("checkpoint.fine_base", cell.ring))
         fine_big = int(engine.balance.ring_value("checkpoint.fine_big", cell.ring))
 

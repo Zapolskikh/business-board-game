@@ -24,39 +24,70 @@ if TYPE_CHECKING:
 class BankCell(BaseCell):
     def on_land(self, engine: GameEngine, player: Player, cell: BoardCell) -> None:
         bonus = int(engine.balance.ring_value("bank_bonus", cell.ring))
-        if self.has_role(player, Role.CAPITALIST):
-            engine.grant_money(player, bonus * 2, reason="Банк (Капиталист x2)")
-        elif self.has_role(player, Role.POLITICIAN):
-            engine.grant_money(player, bonus, reason="Банк")
-            engine.remove_scandal(player, reason="Банк")
-        elif self.has_role(player, Role.FRAUDSTER):
-            # Optional: the Fraudster is NOT obliged to cheat. They choose between
-            # the safe bonus and a deliberate risky roll (1-3 Jail, 4-6 double).
-            engine.request_decision(
-                roll_decision(
-                    player, cell.type, cell.id,
-                    f"Банк. Взять {bonus}$ или рискнуть (1-3 Тюрьма, 4-6 {bonus * 2}$)?",
-                    context={"kind": "fraudster", "bonus": bonus},
-                    roll_label="Рискнуть (бросить кубик)",
-                    skip_label=f"Взять {bonus}$ без риска",
-                    roll_hint=f"1-3 → Тюрьма (потеря хода и опыта). 4-6 → {bonus * 2}$.",
-                    skip_hint=f"Гарантированно получить {bonus}$.",
-                )
-            )
-        else:
-            engine.grant_money(player, bonus, reason="Банк")
+        start_bonus = int(engine.balance.ring_value("start_bonus", player.ring))
+        loan_amount = start_bonus * int(engine.balance.get("loan.start_multiplier", 4))
+        loan_term = int(engine.balance.get("loan.term_starts", 4))
+        options = [DecisionOption("bonus", f"Взять банковский бонус {bonus}$")]
+        if player.loan_payments_left <= 0:
+            options.append(DecisionOption("loan", f"Кредит {loan_amount}$ ({loan_term} Стартов без дохода)"))
+            if self.has_role(player, Role.CAPITALIST):
+                options.append(DecisionOption("loan_capitalist", f"Капиталист: кредит {loan_amount}$ на {max(1, loan_term - 1)} Старта", role="capitalist"))
+            if self.has_role(player, Role.POLITICIAN):
+                options.append(DecisionOption("loan_politician", f"Политик: кредит {loan_amount}$ на 3 Старта (+1 скандал)", role="politician"))
+            if self.has_role(player, Role.FRAUDSTER):
+                options.append(DecisionOption("loan_fraudster", f"Аферист: серый кредит {int(loan_amount * 1.25)}$ (1-2 Тюрьма)", rolls_dice=True, role="fraudster"))
+        elif player.money > 0:
+            options.append(DecisionOption("repay", f"Погасить кредит досрочно ({player.loan_payments_left} счетч.)"))
+        options.append(DecisionOption("skip", "Пропустить"))
+        engine.request_decision(Decision(DecisionType.CHOOSE_OPTION, player.id, "Банк: бонус или кредит?", options, cell.type, cell.id, context={"bonus": bonus, "loan_amount": loan_amount, "loan_term": loan_term}))
 
     def on_resolve(self, engine, player, cell, decision, option) -> None:
         bonus = decision.context.get("bonus", 0)
-        if option.id == "skip":
-            engine.grant_money(player, bonus, reason="Банк")
+        loan_amount = int(decision.context.get("loan_amount", 0))
+        loan_term = int(decision.context.get("loan_term", 4))
+        if decision.context.get("kind") == "fraudster_bonus":
+            if option.id == "skip":
+                engine.grant_money(player, bonus, reason="Банк")
+                return
+            die = engine.interaction_roll(player, reason="Банк (Аферист)")
+            if die <= 3:
+                engine.send_to_jail(player)
+            else:
+                engine.grant_money(player, bonus * 2, reason="Банк (Аферист x2)")
             return
-        # Risky roll (opt-in).
-        die = engine.interaction_roll(player, reason="Банк (Аферист)")
-        if die <= 3:
-            engine.send_to_jail(player)
-        else:
-            engine.grant_money(player, bonus * 2, reason="Банк (Аферист x2)")
+        if option.id == "skip":
+            return
+        if option.id == "bonus":
+            if self.has_role(player, Role.CAPITALIST):
+                engine.grant_money(player, bonus * 2, reason="Банк (Капиталист x2)")
+            elif self.has_role(player, Role.POLITICIAN):
+                engine.grant_money(player, bonus, reason="Банк")
+                engine.remove_scandal(player, reason="Банк")
+            elif self.has_role(player, Role.FRAUDSTER):
+                engine.request_decision(roll_decision(player, "bank", cell.id, f"Банк: рискнуть? 1-3 Тюрьма, 4-6 {bonus * 2}$.", context={"kind": "fraudster_bonus", "bonus": bonus}, skip_label=f"Взять {bonus}$ без риска"))
+            else:
+                engine.grant_money(player, bonus, reason="Банк")
+        elif option.id == "loan":
+            engine.grant_money(player, loan_amount, reason="кредит банка")
+            player.loan_payments_left = loan_term
+        elif option.id == "loan_capitalist":
+            engine.grant_money(player, loan_amount, reason="кредит банка (Капиталист)")
+            player.loan_payments_left = max(1, loan_term - 1)
+        elif option.id == "loan_politician":
+            engine.grant_money(player, loan_amount, reason="субсидированный кредит")
+            player.loan_payments_left = 3
+            engine.add_scandal(player, 1, reason="субсидированный кредит")
+        elif option.id == "loan_fraudster":
+            die = engine.interaction_roll(player, reason="серый кредит")
+            if die <= 2:
+                engine.send_to_jail(player)
+            else:
+                engine.grant_money(player, int(loan_amount * 1.25), reason="серый кредит")
+                player.loan_payments_left = loan_term
+        elif option.id == "repay":
+            cost = min(player.money, player.loan_payments_left * int(engine.balance.ring_value("start_bonus", player.ring)))
+            if engine.charge_money(player, cost, reason="досрочное погашение кредита"):
+                player.loan_payments_left = 0
 
 
 # ---------------------------------------------------------------------------

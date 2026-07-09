@@ -424,8 +424,10 @@ export default function App() {
             busy={busy}
             canAct={isMyTurn}
             selectedCell={selectedCell}
+            cards={meta.question_cards}
             onRoll={() => send("roll_dice")}
             onResolve={(optionId) => send("resolve_decision", { option_id: optionId })}
+            onUseCard={(cardId) => send("use_card", { card_id: cardId })}
           />
         </aside>
 

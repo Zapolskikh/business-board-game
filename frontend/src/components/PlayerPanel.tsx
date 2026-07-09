@@ -40,6 +40,8 @@ export function PlayerPanel({ state, roles, playerColors, mySeat }: Props) {
               <span>Круг {p.ring + 1}</span>
               <span>Скандалы: {p.scandals}</span>
               <span>Крыша: {p.roofs > 0 ? "🎖️".repeat(p.roofs) : "—"}</span>
+              <span>Кредит: {p.loan_payments_left > 0 ? p.loan_payments_left : "—"}</span>
+              <span>Карты: {p.cards?.length ?? 0}</span>
               <span>Капитал: {state.net_worth[p.id]}</span>
             </div>
           </div>

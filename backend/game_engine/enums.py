@@ -62,6 +62,7 @@ class ActionType(StrEnum):
 
     ROLL_DICE = "roll_dice"
     RESOLVE_DECISION = "resolve_decision"
+    USE_CARD = "use_card"
 
 
 # Decision type keys (used to describe pending decisions to clients/bots).

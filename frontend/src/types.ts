@@ -13,6 +13,8 @@ export interface PlayerState {
   scandals: number;
   roofs: number;
   insured_cells: string[];
+  cards: string[];
+  loan_payments_left: number;
   bankrupt_count: number;
   stats: Record<string, number>;
 }
@@ -27,6 +29,7 @@ export interface CellState {
   price: number;
   owner_id: string | null;
   tags: string[];
+  upgraded?: boolean;
 }
 
 export interface BoardState {
@@ -171,6 +174,8 @@ export interface QuestionCard {
   title: string;
   text: string;
   weight: number;
+  deck?: string;
+  play?: string;
   effect: QuestionCardEffect;
 }
 

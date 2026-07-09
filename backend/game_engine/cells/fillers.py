@@ -11,8 +11,8 @@ from typing import TYPE_CHECKING
 
 from game_engine.cells.base import BaseCell
 from game_engine.cells.common import roll_decision
+from game_engine.cells.cards import give_card
 from game_engine.cells.effects import apply_simple_effect
-from game_engine.config_loader import load_question_cards
 from game_engine.registry import register_cell
 
 if TYPE_CHECKING:
@@ -130,48 +130,33 @@ def _resolve_move(engine: GameEngine, player, cell, decision, sign: int) -> None
 # ---------------------------------------------------------------------------
 # "?" card — a data-driven deck (source of truth for the game AND the FAQ).
 # ---------------------------------------------------------------------------
-_QUESTION_CARDS = load_question_cards()
-
-
 @register_cell("question")
 class QuestionCell(BaseCell):
-    """Draw a "?" card. The player rolls the die deliberately; the roll seeds a
-    draw from the weighted deck in ``data/question_cards.json``."""
+    """Draw a held "?" card into the player's hand."""
 
     def on_land(self, engine: GameEngine, player: Player, cell: BoardCell) -> None:
         engine.request_decision(
             roll_decision(
                 player, cell.type, cell.id,
-                "Карта «?»: бросьте кубик, чтобы вытянуть карту.",
-                context={},
+                "Карта «?» в руку: бросьте кубик, чтобы вытянуть карту.",
+                context={"deck": "hand"},
             )
         )
 
     def on_resolve(self, engine, player, cell, decision, option) -> None:
         engine.interaction_roll(player, reason="карта «?»")
-        card = _draw_card(engine)
-        engine.log_event(
-            "question",
-            f"{player.name} вытягивает карту: «{card['title']}» — {card['text']}",
-            player.id,
-        )
-        effect = card.get("effect", {})
-        apply_simple_effect(
-            engine, player, cell,
-            effect.get("kind", ""),
-            key=effect.get("key"),
-            amount=effect.get("amount"),
-            reason=f"Карта: {card['title']}",
-        )
+        give_card(engine, player, decision.context.get("deck", "hand"))
 
 
-def _draw_card(engine: GameEngine) -> dict:
-    weights = [max(1, int(c.get("weight", 1))) for c in _QUESTION_CARDS]
-    total = sum(weights)
-    pick = engine.rng.randint(1, total)
-    upto = 0
-    for card, weight in zip(_QUESTION_CARDS, weights, strict=True):
-        upto += weight
-        if pick <= upto:
-            return card
-    return _QUESTION_CARDS[-1]
+@register_cell("question_instant")
+class InstantQuestionCell(QuestionCell):
+    """Draw and immediately resolve an instant "?" card."""
+
+    def on_land(self, engine: GameEngine, player: Player, cell: BoardCell) -> None:
+        engine.request_decision(
+            roll_decision(
+                player, cell.type, cell.id,
+                "Мгновенная карта «?»: бросьте кубик, чтобы вытянуть событие.",
+                context={"deck": "instant"},
+            )
+        )

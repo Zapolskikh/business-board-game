@@ -369,6 +369,23 @@ select {
   flex-direction: column;
   gap: 8px;
 }
+.hand-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.hand-title {
+  color: var(--text-dim);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.card-btn {
+  border-color: rgba(163, 113, 247, 0.55);
+}
 .btn.option {
   text-align: left;
 }

@@ -35,6 +35,8 @@ class Player:
     scandals: int = 0
     roofs: int = 0  # "Крыша" — consumable protection charges
     insured_cells: set[str] = field(default_factory=set)  # capitalist insurance
+    cards: list[str] = field(default_factory=list)  # held "?" cards
+    loan_payments_left: int = 0  # future Start payouts redirected to the bank
 
     bankrupt_count: int = 0
     extra_rolls: int = 0  # granted by "roll again" cells
@@ -60,6 +62,8 @@ class Player:
             "scandals": self.scandals,
             "roofs": self.roofs,
             "insured_cells": sorted(self.insured_cells),
+            "cards": list(self.cards),
+            "loan_payments_left": self.loan_payments_left,
             "bankrupt_count": self.bankrupt_count,
             "stats": dict(self.stats),
         }
@@ -97,6 +101,7 @@ class BoardCell:
             "price": self.price,
             "owner_id": self.owner_id,
             "tags": self.tags,
+            "upgraded": bool(self.state.get("upgraded", False)),
         }
 
 
@@ -248,7 +253,7 @@ class GameState:
 
     def net_worth(self, player: Player) -> int:
         """Placeholder scoring: cash + owned property prices + weighted experience."""
-        owned = sum(c.price for c in self.board.cells_owned_by(player.id))
+        owned = sum(c.price + (int(c.state.get("upgrade_cost", c.price)) if c.state.get("upgraded") else 0) for c in self.board.cells_owned_by(player.id))
         exp = player.experience * self.config.victory.experience_weight
         return player.money + owned + exp
 
