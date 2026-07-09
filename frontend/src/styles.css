@@ -713,8 +713,45 @@ select {
 }
 
 @media (max-width: 1000px) {
+  .app.game {
+    height: auto;
+    overflow: visible;
+    padding: 4px 6px 16px;
+  }
   .layout {
     grid-template-columns: 1fr;
+    overflow: visible;
+  }
+  .col-center {
+    overflow-x: auto;
+    overflow-y: visible;
+    min-height: unset;
+  }
+  .col-left {
+    overflow: visible;
+    min-height: unset;
+  }
+  .col-right {
+    overflow: visible;
+    min-height: unset;
+  }
+  .action-panel {
+    flex: none;
+    min-height: unset;
+    overflow-y: visible;
+  }
+  .board-svg {
+    min-width: 400px;
+  }
+  .log-panel-wrap {
+    position: static;
+    height: auto;
+    border-radius: 8px;
+    margin-top: 6px;
+  }
+  .log-panel-wrap.expanded {
+    height: auto;
+    max-height: 220px;
   }
 }
 

@@ -143,7 +143,7 @@ export function Board({
           cx: x + CELL_W / 2,
           cy: y + CELL_H / 2,
           color: cellMeta?.color ?? "#30363d",
-          title: cellMeta?.title ?? cell.type,
+          title: cellMeta?.ring_titles?.[ringIdx] ?? cellMeta?.title ?? cell.type,
           ownerId: cell.owner_id,
         });
         // First cell of each ring = Start: mark it with an arrow + pass bonus/XP.
@@ -428,7 +428,7 @@ export function Board({
 }
 
 function shortTitle(title: string): string {
-  return title.length > 12 ? title.slice(0, 11) + "…" : title;
+  return title.length > 13 ? title.slice(0, 12) + "…" : title;
 }
 
 // Small triangle arrow pointing from (cx, cy) in direction (dx, dy).
