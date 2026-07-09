@@ -98,6 +98,14 @@ export interface GameState {
   // `log_size` is the total event count so `event.seq` stays absolute/stable.
   log?: GameEvent[];
   log_size?: number;
+  chat?: ChatMessage[];
+}
+
+export interface ChatMessage {
+  player_id: string;
+  name: string;
+  text: string;
+  idx: number;
 }
 
 export interface GameEvent {

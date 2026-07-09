@@ -8,12 +8,14 @@ import { PlayerPanel } from "./components/PlayerPanel";
 import { ActionPanel } from "./components/ActionPanel";
 import { CellInfo } from "./components/CellInfo";
 import { EventLog } from "./components/EventLog";
+import { Chat } from "./components/Chat";
 import { GameSetup } from "./components/GameSetup";
 import { SimPanel } from "./components/SimPanel";
 import { Faq } from "./components/Faq";
 import {
   CANCEL_OPTION,
   MAP_PICK,
+  type ChatMessage,
   type GameEvent,
   type GameState,
   type MapCandidateInfo,
@@ -39,6 +41,7 @@ export default function App() {
   const [meta, setMeta] = useState<Meta | null>(null);
   const [state, setState] = useState<GameState | null>(null);
   const [events, setEvents] = useState<GameEvent[]>([]);
+  const [chat, setChat] = useState<ChatMessage[]>([]);
   const [selectedCell, setSelectedCell] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -136,6 +139,7 @@ export default function App() {
     const isNewMove = !!move && moveSeq !== lastAnimatedSeq.current;
 
     setEvents(nextEvents);
+    if (s.chat) setChat(s.chat);
     if (isNewMove && move) {
       lastAnimatedSeq.current = moveSeq;
       window.requestAnimationFrame(() => {
@@ -207,6 +211,21 @@ export default function App() {
       setError((e as Error).message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const sendChat = async (text: string) => {
+    if (!state || !mySeat) return;
+    try {
+      await api.chat(state.game_id, mySeat, text);
+      // Optimistically add the message locally; polling will sync others.
+      const me = state.players.find((p) => p.id === mySeat);
+      setChat((prev) => [
+        ...prev,
+        { player_id: mySeat, name: me?.name ?? mySeat, text, idx: prev.length },
+      ]);
+    } catch {
+      /* ignore chat errors silently */
     }
   };
 
@@ -352,7 +371,7 @@ export default function App() {
   return (
     <div className="app game">
       <header className="topbar">
-        <h1>Сатирическая бизнес-игра</h1>
+        <h1 className="topbar-title">Сатирическая бизнес-игра</h1>
         <div className="topbar-actions">
           <IdentityBadge
             state={state}
@@ -420,20 +439,33 @@ export default function App() {
             <span className="ti-sep">·</span>
             <span className="ti-goal">Цель: капитал ≥ {state.victory.target_net_worth}$</span>
           </div>
-          <Board
-            board={state.board}
-            players={state.players}
-            meta={meta.cells}
-            economy={meta.economy}
-            selectedCellId={selectedCell}
-            onSelectCell={setSelectedCell}
-            playerColors={playerColors}
-            candidates={candidates}
-            recentMove={recentMove}
-            blinkingCellId={blinkCellId}
-            centerEvent={centerEvent}
-          />
-          <EventLog events={events} />
+          <div className="board-area">
+            <Board
+              board={state.board}
+              players={state.players}
+              meta={meta.cells}
+              economy={meta.economy}
+              selectedCellId={selectedCell}
+              onSelectCell={setSelectedCell}
+              playerColors={playerColors}
+              candidates={candidates}
+              recentMove={recentMove}
+              blinkingCellId={blinkCellId}
+              centerEvent={centerEvent}
+            />
+          </div>
+          <div className="bottom-row">
+            <div className="bottom-log">
+              <EventLog events={events} />
+            </div>
+            <Chat
+              messages={chat}
+              players={state.players}
+              mySeat={mySeat ?? null}
+              playerColors={playerColors}
+              onSend={sendChat}
+            />
+          </div>
         </main>
 
         <aside className="col-right">

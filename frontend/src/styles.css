@@ -194,7 +194,6 @@ select {
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
-  position: relative;
 }
 
 .panel {
@@ -379,60 +378,40 @@ select {
   color: var(--accent);
 }
 
-/* ---- event log (bottom of board column, expands upward as overlay) ---- */
-.log-panel-wrap {
-  position: absolute;
-  left: 4px; right: 4px; bottom: 4px;
-  background: rgba(22, 27, 34, 0.97);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+/* ---- event log (static panel inside bottom-row) ---- */
+.log-panel {
   display: flex;
   flex-direction: column;
+  height: 100%;
   overflow: hidden;
-  transition: height 0.25s ease;
-  height: 36px;
-  z-index: 10;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
-.log-panel-wrap.expanded {
-  height: 280px;
-}
-.log-toggle-btn {
-  all: unset;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  font-size: 12px;
-  color: var(--text-dim);
+.log-head {
   flex: 0 0 auto;
-  white-space: nowrap;
-  overflow: hidden;
-}
-.log-toggle-btn:hover { color: var(--text); }
-.log-peek {
+  padding: 4px 8px;
   font-size: 11px;
   color: var(--text-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
 }
 .log {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-anchor: none;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   font-size: 12px;
-  padding: 0 8px 8px;
+  padding: 4px 8px 6px;
 }
 .log-line {
   display: flex;
   gap: 6px;
-  padding: 3px 4px;
+  padding: 2px 4px;
   border-radius: 4px;
 }
 .log-line:nth-child(odd) {
@@ -448,6 +427,82 @@ select {
 .ev-bankruptcy,
 .ev-jail {
   color: var(--danger);
+}
+
+/* ---- chat panel ---- */
+.chat-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-width: 0;
+}
+.chat-head {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+}
+.chat-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-anchor: none;
+  padding: 4px 8px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+.chat-empty {
+  color: var(--text-dim);
+  font-style: italic;
+  font-size: 12px;
+}
+.chat-msg {
+  line-height: 1.4;
+  word-break: break-word;
+}
+.chat-author {
+  font-weight: 600;
+}
+.chat-input-row {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 4px;
+  padding: 4px 6px;
+  border-top: 1px solid var(--border);
+}
+.chat-input {
+  flex: 1;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+/* ---- bottom row (log + chat below the board) ---- */
+.board-area {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.bottom-row {
+  flex: 0 0 160px;
+  display: flex;
+  gap: 6px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+.bottom-log {
+  flex: 0 0 42%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ---- sim panel ---- */
@@ -718,14 +773,20 @@ select {
     overflow: visible;
     padding: 4px 6px 16px;
   }
+  .topbar-title {
+    display: none;
+  }
   .layout {
     grid-template-columns: 1fr;
     overflow: visible;
   }
   .col-center {
-    overflow-x: auto;
+    overflow-x: visible;
     overflow-y: visible;
     min-height: unset;
+    background: transparent;
+    border: none;
+    padding: 0;
   }
   .col-left {
     overflow: visible;
@@ -740,18 +801,20 @@ select {
     min-height: unset;
     overflow-y: visible;
   }
+  .board-area {
+    overflow-x: auto;
+    overflow-y: visible;
+    min-height: unset;
+  }
   .board-svg {
     min-width: 400px;
   }
-  .log-panel-wrap {
-    position: static;
-    height: auto;
-    border-radius: 8px;
-    margin-top: 6px;
+  .bottom-row {
+    flex: none;
+    height: 200px;
   }
-  .log-panel-wrap.expanded {
-    height: auto;
-    max-height: 220px;
+  .bottom-log {
+    display: none;
   }
 }
 

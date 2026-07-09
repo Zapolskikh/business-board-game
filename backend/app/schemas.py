@@ -47,3 +47,8 @@ class ActionResult(BaseModel):
 
 class GameStateResponse(BaseModel):
     state: dict[str, Any]
+
+
+class ChatIn(BaseModel):
+    player_id: str
+    text: str = Field(..., min_length=1, max_length=200)

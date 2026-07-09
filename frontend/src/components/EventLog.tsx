@@ -1,6 +1,6 @@
-// Event log pinned to the bottom of the board column. Collapsed by default
-// (shows last 3 events); expands upward to overlay the board on demand.
-import { useEffect, useRef, useState } from "react";
+// Event log panel. Shown in the bottom-left section of the board column on
+// desktop; hidden on mobile (chat replaces it there).
+import { useEffect, useRef } from "react";
 import type { GameEvent } from "../types";
 
 interface Props {
@@ -23,32 +23,28 @@ const ICONS: Record<string, string> = {
 };
 
 export function EventLog({ events }: Props) {
-  const [expanded, setExpanded] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (logRef.current) {
+      logRef.current.scrollTop = logRef.current.scrollHeight;
+    }
   }, [events.length]);
 
   const filtered = events.filter((e) => e.type !== "player_moved" && e.message);
 
   return (
-    <div className={`log-panel-wrap${expanded ? " expanded" : ""}`}>
-      <button className="log-toggle-btn" onClick={() => setExpanded((v) => !v)}>
-        {expanded ? "▼ Скрыть лог" : "▲ Лог событий"}
-        {!expanded && filtered.length > 0 && (
-          <span className="log-peek">{filtered[filtered.length - 1]?.message}</span>
-        )}
-      </button>
-      <div className="log">
+    <div className="log-panel">
+      <div className="log-head">📋 Лог событий</div>
+      <div className="log" ref={logRef}>
         {filtered.map((e, i) => (
           <div key={i} className={`log-line ev-${e.type}`}>
             <span className="log-icon">{ICONS[e.type] ?? "•"}</span>
             <span>{e.message}</span>
           </div>
         ))}
-        <div ref={bottomRef} />
       </div>
     </div>
   );
 }
+

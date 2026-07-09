@@ -78,4 +78,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ games, players, board, seed, bot }),
     }),
+
+  chat: (gameId: string, playerId: string, text: string) =>
+    request<{ ok: boolean }>(`/games/${gameId}/chat`, {
+      method: "POST",
+      body: JSON.stringify({ player_id: playerId, text }),
+    }),
 };

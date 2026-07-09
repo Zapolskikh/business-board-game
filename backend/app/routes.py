@@ -7,6 +7,7 @@ from app.game_manager import manager
 from app.schemas import (
     ActionIn,
     ActionResult,
+    ChatIn,
     CreateGameIn,
     GameStateResponse,
     SimulateIn,
@@ -110,6 +111,28 @@ def post_action(game_id: str, body: ActionIn) -> ActionResult:
 @router.delete("/games/{game_id}")
 def delete_game(game_id: str) -> dict:
     manager.delete(game_id)
+    return {"ok": True}
+
+
+@router.post("/games/{game_id}/chat")
+def post_chat(game_id: str, body: ChatIn) -> dict:
+    try:
+        state = manager.get(game_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Игра не найдена.") from exc
+    try:
+        player = state.player_by_id(body.player_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=400, detail="Неизвестный игрок.") from exc
+    if not hasattr(state, "chat"):
+        state.chat = []
+    state.chat.append({
+        "player_id": body.player_id,
+        "name": player.name,
+        "text": body.text,
+        "idx": len(state.chat),
+    })
+    manager.save(state)
     return {"ok": True}
 
 

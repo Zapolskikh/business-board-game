@@ -222,6 +222,7 @@ class GameState:
     # Last dice result, surfaced to the UI ("what did the current player roll?").
     last_die: int | None = None
     last_die_player_id: str | None = None
+    chat: list = field(default_factory=list)  # [{player_id, name, text, idx}]
 
     # ---- convenience accessors -------------------------------------------
     @property
@@ -278,6 +279,7 @@ class GameState:
             "last_die_player_id": self.last_die_player_id,
             "log": log,
             "log_size": len(events),
+            "chat": getattr(self, "chat", [])[-50:],
             "victory": {
                 "max_turns": self.config.victory.max_turns,
                 "target_net_worth": self.config.victory.target_net_worth,
