@@ -17,33 +17,33 @@ export const DISTRICTS: District[] = [
 ];
 
 export const ROLES: RoleCard[] = [
-  { id: "capitalist", title: "Капиталист", color: "#d4af37", passive: "+1 доход с Делового центра.", power: "Раз в ход покупает объект на 2$ дешевле.", districts: ["business", "tech"] },
-  { id: "politician", title: "Политик", color: "#4f7de0", passive: "+1 влияние с госконтрактов.", power: "Снять скандал или получить 2$ субсидии.", districts: ["government", "residential"] },
+  { id: "capitalist", title: "Капиталист", color: "#d4af37", passive: "Покупки −1$; профильные районы дают +1$ с объекта.", power: "Получить 2$ капитала.", districts: ["business", "tech"] },
+  { id: "politician", title: "Политик", color: "#4f7de0", passive: "Профильные районы +1$; госуслуги дают +1 влияние.", power: "Снять скандал или получить 2$ субсидии.", districts: ["government", "residential"] },
   { id: "journalist", title: "Журналист", color: "#32a86a", passive: "Видит силу серых схем соперников.", power: "Дать скандал лидеру по капиталу.", districts: ["residential", "government"] },
-  { id: "fraudster", title: "Аферист", color: "#aa68ee", passive: "+2$ за успешную серую схему.", power: "Перебросить результат своей схемы.", districts: ["tech", "shadows"] },
+  { id: "fraudster", title: "Аферист", color: "#aa68ee", passive: "+20% шанса и +1$ серым схемам; профиль +1$.", power: "Получить 1$ и 1 влияние.", districts: ["tech", "shadows"] },
   { id: "mafia", title: "Мафиози", color: "#b84343", passive: "Крыша стоит на 1$ дешевле.", power: "Получить 2$ с выбранного игрока или скандал.", districts: ["industrial", "shadows"] },
   { id: "military", title: "Военный", color: "#70848b", passive: "Первый объект нельзя заблокировать.", power: "Закрыть чужой объект на один раунд.", districts: ["industrial", "government"] },
 ];
 
 export const ASSETS: AssetCard[] = [
   { id:"housing", title:"Модульный жилой комплекс", district:"residential", cost:6, income:2, influence:0, text:"Надёжный базовый доход.", tags:["legal"] },
-  { id:"delivery", title:"Сеть тёмных кухонь", district:"residential", cost:5, income:2, influence:0, text:"+1$ во время городских фестивалей.", tags:["service"] },
-  { id:"media", title:"Городская медиасеть", district:"residential", cost:7, income:1, influence:2, text:"Репутация становится экономическим активом.", tags:["media"] },
-  { id:"fund", title:"Венчурный фонд", district:"business", cost:8, income:3, influence:1, text:"Усиливает технологические инвестиции.", tags:["finance"] },
-  { id:"bank", title:"Цифровой банк", district:"business", cost:9, income:3, influence:1, text:"Стабильная финансовая инфраструктура.", tags:["finance"] },
-  { id:"cowork", title:"Сеть гибких офисов", district:"business", cost:6, income:2, influence:1, text:"Доход и немного влияния.", tags:["office"] },
+  { id:"delivery", title:"Сеть тёмных кухонь", district:"residential", cost:5, income:2, influence:0, text:"+1$ во время Городского фестиваля.", tags:["service"] },
+  { id:"media", title:"Городская медиасеть", district:"residential", cost:7, income:1, influence:2, text:"+1 влияние за раунд вместе с Административным кварталом.", tags:["media"] },
+  { id:"fund", title:"Венчурный фонд", district:"business", cost:8, income:3, influence:1, text:"+1$ за каждый ваш объект Технокластера.", tags:["finance"] },
+  { id:"bank", title:"Цифровой банк", district:"business", cost:9, income:3, influence:1, text:"+1$ за каждый другой объект Делового центра.", tags:["finance"] },
+  { id:"cowork", title:"Сеть гибких офисов", district:"business", cost:6, income:2, influence:1, text:"+1$ вместе с объектом Спального района.", tags:["office"] },
   { id:"robotics", title:"Роботизированный завод", district:"industrial", cost:9, income:4, influence:0, text:"Высокая производительность.", tags:["production"] },
-  { id:"battery", title:"Завод накопителей энергии", district:"industrial", cost:8, income:3, influence:1, text:"Критическая городская инфраструктура.", tags:["energy"] },
-  { id:"logistics", title:"Автономный логистический хаб", district:"industrial", cost:7, income:3, influence:0, text:"Удешевляет будущие промышленные покупки.", tags:["logistics"] },
-  { id:"ai", title:"Лаборатория генеративного ИИ", district:"tech", cost:8, income:3, influence:1, text:"Может взлететь на технологическом событии.", tags:["ai"] },
-  { id:"crypto", title:"Городская криптобиржа", district:"tech", cost:6, income:2, influence:0, text:"Доходная, но связана с серыми схемами.", tags:["crypto","grey"] },
-  { id:"data", title:"Платформа городских данных", district:"tech", cost:7, income:2, influence:2, text:"Данные дают деньги и политический вес.", tags:["data"] },
-  { id:"contract", title:"Оператор госуслуг", district:"government", cost:8, income:2, influence:2, text:"Конвертирует бюджет в влияние.", tags:["contract"] },
+  { id:"battery", title:"Завод накопителей энергии", district:"industrial", cost:8, income:3, influence:1, text:"+1$ вместе с объектом Спального района.", tags:["energy"] },
+  { id:"logistics", title:"Автономный логистический хаб", district:"industrial", cost:7, income:3, influence:0, text:"Ваши следующие промышленные покупки дешевле на 1$.", tags:["logistics"] },
+  { id:"ai", title:"Лаборатория генеративного ИИ", district:"tech", cost:8, income:3, influence:1, text:"+1$ с Деловым центром; усиливает Инновационный грант.", tags:["ai"] },
+  { id:"crypto", title:"Городская криптобиржа", district:"tech", cost:6, income:2, influence:0, text:"+1$ с Серым сектором; открывает серые схемы.", tags:["crypto","grey"] },
+  { id:"data", title:"Платформа городских данных", district:"tech", cost:7, income:2, influence:2, text:"+1 влияние за раунд вместе с Административным кварталом.", tags:["data"] },
+  { id:"contract", title:"Оператор госуслуг", district:"government", cost:8, income:2, influence:2, text:"Даёт Политику +1 влияние за раунд.", tags:["contract"] },
   { id:"security", title:"Частная служба безопасности", district:"government", cost:7, income:2, influence:1, text:"При покупке выдаёт Крышу.", tags:["security"] },
-  { id:"lobby", title:"Лоббистское бюро", district:"government", cost:6, income:1, influence:2, text:"Помогает удерживать роли.", tags:["lobby"] },
+  { id:"lobby", title:"Лоббистское бюро", district:"government", cost:6, income:1, influence:2, text:"Переворот против вашей роли стоит на 1 влияние дороже.", tags:["lobby"] },
   { id:"cash", title:"Сеть наличных обменников", district:"shadows", cost:4, income:2, influence:0, text:"Дешёвый вход в серую экономику.", tags:["grey"] },
-  { id:"market", title:"Ночной рынок", district:"shadows", cost:5, income:2, influence:1, text:"Связывает легальный и серый сектор.", tags:["grey"] },
-  { id:"datacenter", title:"Нелегальный дата-центр", district:"shadows", cost:6, income:3, influence:0, text:"Серая инфраструктура для ИИ и крипто.", tags:["grey","tech"] },
+  { id:"market", title:"Ночной рынок", district:"shadows", cost:5, income:2, influence:1, text:"+1$ со Спальным районом или Деловым центром; открывает схемы.", tags:["grey"] },
+  { id:"datacenter", title:"Нелегальный дата-центр", district:"shadows", cost:6, income:3, influence:0, text:"+1$ с Технокластером; открывает серые схемы.", tags:["grey","tech"] },
 ];
 
 export const ACTIONS: ActionCard[] = [
