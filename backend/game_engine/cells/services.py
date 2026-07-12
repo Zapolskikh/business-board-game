@@ -295,6 +295,9 @@ class SecurityAgencyCell(BaseCell):
         self._offer_roof(engine, player, cell)
 
     def _offer_roof(self, engine: GameEngine, player: Player, cell: BoardCell) -> None:
+        if player.roofs > 0:
+            engine.log_event("roof_owned", f"{player.name}: Крыша уже есть, повторная покупка недоступна.", player.id)
+            return
         price = int(engine.balance.ring_value("roof_price", cell.ring))
         engine.request_decision(
             Decision(
@@ -327,7 +330,7 @@ class SecurityAgencyCell(BaseCell):
     def on_resolve(self, engine, player, cell, decision, option) -> None:
         kind = decision.context.get("kind")
         if kind == "buy":
-            if option.id == "buy" and engine.charge_money(player, decision.context["price"], reason="Крыша"):
+            if option.id == "buy" and player.roofs == 0 and engine.charge_money(player, decision.context["price"], reason="Крыша"):
                 engine.add_roof(player)
         elif kind == "military":
             if option.id == "buy":

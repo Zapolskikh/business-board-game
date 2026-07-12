@@ -40,6 +40,7 @@ def get_meta() -> dict:
         "economy": {
             "start_bonus": balance.get("start_bonus"),
             "start_experience": balance.get("start_experience"),
+            "start_experience_coefficients": balance.get("start_experience_coefficients", [1, 2, 0]),
             "promotion": balance.get("promotion", {}),
             "prices": balance.get("prices", {}),
             "rent": balance.get("rent", {}),

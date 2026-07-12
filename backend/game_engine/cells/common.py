@@ -59,7 +59,8 @@ def do_buy(engine: GameEngine, player: Player, cell: BoardCell) -> bool:
 
 
 def do_upgrade(engine: GameEngine, player: Player, cell: BoardCell, *, free: bool = False) -> bool:
-    if not cell.buyable or cell.owner_id != player.id or cell.state.get("upgraded"):
+    # Only rent-producing businesses have an implemented upgrade effect.
+    if cell.type not in {"food", "dormitory"} or cell.owner_id != player.id or cell.state.get("upgraded"):
         return False
     cost = upgrade_cost(engine, cell)
     if not free and not engine.charge_money(player, cost, reason=f"улучшение «{cell.title}»"):

@@ -6,7 +6,9 @@
   "starting_roles_mode": "none",
 
   "start_bonus": [250, 420, 650],
-  "start_experience": [1, 2, 3],
+  "start_experience": [1, 2, 0],
+  "start_experience_base": 1,
+  "start_experience_coefficients": [1, 2, 0],
   "bank_bonus": [150, 240, 380],
   "roof_price": [80, 130, 190],
 

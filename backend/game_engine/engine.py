@@ -221,6 +221,7 @@ class GameEngine:
             for _ in range(crossings):
                 start_bonus = self.balance.ring_value("start_bonus", player.ring)
                 if player.loan_payments_left > 0:
+                    player.flags["last_start_paid_loan"] = True
                     player.loan_payments_left -= 1
                     self.log_event(
                         "loan_payment",
@@ -228,8 +229,12 @@ class GameEngine:
                         player.id,
                     )
                 else:
+                    player.flags["last_start_paid_loan"] = False
                     self.grant_money(player, start_bonus, reason="Проход через Старт")
-                exp = int(self.balance.ring_value("start_experience", player.ring))
+                base_exp = int(self.config.extra.get("start_experience", self.balance.get("start_experience_base", 1)))
+                coefficients = self.balance.get("start_experience_coefficients", [1, 2, 0])
+                coefficient = coefficients[player.ring] if player.ring < len(coefficients) else 0
+                exp = base_exp * int(coefficient)
                 self.grant_experience(player, exp, reason="Проход через Старт")
                 player.bump("start_passes")
             player.flags["crossed_start"] = crossings > 0
@@ -249,7 +254,10 @@ class GameEngine:
         steps = (dest_slot - player.position) % size
         self.advance_player(player, steps)
         if activate:
-            self._activate_landing(player)
+            # Taxi/Station movement is still real movement: pause at Start's
+            # promotion checkpoint before resolving the destination interaction.
+            if not self._maybe_offer_promotion(player):
+                self._activate_landing(player)
         return steps
 
     def _log_move(self, player: Player, from_ring: int, from_slot: int, mode: str) -> None:
@@ -292,7 +300,10 @@ class GameEngine:
                 prompt=f"Вы прошли Старт. Купить повышение на круг {next_ring + 1} за {need} опыта?",
                 options=[
                     DecisionOption("promote", f"Повыситься за {need} опыта"),
-                    DecisionOption("stay", "Остаться на текущем круге"),
+                    DecisionOption(
+                        "stay",
+                        f"Продолжить к «{self.state.board.cell_at(player.ring, player.position).title}»",
+                    ),
                 ],
                 handler="start",
                 cell_id=None,
@@ -305,6 +316,13 @@ class GameEngine:
         """Spend ``cost`` experience to move ``player`` to ``next_ring``'s Start."""
         from_ring, from_slot = player.ring, player.position
         self.lose_experience(player, cost, reason="покупка повышения")
+        # The crossing is valued as a Start on the new ring. The old-ring bonus
+        # was already paid by advance_player, so add only the difference. Credit
+        # crossings are the exception and never produce this extra income.
+        if not player.flags.get("last_start_paid_loan"):
+            old_bonus = int(self.balance.ring_value("start_bonus", player.ring))
+            new_bonus = int(self.balance.ring_value("start_bonus", next_ring))
+            self.grant_money(player, max(0, new_bonus - old_bonus), reason="повышение: бонус нового круга")
         player.ring = next_ring
         player.position = 0
         player.bump("promotions")
@@ -482,18 +500,19 @@ class GameEngine:
 
     # ---- status helpers --------------------------------------------------
     def add_scandal(self, player: Player, count: int = 1, reason: str = "") -> None:
+        # Scandals track reputation of a role; a roleless player has none to lose.
+        if not player.role:
+            self.log_event("scandal_ignored", f"{player.name}: без роли скандал не начисляется.", player.id)
+            return
         player.scandals += count
         player.bump("scandals_received", count)
         suffix = f" ({reason})" if reason else ""
         self.log_event(
             "scandal", f"{player.name} получает {count} скандал{suffix}.", player.id, count=count
         )
-        if player.scandals >= 2:
+        if player.scandals >= 3:
             if player.role:
-                self.remove_role(player, reason="2 скандала")
-            else:
-                fine = self.balance.ring_value("fillers.money_minus", player.ring)
-                self.charge_money(player, fine, reason="2 скандала без роли")
+                self.remove_role(player, reason="3 скандала")
             player.scandals = 0
 
     def remove_scandal(self, player: Player, count: int = 1, reason: str = "") -> None:
@@ -509,6 +528,9 @@ class GameEngine:
             player.id,
             count=removed,
         )
+
+    def clear_scandals(self, player: Player, reason: str = "") -> None:
+        self.remove_scandal(player, player.scandals, reason)
 
     def add_roof(self, player: Player, count: int = 1) -> None:
         """Grant Крыша (roof) charges. Everyone may hold **at most one** roof; the

@@ -785,6 +785,15 @@ select {
 }
 
 @media (max-width: 1000px) {
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    min-height: 44px;
+    padding-top: env(safe-area-inset-top);
+    background: var(--bg);
+  }
+  .topbar-actions { margin-left: auto; }
   .app.game {
     height: auto;
     overflow: visible;
@@ -841,6 +850,9 @@ select {
   gap: 8px;
   align-items: center;
 }
+.card-btn.bonus { border-left: 4px solid #3fb950; background: rgba(46, 160, 67, .16); }
+.card-btn.debuff { border-left: 4px solid #f85149; background: rgba(248, 81, 73, .14); }
+.card-btn.neutral { border-left: 4px solid #58a6ff; background: rgba(88, 166, 255, .14); }
 .btn.ghost {
   background: transparent;
 }

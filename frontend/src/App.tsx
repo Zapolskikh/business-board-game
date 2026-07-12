@@ -335,14 +335,14 @@ export default function App() {
         const res = await api.action(s.game_id, botActor.id, action, payload);
         // Extra pause after the action so the player can read what happened
         // before the board updates to the next bot turn.
-        await new Promise((r) => window.setTimeout(r, 900));
+        await new Promise((r) => window.setTimeout(r, 400));
         adopt(res.state);
       } catch (e) {
         setError((e as Error).message);
       } finally {
         setBusy(false);
       }
-    }, 1400);
+    }, 700);
     return () => {
       cancelled = true;
       clearTimeout(timer);

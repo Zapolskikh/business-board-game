@@ -44,16 +44,6 @@ class NewspaperCell(BaseCell):
             return
         if cell.owner_id == player.id:
             self._reduce_scandal(engine, player)
-            if not player.is_bot and not cell.state.get("upgraded"):
-                engine.request_decision(Decision(
-                    DecisionType.YES_NO,
-                    player.id,
-                    f"Улучшить «{cell.title}»?",
-                    [DecisionOption("upgrade", "Улучшить"), DecisionOption("skip", "Не улучшать")],
-                    handler=cell.type,
-                    cell_id=cell.id,
-                    context={"kind": "upgrade"},
-                ))
             return
 
         owner = engine.state.player_by_id(cell.owner_id)
@@ -307,8 +297,6 @@ class StationCell(BaseCell):
             options.append(
                 DecisionOption("buy", f"Купить «{cell.title}» за {cell.price}$", {"cell_id": cell.id})
             )
-        if not player.is_bot and cell.owner_id == player.id and not cell.state.get("upgraded"):
-            options.append(DecisionOption("upgrade", "Улучшить Вокзал"))
         # After arriving via station-travel this turn, you may act on the cell but
         # not immediately hop again (prevents infinite station->station chaining).
         chained = bool(player.flags.get("no_station"))

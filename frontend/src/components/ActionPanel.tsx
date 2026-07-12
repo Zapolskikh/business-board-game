@@ -56,10 +56,13 @@ export function ActionPanel({ state, roles, busy, canAct, selectedCell, cards, o
               <div className="hand-title">Карты в руке</div>
               {currentHand.map((cardId, idx) => {
                 const card = cardById[cardId];
+                const hostile = new Set(["kompromat", "crisis", "public_hearing", "awkward_interview", "charity"]);
+                const neutral = new Set(["staff_shuffle", "friendly_taxi", "ticket"]);
+                const tone = hostile.has(card?.effect.kind) ? "debuff" : neutral.has(card?.effect.kind) ? "neutral" : "bonus";
                 return (
                   <button
                     key={`${cardId}-${idx}`}
-                    className="btn option card-btn"
+                    className={`btn option card-btn ${tone}`}
                     onClick={() => onUseCard(cardId)}
                     disabled={busy || !canAct}
                     title={card?.text}

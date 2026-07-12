@@ -93,6 +93,10 @@ class RolePowerBehaviour(BaseCell):
         elif kind == "mafia_take_pick":
             mafia = engine.state.player_by_id(decision.context["mafia_id"])
             target = engine.state.board.by_id(option.data["cell_id"])
+            owner = engine.state.player_by_id(target.owner_id) if target.owner_id else None
+            if owner and owner.role == Role.MILITARY.value:
+                engine.log_event("military_immunity", f"{owner.name}: у Военного нельзя отжимать объекты.", owner.id)
+                return
             target.owner_id = mafia.id
             engine.log_event("role_power", f"{mafia.name} отжимает «{target.title}».", mafia.id, cell_id=target.id)
         elif kind == "journalist":

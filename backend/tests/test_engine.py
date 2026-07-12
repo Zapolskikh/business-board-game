@@ -51,23 +51,25 @@ def test_charge_causes_bankruptcy_setback_not_elimination():
     assert p in state.players  # still in the game
 
 
-def test_two_scandals_remove_role():
+def test_three_scandals_remove_role():
     engine, state = make_engine()
     p = state.players[0]
     p.role = "capitalist"
     engine.add_scandal(p, 2, reason="test")
+    assert p.role == "capitalist"
+    engine.add_scandal(p, 1, reason="test")
     assert p.role is None
     assert p.scandals == 0
 
 
-def test_scandal_without_role_fines_and_resets():
+def test_scandal_without_role_is_ignored():
     engine, state = make_engine()
     p = state.players[0]
     p.role = None
     p.money = 1000
     engine.add_scandal(p, 2, reason="test")
     assert p.scandals == 0
-    assert p.money < 1000
+    assert p.money == 1000
 
 
 def test_roof_consumption():

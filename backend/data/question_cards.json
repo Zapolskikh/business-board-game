@@ -141,7 +141,7 @@
       "title": "Черная бухгалтерия",
       "text": "Следующий денежный доход x2.",
       "deck": "hand",
-      "play": "held",
+      "play": "passive",
       "weight": 1,
       "effect": { "kind": "black_accounting" }
     },

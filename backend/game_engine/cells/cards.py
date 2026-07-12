@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 from game_engine.cells.base import BaseCell
 from game_engine.cells.common import CANCEL_OPTION_ID, MapCandidate, do_upgrade, map_pick_decision, player_options, upgraded_value
 from game_engine.config_loader import load_question_cards, load_role_ids, load_roles
-from game_engine.enums import DecisionType
+from game_engine.enums import DecisionType, Role
 from game_engine.models import Decision, DecisionOption
 from game_engine.registry import register_cell
 
@@ -50,6 +50,14 @@ def draw_card(engine: GameEngine, deck: str) -> dict[str, Any]:
 
 def give_card(engine: GameEngine, player: Player, deck: str = "hand") -> None:
     card = draw_card(engine, deck)
+    engine.log_event(
+        "card_revealed",
+        f"{player.name} вытягивает «{card['title']}»: {card.get('text', '')}",
+        player.id, card_id=card["id"], title=card["title"], description=card.get("text", ""),
+    )
+    if card.get("play") == "passive":
+        CardSystem().start_card(engine, player, card["id"], from_hand=False)
+        return
     if card.get("play", "held") == "instant":
         engine.log_event("card_drawn", f"{player.name} тянет мгновенную карту: «{card['title']}».", player.id, card_id=card["id"])
         CardSystem().start_card(engine, player, card["id"], from_hand=False)
@@ -92,7 +100,7 @@ class CardSystem(BaseCell):
             options = [DecisionOption(r, _ROLE_TITLES.get(r, r), {"role": r}) for r in roles]
             engine.request_decision(Decision(DecisionType.CHOOSE_ROLE, player.id, "Кадровая перестановка: выберите свободную роль.", options, "cards", context=ctx))
         elif kind == "free_upgrade":
-            self._pick_owned_cell(engine, player, ctx, "Выберите свой объект для бесплатного улучшения.", lambda c: c.buyable and c.owner_id == player.id and not c.state.get("upgraded"))
+            self._pick_owned_cell(engine, player, ctx, "Выберите Еду или Жильё для бесплатного улучшения.", lambda c: c.type in {"food", "dormitory"} and c.owner_id == player.id and not c.state.get("upgraded"))
         elif kind == "tax_optimization":
             player.flags["payment_shield"] = player.flags.get("payment_shield", 0) + 1
             engine.log_event("card", f"{player.name}: следующий платеж или штраф будет отменен.", player.id)
@@ -198,6 +206,10 @@ class CardSystem(BaseCell):
             if option.id != CANCEL_OPTION_ID:
                 target = engine.state.board.by_id(option.data["cell_id"])
                 owner = engine.state.player_by_id(target.owner_id)
+                if owner.role == Role.MILITARY.value:
+                    engine.log_event("military_immunity", f"{owner.name}: у Военного нельзя отжимать объекты.", owner.id)
+                    self._consume(engine, player, card_id, from_hand)
+                    return
                 price = upgraded_value(engine, target) * 2
                 if engine.transfer_money(player, owner, price, reason=f"рейдерская покупка «{target.title}»"):
                     target.owner_id = player.id

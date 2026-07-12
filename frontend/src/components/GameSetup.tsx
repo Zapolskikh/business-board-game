@@ -23,6 +23,7 @@ export function GameSetup({ busy, onStart }: Props) {
   // the game). Defaults mirror the backend balance.json.
   const [targetCapital, setTargetCapital] = useState<string>("4000");
   const [maxRounds, setMaxRounds] = useState<string>("60");
+  const [startExperience, setStartExperience] = useState<string>("1");
 
   const update = (i: number, patch: Partial<PlayerInput>) =>
     setPlayers((ps) => ps.map((p, idx) => (idx === i ? { ...p, ...patch } : p)));
@@ -59,6 +60,11 @@ export function GameSetup({ busy, onStart }: Props) {
       </div>
 
       <div className="setup-row">
+        <label>
+          Опыт за Старт (1-й круг)
+          <input type="number" min={0} step={1} value={startExperience} onChange={(e) => setStartExperience(e.target.value)} />
+          <small>2-й круг ×2, 3-й ×0</small>
+        </label>
         <label>
           Победа: капитал ≥
           <input
@@ -111,7 +117,10 @@ export function GameSetup({ busy, onStart }: Props) {
             const victory: Record<string, number> = {};
             if (targetCapital) victory.target_net_worth = Number(targetCapital);
             if (maxRounds) victory.max_turns = Number(maxRounds);
-            const config = Object.keys(victory).length ? { victory } : undefined;
+            const config: Record<string, unknown> = {
+              victory,
+              extra: { start_experience: Math.max(0, Number(startExperience) || 0) },
+            };
             onStart(players, board, seed ? Number(seed) : undefined, config);
           }}
         >

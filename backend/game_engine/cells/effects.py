@@ -60,7 +60,7 @@ def apply_simple_effect(
     elif kind == "scandal_plus":
         engine.add_scandal(player, int(amount or 1), reason=reason or "Скандал")
     elif kind == "scandal_minus":
-        engine.remove_scandal(player, int(amount or 1), reason=reason or "PR-служба")
+        engine.clear_scandals(player, reason=reason or "PR-служба")
     elif kind == "role_loss":
         if player.role:
             engine.remove_role(player, reason=reason or "Потеря роли")
