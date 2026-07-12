@@ -18,7 +18,7 @@ export const DISTRICTS: District[] = [
 
 export const ROLES: RoleCard[] = [
   { id: "capitalist", title: "Капиталист", color: "#d4af37", passive: "Новый район −1$; Деловой центр +1$; деловые условия всегда активны.", power: "Ускоренное финансирование: 3◆ → +1 инвестиционное действие.", districts: ["business"] },
-  { id: "politician", title: "Политик", color: "#4f7de0", passive: "Профильные районы +1$; госуслуги дают +1 влияние.", power: "Снять скандал или получить 2$ субсидии.", districts: ["government", "residential"] },
+  { id: "politician", title: "Политик", color: "#4f7de0", passive: "Жильё +1$; административные объекты дают влияние; административная связь всегда активна.", power: "Налог района: 5◆ → 1$ за каждый городской объект. Скандал: 2◆.", districts: ["residential"] },
   { id: "journalist", title: "Журналист", color: "#32a86a", passive: "Видит силу серых схем соперников.", power: "Дать скандал лидеру по капиталу.", districts: ["residential", "government"] },
   { id: "fraudster", title: "Аферист", color: "#aa68ee", passive: "+20% шанса и +1$ серым схемам; профиль +1$.", power: "Получить 1$ и 1 влияние.", districts: ["tech", "shadows"] },
   { id: "mafia", title: "Мафиози", color: "#b84343", passive: "Крыша стоит на 1$ дешевле.", power: "Получить 2$ с выбранного игрока или скандал.", districts: ["industrial", "shadows"] },
