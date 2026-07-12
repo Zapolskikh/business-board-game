@@ -23,12 +23,6 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 # Deterministic, decision-free fillers (no dice, no choices).
 # ---------------------------------------------------------------------------
-@register_cell("money_plus")
-class MoneyPlusCell(BaseCell):
-    def on_land(self, engine: GameEngine, player: Player, cell: BoardCell) -> None:
-        apply_simple_effect(engine, player, cell, "money_plus", key="fillers.money_plus", reason="Прибыль")
-
-
 @register_cell("money_minus")
 class MoneyMinusCell(BaseCell):
     def on_land(self, engine: GameEngine, player: Player, cell: BoardCell) -> None:
@@ -74,9 +68,7 @@ class ExperienceCell(BaseCell):
 @register_cell("experience_loss")
 class ExperienceLossCell(BaseCell):
     def on_land(self, engine: GameEngine, player: Player, cell: BoardCell) -> None:
-        engine.lose_experience(
-            player, engine.balance.ring_value("fillers.experience_loss", cell.ring), reason="Потеря опыта"
-        )
+        apply_simple_effect(engine, player, cell, "exp_minus", key="fillers.experience_loss", reason="Потеря опыта")
 
 
 @register_cell("roll_again")

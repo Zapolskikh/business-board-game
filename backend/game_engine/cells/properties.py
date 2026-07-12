@@ -79,7 +79,7 @@ class NewspaperCell(BaseCell):
                 )
             )
         else:
-            engine.add_scandal(player, 1, reason="чужая Газета")
+            engine.apply_negative_effect(player, "scandal", count=1, reason="чужая Газета")
 
     def on_resolve(self, engine, player, cell, decision, option) -> None:
         kind = decision.context.get("kind")
@@ -91,13 +91,13 @@ class NewspaperCell(BaseCell):
                 do_upgrade(engine, player, cell)
         elif kind == "journalist":
             target = engine.state.player_by_id(option.data["player_id"])
-            engine.add_scandal(target, 1, reason="Журналист")
+            engine.apply_negative_effect(target, "scandal", count=1, reason="Журналист")
         elif kind == "capitalist":
             if option.id == "pay":
                 owner = engine.state.player_by_id(decision.context["owner_id"])
                 engine.transfer_money(player, owner, decision.context["pay"], reason="откуп от Газеты")
             else:
-                engine.add_scandal(player, 1, reason="чужая Газета")
+                engine.apply_negative_effect(player, "scandal", count=1, reason="чужая Газета")
 
     def _offer_buy(self, engine: GameEngine, player: Player, cell: BoardCell) -> None:
         engine.request_decision(
@@ -261,7 +261,7 @@ class CasinoCell(BaseCell):
                 loss *= 2
             if owner is not None and _has_vertical_set(engine, owner, "casino"):
                 loss *= 2
-            engine.charge_money(player, loss, reason="проигрыш в Казино", to_player=owner)
+            engine.apply_negative_effect(player, "money", amount=loss, reason="проигрыш в Казино", to_player_id=owner.id if owner else None)
 
 
 # ---------------------------------------------------------------------------

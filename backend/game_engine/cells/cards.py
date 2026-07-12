@@ -88,7 +88,7 @@ class CardSystem(BaseCell):
         elif kind == "public_hearing":
             for target in engine.state.players:
                 if target.role:
-                    engine.add_scandal(target, 1, reason=card["title"])
+                    engine.apply_negative_effect(target, "scandal", count=1, reason=card["title"])
             self._consume(engine, player, card_id, from_hand)
         elif kind == "staff_shuffle":
             taken = {p.role for p in engine.state.players if p.role}
@@ -129,7 +129,7 @@ class CardSystem(BaseCell):
             self._consume(engine, player, card_id, from_hand)
         elif kind == "aggressive_expansion":
             player.flags["next_purchase_discount"] = max(float(player.flags.get("next_purchase_discount", 0) or 0), 0.5)
-            engine.add_scandal(player, 1, reason=card["title"])
+            engine.apply_negative_effect(player, "scandal", count=1, reason=card["title"])
             self._consume(engine, player, card_id, from_hand)
         elif kind == "lawyers":
             player.flags["lawyers"] = player.flags.get("lawyers", 0) + 1
@@ -150,11 +150,11 @@ class CardSystem(BaseCell):
             ], "cards", context=ctx))
         elif kind == "awkward_interview":
             leader = max(engine.state.players, key=engine.state.net_worth)
-            engine.add_scandal(leader, 1, reason=card["title"])
+            engine.apply_negative_effect(leader, "scandal", count=1, reason=card["title"])
             self._consume(engine, player, card_id, from_hand)
         elif kind == "charity":
             for target in engine.state.players:
-                engine.charge_money(target, 50, reason=card["title"])
+                engine.apply_negative_effect(target, "money", amount=50, reason=card["title"])
             self._consume(engine, player, card_id, from_hand)
         elif kind == "raid_interest":
             self._pick_any_cell(engine, player, ctx, "Рейдерский интерес: выберите чужой объект.", lambda c: c.buyable and c.owner_id and c.owner_id != player.id)
@@ -178,10 +178,10 @@ class CardSystem(BaseCell):
 
         if kind == "kompromat":
             target = engine.state.player_by_id(option.data["player_id"])
-            engine.add_scandal(target, 1, reason=card_title(card_id))
+            engine.apply_negative_effect(target, "scandal", count=1, reason=card_title(card_id))
         elif kind == "crisis":
             target = engine.state.player_by_id(option.data["player_id"])
-            engine.remove_role(target, reason=card_title(card_id))
+            engine.apply_negative_effect(target, "role", reason=card_title(card_id))
         elif kind == "staff_shuffle":
             engine.set_role(player, option.data["role"])
         elif kind == "free_upgrade":

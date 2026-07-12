@@ -15,7 +15,6 @@
     "roll_again": 6,
     "food": 6,
     "dormitory": 6,
-    "money_plus": 3,
     "money_minus": 3,
     "scandal_plus": 4,
     "scandal_minus": 4
@@ -44,7 +43,6 @@
       "ambush": 1,
       "checkpoint": 1,
       "role": 3,
-      "money_plus": 2,
       "money_minus": 2,
       "scandal_plus": 1,
       "scandal_minus": 1,
@@ -71,7 +69,6 @@
       "ambush": 2,
       "checkpoint": 1,
       "role": 2,
-      "money_plus": 1,
       "scandal_plus": 1,
       "scandal_minus": 1,
       "role_loss": 1,

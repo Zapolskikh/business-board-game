@@ -421,6 +421,74 @@ class GameEngine:
     def transfer_money(self, src: Player, dst: Player, amount: int, reason: str) -> bool:
         return self.charge_money(src, amount, reason, to_player=dst)
 
+    def apply_negative_effect(
+        self,
+        player: Player,
+        kind: str,
+        *,
+        roof_protectable: bool = True,
+        reason: str = "",
+        **data,
+    ) -> bool:
+        """Apply a serialisable negative effect, optionally offering Крыша.
+
+        New effects opt in/out with ``roof_protectable``. Returning ``False``
+        means the effect was deferred until the player answers the roof choice.
+        """
+        if self.state.pending_decision is not None and self.state.pending_decision.handler == "roof_protection":
+            self.state.negative_effect_queue.append({
+                "player_id": player.id, "kind": kind, "roof_protectable": roof_protectable,
+                "reason": reason, "data": data,
+            })
+            return False
+        if roof_protectable and player.roofs > 0:
+            label = reason or {
+                "money": "денежный штраф", "experience": "потерю опыта",
+                "scandal": "скандал", "role": "потерю роли",
+                "hospital": "отправку в Больницу", "jail": "отправку в Тюрьму",
+            }.get(kind, "негативный эффект")
+            self.request_decision(Decision(
+                type="roof_protection",
+                player_id=player.id,
+                prompt=f"Крыша может отменить: {label}. Что выбрать?",
+                options=[
+                    DecisionOption("use_roof", "Потратить Крышу и отменить эффект"),
+                    DecisionOption("take_effect", "Сохранить Крышу и принять эффект"),
+                ],
+                handler="roof_protection",
+                context={"kind": kind, "reason": reason, "data": data},
+            ))
+            return False
+        self.execute_negative_effect(player, kind, reason=reason, **data)
+        return True
+
+    def continue_negative_queue(self) -> None:
+        """Resolve queued group effects until another player needs a roof choice."""
+        while self.state.negative_effect_queue and self.state.pending_decision is None:
+            item = self.state.negative_effect_queue.pop(0)
+            self.apply_negative_effect(
+                self.state.player_by_id(item["player_id"]), item["kind"],
+                roof_protectable=item["roof_protectable"], reason=item["reason"], **item["data"],
+            )
+
+    def execute_negative_effect(self, player: Player, kind: str, *, reason: str = "", **data) -> None:
+        """Execute a previously confirmed negative effect without another prompt."""
+        if kind == "money":
+            target = self.state.player_by_id(data["to_player_id"]) if data.get("to_player_id") else None
+            self.charge_money(player, int(data.get("amount", 0)), reason or "штраф", to_player=target)
+        elif kind == "experience":
+            self.lose_experience(player, int(data.get("amount", 0)), reason or "потеря опыта")
+        elif kind == "scandal":
+            self.add_scandal(player, int(data.get("count", 1)), reason=reason)
+        elif kind == "role":
+            self.remove_role(player, reason=reason)
+        elif kind == "hospital":
+            self.send_to_hospital(player)
+        elif kind == "jail":
+            self.send_to_jail(player)
+        else:
+            raise ValueError(f"Неизвестный негативный эффект: {kind}")
+
     def _handle_bankruptcy(self, player: Player) -> None:
         """Bankruptcy = setback, not elimination (design section 3.5).
 

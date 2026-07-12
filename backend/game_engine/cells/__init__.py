@@ -14,6 +14,7 @@ from game_engine.cells import (
     dangers,  # noqa: F401
     fillers,  # noqa: F401
     places,  # noqa: F401
+    protection,  # noqa: F401
     properties,  # noqa: F401
     pvp,  # noqa: F401
     role_cell,  # noqa: F401
@@ -27,6 +28,7 @@ __all__ = [
     "dangers",
     "fillers",
     "places",
+    "protection",
     "properties",
     "pvp",
     "role_cell",

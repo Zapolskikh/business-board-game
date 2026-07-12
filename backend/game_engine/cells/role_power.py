@@ -101,8 +101,8 @@ class RolePowerBehaviour(BaseCell):
             engine.log_event("role_power", f"{mafia.name} отжимает «{target.title}».", mafia.id, cell_id=target.id)
         elif kind == "journalist":
             target = engine.state.player_by_id(option.data["player_id"])
-            engine.add_scandal(target, 1, reason="Журналист")
+            engine.apply_negative_effect(target, "scandal", count=1, reason="Журналист")
         elif kind == "military":
             target = engine.state.player_by_id(option.data["player_id"])
             if not engine.consume_roof(target):
-                engine.remove_role(target, reason="Военный")
+                engine.apply_negative_effect(target, "role", reason="Военный")

@@ -77,7 +77,6 @@
   },
 
   "fillers": {
-    "money_plus": [100, 170, 270],
     "money_minus": [50, 90, 140],
     "windfall": [200, 340, 540],
     "experience": [1, 2, 3],

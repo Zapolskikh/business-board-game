@@ -18,7 +18,6 @@
     "checkpoint": { "title": "Блокпост", "buyable": false, "tags": ["military", "mafia", "fraudster"], "color": "#da3633" },
     "ambush": { "title": "Засада", "buyable": false, "tags": ["mafia", "military", "capitalist"], "color": "#b62324" },
     "role": { "title": "Клетка роли", "buyable": false, "tags": [], "color": "#ffd33d" },
-    "money_plus": { "title": "Прибыль +$", "buyable": false, "tags": [], "color": "#2ea043" },
     "money_minus": { "title": "Убыток −$", "buyable": false, "tags": [], "color": "#bf4b3c" },
     "windfall": { "title": "Джекпот", "buyable": false, "tags": [], "color": "#3fb950" },
     "scandal_plus": { "title": "Скандал", "buyable": false, "tags": [], "color": "#d29922" },

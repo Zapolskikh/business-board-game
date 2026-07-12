@@ -27,10 +27,10 @@ def test_fallback_for_unknown_type():
     assert behaviour is not None  # graceful fallback, no crash
 
 
-def test_money_plus_cell_grants_money():
+def test_jackpot_cell_grants_money():
     engine, state = make_engine()
     p = state.players[0]
-    cell = state.board.find_by_type("money_plus")[0]
+    cell = state.board.find_by_type("windfall")[0]
     before = p.money
     engine.teleport(p, cell.ring, cell.slot, activate=True)
     assert p.money > before

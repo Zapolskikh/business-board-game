@@ -37,6 +37,12 @@ def test_unique_cell_ids():
     assert len(ids) == len(set(ids))
 
 
+def test_shipped_boards_do_not_contain_money_plus():
+    for board_name in ("board_60", "board_72"):
+        _, board = _build(board_name)
+        assert not board.find_by_type("money_plus")
+
+
 def test_resize_reconciles_short_distribution():
     """A tiny custom spec proves you can change the field size freely: the
     builder pads missing slots with the filler type."""

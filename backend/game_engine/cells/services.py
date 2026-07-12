@@ -51,7 +51,7 @@ class BankCell(BaseCell):
                 return
             die = engine.interaction_roll(player, reason="Банк (Аферист)")
             if die <= 3:
-                engine.send_to_jail(player)
+                engine.apply_negative_effect(player, "jail", reason="Банк: неудачная схема")
             else:
                 engine.grant_money(player, bonus * 2, reason="Банк (Аферист x2)")
             return
@@ -76,11 +76,11 @@ class BankCell(BaseCell):
         elif option.id == "loan_politician":
             engine.grant_money(player, loan_amount, reason="субсидированный кредит")
             player.loan_payments_left = 3
-            engine.add_scandal(player, 1, reason="субсидированный кредит")
+            engine.apply_negative_effect(player, "scandal", count=1, reason="субсидированный кредит")
         elif option.id == "loan_fraudster":
             die = engine.interaction_roll(player, reason="серый кредит")
             if die <= 2:
-                engine.send_to_jail(player)
+                engine.apply_negative_effect(player, "jail", reason="серый кредит")
             else:
                 engine.grant_money(player, int(loan_amount * 1.25), reason="серый кредит")
                 player.loan_payments_left = loan_term
@@ -133,7 +133,7 @@ class BusinessSchoolCell(BaseCell):
         if decision.context.get("kind") == "fake_roll":
             die = engine.interaction_roll(player, reason="фальшивый диплом")
             if die <= 2:
-                engine.send_to_jail(player)
+                engine.apply_negative_effect(player, "jail", reason="фальшивый диплом")
             else:
                 engine.grant_experience(player, exp, reason="фальшивый диплом")
             return
@@ -145,7 +145,7 @@ class BusinessSchoolCell(BaseCell):
                 engine.grant_experience(player, exp * 2, reason="Бизнес-школа x2")
         elif option.id == "free_scandal":
             engine.grant_experience(player, exp, reason="Бизнес-школа (Политик)")
-            engine.add_scandal(player, 1, reason="Бизнес-школа даром")
+            engine.apply_negative_effect(player, "scandal", count=1, reason="Бизнес-школа даром")
         elif option.id == "fake":
             # Deliberate, separate roll for the risky fake diploma.
             engine.request_decision(
@@ -220,7 +220,7 @@ class GovernmentCell(BaseCell):
                 )
             )
         else:
-            engine.charge_money(player, fee, reason="административный сбор")
+            engine.apply_negative_effect(player, "money", amount=fee, reason="административный сбор")
 
     def on_resolve(self, engine, player, cell, decision, option) -> None:
         ctx = decision.context
@@ -228,7 +228,7 @@ class GovernmentCell(BaseCell):
         if kind == "pretend_roll":
             die = engine.interaction_roll(player, reason="притвориться Политиком")
             if die <= 2:
-                engine.send_to_jail(player)
+                engine.apply_negative_effect(player, "jail", reason="поддельная субсидия")
             else:
                 engine.grant_money(player, ctx["subsidy"], reason="поддельная субсидия")
             return
@@ -246,7 +246,7 @@ class GovernmentCell(BaseCell):
                 engine.remove_scandal(player)
         elif kind == "fraudster":
             if option.id == "base":
-                engine.charge_money(player, ctx["fee"], reason="административный сбор")
+                engine.apply_negative_effect(player, "money", amount=ctx["fee"], reason="административный сбор")
             else:
                 # Deliberate, separate roll for the risky impersonation.
                 engine.request_decision(
@@ -258,9 +258,9 @@ class GovernmentCell(BaseCell):
                 )
         elif kind == "mafia":
             if option.id == "pay":
-                engine.charge_money(player, ctx["mafia_fine"], reason="штраф госучреждению")
+                engine.apply_negative_effect(player, "money", amount=ctx["mafia_fine"], reason="штраф госучреждению")
             else:
-                engine.send_to_jail(player)
+                engine.apply_negative_effect(player, "jail", reason="Госучреждение")
 
     @staticmethod
     def _remove_scandal(engine: GameEngine, player: Player) -> None:

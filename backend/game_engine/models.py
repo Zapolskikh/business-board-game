@@ -228,6 +228,7 @@ class GameState:
     last_die: int | None = None
     last_die_player_id: str | None = None
     chat: list = field(default_factory=list)  # [{player_id, name, text, idx}]
+    negative_effect_queue: list[dict[str, Any]] = field(default_factory=list)
 
     # ---- convenience accessors -------------------------------------------
     @property

@@ -371,8 +371,9 @@ export default function App() {
   return (
     <div className="app game">
       <header className="topbar">
-        <h1 className="topbar-title">Сатирическая бизнес-игра</h1>
+        <h1 className="topbar-title">Сатирическая бизнес-игра <small>v{__GAME_VERSION__}</small></h1>
         <div className="topbar-actions">
+          <span className="game-version" title="Версия сборки">v{__GAME_VERSION__}</span>
           <IdentityBadge
             state={state}
             mySeat={mySeat}

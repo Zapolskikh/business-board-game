@@ -82,6 +82,37 @@ def test_roof_consumption():
     assert engine.consume_roof(p) is False
 
 
+def test_roof_can_cancel_or_accept_configured_negative_effect():
+    engine, state = make_engine()
+    p = state.players[0]
+    p.roofs = 1
+    before = p.money
+    assert engine.apply_negative_effect(p, "money", amount=100, reason="тест") is False
+    state.phase = Phase.AWAIT_DECISION
+    engine.apply_action(p.id, "resolve_decision", {"option_id": "use_roof"})
+    assert p.roofs == 0
+    assert p.money == before
+
+    state.current_index = 0
+    p.roofs = 1
+    assert engine.apply_negative_effect(p, "money", amount=100, reason="тест") is False
+    state.phase = Phase.AWAIT_DECISION
+    engine.apply_action(p.id, "resolve_decision", {"option_id": "take_effect"})
+    assert p.roofs == 1
+    assert p.money == before - 100
+
+
+def test_negative_effect_can_disable_roof_protection():
+    engine, state = make_engine()
+    p = state.players[0]
+    p.roofs = 1
+    before = p.money
+    assert engine.apply_negative_effect(p, "money", amount=25, roof_protectable=False) is True
+    assert state.pending_decision is None
+    assert p.roofs == 1
+    assert p.money == before - 25
+
+
 def test_hospital_moves_to_first_ring():
     engine, state = make_engine()
     p = state.players[0]

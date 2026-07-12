@@ -39,12 +39,11 @@ def apply_simple_effect(
     key: str | None = None,
     amount: int | None = None,
     reason: str = "",
+    roof_protectable: bool = True,
 ) -> None:
     """Apply one simple effect identified by ``kind`` to ``player``."""
-    if kind == "money_plus":
-        engine.grant_money(player, _amount(engine, cell, key=key, amount=amount), reason=reason or "Прибыль")
-    elif kind == "money_minus":
-        engine.charge_money(player, _amount(engine, cell, key=key, amount=amount), reason=reason or "Убыток")
+    if kind == "money_minus":
+        engine.apply_negative_effect(player, "money", amount=_amount(engine, cell, key=key, amount=amount), reason=reason or "Убыток", roof_protectable=roof_protectable)
     elif kind == "windfall":
         engine.grant_money(
             player, _amount(engine, cell, key=key or "fillers.windfall", amount=amount), reason=reason or "Джекпот"
@@ -54,16 +53,14 @@ def apply_simple_effect(
             player, _amount(engine, cell, key=key, amount=amount, default=1), reason=reason or "Опыт"
         )
     elif kind == "exp_minus":
-        engine.lose_experience(
-            player, _amount(engine, cell, key=key, amount=amount, default=1), reason=reason or "Потеря опыта"
-        )
+        engine.apply_negative_effect(player, "experience", amount=_amount(engine, cell, key=key, amount=amount, default=1), reason=reason or "Потеря опыта", roof_protectable=roof_protectable)
     elif kind == "scandal_plus":
-        engine.add_scandal(player, int(amount or 1), reason=reason or "Скандал")
+        engine.apply_negative_effect(player, "scandal", count=int(amount or 1), reason=reason or "Скандал", roof_protectable=roof_protectable)
     elif kind == "scandal_minus":
         engine.clear_scandals(player, reason=reason or "PR-служба")
     elif kind == "role_loss":
         if player.role:
-            engine.remove_role(player, reason=reason or "Потеря роли")
+            engine.apply_negative_effect(player, "role", reason=reason or "Потеря роли", roof_protectable=roof_protectable)
         else:
             engine.log_event("role_lost", f"{player.name}: роли нет — терять нечего.", player.id)
     elif kind == "roof_gift":

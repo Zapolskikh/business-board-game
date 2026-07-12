@@ -27,13 +27,10 @@ class AmbushCell(BaseCell):
                 player.flags.pop("detour", None)
             engine.log_event("card", f"{player.name} объезжает Засаду.", player.id)
             return
-        # Roof always saves you first (except Military/Capitalist who get a choice).
         if self.has_role(player, Role.MILITARY):
             self._military(engine, player, cell)
             return
         if self.has_role(player, Role.CAPITALIST):
-            if engine.consume_roof(player):
-                return
             ransom = int(engine.balance.ring_value("ambush.capitalist_ransom", cell.ring))
             engine.request_decision(
                 Decision(
@@ -45,8 +42,6 @@ class AmbushCell(BaseCell):
             )
             return
 
-        if engine.consume_roof(player):
-            return
         if self.has_role(player, Role.MAFIA):
             # Separate, deliberate roll to fight off the ambush (1-3 -> Hospital).
             engine.request_decision(
@@ -57,7 +52,7 @@ class AmbushCell(BaseCell):
                 )
             )
         else:
-            engine.send_to_hospital(player)
+            engine.apply_negative_effect(player, "hospital", reason="Засада")
 
     def _military(self, engine: GameEngine, player: Player, cell: BoardCell) -> None:
         if player.roofs > 0:
@@ -80,13 +75,13 @@ class AmbushCell(BaseCell):
         if kind == "mafia_escape":
             die = engine.interaction_roll(player, reason="Засада (Мафиози)")
             if die <= 3:
-                engine.send_to_hospital(player)
+                engine.apply_negative_effect(player, "hospital", reason="Засада (Мафиози)")
         elif kind == "capitalist":
             if option.id == "pay":
                 if not engine.charge_money(player, decision.context["ransom"], reason="выкуп из Засады"):
-                    engine.send_to_hospital(player)
+                    engine.apply_negative_effect(player, "hospital", reason="Засада")
             else:
-                engine.send_to_hospital(player)
+                engine.apply_negative_effect(player, "hospital", reason="Засада")
         elif kind == "military":
             if option.id == "roof":
                 engine.consume_roof(player)
@@ -97,7 +92,7 @@ class AmbushCell(BaseCell):
     def _military_roll(engine: GameEngine, player: Player) -> None:
         die = engine.interaction_roll(player, reason="Засада (Военный)")
         if die <= 2:
-            engine.send_to_hospital(player)
+            engine.apply_negative_effect(player, "hospital", reason="Засада (Военный)")
 
 
 @register_cell("checkpoint")
@@ -133,16 +128,15 @@ class CheckpointCell(BaseCell):
                 )
             )
         else:
-            engine.charge_money(player, fine_base, reason="проверка на Блокпосту")
+            engine.apply_negative_effect(player, "money", amount=fine_base, reason="проверка на Блокпосту")
 
     def on_resolve(self, engine, player, cell, decision, option) -> None:
         kind = decision.context.get("kind")
         if kind == "military":
             target = engine.state.player_by_id(option.data["player_id"])
-            if not engine.consume_roof(target):  # roof protects the role
-                engine.remove_role(target, reason="Блокпост (Военный)")
+            engine.apply_negative_effect(target, "role", reason="Блокпост (Военный)")
         elif kind == "role_or_pay":
             if option.id == "pay":
-                engine.charge_money(player, decision.context["fine_big"], reason="штраф на Блокпосту")
-            elif not engine.consume_roof(player):  # roof protects the role
-                engine.remove_role(player, reason="Блокпост")
+                engine.apply_negative_effect(player, "money", amount=decision.context["fine_big"], reason="штраф на Блокпосту")
+            else:
+                engine.apply_negative_effect(player, "role", reason="Блокпост")
