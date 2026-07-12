@@ -19,10 +19,10 @@ export const DISTRICTS: District[] = [
 export const ROLES: RoleCard[] = [
   { id: "capitalist", title: "Капиталист", color: "#d4af37", passive: "Новый район −1$; Деловой центр +1$; деловые условия всегда активны.", power: "Ускоренное финансирование: 3◆ → +1 инвестиционное действие.", districts: ["business"] },
   { id: "politician", title: "Политик", color: "#4f7de0", passive: "Жильё +1$; административные объекты дают влияние; административная связь всегда активна.", power: "Налог района: 5◆ → 1$ за каждый городской объект. Скандал: 2◆.", districts: ["residential"] },
-  { id: "journalist", title: "Журналист", color: "#32a86a", passive: "Видит силу серых схем соперников.", power: "Дать скандал лидеру по капиталу.", districts: ["residential", "government"] },
-  { id: "fraudster", title: "Аферист", color: "#aa68ee", passive: "+20% шанса и +1$ серым схемам; профиль +1$.", power: "Получить 1$ и 1 влияние.", districts: ["tech", "shadows"] },
-  { id: "mafia", title: "Мафиози", color: "#b84343", passive: "Крыша стоит на 1$ дешевле.", power: "Получить 2$ с выбранного игрока или скандал.", districts: ["industrial", "shadows"] },
-  { id: "military", title: "Военный", color: "#70848b", passive: "Первый объект нельзя заблокировать.", power: "Закрыть чужой объект на один раунд.", districts: ["industrial", "government"] },
+  { id: "journalist", title: "Журналист", color: "#32a86a", passive: "Скандалы превращаются во влияние; может создавать скандалы себе и соперникам.", power: "Публикация: 3◆ → цели +1 скандал.", districts: [] },
+  { id: "fraudster", title: "Аферист", color: "#aa68ee", passive: "4 действия; Технокластер +1$; камбэк и поддельные роли.", power: "Криптоскам, очистка скандалов и подделка документов.", districts: ["tech"] },
+  { id: "mafia", title: "Мафиози", color: "#b84343", passive: "Серый сектор +1$; Крыша дешевле; получает дань с районного меньшинства.", power: "Рэкет, сжечь связи или замять дело.", districts: ["shadows"] },
+  { id: "military", title: "Силовик", color: "#70848b", passive: "Промзона +1$; использует чужие скандалы.", power: "Санкции: влияние, штрафы, Крыша, улучшения и конфискация.", districts: ["industrial"] },
 ];
 
 export const ASSETS: AssetCard[] = [
@@ -36,14 +36,14 @@ export const ASSETS: AssetCard[] = [
   { id:"battery", title:"Завод накопителей энергии", district:"industrial", cost:8, income:3, influence:1, text:"+1$ вместе с объектом Спального района.", tags:["energy"] },
   { id:"logistics", title:"Автономный логистический хаб", district:"industrial", cost:7, income:3, influence:0, text:"Ваши следующие промышленные покупки дешевле на 1$.", tags:["logistics"] },
   { id:"ai", title:"Лаборатория генеративного ИИ", district:"tech", cost:8, income:3, influence:1, text:"+1$ с Деловым центром; усиливает Инновационный грант.", tags:["ai"] },
-  { id:"crypto", title:"Городская криптобиржа", district:"tech", cost:6, income:2, influence:0, text:"+1$ с Серым сектором; открывает серые схемы.", tags:["crypto","grey"] },
+  { id:"crypto", title:"Городская криптобиржа", district:"tech", cost:6, income:2, influence:0, text:"При покупке +2◆ и +1 скандал. Открывает памп и криптоскам Афериста.", tags:["crypto","grey"] },
   { id:"data", title:"Платформа городских данных", district:"tech", cost:7, income:2, influence:2, text:"+1 влияние за раунд вместе с Административным кварталом.", tags:["data"] },
   { id:"contract", title:"Оператор госуслуг", district:"government", cost:8, income:2, influence:2, text:"Даёт Политику +1 влияние за раунд.", tags:["contract"] },
   { id:"security", title:"Частная служба безопасности", district:"government", cost:7, income:2, influence:1, text:"При покупке выдаёт Крышу.", tags:["security"] },
   { id:"lobby", title:"Лоббистское бюро", district:"government", cost:6, income:1, influence:2, text:"Переворот против вашей роли стоит на 1 влияние дороже.", tags:["lobby"] },
-  { id:"cash", title:"Сеть наличных обменников", district:"shadows", cost:4, income:2, influence:0, text:"Дешёвый вход в серую экономику.", tags:["grey"] },
-  { id:"market", title:"Ночной рынок", district:"shadows", cost:5, income:2, influence:1, text:"+1$ со Спальным районом или Деловым центром; открывает схемы.", tags:["grey"] },
-  { id:"datacenter", title:"Нелегальный дата-центр", district:"shadows", cost:6, income:3, influence:0, text:"+1$ с Технокластером; открывает серые схемы.", tags:["grey","tech"] },
+  { id:"cash", title:"Сеть наличных обменников", district:"shadows", cost:4, income:2, influence:0, text:"При покупке +2$ и +1 скандал. Открывает отмывание.", tags:["grey"] },
+  { id:"market", title:"Ночной рынок", district:"shadows", cost:5, income:2, influence:1, text:"При покупке карта и +1 скандал. Открывает контрабанду.", tags:["grey"] },
+  { id:"datacenter", title:"Нелегальный дата-центр", district:"shadows", cost:6, income:3, influence:0, text:"При покупке +2 скандала. Открывает взлом.", tags:["grey","tech"] },
 ];
 
 export const ACTIONS: ActionCard[] = [
