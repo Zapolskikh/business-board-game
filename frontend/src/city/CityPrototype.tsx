@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ACTIONS, ASSETS, DISTRICTS, EVENTS, ROLES,
   type ActionCard, type AssetCard, type DistrictId, type EventCard, type RoleId,
@@ -6,16 +6,19 @@ import {
 
 type OwnedAsset = AssetCard & { uid: string; automated: boolean; scaled: boolean; blocked: boolean };
 type MarketAsset = AssetCard & { uid: string };
+type HeldActionCard = ActionCard & { uid: string };
 interface Player {
   id: number; name: string; isBot: boolean; money: number; influence: number; scandals: number; roofs: number;
-  role: RoleId | null; assets: OwnedAsset[]; hand: ActionCard[]; projects: number;
+  role: RoleId | null; assets: OwnedAsset[]; hand: HeldActionCard[]; projects: number;
 }
 type DistrictLevels = Record<DistrictId, number>;
 
 const MAX_ROUNDS = 10;
 const shuffle = <T,>(items: T[]) => [...items].sort(() => Math.random() - .5);
 const freshMarket = (cycle: number): MarketAsset[] => shuffle(ASSETS).map((a, i) => ({ ...a, uid: `${a.id}:${cycle}:${i}` }));
-const freshHand = () => shuffle(ACTIONS).slice(0, 3);
+let cardSequence = 0;
+const actionCard = (card: ActionCard): HeldActionCard => ({ ...card, uid: `${card.id}:${++cardSequence}` });
+const freshHand = () => shuffle(ACTIONS).slice(0, 3).map(actionCard);
 const initialPlayers = (): Player[] => ["Игрок 1", "Бот-инвестор", "Бот-политик", "Бот-аферист"].map((name, id) => ({
   id, name, isBot: id > 0, money: 10, influence: 2, scandals: 0, roofs: 0, role: null,
   assets: [], hand: freshHand(), projects: 0,
@@ -42,6 +45,7 @@ export default function CityPrototype() {
   const [log, setLog] = useState<string[]>(["Город открыт для инвестиций. Постройте экономику и захватите влияние."]);
   const [finished, setFinished] = useState(false);
   const [showRules, setShowRules] = useState(true);
+  const processingCards = useRef(new Set<string>());
 
   const me = players[turn];
   const role = ROLES.find(r => r.id === me.role);
@@ -121,9 +125,11 @@ export default function CityPrototype() {
     say(`${me.name} применяет полномочие роли «${role?.title}».`); setRolePowerUsed(true); spendAction();
   };
 
-  const playCard = (card: ActionCard) => {
+  const playCard = (card: HeldActionCard) => {
     const targeted = directedKinds.has(card.kind);
-    if (actionsLeft < 1 || (targeted && target === null) || (card.kind === "influence" && me.money < 2)) return;
+    if (processingCards.current.has(card.uid) || !me.hand.some(c => c.uid === card.uid)
+      || actionsLeft < 1 || (targeted && target === null) || (card.kind === "influence" && me.money < 2)) return;
+    processingCards.current.add(card.uid);
     if (card.kind === "clean") update(me.id, p => ({ ...p, scandals: Math.max(0, p.scandals - 1) }));
     if (card.kind === "roof") update(me.id, p => ({ ...p, roofs: Math.min(2, p.roofs + 1) }));
     if (card.kind === "grant") update(me.id, p => ({ ...p, money: p.money + card.value, influence: p.influence + (p.assets.some(a => a.tags.includes("ai")) ? 1 : 0) }));
@@ -132,12 +138,17 @@ export default function CityPrototype() {
     if (card.kind === "scandal" && target !== null) update(target, p => protectOr(p, q => ({ ...q, scandals: q.scandals + 1 })));
     if (card.kind === "fine" && target !== null) update(target, p => protectOr(p, q => q.money >= 3 ? { ...q, money: q.money - 3 } : { ...q, scandals: q.scandals + 1 }));
     if (card.kind === "steal" && target !== null) { update(me.id, p => ({ ...p, money: p.money + 1 })); update(target, p => protectOr(p, q => ({ ...q, money: Math.max(0, q.money - 2) }))); }
-    update(me.id, p => ({ ...p, hand: p.hand.filter(c => c.id !== card.id) }));
+    update(me.id, p => ({ ...p, hand: p.hand.filter(c => c.uid !== card.uid) }));
     say(`${me.name} играет «${card.title}»${targeted ? ` против ${targetPlayer?.name}` : ""}.`); spendAction();
   };
 
-  const convertCard = (card: ActionCard, into: "money" | "influence") => {
-    update(me.id, p => ({ ...p, money: p.money + (into === "money" ? 1 : 0), influence: p.influence + (into === "influence" ? 1 : 0), hand: p.hand.filter(c => c.id !== card.id) }));
+  const convertCard = (card: HeldActionCard, into: "money" | "influence") => {
+    if (processingCards.current.has(card.uid) || !me.hand.some(c => c.uid === card.uid)) return;
+    processingCards.current.add(card.uid);
+    update(me.id, p => {
+      if (!p.hand.some(c => c.uid === card.uid)) return p;
+      return { ...p, money: p.money + (into === "money" ? 1 : 0), influence: p.influence + (into === "influence" ? 1 : 0), hand: p.hand.filter(c => c.uid !== card.uid) };
+    });
     say(`${me.name} сбрасывает «${card.title}» и получает ${into === "money" ? "1$" : "1 влияние"}.`);
   };
 
@@ -197,7 +208,7 @@ export default function CityPrototype() {
       if (p.role === "capitalist") income += assets.filter(a => a.district === "business").length;
       const losesRole = p.scandals >= 3;
       const rolelessFine = losesRole && !p.role ? 3 : 0;
-      return { ...p, assets, money: Math.max(0, p.money + income - rolelessFine), role: losesRole ? null : p.role, scandals: losesRole ? 0 : p.scandals, hand: [...p.hand, shuffle(ACTIONS)[0]].slice(-4) };
+      return { ...p, assets, money: Math.max(0, p.money + income - rolelessFine), role: losesRole ? null : p.role, scandals: losesRole ? 0 : p.scandals, hand: [...p.hand, actionCard(shuffle(ACTIONS)[0])].slice(-4) };
     }));
     refillMarket(); setEventDeck(nextEventDeck); setEvent(nextEvent); setRound(round + 1); setTurn(0); setTarget(null); setActionsLeft(3); setRolePowerUsed(false);
     say(`Раунд ${round + 1}: «${nextEvent.title}».`);
@@ -240,7 +251,7 @@ export default function CityPrototype() {
       <aside className={`city-actions ${me.isBot ? "bot-turn" : ""}`}><h2>Решения <span className="action-counter">{actionsLeft}/3</span></h2>{me.isBot && <p className="bot-action-note">🤖 Бот анализирует рынок и продолжит автоматически.</p>}{actionsLeft === 0 && !me.isBot && <p className="no-actions">Действия потрачены. Завершите ход.</p>}<label className={`target-picker ${target === null ? "required" : ""}`}>Цель<select value={target ?? ""} onChange={e => setTarget(e.target.value === "" ? null : Number(e.target.value))}><option value="">— выберите игрока —</option>{players.filter(p => p.id !== me.id).map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
         <div className="action-group"><b>Город</b><button className="btn" disabled={actionsLeft < 1} onClick={() => basicAction("work")}>Городской заказ: +2$</button><button className="btn" disabled={actionsLeft < 1 || me.money < 2} onClick={() => basicAction("campaign")}>Кампания: 2$ → 2 влияния</button><button className="btn" disabled={actionsLeft < 1 || me.influence < 3} onClick={cityProject}>Городской проект: 3◆ → 6 очков</button><button className="btn" disabled={actionsLeft < 1 || me.money < 2 || districtLevels[district] >= 2} onClick={investDistrict}>Развить выбранный район: 2$</button></div>
         <div className="action-group"><b>Роли · свободная 3◆, переворот 3–5◆</b><div className="role-market">{ROLES.map(r => { const holder=roleHolder(r.id);const cost=holder?Math.max(3,5-holder.scandals):3;return <button disabled={holder?.id===me.id || me.influence<cost || actionsLeft<1} onClick={() => claimRole(r.id)} style={{borderColor:r.color}} key={r.id}>{r.title} · {cost}◆<small>{holder ? `занята: ${holder.name}` : r.passive}</small></button>})}</div>{me.role && <button className="btn full-width" disabled={rolePowerUsed || actionsLeft<1 || (["mafia","military"].includes(me.role)&&target===null)} onClick={rolePower}>{rolePowerUsed ? "Полномочие использовано" : role?.power}</button>}</div>
-        <div className="action-group"><b>Карты · сыграть или конвертировать без действия</b>{me.hand.map(c => { const targeted=directedKinds.has(c.kind);return <div className={`hand-card ${c.tone}`} key={c.id}><button className="action-card" onClick={() => playCard(c)} disabled={actionsLeft<1||(targeted&&target===null)||(c.kind==="influence"&&me.money<2)}><strong>{c.title}<em>{targeted?`→ ${targetPlayer?.name??"цель"}`:"→ себе"}</em></strong><small>{c.text}</small></button><div><button onClick={() => convertCard(c,"money")}>Продать +1$</button><button onClick={() => convertCard(c,"influence")}>Сбросить +1◆</button></div></div>})}</div>
+        <div className="action-group"><b>Карты · сыграть или конвертировать без действия</b>{me.hand.map(c => { const targeted=directedKinds.has(c.kind);return <div className={`hand-card ${c.tone}`} key={c.uid}><button className="action-card" onClick={() => playCard(c)} disabled={actionsLeft<1||(targeted&&target===null)||(c.kind==="influence"&&me.money<2)}><strong>{c.title}<em>{targeted?`→ ${targetPlayer?.name??"цель"}`:"→ себе"}</em></strong><small>{c.text}</small></button><div><button onClick={() => convertCard(c,"money")}>Продать +1$</button><button onClick={() => convertCard(c,"influence")}>Сбросить +1◆</button></div></div>})}</div>
         <div className="action-group"><b>Серые схемы · нужен серый объект</b><button className="btn" disabled={actionsLeft<1||!me.assets.some(a=>a.tags.includes("grey"))} onClick={() => greyScheme("safe")}>Осторожная: 75% → +3$</button><button className="btn danger" disabled={actionsLeft<1||!me.assets.some(a=>a.tags.includes("grey"))} onClick={() => greyScheme("bold")}>Наглая: 45% → +7$ / 2 скандала</button></div>
         <button className="btn" disabled={actionsLeft<1||me.money<(me.role==="mafia"?2:3)||me.roofs>=(me.role==="mafia"?2:1)} onClick={buyRoof}>Купить Крышу ({me.role==="mafia"?2:3}$)</button><button className="btn primary full-width" onClick={endTurn}>Завершить ход</button>
       </aside>
