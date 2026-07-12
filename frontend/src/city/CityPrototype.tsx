@@ -135,7 +135,7 @@ export default function CityPrototype() {
   };
 
   return <div className="city-game">
-    <header className="city-head"><div><h1>Город влияния <small>digital prototype</small></h1><p>Раунд {round}/10 · Ход: <b>{me.name}</b> · Действий: <b>{actionsLeft}</b></p></div><a className="btn" href="/">← Старый MVP</a></header>
+    <header className="city-head"><div><h1>Город влияния <small>digital prototype</small></h1><p>Раунд {round}/10 · Ход: <b>{me.name}</b> · Действий: <b>{actionsLeft}</b></p></div><a className="btn" href="?legacy=1">← Старый MVP</a></header>
     <div className="city-event"><strong>📰 {event.title}</strong><span>{event.text}</span></div>
     <section className="city-players">{players.map(p => <article className={`city-player ${p.id === me.id ? "active" : ""}`} key={p.id}><b>{p.name}</b><span>💰{p.money}　◆{p.influence}　⚠{p.scandals}/3　🛡{p.roofs}</span><small>{ROLES.find(r => r.id === p.role)?.title ?? "без роли"} · объектов {p.assets.length}</small></article>)}</section>
     {finished ? <section className="city-finish"><h2>Итоги города</h2>{scores.map((p, i) => <p key={p.id}>{i + 1}. <b>{p.name}</b> — {p.score} очков</p>)}<button className="btn primary" onClick={() => location.reload()}>Новая партия</button></section> :
