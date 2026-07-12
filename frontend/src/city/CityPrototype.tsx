@@ -76,20 +76,41 @@ export default function CityPrototype() {
 
   const assetValue = (a: OwnedAsset) => Math.floor(a.cost / 2) + (a.automated ? 2 : 0) + (a.scaled ? 2 : 0);
   const isManaged = (_assets: OwnedAsset[], index: number) => index < me.capacity;
-  const assetAbility = (asset: OwnedAsset) => {
-    const abilities: Record<string, string> = {
-      housing: "Стабильный объект без условий.", delivery: "+1$ во время Городского фестиваля.",
-      media: "+1 влияние за раунд, если есть объект Административного квартала.",
-      fund: "+1$ за каждый ваш объект Технокластера.", bank: "+1$ за каждый другой объект Делового центра.",
-      cowork: "+1$, если есть объект Спального района.", robotics: "Высокий базовый доход.",
-      battery: "+1$, если есть объект Спального района.", logistics: "Промышленные покупки дешевле на 1$.",
-      ai: "+1$ с объектом Делового центра; грант даёт +1 влияние.", crypto: "+1$ с объектом Серого сектора; открывает серые схемы.",
-      data: "+1 влияние за раунд с объектом Административного квартала.", contract: "+1 влияние за раунд для Политика.",
-      security: "При покупке даёт Крышу.", lobby: "Переворот против вашей роли стоит сопернику на 1 влияние дороже.",
-      cash: "Открывает серые схемы.", market: "+1$ с объектом Спального района или Делового центра; открывает схемы.",
-      datacenter: "+1$ с другим объектом Технокластера; открывает схемы.",
+  const assetAbilities = (asset: OwnedAsset): { text: string; active: boolean }[] => {
+    const has = (district: DistrictId) => districtCount(me, district) > 0;
+    const abilities: Record<string, { text: string; active: boolean }[]> = {
+      housing: [{ text: "Стабильный объект без условий.", active: true }],
+      delivery: [{ text: "+1$ во время Городского фестиваля.", active: event.id === "festival" }],
+      media: [{ text: "+1 влияние за раунд с Административным кварталом.", active: has("government") }],
+      fund: [{ text: `+1$ за каждый объект Технокластера (${districtCount(me, "tech")}).`, active: has("tech") }],
+      bank: [{ text: "+1$ за каждый другой объект Делового центра.", active: districtCount(me, "business") > 1 }],
+      cowork: [{ text: "+1$ с объектом Спального района.", active: has("residential") }],
+      robotics: [{ text: "Высокий базовый доход без дополнительного условия.", active: true }],
+      battery: [{ text: "+1$ с объектом Спального района.", active: has("residential") }],
+      logistics: [{ text: "Промышленные покупки дешевле на 1$.", active: true }],
+      ai: [
+        { text: "+1$ с объектом Делового центра.", active: has("business") },
+        { text: "Инновационный грант даёт +1 влияние.", active: true },
+      ],
+      crypto: [
+        { text: "+1$ с объектом Серого сектора.", active: has("shadows") },
+        { text: "Открывает серые схемы.", active: !asset.blocked || asset.automated },
+      ],
+      data: [{ text: "+1 влияние за раунд с Административным кварталом.", active: has("government") }],
+      contract: [{ text: "+1 влияние за раунд для Политика.", active: me.role === "politician" }],
+      security: [{ text: "При покупке выдала Крышу.", active: true }],
+      lobby: [{ text: "Переворот против вашей роли стоит на 1 влияние дороже.", active: me.role !== null }],
+      cash: [{ text: "Открывает серые схемы.", active: !asset.blocked || asset.automated }],
+      market: [
+        { text: "+1$ со Спальным районом или Деловым центром.", active: has("residential") || has("business") },
+        { text: "Открывает серые схемы.", active: !asset.blocked || asset.automated },
+      ],
+      datacenter: [
+        { text: "+1$ с объектом Технокластера.", active: has("tech") },
+        { text: "Открывает серые схемы.", active: !asset.blocked || asset.automated },
+      ],
     };
-    return abilities[asset.id] ?? "Базовый объект.";
+    return abilities[asset.id] ?? [{ text: "Базовый объект.", active: true }];
   };
   const assetIncome = (asset: OwnedAsset, index: number) => {
     const roleIncome = me.role === "capitalist" && asset.district === "business" ? 1 : 0;
@@ -270,7 +291,7 @@ export default function CityPrototype() {
   };
 
   const greyScheme = (risk: "safe" | "bold") => {
-    const greyAssets = me.assets.filter(a => a.tags.includes("grey") && !a.blocked);
+    const greyAssets = me.assets.filter(a => a.tags.includes("grey") && (!a.blocked || a.automated));
     if (actionsLeft < 1 || greyAssets.length === 0) return;
     const baseChance = risk === "safe" ? .75 : .45;
     const chance = Math.min(.9, baseChance + (me.role === "fraudster" ? .2 : 0) + Math.min(.1, greyAssets.length * .05));
@@ -355,7 +376,7 @@ export default function CityPrototype() {
         const available = wanted.find(r => roleHolder(r)?.id !== me.id && me.influence >= roleCost(roleHolder(r)));
         if (available) { claimRole(available); return; }
       }
-      if (me.id === 3 && me.assets.some(a => a.tags.includes("grey"))) { greyScheme(me.scandals < 2 ? "bold" : "safe"); return; }
+      if (me.id === 3 && me.assets.some(a => a.tags.includes("grey") && (!a.blocked || a.automated))) { greyScheme(me.scandals < 2 ? "bold" : "safe"); return; }
       if (me.id === 2 && me.money >= 2) { basicAction("campaign"); return; }
       const scalable = me.assets.find(a => !a.scaled && !a.automated);
       if (scalable && me.money >= 4) { improve(scalable.uid, me.id === 1 ? "scale" : "automate"); return; }
@@ -382,7 +403,7 @@ export default function CityPrototype() {
               <span>{districtName} · {managed ? "● управляется" : "○ без управления"}</span>
               <strong className="asset-income">Доход в этом раунде: {assetIncome(a, i)}$</strong>
               <small>База {a.income}$ {a.automated && "· автоматизация +1$"} {a.scaled && "· масштаб +2$"} {districtLevels[a.district] > 0 && `· район +${districtLevels[a.district] * 25}%`} {event.district === a.district && event.incomeMultiplier && `· событие ×${event.incomeMultiplier}`}</small>
-              <small className="asset-ability">{assetAbility(a)}</small>
+              <div className="asset-abilities">{assetAbilities(a).map((ability, abilityIndex) => <small className={`asset-ability ${ability.active ? "active" : "inactive"}`} key={abilityIndex}>{ability.active ? "✓ " : "○ "}{ability.text}</small>)}</div>
               <div>
                 <button className={a.automated ? "upgrade-complete" : ""} title="Безопасная ветка: +1$ дохода и иммунитет к блокировке" disabled={a.automated || a.scaled || me.money < 5 || actionsLeft < 1} onClick={() => improve(a.uid,"automate")}>{a.automated ? "✓ Автоматизация: +1$, защита" : a.scaled ? "Недоступно: выбран масштаб" : "Автоматизация 5$ → +1$ и защита"}</button>
                 <button className={a.scaled ? "upgrade-complete" : ""} title="Доходная ветка: +2$ дохода" disabled={a.scaled || a.automated || me.money < 4 || actionsLeft < 1} onClick={() => improve(a.uid,"scale")}>{a.scaled ? "✓ Масштабировано +2$" : a.automated ? "Недоступно: выбрана автоматизация" : "Масштаб 4$ → +2$"}</button>
@@ -396,7 +417,7 @@ export default function CityPrototype() {
         <div className="action-group"><b>Город</b><button className="btn" disabled={actionsLeft < 1} onClick={() => basicAction("work")}>Городской заказ: +2$</button><button className="btn" disabled={actionsLeft < 1 || me.money < 2} onClick={() => basicAction("campaign")}>Кампания: 2$ → 2 влияния</button><button className="btn" disabled={actionsLeft < 1 || me.influence < 3} onClick={cityProject}>Городской проект: 3◆ → 6 очков</button><button className="btn" disabled={actionsLeft < 1 || me.capacity >= MAX_CAPACITY || me.money < (CAPACITY_COST[me.capacity] ?? Infinity)} onClick={buyCapacity}>{me.capacity >= MAX_CAPACITY ? "✓ Максимум 6 слотов" : `Купить слот ${me.capacity + 1}: ${CAPACITY_COST[me.capacity]}$`}</button><button className="btn" title="+25% дохода всем объектам выбранного района; +1◆, если у вас там есть объект. Максимум 2 уровня" disabled={actionsLeft < 1 || me.money < 2 || districtLevels[district] >= 2 || districtCount(me, district) < 2} onClick={investDistrict}>Развить район (нужно 2 объекта): 2$ → +25% дохода{me.assets.some(a => a.district === district) ? " +1◆" : ""}</button></div>
         <div className="action-group"><b>Роли · свободная 3◆, переворот 3–6◆</b><div className="role-market">{ROLES.map(r => { const holder=roleHolder(r.id);const cost=roleCost(holder);return <button disabled={holder?.id===me.id || me.influence<cost || actionsLeft<1} onClick={() => claimRole(r.id)} style={{borderColor:r.color}} key={r.id}>{r.title} · {cost}◆<small>{holder ? `занята: ${holder.name}${holder.roofs ? " · защищена Крышей" : ""}` : r.passive}</small></button>})}</div>{me.role && <button className="btn full-width" disabled={rolePowerUsed || actionsLeft<1 || (["mafia","military"].includes(me.role)&&target===null)} onClick={rolePower}>{rolePowerUsed ? "Полномочие использовано" : role?.power}</button>}</div>
         <div className="action-group"><b>Карты · сыграть или конвертировать без действия</b>{me.hand.map(c => { const targeted=directedKinds.has(c.kind);return <div className={`hand-card ${c.tone}`} key={c.uid}><button className="action-card" onClick={() => playCard(c)} disabled={actionsLeft<1||(targeted&&target===null)||(c.kind==="influence"&&me.money<2)}><strong>{c.title}<em>{targeted?`→ ${targetPlayer?.name??"цель"}`:"→ себе"}</em></strong><small>{c.text}</small></button><div><button onClick={() => convertCard(c,"money")}>Продать +1$</button><button onClick={() => convertCard(c,"influence")}>Сбросить +1◆</button></div></div>})}</div>
-        <div className="action-group"><b>Серые схемы · нужен серый объект</b><button className="btn" disabled={actionsLeft<1||!me.assets.some(a=>a.tags.includes("grey"))} onClick={() => greyScheme("safe")}>Осторожная: 75% → +3$</button><button className="btn danger" disabled={actionsLeft<1||!me.assets.some(a=>a.tags.includes("grey"))} onClick={() => greyScheme("bold")}>Наглая: 45% → +7$ / 2 скандала</button></div>
+        <div className="action-group"><b>Серые схемы · нужен активный серый объект</b><button className="btn" disabled={actionsLeft<1||!me.assets.some(a=>a.tags.includes("grey")&&(!a.blocked||a.automated))} onClick={() => greyScheme("safe")}>Осторожная: 75% → +3$</button><button className="btn danger" disabled={actionsLeft<1||!me.assets.some(a=>a.tags.includes("grey")&&(!a.blocked||a.automated))} onClick={() => greyScheme("bold")}>Наглая: 45% → +7$ / 2 скандала</button></div>
         <button className="btn" disabled={actionsLeft<1||me.money<(me.role==="mafia"?2:3)||me.roofs>=(me.role==="mafia"?2:1)} onClick={buyRoof}>Купить Крышу ({me.role==="mafia"?2:3}$)</button><button className="btn primary full-width" onClick={endTurn}>Завершить ход</button>
       </aside>
       <aside className="city-log"><h2>Хроника</h2>{log.map((x,i)=><p key={i}>{x}</p>)}</aside>
