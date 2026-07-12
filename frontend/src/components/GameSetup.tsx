@@ -39,6 +39,7 @@ export function GameSetup({ busy, onStart }: Props) {
     <div className="setup">
       <h1>Сатирическая бизнес-игра</h1>
       <p className="subtitle">Прототип · 3 круга · борьба за роли · v{__GAME_VERSION__}</p>
+      <a className="btn city-entry" href="?city=1">🏙️ Открыть новый digital-прототип</a>
 
       <div className="setup-row">
         <label>
