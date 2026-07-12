@@ -45,6 +45,7 @@ export default function CityPrototype() {
   const [log, setLog] = useState<string[]>(["Город открыт для инвестиций. Постройте экономику и захватите влияние."]);
   const [finished, setFinished] = useState(false);
   const [showRules, setShowRules] = useState(true);
+  const [logExportStatus, setLogExportStatus] = useState("");
   const processingCards = useRef(new Set<string>());
 
   const me = players[turn];
@@ -53,12 +54,47 @@ export default function CityPrototype() {
   const roleHolder = (id: RoleId) => players.find(p => p.role === id);
 
   const assetValue = (a: OwnedAsset) => Math.floor(a.cost / 2) + (a.automated ? 2 : 0) + (a.scaled ? 2 : 0);
+  const isManaged = (assets: OwnedAsset[], index: number) => assets[index].automated
+    || assets.slice(0, index).filter(a => !a.automated).length < 3;
   const scoreOf = (p: Player) => p.money + p.influence + p.assets.reduce((s, a) => s + assetValue(a), 0)
     + p.projects * 6 + (p.role ? 3 : 0) - p.scandals * 2;
   const scores = useMemo(() => players.map(p => ({ ...p, score: scoreOf(p) })).sort((a, b) => b.score - a.score), [players]);
 
+  const gameLogText = () => [
+    "Город влияния — полный журнал игры",
+    `Версия: v${__GAME_VERSION__}`,
+    `Дата экспорта: ${new Date().toLocaleString("ru-RU")}`,
+    `Раунд: ${round}/${MAX_ROUNDS}`,
+    "",
+    "Итоги:",
+    ...scores.map((p, i) => `${i + 1}. ${p.name} — ${p.score} очков; деньги ${p.money}$; влияние ${p.influence}; объектов ${p.assets.length}`),
+    "",
+    `Хронология (${log.length} записей):`,
+    ...[...log].reverse().map((entry, i) => `${i + 1}. ${entry}`),
+  ].join("\n");
+
+  const copyGameLog = async () => {
+    try {
+      await navigator.clipboard.writeText(gameLogText());
+      setLogExportStatus("Лог скопирован");
+    } catch {
+      setLogExportStatus("Не удалось скопировать — скачайте файл");
+    }
+  };
+
+  const downloadGameLog = () => {
+    const blob = new Blob([gameLogText()], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `business-board-game-${new Date().toISOString().replace(/[:.]/g, "-")}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setLogExportStatus("Лог скачан");
+  };
+
   const update = (id: number, fn: (p: Player) => Player) => setPlayers(ps => ps.map(p => p.id === id ? fn(p) : p));
-  const say = (text: string) => setLog(xs => [text, ...xs].slice(0, 40));
+  const say = (text: string) => setLog(xs => [text, ...xs]);
   const spendAction = () => setActionsLeft(x => Math.max(0, x - 1));
   const priceOf = (asset: AssetCard) => {
     const eventDiscount = event.district === asset.district ? (event.marketDiscount ?? 0) : 0;
@@ -244,12 +280,12 @@ export default function CityPrototype() {
     <header className="city-head"><div><h1>Город влияния <small>strategy prototype v2</small> <span className="game-version" title="Версия сборки">v{__GAME_VERSION__}</span></h1><p>Раунд {round}/{MAX_ROUNDS} · Ход: <b>{me.name}</b> · Действий: <b>{actionsLeft}</b>{me.isBot && <span className="bot-thinking"> · принимает решение…</span>}</p></div><div className="city-head-buttons"><button className="btn" onClick={() => setShowRules(x => !x)}>📖 Правила</button><a className="btn" href="?legacy=1">Старый MVP</a></div></header>
     <div className="city-event"><strong>📰 {event.title}</strong><span>{event.text}</span><em>Городские проекты: 3◆ → 6 итоговых очков</em></div>
     <section className="city-players">{players.map(p => <article className={`city-player ${p.id === me.id ? "active" : ""}`} key={p.id}><b>{p.name} <em>{scoreOf(p)} оч.</em></b><span>💰{p.money}　◆{p.influence}　⚠{p.scandals}/3　🛡{p.roofs}</span><small>{ROLES.find(r => r.id === p.role)?.title ?? "без роли"} · объектов {p.assets.length}</small></article>)}</section>
-    {finished ? <section className="city-finish"><h2>Итоги города</h2>{scores.map((p, i) => <p key={p.id}>{i + 1}. <b>{p.name}</b> — {p.score} очков</p>)}<button className="btn primary" onClick={() => location.reload()}>Новая партия</button></section> : <main className="city-layout">
+    {finished ? <section className="city-finish"><h2>Итоги города</h2>{scores.map((p, i) => <p key={p.id}>{i + 1}. <b>{p.name}</b> — {p.score} очков</p>)}<h3>Полный журнал</h3><p className="dim">Сохранено записей: {log.length}. В файле действия расположены от начала игры к завершению.</p><div className="log-export-actions"><button className="btn" onClick={copyGameLog}>Копировать лог</button><button className="btn" onClick={downloadGameLog}>Скачать .txt</button></div>{logExportStatus && <p className="log-export-status">{logExportStatus}</p>}<button className="btn primary" onClick={() => location.reload()}>Новая партия</button></section> : <main className="city-layout">
       <section className="city-map"><h2>Районы и рынок</h2><div className="district-grid">{DISTRICTS.map(d => <div className={`district ${district === d.id ? "selected" : ""}`} style={{"--district": d.color} as React.CSSProperties} onClick={() => setDistrict(d.id)} key={d.id}><h3>{d.icon} {d.title} <span className="district-level">{districtLevels[d.id] >= 0 ? "+" : ""}{districtLevels[d.id]}</span></h3><p>{d.description}</p><div className="market-cards">{market.filter(a => a.district === d.id).map(a => <button className="market-card" disabled={me.money < priceOf(a) || actionsLeft < 1} onClick={() => buy(a)} key={a.uid}><b>{a.title}</b><span>{priceOf(a)}$ · доход {a.income}$ · ◆{a.influence}</span><small>{a.text}</small></button>)}</div></div>)}</div>
-        <div className="owned-panel"><h2>Ваш бизнес · управление 3</h2>{me.assets.length === 0 ? <p className="dim">Купите первый объект на рынке.</p> : <div className="owned-grid">{me.assets.map((a, i) => <article className={a.blocked ? "blocked" : ""} key={a.uid}><b>{a.title}</b><span>{i < 3 || a.automated ? "● управляется" : "○ без управления"} · доход {a.income + (a.scaled ? 2 : 0)}$</span><div><button disabled={a.automated || me.money < 4 || actionsLeft < 1} onClick={() => improve(a.uid,"automate")}>Автоматизация 4$</button><button disabled={a.scaled || me.money < 3 || actionsLeft < 1} onClick={() => improve(a.uid,"scale")}>Масштаб 3$</button><button disabled={actionsLeft < 1} onClick={() => sellAsset(a.uid)}>Продать {assetValue(a)}$</button></div></article>)}</div>}</div>
+        <div className="owned-panel"><h2>Ваш бизнес · управление 3</h2><p className="dim">Доход приносят 3 неавтоматизированных объекта. Автоматизированные работают сверх этого лимита.</p>{me.assets.length === 0 ? <p className="dim">Купите первый объект на рынке.</p> : <div className="owned-grid">{me.assets.map((a, i) => <article className={a.blocked ? "blocked" : ""} key={a.uid}><b>{a.title}</b><span>{isManaged(me.assets, i) ? "● управляется" : "○ без управления"} · доход {a.income + (a.scaled ? 2 : 0)}$</span><div><button title="Объект всегда приносит доход и не занимает один из 3 слотов управления" disabled={a.automated || me.money < 4 || actionsLeft < 1} onClick={() => improve(a.uid,"automate")}>Автоматизация 4$</button><button title="Постоянно добавляет объекту +2$ дохода" disabled={a.scaled || me.money < 3 || actionsLeft < 1} onClick={() => improve(a.uid,"scale")}>Масштаб 3$</button><button disabled={actionsLeft < 1} onClick={() => sellAsset(a.uid)}>Продать {assetValue(a)}$</button></div></article>)}</div>}</div>
       </section>
       <aside className={`city-actions ${me.isBot ? "bot-turn" : ""}`}><h2>Решения <span className="action-counter">{actionsLeft}/3</span></h2>{me.isBot && <p className="bot-action-note">🤖 Бот анализирует рынок и продолжит автоматически.</p>}{actionsLeft === 0 && !me.isBot && <p className="no-actions">Действия потрачены. Завершите ход.</p>}<label className={`target-picker ${target === null ? "required" : ""}`}>Цель<select value={target ?? ""} onChange={e => setTarget(e.target.value === "" ? null : Number(e.target.value))}><option value="">— выберите игрока —</option>{players.filter(p => p.id !== me.id).map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
-        <div className="action-group"><b>Город</b><button className="btn" disabled={actionsLeft < 1} onClick={() => basicAction("work")}>Городской заказ: +2$</button><button className="btn" disabled={actionsLeft < 1 || me.money < 2} onClick={() => basicAction("campaign")}>Кампания: 2$ → 2 влияния</button><button className="btn" disabled={actionsLeft < 1 || me.influence < 3} onClick={cityProject}>Городской проект: 3◆ → 6 очков</button><button className="btn" disabled={actionsLeft < 1 || me.money < 2 || districtLevels[district] >= 2} onClick={investDistrict}>Развить выбранный район: 2$</button></div>
+        <div className="action-group"><b>Город</b><button className="btn" disabled={actionsLeft < 1} onClick={() => basicAction("work")}>Городской заказ: +2$</button><button className="btn" disabled={actionsLeft < 1 || me.money < 2} onClick={() => basicAction("campaign")}>Кампания: 2$ → 2 влияния</button><button className="btn" disabled={actionsLeft < 1 || me.influence < 3} onClick={cityProject}>Городской проект: 3◆ → 6 очков</button><button className="btn" title="+25% дохода всем объектам выбранного района; +1◆, если у вас там есть объект. Максимум 2 уровня" disabled={actionsLeft < 1 || me.money < 2 || districtLevels[district] >= 2} onClick={investDistrict}>Развить район: 2$ → +25% дохода{me.assets.some(a => a.district === district) ? " +1◆" : ""}</button></div>
         <div className="action-group"><b>Роли · свободная 3◆, переворот 3–5◆</b><div className="role-market">{ROLES.map(r => { const holder=roleHolder(r.id);const cost=holder?Math.max(3,5-holder.scandals):3;return <button disabled={holder?.id===me.id || me.influence<cost || actionsLeft<1} onClick={() => claimRole(r.id)} style={{borderColor:r.color}} key={r.id}>{r.title} · {cost}◆<small>{holder ? `занята: ${holder.name}` : r.passive}</small></button>})}</div>{me.role && <button className="btn full-width" disabled={rolePowerUsed || actionsLeft<1 || (["mafia","military"].includes(me.role)&&target===null)} onClick={rolePower}>{rolePowerUsed ? "Полномочие использовано" : role?.power}</button>}</div>
         <div className="action-group"><b>Карты · сыграть или конвертировать без действия</b>{me.hand.map(c => { const targeted=directedKinds.has(c.kind);return <div className={`hand-card ${c.tone}`} key={c.uid}><button className="action-card" onClick={() => playCard(c)} disabled={actionsLeft<1||(targeted&&target===null)||(c.kind==="influence"&&me.money<2)}><strong>{c.title}<em>{targeted?`→ ${targetPlayer?.name??"цель"}`:"→ себе"}</em></strong><small>{c.text}</small></button><div><button onClick={() => convertCard(c,"money")}>Продать +1$</button><button onClick={() => convertCard(c,"influence")}>Сбросить +1◆</button></div></div>})}</div>
         <div className="action-group"><b>Серые схемы · нужен серый объект</b><button className="btn" disabled={actionsLeft<1||!me.assets.some(a=>a.tags.includes("grey"))} onClick={() => greyScheme("safe")}>Осторожная: 75% → +3$</button><button className="btn danger" disabled={actionsLeft<1||!me.assets.some(a=>a.tags.includes("grey"))} onClick={() => greyScheme("bold")}>Наглая: 45% → +7$ / 2 скандала</button></div>
@@ -264,8 +300,8 @@ export default function CityPrototype() {
 function Rules() { return <section className="city-help"><h2>Как играть</h2><div className="help-grid">
   <article><h3>🎯 Победа</h3><p>Деньги + влияние + половина стоимости бизнеса + проекты + роль − скандалы. Текущий прогноз виден у каждого игрока.</p></article>
   <article><h3>⏱️ Три действия</h3><p>Покупайте и улучшайте бизнес, развивайте районы, боритесь за роли, играйте карты или стройте серые схемы.</p></article>
-  <article><h3>🏙️ Районы</h3><p>Инвестиция повышает состояние выбранного района и будущий доход всех его компаний. Событие раунда известно заранее.</p></article>
-  <article><h3>⚙️ Управление</h3><p>Доход дают первые три компании. Автоматизация освобождает управление, масштабирование добавляет +2$ дохода.</p></article>
+  <article><h3>🏙️ Районы</h3><p>Развитие стоит 2$ и добавляет +25% к доходу каждого объекта района за уровень (максимум +2). Если у вас уже есть объект в этом районе, вы сразу получаете +1 влияние.</p></article>
+  <article><h3>⚙️ Управление</h3><p>Доход приносят только три неавтоматизированных объекта. Автоматизация за 4$ заставляет объект работать всегда и не занимать слот управления. Масштабирование за 3$ постоянно добавляет объекту +2$ дохода.</p></article>
   <article><h3>🏷️ Роли</h3><p>Свободная роль стоит 3 влияния. Занятую можно отобрать за 3–5. Три скандала снимают роль; игрок без роли платит кризисный штраф 3$.</p></article>
   <article><h3>🃏 Карты</h3><p>Карту можно сыграть за действие, продать за 1$ или сбросить за 1 влияние. Поэтому разыгрывать всю руку не всегда выгодно.</p></article>
   <article><h3>🌒 Серые схемы</h3><p>Требуют хотя бы один объект Серого сектора. Аферист повышает шанс и награду; провал блокирует бизнес и создаёт скандалы.</p></article>
