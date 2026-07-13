@@ -1,5 +1,5 @@
 # Запуск проекта
-
+cd /c/Zapolskikh/business-board-game/frontend && npm run dev
 ## Первый запуск (однократно)
 
 ```bash
