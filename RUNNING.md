@@ -15,7 +15,7 @@ cd frontend && npm install && cd ..
 
 Открыть **два терминала**:
 
-**Терминал 1 — бэкенд (FastAPI)**
+**Терминал 1 — бэкенд (FastAPI) **
 ```bash
 cd backend
 ../.venv/Scripts/python.exe -m uvicorn app.main:app --reload --port 8000
