@@ -21,7 +21,7 @@ const shuffle = <T,>(items: T[]) => [...items].sort(() => Math.random() - .5);
 const freshMarket = (cycle: number): MarketAsset[] => shuffle(ASSETS).map((a, i) => ({ ...a, uid: `${a.id}:${cycle}:${i}` }));
 let cardSequence = 0;
 const actionCard = (card: ActionCard): HeldActionCard => ({ ...card, uid: `${card.id}:${++cardSequence}` });
-const initialPlayers = (): Player[] => ["Игрок 1", "Бот-инвестор", "Бот-политик", "Бот-аферист"].map((name, id) => ({
+const initialPlayers = (): Player[] => ["Игрок 1", "Бот 1", "Бот 2", "Бот 3"].map((name, id) => ({
   id, name, isBot: id > 0, money: 10, influence: 2, scandals: 0, roofs: 0, role: null,
   copiedRole: null, pendingRole: null, jailTurns: 0, scandalGainedThisRound: 0,
   assets: [], hand: [], projects: 0, capacity: 3,
@@ -661,43 +661,131 @@ export default function CityPrototype() {
   useEffect(() => {
     if (!me.isBot || finished) return;
     const timer = window.setTimeout(() => {
-      if ((hasRole(me,"journalist")||hasRole(me,"mafia")||hasRole(me,"military")) && target===null) { setTarget(scores.find(p=>p.id!==me.id)?.id??null); return; }
-      if (me.role === "politician" && !politicianCleanupUsed && me.scandals > 0 && me.influence >= 2) { cleanPoliticianScandal(); return; }
-      if (me.role === "politician" && !politicianTaxUsed && me.influence >= 5) {
-        const bestDistrict = [...DISTRICTS].sort((a, b) => objectsInDistrict(b.id) - objectsInDistrict(a.id))[0];
-        if (objectsInDistrict(bestDistrict.id) >= 5) { collectDistrictTax(bestDistrict.id); return; }
+      const myPlace = scores.findIndex(p => p.id === me.id) + 1;
+      const leader = scores.find(p => p.id !== me.id) ?? null;
+      const gap = Math.max(0, (scores[0]?.score ?? 0) - scoreOf(me));
+      const distinctDistricts = new Set(me.assets.map(a => a.district)).size;
+      const maxEnemyScandals = Math.max(0, ...players.filter(p => p.id !== me.id).map(p => p.scandals));
+      const isComebackPosition = myPlace === players.length || (myPlace >= 3 && gap >= 10);
+
+      // The same evaluator is used by every bot. Buildings, position and opponents
+      // determine the role; bot ids no longer encode an archetype.
+      const roleUtility = (roleId: RoleId) => {
+        const counts = (districtId: DistrictId) => districtCount(me, districtId);
+        if (roleId === "capitalist") return counts("business") * 4 + distinctDistricts * 1.2 + Math.min(3, me.money / 6);
+        if (roleId === "politician") return counts("residential") * 3 + counts("government") * 4 + passiveInfluenceFor(me) * 1.5;
+        if (roleId === "fraudster") return counts("tech") * 4 + counts("shadows") * 1.5 + (isComebackPosition ? 7 : 0);
+        if (roleId === "mafia") return counts("shadows") * 4 + counts("government") * 2 + (gap >= 8 ? 2 : 0);
+        if (roleId === "military") return counts("industrial") * 4 + maxEnemyScandals * 2.5 + (isComebackPosition ? 4 : 0);
+        return maxEnemyScandals * 2 + players.filter(p => p.id !== me.id && p.role).length;
+      };
+      const strategicRoles: RoleId[] = ["capitalist", "politician", "fraudster", "mafia", "military"];
+      let strategicRole = [...strategicRoles].sort((a, b) => roleUtility(b) - roleUtility(a))[0];
+      if (isComebackPosition) {
+        strategicRole = maxEnemyScandals > 0 && roleUtility("military") >= roleUtility("fraudster")
+          ? "military" : "fraudster";
       }
-      if (hasRole(me,"capitalist") && !rolePowerUsed && me.influence >= 3) { rolePower(); return; }
-      if (hasRole(me,"journalist") && !journalistPublishUsed && target!==null && me.influence>=3) { journalistPublish(); return; }
-      if (actionsLeft>0 && hasRole(me,"mafia") && !mafiaRacketUsed && target!==null && me.assets.some(a=>a.district==="shadows"&&!a.blocked)) { mafiaRacket(); return; }
-      if (actionsLeft>0 && hasRole(me,"military") && target!==null && targetPlayer && targetPlayer.scandals>0 && !sanctionedPlayers.includes(target)) { enforcerSanction(); return; }
-      if (hasRole(me,"fraudster") && me.scandals>=3 && actionsLeft>0) { fraudCleanScandal(); return; }
-      if (actionsLeft > 0) {
-        const safeCard = me.hand.find(c => !directedKinds.has(c.kind) && (c.kind !== "influence" || me.money >= 2));
-        if (safeCard) { playCard(safeCard); return; }
-        const unusedCard = me.hand[0];
-        if (unusedCard) { convertCard(unusedCard, me.id === 2 ? "influence" : "money"); return; }
+      const strategicHolder = roleHolder(strategicRole);
+      const scandalTarget = players
+        .filter(p => p.id !== me.id)
+        .sort((a, b) => b.scandals - a.scandals || scoreOf(b) - scoreOf(a))[0] ?? null;
+      const journalistTarget = strategicHolder && strategicHolder.id !== me.id ? strategicHolder : leader;
+      const desiredTarget = hasRole(me, "journalist") ? journalistTarget
+        : hasRole(me, "military") ? scandalTarget
+        : hasRole(me, "mafia") || me.assets.some(a => (a.id === "market" || a.id === "datacenter") && !a.blocked) ? leader
+        : null;
+      if (desiredTarget && target !== desiredTarget.id) { setTarget(desiredTarget.id); return; }
+
+      // Free and role-specific powers are resolved before spending normal actions.
+      if (hasRole(me, "politician") && !politicianCleanupUsed && me.scandals > 0 && me.influence >= 2) { cleanPoliticianScandal(); return; }
+      if (hasRole(me, "politician") && !politicianTaxUsed && me.influence >= 5) {
+        const bestTaxDistrict = [...DISTRICTS].sort((a, b) => objectsInDistrict(b.id) - objectsInDistrict(a.id))[0];
+        if (objectsInDistrict(bestTaxDistrict.id) >= 5) { collectDistrictTax(bestTaxDistrict.id); return; }
       }
-      const affordable = market.filter(a => priceOf(a) <= me.money)
-        .sort((a, b) => (b.income / priceOf(b) + districtCount(me, b.district) * .35 + b.influence * .08)
-          - (a.income / priceOf(a) + districtCount(me, a.district) * .35 + a.influence * .08));
-      if (canInvest && affordable.length && me.assets.length < me.capacity) { buy(affordable[0]); return; }
+      if (hasRole(me, "capitalist") && !rolePowerUsed && me.influence >= 3 && me.money >= 4) { rolePower(); return; }
+      if (hasRole(me, "journalist") && target !== null && !journalistInflateUsed && me.scandals < 4) { journalistInflate(); return; }
+      if (hasRole(me, "journalist") && target !== null && !journalistPublishUsed && me.influence >= 3) { journalistPublish(); return; }
+      if (hasRole(me, "mafia") && !mafiaCleanupUsed && me.scandals >= 2 && (me.roofs > 0 || (me.money >= 3 && districtCount(me, "government") > 0))) {
+        mafiaCleanup(me.roofs > 0 ? "roof" : "money"); return;
+      }
+      if (actionsLeft > 0 && hasRole(me, "mafia") && !mafiaRacketUsed && target !== null && me.assets.some(a => a.district === "shadows" && !a.blocked)) { mafiaRacket(); return; }
+      if (actionsLeft > 0 && hasRole(me, "mafia") && !mafiaRoofSweepUsed && me.roofs > 0 && players.filter(p => p.id !== me.id && p.roofs > 0).length >= 2) { mafiaSweepRoofs(); return; }
+      if (actionsLeft > 0 && hasRole(me, "military") && target !== null && targetPlayer && targetPlayer.scandals > 0 && !sanctionedPlayers.includes(target)) { enforcerSanction(); return; }
+      if (actionsLeft > 0 && hasRole(me, "fraudster") && me.scandals >= 4) { fraudCleanScandal(); return; }
+
+      // A role is changed only when the situational choice is materially better.
+      // If the best role is occupied and a takeover is unaffordable, Journalist is
+      // a counter-pick that can push its holder over the scandal threshold.
+      if (actionsLeft > 0 && me.scandals < 5) {
+        const currentUtility = me.role ? roleUtility(me.role) : -2;
+        const shouldChangeRole = me.role !== strategicRole && (me.role === null || roleUtility(strategicRole) >= currentUtility + 3 || isComebackPosition);
+        if (shouldChangeRole) {
+          const holder = roleHolder(strategicRole);
+          const cost = roleCost(holder);
+          if ((!holder || me.influence >= cost) && me.influence >= cost) { claimRole(strategicRole); return; }
+          const journalistHolder = roleHolder("journalist");
+          if (holder && holder.id !== me.id && me.role !== "journalist" && !journalistHolder && me.influence >= 5) { claimRole("journalist"); return; }
+        }
+      }
+
+      if (actionsLeft > 0 && hasRole(me, "fraudster") && !fraudCryptoUsed && me.assets.some(a => a.id === "crypto" && !a.blocked) && me.scandals <= 3) {
+        const safeAmount = Math.max(1, Math.min(isComebackPosition ? 2 : 1, 4 - me.scandals));
+        if (fraudScamAmount !== safeAmount) { setFraudScamAmount(safeAmount); return; }
+        fraudCryptoScam(); return;
+      }
+      if (actionsLeft >= 4 && hasRole(me, "fraudster") && !fraudDocsUsed && !me.pendingRole && me.influence >= 5 && districtCount(me, "tech") >= 2) {
+        const copied = strategicRoles.filter(r => r !== "fraudster").sort((a, b) => roleUtility(b) - roleUtility(a))[0];
+        if (forgedRoleChoice !== copied) { setForgedRoleChoice(copied); return; }
+        fraudForgeDocuments(); return;
+      }
+
+      // Score market cards by immediate economy, completing 2/4-object synergies
+      // and compatibility with the role currently being pursued.
+      const marketValue = (asset: MarketAsset) => {
+        const count = districtCount(me, asset.district);
+        const completion = count === 1 ? 5 : count === 3 ? 7 : count === 2 ? 2 : 0;
+        const roleMatch = ROLES.find(r => r.id === strategicRole)?.districts.includes(asset.district) ? 3 : 0;
+        const conditionMatch = (asset.id === "cowork" || asset.id === "battery") && districtCount(me, "residential") > 0
+          || asset.id === "ai" && districtCount(me, "business") > 0
+          || asset.id === "fund" && districtCount(me, "tech") > 0 ? 2 : 0;
+        const greyPenalty = asset.tags.includes("grey") && !hasRole(me, "fraudster") && !hasRole(me, "mafia") ? me.scandals * 2 + 2 : 0;
+        return asset.income * 2.5 - priceOf(asset) + asset.influence + completion + roleMatch + conditionMatch - greyPenalty;
+      };
+      const affordable = market.filter(a => priceOf(a) <= me.money).sort((a, b) => marketValue(b) - marketValue(a));
+      const bestMarket = affordable[0];
+      if (canInvest && bestMarket && me.assets.length < me.capacity) { buy(bestMarket); return; }
       const capacityCost = CAPACITY_COST[me.capacity];
-      if (canInvest && affordable.length && capacityCost && me.money >= capacityCost) { buyCapacity(); return; }
-      if (actionsLeft > 0 && !me.role && me.scandals < 5) {
-        const wanted: RoleId[] = me.id === 1 ? ["capitalist", "military"] : me.id === 2 ? ["politician", "journalist"] : ["fraudster", "mafia"];
-        const available = wanted.find(r => roleHolder(r)?.id !== me.id && me.influence >= roleCost(roleHolder(r)));
-        if (available) { claimRole(available); return; }
+      if (canInvest && bestMarket && me.assets.length >= me.capacity && capacityCost && me.money >= capacityCost && marketValue(bestMarket) >= 4) { buyCapacity(); return; }
+
+      const developable = DISTRICTS
+        .filter(d => districtCount(me, d.id) >= 2 && districtLevels[d.id] < 2)
+        .sort((a, b) => districtCount(me, b.id) - districtCount(me, a.id))[0];
+      if (actionsLeft > 0 && me.money >= 2 && developable) {
+        if (district !== developable.id) { setDistrict(developable.id); return; }
+        investDistrict(); return;
       }
-      if (actionsLeft > 0 && me.assets.some(a => a.id==="cash"&&!a.blocked) && me.influence>=2) { runGreyOperation("cash"); return; }
-      if (actionsLeft > 0 && me.id === 2 && me.money >= 2) { basicAction("campaign"); return; }
-      const scalable = me.assets.find(a => !a.scaled && !a.automated);
-      if (canInvest && scalable && me.money >= 4) { improve(scalable.uid, me.id === 1 ? "scale" : "automate"); return; }
+
+      const upgradeable = me.assets.filter(a => !a.scaled && !a.automated && !a.blocked);
+      const automation = [...upgradeable].sort((a, b) => objectSynergyIncome(me, b, event) - objectSynergyIncome(me, a, event))[0];
+      if (canInvest && me.money >= 5 && automation && objectSynergyIncome(me, automation, event) > 0) { improve(automation.uid, "automate"); return; }
+      const modernization = [...upgradeable].sort((a, b) => b.income - a.income)[0];
+      if (canInvest && me.money >= 4 && modernization) { improve(modernization.uid, "scale"); return; }
+
+      if (actionsLeft > 0) {
+        const safeCard = me.hand.find(c => !processingCards.current.has(c.uid) && !directedKinds.has(c.kind) && (c.kind !== "influence" || me.money >= 2));
+        if (safeCard) { playCard(safeCard); return; }
+        const unusedCard = me.hand.find(c => !processingCards.current.has(c.uid));
+        if (unusedCard) { convertCard(unusedCard, me.influence < 5 ? "influence" : "money"); return; }
+      }
+      if (actionsLeft > 0 && me.influence < (roleHolder(strategicRole) ? 10 : 5) && me.money >= 2) { basicAction("campaign"); return; }
       if (actionsLeft > 0) { basicAction("work"); return; }
+
+      // Absolute fallback: every path above either changes state or reaches here.
+      // This prevents a rejected action from being retried forever.
       endTurn();
     }, 550);
     return () => window.clearTimeout(timer);
-  }, [turn, actionsLeft, investmentActions, round, finished, players, market, target, politicianTaxUsed, politicianCleanupUsed, journalistPublishUsed, mafiaRacketUsed, sanctionedPlayers]);
+  }, [turn, actionsLeft, investmentActions, round, finished, players, market, target, district, politicianTaxUsed, politicianCleanupUsed, journalistInflateUsed, journalistPublishUsed, mafiaCleanupUsed, mafiaRoofSweepUsed, mafiaRacketUsed, sanctionedPlayers, fraudCryptoUsed, fraudDocsUsed, fraudScamAmount, forgedRoleChoice]);
 
   return <div className="city-game">
     <header className="city-head"><div><h1>Город влияния <small>strategy prototype v2</small> <span className="game-version" title="Версия сборки">v{__GAME_VERSION__}</span></h1><p>Раунд {round}/{MAX_ROUNDS} · Ход: <b>{me.name}</b> · Действий: <b>{actionsLeft}</b>{investmentActions > 0 && <> · Инвестиционных: <b className="investment-actions">{investmentActions}</b></>}{me.isBot && <span className="bot-thinking"> · принимает решение…</span>}</p></div><div className="city-head-buttons"><button className="btn" onClick={() => setShowRules(x => !x)}>📖 Правила</button><a className="btn" href="?legacy=1">Старый MVP</a></div></header>
