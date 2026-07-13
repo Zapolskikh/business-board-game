@@ -8,16 +8,18 @@ type OwnedAsset = AssetCard & { uid: string; automated: boolean; scaled: boolean
 type MarketAsset = AssetCard & { uid: string };
 type HeldActionCard = ActionCard & { uid: string };
 interface Player {
-  id: number; name: string; isBot: boolean; money: number; influence: number; scandals: number; roofs: number;
+  id: number; name: string; isBot: boolean; difficulty: BotDifficulty; money: number; influence: number; scandals: number; roofs: number;
   role: RoleId | null; copiedRole: RoleId | null; pendingRole: RoleId | null; jailTurns: number;
   assets: OwnedAsset[]; hand: HeldActionCard[]; projects: number; capacity: number; scandalGainedThisRound: number;
   debt: number; roleShields: number; scandalShields: number; zoningDistrict: DistrictId | null; districtLevels: DistrictLevels; turns: number; bankedActions: number;
 }
 type DistrictLevels = Record<DistrictId, number>;
 type BotDifficulty = "medium" | "hard";
-interface GameSettings { humanPlayers: number; botPlayers: number; maxRounds: number; rolePrice: number; botDifficulty: BotDifficulty }
+interface SlotConfig { isBot: boolean; difficulty: BotDifficulty }
+interface GameSettings { roster: SlotConfig[]; maxRounds: number; rolePrice: number }
+const BOT_DIFFICULTY_LABELS: Record<BotDifficulty, string> = { medium: "Средний", hard: "Сложный" };
 
-const DEFAULT_SETTINGS: GameSettings = { humanPlayers: 1, botPlayers: 3, maxRounds: 15, rolePrice: 3, botDifficulty: "medium" };
+const DEFAULT_SETTINGS: GameSettings = { roster: [ { isBot: false, difficulty: "medium" }, { isBot: true, difficulty: "medium" }, { isBot: true, difficulty: "medium" }, { isBot: true, difficulty: "hard" } ], maxRounds: 15, rolePrice: 3 };
 const MAX_CAPACITY = 6;
 // Stable per-player colours (indexed by player id) used both in the players panel
 // and to highlight names inside the chronicle so logs stay readable at a glance.
@@ -43,12 +45,16 @@ const drawMarket = (deck: MarketAsset[], needed: number, round: number) => {
 };
 let cardSequence = 0;
 const actionCard = (card: ActionCard): HeldActionCard => ({ ...card, uid: `${card.id}:${++cardSequence}` });
-const initialPlayers = (settings: GameSettings): Player[] => Array.from({ length: settings.humanPlayers + settings.botPlayers }, (_, id) => ({
-  id, name: id < settings.humanPlayers ? `Игрок ${id + 1}` : `Бот ${id - settings.humanPlayers + 1}`,
-  isBot: id >= settings.humanPlayers, money: 10, influence: 2, scandals: 0, roofs: 0, role: null,
-  copiedRole: null, pendingRole: null, jailTurns: 0, scandalGainedThisRound: 0,
-  assets: [], hand: [], projects: 0, capacity: 3, debt: 0, roleShields: 0, scandalShields: 0, zoningDistrict: null, districtLevels: initialDistricts(), turns: 0, bankedActions: 0,
-}));
+const initialPlayers = (settings: GameSettings): Player[] => {
+  let humanIdx = 0; let botIdx = 0;
+  return settings.roster.map((slot, id) => ({
+    id,
+    name: slot.isBot ? `Бот ${++botIdx}` : `Игрок ${++humanIdx}`,
+    isBot: slot.isBot, difficulty: slot.difficulty, money: 10, influence: 2, scandals: 0, roofs: 0, role: null,
+    copiedRole: null, pendingRole: null, jailTurns: 0, scandalGainedThisRound: 0,
+    assets: [], hand: [], projects: 0, capacity: 3, debt: 0, roleShields: 0, scandalShields: 0, zoningDistrict: null, districtLevels: initialDistricts(), turns: 0, bankedActions: 0,
+  }));
+};
 const initialDistricts = (): DistrictLevels => ({ residential: 0, business: 0, industrial: 0, tech: 0, government: 0, shadows: 0 });
 const hasRole = (player: Player, role: RoleId) => player.role === role || player.copiedRole === role;
 const withScandals = (player: Player, amount: number): Player => {
@@ -309,7 +315,7 @@ export default function CityPrototype() {
     "Город влияния — полный журнал игры",
     `Версия: v${__GAME_VERSION__}`,
     `Дата экспорта: ${new Date().toLocaleString("ru-RU")}`,
-    `Настройки: игроков ${settings.humanPlayers}; ботов ${settings.botPlayers}; раундов ${settings.maxRounds}; роль ${settings.rolePrice} влияния; переворот ${settings.rolePrice * 3} влияния.`,
+    `Настройки: участников ${settings.roster.length}; ботов ${settings.roster.filter(s => s.isBot).length}; раундов ${settings.maxRounds}; роль ${settings.rolePrice} влияния; переворот ${settings.rolePrice * 3} влияния.`,
     `Раунд: ${round}/${settings.maxRounds}`,
     "",
     "Итоги:",
@@ -837,25 +843,27 @@ export default function CityPrototype() {
     setCardPlayedThisTurn(false); setCardMarketDiscount(0); setCardUpgradeDiscount(0);
   };
   const startGame = () => {
+    const roster = settings.roster.slice(0, 6).map(s => ({ isBot: !!s.isBot, difficulty: s.difficulty === "hard" ? "hard" as BotDifficulty : "medium" as BotDifficulty }));
     const normalized: GameSettings = {
-      humanPlayers: Math.max(1, Math.min(4, settings.humanPlayers)),
-      botPlayers: Math.max(0, Math.min(5, settings.botPlayers)),
+      roster,
       maxRounds: Math.max(5, Math.min(30, settings.maxRounds)),
       rolePrice: Math.max(2, Math.min(10, settings.rolePrice)),
-      botDifficulty: settings.botDifficulty === "hard" ? "hard" : "medium",
     };
-    if (normalized.humanPlayers + normalized.botPlayers < 2 || normalized.humanPlayers + normalized.botPlayers > 6) return;
-    const deck = freshMarket(); const events = shuffle(EVENTS); const cards = shuffle(ACTIONS); const startingTurn = Math.floor(Math.random() * (normalized.humanPlayers + normalized.botPlayers));
-    cardSequence = 0; logSeq.current = 0; setSettings(normalized); setPlayers(initialPlayers(normalized).map(p => p.id === startingTurn ? { ...p, turns: 1 } : p)); setRound(1); setTurn(startingTurn); setGameStartingTurn(startingTurn); setTurnsTakenInRound(0); setActionsLeft(3); setTurnActionLimit(3);
+    const total = normalized.roster.length;
+    const humanCount = normalized.roster.filter(s => !s.isBot).length;
+    const botCount = total - humanCount;
+    if (total < 2 || total > 6 || humanCount < 1) return;
+    const deck = freshMarket(); const events = shuffle(EVENTS); const cards = shuffle(ACTIONS); const startingTurn = Math.floor(Math.random() * total);
+    cardSequence = 0; logSeq.current = 0; setSettings(normalized); const roster0 = initialPlayers(normalized); setPlayers(roster0.map(p => p.id === startingTurn ? { ...p, turns: 1 } : p)); setRound(1); setTurn(startingTurn); setGameStartingTurn(startingTurn); setTurnsTakenInRound(0); setActionsLeft(3); setTurnActionLimit(3);
     const initialDeal = drawMarket(deck, 6, 1);
     setMarket(initialDeal.drawn); setMarketDeck(initialDeal.rest); setEvent(events[0]);
     setActionMarket(cards.slice(0, 3)); setActionDeck(cards.slice(3)); processingCards.current.clear();
     setDistrict("business"); setTarget(null); setViewPlayerId(null); setFinished(false); setLogExportStatus(""); setAntitrustActive(false);
-    const firstName = startingTurn < normalized.humanPlayers ? `Игрок ${startingTurn + 1}` : `Бот ${startingTurn - normalized.humanPlayers + 1}`;
+    const firstName = roster0[startingTurn].name;
     setLog([
       { seq: ++logSeq.current, kind: "turn", text: `Ход ${firstName} · раунд 1 · 10$ · 2◆ · ⚠0 · без роли · действий 3` },
       { seq: ++logSeq.current, kind: "round", text: `Режим города на всю партию: «${events[0].title}» — ${events[0].text} Первым ходит ${firstName}.` },
-      { seq: ++logSeq.current, kind: "system", text: `Игра началась: игроков ${normalized.humanPlayers}, ботов ${normalized.botPlayers}, раундов ${normalized.maxRounds}, роль ${normalized.rolePrice}◆, переворот ${normalized.rolePrice * 3}◆.` },
+      { seq: ++logSeq.current, kind: "system", text: `Игра началась: игроков ${humanCount}, ботов ${botCount}, раундов ${normalized.maxRounds}, роль ${normalized.rolePrice}◆, переворот ${normalized.rolePrice * 3}◆.` },
     ]);
     resetTurnFlags(); setGameStarted(true);
   };
@@ -988,7 +996,7 @@ export default function CityPrototype() {
       // longer horizon, commits to its best role faster, squeezes more value
       // out of every action, harasses the leader earlier and invests spare
       // influence into guaranteed final points more aggressively.
-      const hard = settings.botDifficulty === "hard";
+      const hard = me.difficulty === "hard";
       const hzPlan = Math.min(horizon, hard ? 8 : 5);   // economy planning depth
       const econThreshold = hard ? 0.4 : 1;             // min $-value to act
       const cardBuyThreshold = hard ? 5 : 6;            // min utility to buy a card
@@ -1226,31 +1234,48 @@ export default function CityPrototype() {
       endTurn();
     }, 550);
     return () => window.clearTimeout(timer);
-  }, [turn, actionsLeft, investmentActions, round, finished, gameStarted, settings.rolePrice, settings.botDifficulty, players, market, actionMarket, target, district, cardPlayedThisTurn, cardMarketDiscount, cardUpgradeDiscount, politicianTaxUsed, politicianCleanupUsed, journalistInflateUsed, journalistPublishUsed, mafiaCleanupUsed, mafiaRoofSweepUsed, mafiaRacketUsed, sanctionedPlayers, fraudCryptoUsed, fraudDocsUsed, fraudScamAmount, forgedRoleChoice]);
+  }, [turn, actionsLeft, investmentActions, round, finished, gameStarted, settings.rolePrice, players, market, actionMarket, target, district, cardPlayedThisTurn, cardMarketDiscount, cardUpgradeDiscount, politicianTaxUsed, politicianCleanupUsed, journalistInflateUsed, journalistPublishUsed, mafiaCleanupUsed, mafiaRoofSweepUsed, mafiaRacketUsed, sanctionedPlayers, fraudCryptoUsed, fraudDocsUsed, fraudScamAmount, forgedRoleChoice]);
 
-  const totalConfiguredPlayers = settings.humanPlayers + settings.botPlayers;
-  if (!gameStarted) return <div className="city-game city-setup-page">
+  const roster = settings.roster;
+  const totalConfiguredPlayers = roster.length;
+  const humansConfigured = roster.filter(s => !s.isBot).length;
+  const rosterValid = totalConfiguredPlayers >= 2 && totalConfiguredPlayers <= 6 && humansConfigured >= 1;
+  const updateSlot = (index: number, patch: Partial<SlotConfig>) => setSettings(s => ({ ...s, roster: s.roster.map((slot, i) => i === index ? { ...slot, ...patch } : slot) }));
+  const addSlot = (isBot: boolean) => setSettings(s => s.roster.length >= 6 ? s : ({ ...s, roster: [...s.roster, { isBot, difficulty: "medium" as BotDifficulty }] }));
+  const removeSlot = (index: number) => setSettings(s => s.roster.length <= 2 ? s : ({ ...s, roster: s.roster.filter((_, i) => i !== index) }));
+  if (!gameStarted) {
+    let humanN = 0; let botN = 0;
+    return <div className="city-game city-setup-page">
     <section className="city-setup">
       <h1>Город влияния <small>strategy prototype v2</small></h1>
       <p className="dim">Настройте партию. Несколько обычных игроков играют по очереди за одним экраном.</p>
+      <div className="roster-editor">
+        <div className="roster-head"><span>Участники ({totalConfiguredPlayers}/6)</span><div className="roster-add"><button className="btn" disabled={totalConfiguredPlayers >= 6} onClick={() => addSlot(false)}>+ Игрок</button><button className="btn" disabled={totalConfiguredPlayers >= 6} onClick={() => addSlot(true)}>+ Бот</button></div></div>
+        <ul className="roster-list">{roster.map((slot, i) => { const label = slot.isBot ? `Бот ${++botN}` : `Игрок ${++humanN}`; return <li className={`roster-slot ${slot.isBot ? "is-bot" : "is-human"}`} key={i}>
+          <span className="roster-slot-name">{slot.isBot ? "🤖" : "🧑"} {label}</span>
+          <label className="roster-bot-toggle"><input type="checkbox" checked={slot.isBot} onChange={e => updateSlot(i, { isBot: e.target.checked })}/> бот</label>
+          {slot.isBot
+            ? <select value={slot.difficulty} onChange={e => updateSlot(i, { difficulty: e.target.value as BotDifficulty })}><option value="medium">Средний</option><option value="hard">Сложный</option></select>
+            : <span className="roster-slot-hint">живой игрок</span>}
+          <button className="btn roster-remove" disabled={totalConfiguredPlayers <= 2} title="Убрать участника" onClick={() => removeSlot(i)}>✕</button>
+        </li>; })}</ul>
+      </div>
       <div className="city-setup-grid">
-        <label><span>Игроков</span><input type="number" min="1" max="4" value={settings.humanPlayers} onChange={e => setSettings(s => ({ ...s, humanPlayers: Number(e.target.value) }))}/><small>От 1 до 4</small></label>
-        <label><span>Ботов</span><input type="number" min="0" max="5" value={settings.botPlayers} onChange={e => setSettings(s => ({ ...s, botPlayers: Number(e.target.value) }))}/><small>От 0 до 5</small></label>
         <label><span>Количество раундов</span><input type="number" min="5" max="30" value={settings.maxRounds} onChange={e => setSettings(s => ({ ...s, maxRounds: Number(e.target.value) }))}/><small>Рекомендуется 15</small></label>
         <label><span>Цена свободной роли</span><input type="number" min="2" max="10" value={settings.rolePrice} onChange={e => setSettings(s => ({ ...s, rolePrice: Number(e.target.value) }))}/><small>Переворот: {Math.max(2, settings.rolePrice) * 2}◆</small></label>
-        <label><span>Сложность ботов</span><select value={settings.botDifficulty} onChange={e => setSettings(s => ({ ...s, botDifficulty: e.target.value as BotDifficulty }))}><option value="medium">Средняя</option><option value="hard">Сложная</option></select><small>{settings.botDifficulty === "hard" ? "Планируют глубже и давят лидера" : "Сбалансированная классическая логика"}</small></label>
       </div>
-      <p className={totalConfiguredPlayers < 2 || totalConfiguredPlayers > 6 ? "setup-error" : "setup-summary"}>Всего участников: {totalConfiguredPlayers}. Допустимо от 2 до 6.</p>
-      <button className="btn primary setup-start" disabled={totalConfiguredPlayers < 2 || totalConfiguredPlayers > 6} onClick={startGame}>Начать игру</button>
+      <p className={!rosterValid ? "setup-error" : "setup-summary"}>{humansConfigured < 1 ? "Нужен хотя бы один живой игрок." : `Всего участников: ${totalConfiguredPlayers} (живых ${humansConfigured}, ботов ${totalConfiguredPlayers - humansConfigured}). Допустимо от 2 до 6.`}</p>
+      <button className="btn primary setup-start" disabled={!rosterValid} onClick={startGame}>Начать игру</button>
       <a className="btn setup-legacy" href="?legacy=1">Старый MVP</a>
     </section>
   </div>;
+  }
 
   return <div className="city-game">
     <header className="city-head"><div className="city-head-title"><h1>Город влияния <small>strategy prototype v2</small> <span className="game-version" title="Версия сборки">v{__GAME_VERSION__}</span></h1><p>Раунд {round}/{settings.maxRounds} · Ход: <b>{me.name}</b> · Действий: <b>{actionsLeft}</b>{investmentActions > 0 && <> · Инвестиционных: <b className="investment-actions">{investmentActions}</b></>}{me.isBot && <span className="bot-thinking"> · принимает решение…</span>}</p></div><div className="city-event" title="Режим города — один на всю партию"><strong>📰 {event.title}</strong><span>{event.text}</span></div><div className="city-head-buttons"><button className="btn" onClick={() => setShowRules(x => !x)}>📖 Правила</button><a className="btn" href="?legacy=1">Старый MVP</a></div></header>
     {finished ? <section className="city-finish"><h2>Итоги города</h2>{scores.map((p, i) => <p key={p.id}>{i + 1}. <b>{p.name}</b> — {p.score} очков</p>)}<h3>Полный журнал</h3><p className="dim">Сохранено записей: {log.length}. В файле действия расположены от начала игры к завершению.</p><div className="log-export-actions"><button className="btn" onClick={copyGameLog}>Копировать лог</button><button className="btn" onClick={downloadGameLog}>Скачать .txt</button></div>{logExportStatus && <p className="log-export-status">{logExportStatus}</p>}<button className="btn primary" onClick={() => setGameStarted(false)}>Новая партия</button></section> : <main className="city-layout">
       <div className="city-main-col">
-      <section className="city-players">{players.map(p => { const pRole = ROLES.find(r => r.id === p.role); return <article className={`city-player scandal-${Math.min(6,p.scandals)} ${p.id === me.id ? "active" : ""} ${p.id === viewed.id ? "viewed" : ""}`} style={{"--player": nameColor(p.id)} as React.CSSProperties} onClick={() => setViewPlayerId(p.id === me.id ? null : p.id)} title={p.id === me.id ? "Ваше поле" : `Показать поле: ${p.name}`} key={p.id}><b><span className="player-name"><span className="player-avatar" style={{borderColor: pRole?.color ?? "#3d4757"}} title={pRole?.title ?? "без роли"}>{pRole?.icon ?? "👤"}</span><span style={{color: nameColor(p.id)}}>{p.name}</span></span> <em title="Сходил ходов / очки">🎲{p.turns} · {scoreOf(p)} оч.</em></b><span>💰{p.money}　◆{p.influence}　⚠{p.scandals}/6　🛡{p.roofs}</span><small>{pRole?.title ?? "без роли"} · объектов {p.assets.length}</small><small className="scandal-status">{scandalStatus(p)}</small>{p.id === viewed.id && viewingOther && <small className="viewing-badge">👁 просмотр</small>}</article>; })}</section>
+      <section className="city-players">{players.map(p => { const pRole = ROLES.find(r => r.id === p.role); return <article className={`city-player scandal-${Math.min(6,p.scandals)} ${p.id === me.id ? "active" : ""} ${p.id === viewed.id ? "viewed" : ""}`} style={{"--player": nameColor(p.id)} as React.CSSProperties} onClick={() => setViewPlayerId(p.id === me.id ? null : p.id)} title={p.id === me.id ? "Ваше поле" : `Показать поле: ${p.name}`} key={p.id}><b><span className="player-name"><span className="player-avatar" style={{borderColor: pRole?.color ?? "#3d4757"}} title={pRole?.title ?? "без роли"}>{pRole?.icon ?? "👤"}</span><span style={{color: nameColor(p.id)}}>{p.name}</span>{p.isBot && <span className={`bot-badge diff-${p.difficulty}`} title={`Сложность бота: ${BOT_DIFFICULTY_LABELS[p.difficulty]}`}>{p.difficulty === "hard" ? "HARD" : "MED"}</span>}</span> <em title="Сходил ходов / очки">🎲{p.turns} · {scoreOf(p)} оч.</em></b><span>💰{p.money}　◆{p.influence}　⚠{p.scandals}/6　🛡{p.roofs}</span><small>{pRole?.title ?? "без роли"} · объектов {p.assets.length}</small><small className="scandal-status">{scandalStatus(p)}</small>{p.id === viewed.id && viewingOther && <small className="viewing-badge">👁 просмотр</small>}</article>; })}</section>
       <section className="city-map"><h2>Районы и рынок <small className="market-remaining">уникальных объектов в колоде: {marketDeck.length}</small></h2><div className="district-grid">{DISTRICTS.map(d => <div className={`district ${district === d.id ? "selected" : ""}`} style={{"--district": d.color} as React.CSSProperties} onClick={() => setDistrict(d.id)} key={d.id}><h3>{d.icon} {d.title} <span className="district-level" title={`Объектов у вас: ${districtCount(me, d.id)}/4. Синергия: каждый объект района получает +${districtSynergy(me, d.id)}$. Развитие района: ${districtLevels[d.id]}/2 ★ = +${districtLevels[d.id] * 25}% к доходу объектов (общий для всех игроков).`}><span className="district-objects">{districtCount(me, d.id)}/4</span>{districtSynergy(me, d.id) > 0 && <span className="district-synergy">синергия +{districtSynergy(me, d.id)}$</span>}<span className={`district-dev${districtLevels[d.id] > 0 ? " active" : ""}`}>{"★".repeat(districtLevels[d.id])}{"☆".repeat(2 - districtLevels[d.id])}{districtLevels[d.id] > 0 ? ` +${districtLevels[d.id] * 25}%` : ""}</span></span></h3><p>{d.description}</p><div className="market-cards">{market.filter(a => a.district === d.id).map(a => <button className={`market-card rarity-${a.rarity}`} title={me.assets.length >= me.capacity ? "Нет свободного слота: продайте объект или расширьте бизнес" : a.text} disabled={me.money < priceOf(a) || !canInvest || me.assets.length >= me.capacity} onClick={() => buy(a)} key={a.uid}><span className="rarity-badge">{ASSET_RARITY_LABELS[a.rarity]}</span><b>{a.title}</b><span>{priceOf(a)}$ · доход {a.income}$ · ◆{a.influence}</span><small>{a.text}</small>{newDistrictDiscount(a) > 0 && <small className="capitalist-discount">Капиталист: новый район −1$</small>}</button>)}</div></div>)}</div>
         <div className={`owned-panel ${viewingOther ? "viewing-other" : ""}`} style={viewingOther ? {"--player": nameColor(viewed.id)} as React.CSSProperties : undefined}>
           {viewingOther ? <>
