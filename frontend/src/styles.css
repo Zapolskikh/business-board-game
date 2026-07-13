@@ -373,6 +373,14 @@ select {
 
 /* ---- experimental digital city prototype ---- */
 .city-game { min-height: 100vh; padding: 12px; background: radial-gradient(circle at 50% 0, #17243a, var(--bg) 45%); }
+.city-setup-page { display:grid; place-items:center; }
+.city-setup { width:min(680px,100%); padding:24px; background:rgba(22,27,34,.97); border:1px solid #51617c; border-radius:12px; box-shadow:0 18px 60px rgba(0,0,0,.42); }
+.city-setup h1 { margin:0 0 6px; }.city-setup h1 small { color:#9b6ee7; font-size:12px; }
+.city-setup-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin:20px 0 12px; }
+.city-setup-grid label { display:flex; flex-direction:column; gap:6px; padding:12px; background:var(--panel-2); border:1px solid var(--border); border-radius:8px; }
+.city-setup-grid label span { font-weight:700; }.city-setup-grid label small { color:var(--text-dim); }
+.city-setup-grid input { width:100%; padding:9px; color:var(--text); background:#0d1117; border:1px solid var(--border); border-radius:6px; font-size:16px; }
+.setup-summary { color:#7ee787; }.setup-error { color:#f85149; }.setup-start { width:100%; padding:11px; font-size:15px; }.setup-legacy { display:block; margin-top:8px; text-align:center; text-decoration:none; }
 .city-head { display:flex; justify-content:space-between; align-items:center; gap:12px; max-width:1600px; margin:auto; }
 .city-head h1 { font-size:24px; }.city-head h1 small { color:#9b6ee7; font-size:12px; }.city-head p { margin:4px 0 10px; color:var(--text-dim); }
 .city-head-buttons { display:flex; gap:6px; }.city-head-buttons a { text-decoration:none; }
@@ -405,7 +413,7 @@ select {
 .owned-panel { margin-top:8px; padding-top:10px; border-top:1px solid var(--border); }.owned-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; }.owned-grid article { padding:8px; display:flex; flex-direction:column; gap:5px; background:var(--panel-2); border:1px solid var(--border); border-radius:6px; }.owned-grid article.blocked { border-color:#f85149; opacity:.65; }.owned-grid article span,.owned-grid article small { color:var(--text-dim); font-size:11px; }.owned-grid article>div { display:flex; flex-wrap:wrap; gap:3px; }.owned-grid article>.asset-abilities { flex-direction:column; flex-wrap:nowrap; }.owned-grid button { padding:3px 5px; color:var(--text); background:#121820; border:1px solid var(--border); border-radius:4px; font-size:10px; cursor:pointer; }.owned-grid button.upgrade-complete { color:#7ee787; border-color:#238636; background:rgba(35,134,54,.14); opacity:1; }.asset-income { color:#e3b341; font-size:12px; }.asset-ability { padding:5px; border-left:3px solid #6e7681; background:rgba(110,118,129,.08); }.asset-ability.inactive { color:#8b949e; }.asset-ability.active { color:#7ee787; border-left-color:#3fb950; background:rgba(63,185,80,.09); }.active-bonuses { margin:7px 0; padding:9px; background:rgba(63,185,80,.06); border:1px solid rgba(63,185,80,.3); border-radius:7px; }.active-bonuses h3 { margin:0 0 5px; color:#7ee787; font-size:12px; }.active-bonuses ul { margin:0; padding-left:18px; }.active-bonuses li { margin:3px 0; color:var(--text-dim); font-size:11px; }
 .city-help { max-width:1600px; margin:10px auto 30px; padding:14px; background:#131a24; border:1px solid #34445b; border-radius:10px; }.help-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }.help-grid article { padding:10px; background:var(--panel); border:1px solid var(--border); border-radius:7px; }.help-grid h3 { margin:0 0 5px; font-size:13px; }.help-grid p { margin:0; color:var(--text-dim); font-size:12px; line-height:1.45; }.help-tip { margin:10px 0 0; padding:9px 12px; border-left:4px solid #9b6ee7; background:rgba(155,110,231,.08); }
 @media(max-width:1100px){.city-layout{grid-template-columns:1fr 340px}.city-log{grid-column:1/-1;max-height:180px}.city-players{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:720px){.city-game{padding:6px}.city-layout{display:flex;flex-direction:column}.city-map,.city-actions,.city-log{width:100%;max-height:none}.district-grid{grid-template-columns:1fr}.city-players{grid-template-columns:1fr 1fr}.city-event{flex-direction:column;gap:3px}.city-head h1{font-size:18px}.help-grid{grid-template-columns:1fr}}
+@media(max-width:720px){.city-game{padding:6px}.city-setup-grid{grid-template-columns:1fr}.city-layout{display:flex;flex-direction:column}.city-map,.city-actions,.city-log{width:100%;max-height:none}.district-grid{grid-template-columns:1fr}.city-players{grid-template-columns:1fr 1fr}.city-event{flex-direction:column;gap:3px}.city-head h1{font-size:18px}.help-grid{grid-template-columns:1fr}}
 .hand-panel {
   display: flex;
   flex-direction: column;

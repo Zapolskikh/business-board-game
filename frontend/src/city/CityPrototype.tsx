@@ -13,16 +13,18 @@ interface Player {
   assets: OwnedAsset[]; hand: HeldActionCard[]; projects: number; capacity: number; scandalGainedThisRound: number;
 }
 type DistrictLevels = Record<DistrictId, number>;
+interface GameSettings { humanPlayers: number; botPlayers: number; maxRounds: number; rolePrice: number }
 
-const MAX_ROUNDS = 10;
+const DEFAULT_SETTINGS: GameSettings = { humanPlayers: 1, botPlayers: 3, maxRounds: 15, rolePrice: 5 };
 const MAX_CAPACITY = 6;
 const CAPACITY_COST: Record<number, number> = { 3: 6, 4: 10, 5: 15 };
 const shuffle = <T,>(items: T[]) => [...items].sort(() => Math.random() - .5);
 const freshMarket = (cycle: number): MarketAsset[] => shuffle(ASSETS).map((a, i) => ({ ...a, uid: `${a.id}:${cycle}:${i}` }));
 let cardSequence = 0;
 const actionCard = (card: ActionCard): HeldActionCard => ({ ...card, uid: `${card.id}:${++cardSequence}` });
-const initialPlayers = (): Player[] => ["Игрок 1", "Бот 1", "Бот 2", "Бот 3"].map((name, id) => ({
-  id, name, isBot: id > 0, money: 10, influence: 2, scandals: 0, roofs: 0, role: null,
+const initialPlayers = (settings: GameSettings): Player[] => Array.from({ length: settings.humanPlayers + settings.botPlayers }, (_, id) => ({
+  id, name: id < settings.humanPlayers ? `Игрок ${id + 1}` : `Бот ${id - settings.humanPlayers + 1}`,
+  isBot: id >= settings.humanPlayers, money: 10, influence: 2, scandals: 0, roofs: 0, role: null,
   copiedRole: null, pendingRole: null, jailTurns: 0, scandalGainedThisRound: 0,
   assets: [], hand: [], projects: 0, capacity: 3,
 }));
@@ -81,7 +83,9 @@ const passiveInfluenceFor = (player: Player) => {
 export default function CityPrototype() {
   const firstDeck = useMemo(() => freshMarket(1), []);
   const firstEvents = useMemo(() => shuffle(EVENTS), []);
-  const [players, setPlayers] = useState(initialPlayers);
+  const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
+  const [gameStarted, setGameStarted] = useState(false);
+  const [players, setPlayers] = useState(() => initialPlayers(DEFAULT_SETTINGS));
   const [round, setRound] = useState(1);
   const [turn, setTurn] = useState(0);
   const [actionsLeft, setActionsLeft] = useState(3);
@@ -122,9 +126,7 @@ export default function CityPrototype() {
   const objectsInDistrict = (districtId: DistrictId) => players.reduce((total, player) => total + districtCount(player, districtId), 0);
   const selectedDistrictObjects = objectsInDistrict(district);
   const selectedDistrictOwnObjects = districtCount(me, district);
-  const roleCost = (holder?: Player) => holder
-    ? 10 + (holder.assets.some(a => a.id === "lobby") ? 1 : 0)
-    : 5;
+  const roleCost = (holder?: Player) => holder ? settings.rolePrice * 2 : settings.rolePrice;
   const sanctionOutcome = (player: Player | null) => !player ? "выберите цель"
     : player.scandals < 1 ? "нет оснований"
     : player.scandals === 1 ? "забрать 1◆"
@@ -171,7 +173,7 @@ export default function CityPrototype() {
       data: [{ text: `+${bonus} влияние за раунд с Административным кварталом${automated}.`, active: has("government") }],
       contract: [{ text: `+${bonus} влияние за раунд для Политика${automated}.`, active: hasRole(me, "politician") }],
       security: [{ text: "При покупке выдала Крышу.", active: true }],
-      lobby: [{ text: "Переворот против вашей роли стоит на 1 влияние дороже.", active: me.role !== null }],
+      lobby: [{ text: "Если вашу роль отберут, получите 2 влияния компенсации.", active: me.role !== null }],
       cash: [{ text: "При покупке: +2$ и +1 скандал. Открывает отмывание.", active: !asset.blocked }],
       market: [
         { text: "При покупке: карта и +1 скандал. Открывает контрабанду.", active: !asset.blocked },
@@ -227,7 +229,8 @@ export default function CityPrototype() {
     "Город влияния — полный журнал игры",
     `Версия: v${__GAME_VERSION__}`,
     `Дата экспорта: ${new Date().toLocaleString("ru-RU")}`,
-    `Раунд: ${round}/${MAX_ROUNDS}`,
+    `Настройки: игроков ${settings.humanPlayers}; ботов ${settings.botPlayers}; раундов ${settings.maxRounds}; роль ${settings.rolePrice} влияния; переворот ${settings.rolePrice * 2} влияния.`,
+    `Раунд: ${round}/${settings.maxRounds}`,
     "",
     "Итоги:",
     ...scores.map((p, i) => `${i + 1}. ${p.name} — ${p.score} очков; деньги ${p.money}$; влияние ${p.influence}; объектов ${p.assets.length}`),
@@ -325,9 +328,10 @@ export default function CityPrototype() {
       say(`${me.name} пытается отобрать роль «${ROLES.find(r => r.id === roleId)?.title}», но ${holder.name} тратит Крышу.`);
       spendAction(); return;
     }
+    const lobbyCompensation = holder?.assets.some(a => a.id === "lobby") ? 2 : 0;
     setPlayers(ps => ps.map(p => p.id === me.id ? { ...p, influence: p.influence - cost, role: roleId }
-      : p.id === holder?.id ? { ...p, role: null } : p));
-    say(holder ? `${me.name} проводит переворот и отбирает роль «${ROLES.find(r => r.id === roleId)?.title}» у ${holder.name} за ${cost} влияния.`
+      : p.id === holder?.id ? { ...p, role: null, influence: p.influence + lobbyCompensation } : p));
+    say(holder ? `${me.name} проводит переворот и отбирает роль «${ROLES.find(r => r.id === roleId)?.title}» у ${holder.name} за ${cost} влияния${lobbyCompensation ? `; Лоббистское бюро возвращает ${holder.name} 2 влияния` : ""}.`
       : `${me.name} получает роль «${ROLES.find(r => r.id === roleId)?.title}» за ${cost} влияния.`);
     if (roleId === "fraudster") setFraudTurnPlace(Math.max(1, scores.findIndex(p => p.id === me.id) + 1));
     spendAction();
@@ -426,6 +430,7 @@ export default function CityPrototype() {
           else if (chosen && targetState.assets.length > 1) { confiscated = { ...chosen, automated: false, scaled: false }; changedTarget = { ...targetState, assets: targetState.assets.filter(a => a.uid !== chosen.uid) }; }
         }
       }
+      changedTarget = { ...changedTarget, scandals: Math.max(0, changedTarget.scandals - 1) };
       return ps.map(p => {
         if (p.id === victim.id) return changedTarget;
         if (p.id === me.id) {
@@ -439,7 +444,7 @@ export default function CityPrototype() {
         return p;
       });
     });
-    setSanctionedPlayers(xs => [...xs, target]); spendAction(); say(`${me.name} применяет санкцию к ${victim.name} при ${victim.scandals} скандалах.`);
+    setSanctionedPlayers(xs => [...xs, target]); spendAction(); say(`${me.name} применяет санкцию к ${victim.name} при ${victim.scandals} скандалах; после взыскания у цели −1 скандал.`);
   };
 
   const fraudCleanScandal = () => {
@@ -604,6 +609,21 @@ export default function CityPrototype() {
     setJournalistInflateUsed(false); setJournalistPublishUsed(false); setMafiaCleanupUsed(false); setMafiaRoofSweepUsed(false);
     setMafiaRacketUsed(false); setMafiaOperationBonus(0); setSanctionedPlayers([]); setFraudCryptoUsed(false); setFraudDocsUsed(false);
   };
+  const startGame = () => {
+    const normalized: GameSettings = {
+      humanPlayers: Math.max(1, Math.min(4, settings.humanPlayers)),
+      botPlayers: Math.max(0, Math.min(5, settings.botPlayers)),
+      maxRounds: Math.max(5, Math.min(30, settings.maxRounds)),
+      rolePrice: Math.max(2, Math.min(10, settings.rolePrice)),
+    };
+    if (normalized.humanPlayers + normalized.botPlayers < 2 || normalized.humanPlayers + normalized.botPlayers > 6) return;
+    const deck = freshMarket(1); const events = shuffle(EVENTS);
+    cardSequence = 0; setSettings(normalized); setPlayers(initialPlayers(normalized)); setRound(1); setTurn(0); setActionsLeft(3);
+    setMarketCycle(1); setMarket(deck.slice(0, 6)); setMarketDeck(deck.slice(6)); setEvent(events[0]); setEventDeck(events.slice(1));
+    setDistrictLevels(initialDistricts()); setDistrict("business"); setTarget(null); setFinished(false); setLogExportStatus("");
+    setLog([`Раунд 1: «${events[0].title}».`, `Игра началась: игроков ${normalized.humanPlayers}, ботов ${normalized.botPlayers}, раундов ${normalized.maxRounds}, роль ${normalized.rolePrice}◆, переворот ${normalized.rolePrice * 2}◆.`]);
+    resetTurnFlags(); setGameStarted(true);
+  };
   const startPlayerTurn = (nextTurn: number) => {
     const next = players[nextTurn];
     setPlayers(ps => ps.map(p => {
@@ -616,50 +636,63 @@ export default function CityPrototype() {
     }));
     setTurn(nextTurn); setTarget(null); setActionsLeft(next.jailTurns > 0 ? 1 : next.role === "fraudster" ? 4 : 3); setFraudTurnPlace(Math.max(1,scores.findIndex(p=>p.id===next.id)+1)); resetTurnFlags();
   };
+  const settleRound = (ps: Player[], startNextRound: boolean) => {
+    const incomes = new Map<number, number>();
+    ps.forEach(p => {
+      let income = -p.assets.length;
+      p.assets.forEach(a => { if (!a.blocked) income += Math.floor((a.income + (a.scaled ? 2 : 0)) * (1 + districtLevels[a.district] * .25) * (event.district === a.district ? event.incomeMultiplier ?? 1 : 1)) + objectSynergyIncome(p, a, event); });
+      incomes.set(p.id, income);
+    });
+    ps.filter(p => hasRole(p, "mafia")).forEach(mafia => {
+      let tribute = 0;
+      ps.forEach(p => {
+        if (p.id === mafia.id) return;
+        let levy = 0;
+        DISTRICTS.forEach(d => {
+          const maximum = Math.max(...ps.map(x => districtCount(x, d.id)));
+          if (districtCount(p, d.id) < maximum) levy += p.assets.filter(a => a.district === d.id && !a.blocked).length;
+        });
+        const paid = Math.min(Math.max(0, incomes.get(p.id) ?? 0), levy); incomes.set(p.id, (incomes.get(p.id) ?? 0) - paid); tribute += paid;
+      });
+      incomes.set(mafia.id, (incomes.get(mafia.id) ?? 0) + tribute);
+    });
+    const settled = ps.map(p => {
+      const newsLimit = p.assets.some(a => a.id === "data") ? 3 : 2;
+      const news = hasRole(p, "journalist") ? Math.min(newsLimit, ps.filter(x => x.id !== p.id).reduce((s,x) => s + x.scandalGainedThisRound, 0)) : 0;
+      const rating = hasRole(p, "journalist") ? Math.min(4, p.scandals) : 0;
+      let next: Player = { ...p, copiedRole: null, assets: p.assets.map(a => ({ ...a, blocked: false })), money: Math.max(0, p.money + (incomes.get(p.id) ?? 0)), influence: p.influence + passiveInfluenceFor(p) + news + rating, scandalGainedThisRound: 0 };
+      if (startNextRound && p.id === ps[0].id) {
+        next = { ...next, copiedRole: p.pendingRole, pendingRole: null, jailTurns: Math.max(0, p.jailTurns - 1) };
+        if (!next.role && next.scandals > 0) next.scandals -= 1;
+      }
+      return next;
+    });
+    const summaries = settled.map((p, index) => {
+      const before = ps[index];
+      return `${p.name} завершает раунд: ${p.money - before.money >= 0 ? "+" : ""}${p.money - before.money}$, ${p.influence - before.influence >= 0 ? "+" : ""}${p.influence - before.influence} влияния; теперь ${p.money}$ и ${p.influence}◆.`;
+    });
+    return { settled, summaries };
+  };
   const endTurn = () => {
     if (turn < players.length - 1) { startPlayerTurn(turn + 1); return; }
-    if (round >= MAX_ROUNDS) { setFinished(true); say(`Игра окончена. Побеждает ${scores[0].name}: ${scores[0].score} очков.`); return; }
+    if (round >= settings.maxRounds) {
+      const { settled, summaries } = settleRound(players, false);
+      const finalScores = settled.map(p => ({ ...p, score: scoreOf(p) })).sort((a, b) => b.score - a.score);
+      const finishMessage = `Игра окончена после финальной выплаты. Побеждает ${finalScores[0].name}: ${finalScores[0].score} очков.`;
+      setPlayers(settled); setFinished(true); setLog(xs => [finishMessage, ...[...summaries].reverse(), ...xs]); return;
+    }
     const nextEventDeck = eventDeck.length > 1 ? eventDeck.slice(1) : shuffle(EVENTS); const nextEvent = nextEventDeck[0];
-    setPlayers(ps => {
-      const incomes = new Map<number, number>();
-      ps.forEach(p => {
-        let income = -p.assets.length;
-        p.assets.forEach(a => { if (!a.blocked) income += Math.floor((a.income + (a.scaled ? 2 : 0)) * (1 + districtLevels[a.district] * .25) * (event.district === a.district ? event.incomeMultiplier ?? 1 : 1)) + objectSynergyIncome(p, a, event); });
-        incomes.set(p.id, income);
-      });
-      const mafias = ps.filter(p => hasRole(p, "mafia"));
-      mafias.forEach(mafia => {
-        let tribute = 0;
-        ps.forEach(p => {
-          if (p.id === mafia.id) return;
-          let levy = 0;
-          DISTRICTS.forEach(d => {
-            const maximum = Math.max(...ps.map(x => districtCount(x, d.id)));
-            if (districtCount(p, d.id) < maximum) levy += p.assets.filter(a => a.district === d.id && !a.blocked).length;
-          });
-          const paid = Math.min(Math.max(0, incomes.get(p.id) ?? 0), levy); incomes.set(p.id, (incomes.get(p.id) ?? 0) - paid); tribute += paid;
-        });
-        incomes.set(mafia.id, (incomes.get(mafia.id) ?? 0) + tribute);
-      });
-      return ps.map(p => {
-        const newsLimit = p.assets.some(a => a.id === "data") ? 3 : 2;
-        const news = hasRole(p, "journalist") ? Math.min(newsLimit, ps.filter(x => x.id !== p.id).reduce((s,x) => s + x.scandalGainedThisRound, 0)) : 0;
-        const rating = hasRole(p, "journalist") ? Math.min(4, p.scandals) : 0;
-        let next: Player = { ...p, copiedRole: null, assets: p.assets.map(a => ({ ...a, blocked: false })), money: Math.max(0, p.money + (incomes.get(p.id) ?? 0)), influence: p.influence + passiveInfluenceFor(p) + news + rating, scandalGainedThisRound: 0 };
-        if (p.id === players[0].id) { next = { ...next, copiedRole: p.pendingRole, pendingRole: null, jailTurns: Math.max(0, p.jailTurns - 1) }; if (!next.role && next.scandals > 0) next.scandals -= 1; }
-        return next;
-      });
-    });
-    refillMarket(); setEventDeck(nextEventDeck); setEvent(nextEvent); setRound(round + 1); setTurn(0); setTarget(null); setActionsLeft(players[0].jailTurns > 0 ? 1 : players[0].role === "fraudster" ? 4 : 3); setFraudTurnPlace(Math.max(1,scores.findIndex(p=>p.id===players[0].id)+1)); resetTurnFlags();
-    say(`Раунд ${round + 1}: «${nextEvent.title}».`);
+    const { settled, summaries } = settleRound(players, true); setPlayers(settled);
+    refillMarket(); setEventDeck(nextEventDeck); setEvent(nextEvent); setRound(round + 1); setTurn(0); setTarget(null); setActionsLeft(players[0].jailTurns > 0 ? 1 : settled[0].role === "fraudster" ? 4 : 3); setFraudTurnPlace(Math.max(1,scores.findIndex(p=>p.id===players[0].id)+1)); resetTurnFlags();
+    setLog(xs => [`Раунд ${round + 1}: «${nextEvent.title}».`, ...[...summaries].reverse(), ...xs]);
   };
 
   useEffect(() => {
-    if (me.role === "fraudster") setFraudTurnPlace(Math.max(1, scores.findIndex(p => p.id === me.id) + 1));
-  }, [turn, round]);
+    if (gameStarted && me.role === "fraudster") setFraudTurnPlace(Math.max(1, scores.findIndex(p => p.id === me.id) + 1));
+  }, [turn, round, gameStarted]);
 
   useEffect(() => {
-    if (!me.isBot || finished) return;
+    if (!gameStarted || !me.isBot || finished) return;
     const timer = window.setTimeout(() => {
       const myPlace = scores.findIndex(p => p.id === me.id) + 1;
       const leader = scores.find(p => p.id !== me.id) ?? null;
@@ -724,7 +757,7 @@ export default function CityPrototype() {
           const cost = roleCost(holder);
           if ((!holder || me.influence >= cost) && me.influence >= cost) { claimRole(strategicRole); return; }
           const journalistHolder = roleHolder("journalist");
-          if (holder && holder.id !== me.id && me.role !== "journalist" && !journalistHolder && me.influence >= 5) { claimRole("journalist"); return; }
+          if (holder && holder.id !== me.id && me.role !== "journalist" && !journalistHolder && me.influence >= settings.rolePrice) { claimRole("journalist"); return; }
         }
       }
 
@@ -775,9 +808,9 @@ export default function CityPrototype() {
         const safeCard = me.hand.find(c => !processingCards.current.has(c.uid) && !directedKinds.has(c.kind) && (c.kind !== "influence" || me.money >= 2));
         if (safeCard) { playCard(safeCard); return; }
         const unusedCard = me.hand.find(c => !processingCards.current.has(c.uid));
-        if (unusedCard) { convertCard(unusedCard, me.influence < 5 ? "influence" : "money"); return; }
+        if (unusedCard) { convertCard(unusedCard, me.influence < settings.rolePrice ? "influence" : "money"); return; }
       }
-      if (actionsLeft > 0 && me.influence < (roleHolder(strategicRole) ? 10 : 5) && me.money >= 2) { basicAction("campaign"); return; }
+      if (actionsLeft > 0 && me.influence < (roleHolder(strategicRole) ? settings.rolePrice * 2 : settings.rolePrice) && me.money >= 2) { basicAction("campaign"); return; }
       if (actionsLeft > 0) { basicAction("work"); return; }
 
       // Absolute fallback: every path above either changes state or reaches here.
@@ -785,13 +818,30 @@ export default function CityPrototype() {
       endTurn();
     }, 550);
     return () => window.clearTimeout(timer);
-  }, [turn, actionsLeft, investmentActions, round, finished, players, market, target, district, politicianTaxUsed, politicianCleanupUsed, journalistInflateUsed, journalistPublishUsed, mafiaCleanupUsed, mafiaRoofSweepUsed, mafiaRacketUsed, sanctionedPlayers, fraudCryptoUsed, fraudDocsUsed, fraudScamAmount, forgedRoleChoice]);
+  }, [turn, actionsLeft, investmentActions, round, finished, gameStarted, settings.rolePrice, players, market, target, district, politicianTaxUsed, politicianCleanupUsed, journalistInflateUsed, journalistPublishUsed, mafiaCleanupUsed, mafiaRoofSweepUsed, mafiaRacketUsed, sanctionedPlayers, fraudCryptoUsed, fraudDocsUsed, fraudScamAmount, forgedRoleChoice]);
+
+  const totalConfiguredPlayers = settings.humanPlayers + settings.botPlayers;
+  if (!gameStarted) return <div className="city-game city-setup-page">
+    <section className="city-setup">
+      <h1>Город влияния <small>strategy prototype v2</small></h1>
+      <p className="dim">Настройте партию. Несколько обычных игроков играют по очереди за одним экраном.</p>
+      <div className="city-setup-grid">
+        <label><span>Игроков</span><input type="number" min="1" max="4" value={settings.humanPlayers} onChange={e => setSettings(s => ({ ...s, humanPlayers: Number(e.target.value) }))}/><small>От 1 до 4</small></label>
+        <label><span>Ботов</span><input type="number" min="0" max="5" value={settings.botPlayers} onChange={e => setSettings(s => ({ ...s, botPlayers: Number(e.target.value) }))}/><small>От 0 до 5</small></label>
+        <label><span>Количество раундов</span><input type="number" min="5" max="30" value={settings.maxRounds} onChange={e => setSettings(s => ({ ...s, maxRounds: Number(e.target.value) }))}/><small>Рекомендуется 15</small></label>
+        <label><span>Цена свободной роли</span><input type="number" min="2" max="10" value={settings.rolePrice} onChange={e => setSettings(s => ({ ...s, rolePrice: Number(e.target.value) }))}/><small>Переворот: {Math.max(2, settings.rolePrice) * 2}◆</small></label>
+      </div>
+      <p className={totalConfiguredPlayers < 2 || totalConfiguredPlayers > 6 ? "setup-error" : "setup-summary"}>Всего участников: {totalConfiguredPlayers}. Допустимо от 2 до 6.</p>
+      <button className="btn primary setup-start" disabled={totalConfiguredPlayers < 2 || totalConfiguredPlayers > 6} onClick={startGame}>Начать игру</button>
+      <a className="btn setup-legacy" href="?legacy=1">Старый MVP</a>
+    </section>
+  </div>;
 
   return <div className="city-game">
-    <header className="city-head"><div><h1>Город влияния <small>strategy prototype v2</small> <span className="game-version" title="Версия сборки">v{__GAME_VERSION__}</span></h1><p>Раунд {round}/{MAX_ROUNDS} · Ход: <b>{me.name}</b> · Действий: <b>{actionsLeft}</b>{investmentActions > 0 && <> · Инвестиционных: <b className="investment-actions">{investmentActions}</b></>}{me.isBot && <span className="bot-thinking"> · принимает решение…</span>}</p></div><div className="city-head-buttons"><button className="btn" onClick={() => setShowRules(x => !x)}>📖 Правила</button><a className="btn" href="?legacy=1">Старый MVP</a></div></header>
+    <header className="city-head"><div><h1>Город влияния <small>strategy prototype v2</small> <span className="game-version" title="Версия сборки">v{__GAME_VERSION__}</span></h1><p>Раунд {round}/{settings.maxRounds} · Ход: <b>{me.name}</b> · Действий: <b>{actionsLeft}</b>{investmentActions > 0 && <> · Инвестиционных: <b className="investment-actions">{investmentActions}</b></>}{me.isBot && <span className="bot-thinking"> · принимает решение…</span>}</p></div><div className="city-head-buttons"><button className="btn" onClick={() => setShowRules(x => !x)}>📖 Правила</button><a className="btn" href="?legacy=1">Старый MVP</a></div></header>
     <div className="city-event"><strong>📰 {event.title}</strong><span>{event.text}</span><em>Городские проекты: 3◆ → 6 итоговых очков</em></div>
     <section className="city-players">{players.map(p => <article className={`city-player scandal-${Math.min(6,p.scandals)} ${p.id === me.id ? "active" : ""}`} key={p.id}><b>{p.name} <em>{scoreOf(p)} оч.</em></b><span>💰{p.money}　◆{p.influence}　⚠{p.scandals}/6　🛡{p.roofs}</span><small>{ROLES.find(r => r.id === p.role)?.title ?? "без роли"} · объектов {p.assets.length}</small><small className="scandal-status">{scandalStatus(p)}</small></article>)}</section>
-    {finished ? <section className="city-finish"><h2>Итоги города</h2>{scores.map((p, i) => <p key={p.id}>{i + 1}. <b>{p.name}</b> — {p.score} очков</p>)}<h3>Полный журнал</h3><p className="dim">Сохранено записей: {log.length}. В файле действия расположены от начала игры к завершению.</p><div className="log-export-actions"><button className="btn" onClick={copyGameLog}>Копировать лог</button><button className="btn" onClick={downloadGameLog}>Скачать .txt</button></div>{logExportStatus && <p className="log-export-status">{logExportStatus}</p>}<button className="btn primary" onClick={() => location.reload()}>Новая партия</button></section> : <main className="city-layout">
+    {finished ? <section className="city-finish"><h2>Итоги города</h2>{scores.map((p, i) => <p key={p.id}>{i + 1}. <b>{p.name}</b> — {p.score} очков</p>)}<h3>Полный журнал</h3><p className="dim">Сохранено записей: {log.length}. В файле действия расположены от начала игры к завершению.</p><div className="log-export-actions"><button className="btn" onClick={copyGameLog}>Копировать лог</button><button className="btn" onClick={downloadGameLog}>Скачать .txt</button></div>{logExportStatus && <p className="log-export-status">{logExportStatus}</p>}<button className="btn primary" onClick={() => setGameStarted(false)}>Новая партия</button></section> : <main className="city-layout">
       <section className="city-map"><h2>Районы и рынок</h2><div className="district-grid">{DISTRICTS.map(d => <div className={`district ${district === d.id ? "selected" : ""}`} style={{"--district": d.color} as React.CSSProperties} onClick={() => setDistrict(d.id)} key={d.id}><h3>{d.icon} {d.title} <span className="district-level">{districtCount(me, d.id)}/4 · +{districtSynergy(me, d.id)}$</span></h3><p>{d.description}</p><div className="market-cards">{market.filter(a => a.district === d.id).map(a => <button className="market-card" title={me.assets.length >= me.capacity ? "Нет свободного слота: продайте объект или расширьте бизнес" : a.text} disabled={me.money < priceOf(a) || !canInvest || me.assets.length >= me.capacity} onClick={() => buy(a)} key={a.uid}><b>{a.title}</b><span>{priceOf(a)}$ · доход {a.income}$ · ◆{a.influence}</span><small>{a.text}</small>{newDistrictDiscount(a) > 0 && <small className="capitalist-discount">Капиталист: новый район −1$</small>}</button>)}</div></div>)}</div>
         <div className="owned-panel">
           <h2>Ваш бизнес · слоты {me.assets.length}/{me.capacity}</h2>
@@ -817,7 +867,7 @@ export default function CityPrototype() {
       </section>
       <aside className={`city-actions ${me.isBot ? "bot-turn" : ""}`}><h2>Решения <span className="action-counter">{actionsLeft}/{me.role==="fraudster"?4:me.jailTurns>0?1:3}{investmentActions > 0 ? ` + ${investmentActions} инвестиционное` : ""}</span></h2>{me.isBot && <p className="bot-action-note">🤖 Бот анализирует рынок и продолжит автоматически.</p>}{actionsLeft === 0 && investmentActions === 0 && !me.isBot && <p className="no-actions">Действия потрачены. Завершите ход.</p>}{investmentActions > 0 && !me.isBot && <p className="investment-note">Доступно дополнительное действие: покупка объекта, слота, автоматизация или модернизация.</p>}{me.jailTurns>0&&<p className="no-actions">Тюрьма: в этом ходу доступно только одно действие.</p>}<label className={`target-picker ${target === null ? "required" : ""}`}>Цель<select value={target ?? ""} onChange={e => setTarget(e.target.value === "" ? null : Number(e.target.value))}><option value="">— выберите игрока —</option>{players.filter(p => p.id !== me.id).map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
         <div className="action-group"><b>Город</b><button className="btn" disabled={actionsLeft < 1} onClick={() => basicAction("work")}>Городской заказ: +2$</button><button className="btn" disabled={actionsLeft < 1 || me.money < 2} onClick={() => basicAction("campaign")}>Кампания: 2$ → 2 влияния</button><button className="btn" disabled={actionsLeft < 1 || me.influence < 3} onClick={cityProject}>Городской проект: 3◆ → 6 очков</button><button className="btn" disabled={!canInvest || me.capacity >= MAX_CAPACITY || me.money < (CAPACITY_COST[me.capacity] ?? Infinity)} onClick={buyCapacity}>{me.capacity >= MAX_CAPACITY ? "✓ Максимум 6 слотов" : `Купить слот ${me.capacity + 1}: ${CAPACITY_COST[me.capacity]}$`}</button><button className="btn" title="+25% дохода всем объектам выбранного района; +1◆, если у вас там есть объект. Максимум 2 уровня" disabled={actionsLeft < 1 || me.money < 2 || districtLevels[district] >= 2 || districtCount(me, district) < 2} onClick={investDistrict}>Развить район (нужно 2 объекта): 2$ → +25% дохода{me.assets.some(a => a.district === district) ? " +1◆" : ""}</button></div>
-        <div className="action-group"><b>Роли · свободная 5◆, переворот 10◆</b><div className="role-market">{ROLES.map(r => { const holder=roleHolder(r.id);const cost=roleCost(holder);return <button disabled={holder?.id===me.id || me.influence<cost || actionsLeft<1 || me.scandals>=5} onClick={() => claimRole(r.id)} style={{borderColor:r.color}} key={r.id}>{r.title} · {cost}◆<small>{holder ? `занята: ${holder.name}${holder.roofs ? " · защищена Крышей" : ""}` : r.passive}</small></button>})}</div>
+        <div className="action-group"><b>Роли · свободная {settings.rolePrice}◆, переворот {settings.rolePrice * 2}◆</b><div className="role-market">{ROLES.map(r => { const holder=roleHolder(r.id);const cost=roleCost(holder);return <button disabled={holder?.id===me.id || me.influence<cost || actionsLeft<1 || me.scandals>=5} onClick={() => claimRole(r.id)} style={{borderColor:r.color}} key={r.id}>{r.title} · {cost}◆<small>{holder ? `занята: ${holder.name}${holder.roofs ? " · защищена Крышей" : ""}` : r.passive}</small></button>})}</div>
           {me.copiedRole && <p className="copied-role">Поддельная роль: {ROLES.find(r=>r.id===me.copiedRole)?.title} — до конца хода</p>}
           {hasRole(me,"capitalist") && <button className="btn full-width" disabled={rolePowerUsed||me.influence<3} onClick={rolePower}>{rolePowerUsed?"✓ Финансирование использовано":"Ускоренное финансирование: 3◆"}</button>}
           {hasRole(me,"politician") && <div className="politician-powers"><small>Прогноз влияния: +{passiveInfluenceFor(me)}◆ за раунд</small><button className="btn full-width" disabled={politicianTaxUsed||me.influence<5||selectedDistrictObjects<1} onClick={()=>collectDistrictTax(district)}>{politicianTaxUsed?"✓ Налог собран":`Налог: 5◆ → ${selectedDistrictObjects}$ (${selectedDistrictOwnObjects} своих + ${selectedDistrictObjects-selectedDistrictOwnObjects} чужих)`}</button><button className="btn full-width" disabled={politicianCleanupUsed||me.influence<2||me.scandals<1} onClick={cleanPoliticianScandal}>{politicianCleanupUsed?"✓ Скандал урегулирован":"Урегулировать скандал: 2◆"}</button></div>}
@@ -833,23 +883,23 @@ export default function CityPrototype() {
       </aside>
       <aside className="city-log"><h2>Хроника</h2>{log.map((x,i)=><p key={i}>{x}</p>)}</aside>
     </main>}
-    {showRules && <Rules />}
+    {showRules && <Rules rolePrice={settings.rolePrice} />}
   </div>;
 }
 
-function Rules() { return <section className="city-help"><h2>Как играть</h2><div className="help-grid">
+function Rules({ rolePrice }: { rolePrice: number }) { return <section className="city-help"><h2>Как играть</h2><div className="help-grid">
   <article><h3>🎯 Победа</h3><p>Деньги + влияние + половина стоимости бизнеса + проекты + роль − скандалы. Текущий прогноз виден у каждого игрока.</p></article>
   <article><h3>⏱️ Действия</h3><p>Обычно доступны три действия, у Афериста — четыре. После тюрьмы следующий ход проходит с одним действием.</p></article>
   <article><h3>🏙️ Комбинации районов</h3><p>Два объекта района дают каждому +1$ дохода, четыре — +2$. Развивать район можно только с двумя своими объектами: уровень стоит 2$ и добавляет ещё +25% дохода.</p></article>
   <article><h3>⚙️ Слоты бизнеса</h3><p>В начале доступны 3 объекта. Новые слоты стоят 6/10/15$. При полном составе нужно продать объект или расшириться; каждый объект требует 1$ содержания за раунд.</p></article>
   <article><h3>🔧 Ветка улучшения</h3><p>Объект выбирает одну ветку: автоматизация за 5$ удваивает его районные, ролевые и условные синергии; модернизация за 4$ всегда добавляет +2$ базового дохода. Вторая ветка закрывается.</p></article>
-  <article><h3>🏷️ Роли и скандалы</h3><p>Свободная роль стоит 5◆, переворот — 10◆. Пять скандалов немедленно снимают роль, шесть отправляют в тюрьму. Без роли в начале хода снимается один скандал.</p></article>
+  <article><h3>🏷️ Роли и скандалы</h3><p>Свободная роль стоит {rolePrice}◆, переворот всегда ровно вдвое дороже — {rolePrice * 2}◆. Лоббистское бюро возвращает владельцу 2◆, если его роль отобрали. Пять скандалов немедленно снимают роль, шесть отправляют в тюрьму. Без роли в начале хода снимается один скандал.</p></article>
   <article><h3>💼 Капиталист</h3><p>Первый объект нового района дешевле на 1$. Деловые объекты получают +1$ синергии, а условия связи с Деловым центром всегда активны. Раз в раунд 3◆ дают дополнительное действие только на покупку объекта, слота или улучшение.</p></article>
   <article><h3>🏛️ Политик</h3><p>Условия Административного квартала всегда активны. Жильё получает +1$ дохода, административные объекты — +1◆ за раунд; автоматизация удваивает бонус. Раз в раунд 5◆ можно обменять на 1$ за каждый объект выбранного района во всём городе, а 2◆ — на снятие скандала.</p></article>
   <article><h3>🃏 Карты</h3><p>Карта не выдаётся бесплатно: случайная карта стоит 3$ + 1◆ и отдельное действие. Лимит руки — четыре.</p></article>
   <article><h3>🌒 Серые операции</h3><p>Обменники открывают отмывание, Ночной рынок — контрабанду, Криптобиржа — памп, дата-центр — взлом. Покупки и операции дают скандалы и могут лишить денег, улучшений, роли или свободы.</p></article>
   <article><h3>📰 Журналист</h3><p>Получает влияние за собственные и чужие скандалы, может одновременно дать скандал себе и цели, а за 3◆ провести публикацию.</p></article>
-  <article><h3>⚖️ Силовик</h3><p>Промзона получает +1$. Санкции по уровню скандалов отнимают влияние, деньги, Крышу, улучшения или конфискуют объект.</p></article>
+  <article><h3>⚖️ Силовик</h3><p>Промзона получает +1$. Санкции по уровню скандалов отнимают влияние, деньги, Крышу, улучшения или конфискуют объект. После каждой санкции цель теряет 1 скандал.</p></article>
   <article><h3>🔪 Мафиози</h3><p>Серый сектор получает +1$. Рэкет давит на лидера, Крыша и коррупция чистят скандалы, а дань перенаправляет доход районного меньшинства.</p></article>
   <article><h3>🎭 Аферист</h3><p>Имеет четыре действия и бонус Технокластера. Может снять скандал действием, провести криптоскам или рискнуть всем ходом ради временной копии другой роли.</p></article>
   <article><h3>🛡️ Крыша</h3><p>Отменяет направленный финансовый, репутационный или силовой эффект. Обычный лимит — одна, у Мафиози — две.</p></article>

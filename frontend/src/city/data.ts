@@ -22,7 +22,7 @@ export const ROLES: RoleCard[] = [
   { id: "journalist", title: "Журналист", color: "#32a86a", passive: "Скандалы превращаются во влияние; может создавать скандалы себе и соперникам.", power: "Публикация: 3◆ → цели +1 скандал.", districts: [] },
   { id: "fraudster", title: "Аферист", color: "#aa68ee", passive: "4 действия; Технокластер +1$; камбэк и поддельные роли.", power: "Криптоскам, очистка скандалов и подделка документов.", districts: ["tech"] },
   { id: "mafia", title: "Мафиози", color: "#b84343", passive: "Серый сектор +1$; Крыша дешевле; получает дань с районного меньшинства.", power: "Рэкет, сжечь связи или замять дело.", districts: ["shadows"] },
-  { id: "military", title: "Силовик", color: "#70848b", passive: "Промзона +1$; использует чужие скандалы.", power: "Санкции: влияние, штрафы, Крыша, улучшения и конфискация.", districts: ["industrial"] },
+  { id: "military", title: "Силовик", color: "#70848b", passive: "Промзона +1$; использует чужие скандалы.", power: "Санкции: штраф по уровню цели, затем −1 скандал у цели.", districts: ["industrial"] },
 ];
 
 export const ASSETS: AssetCard[] = [
@@ -40,7 +40,7 @@ export const ASSETS: AssetCard[] = [
   { id:"data", title:"Платформа городских данных", district:"tech", cost:7, income:2, influence:2, text:"+1 влияние за раунд вместе с Административным кварталом.", tags:["data"] },
   { id:"contract", title:"Оператор госуслуг", district:"government", cost:8, income:2, influence:2, text:"Даёт Политику +1 влияние за раунд.", tags:["contract"] },
   { id:"security", title:"Частная служба безопасности", district:"government", cost:7, income:2, influence:1, text:"При покупке выдаёт Крышу.", tags:["security"] },
-  { id:"lobby", title:"Лоббистское бюро", district:"government", cost:6, income:1, influence:2, text:"Переворот против вашей роли стоит на 1 влияние дороже.", tags:["lobby"] },
+  { id:"lobby", title:"Лоббистское бюро", district:"government", cost:6, income:1, influence:2, text:"Если вашу роль отберут, получите 2 влияния компенсации.", tags:["lobby"] },
   { id:"cash", title:"Сеть наличных обменников", district:"shadows", cost:4, income:2, influence:0, text:"При покупке +2$ и +1 скандал. Открывает отмывание.", tags:["grey"] },
   { id:"market", title:"Ночной рынок", district:"shadows", cost:5, income:2, influence:1, text:"При покупке карта и +1 скандал. Открывает контрабанду.", tags:["grey"] },
   { id:"datacenter", title:"Нелегальный дата-центр", district:"shadows", cost:6, income:3, influence:0, text:"При покупке +2 скандала. Открывает взлом.", tags:["grey","tech"] },
