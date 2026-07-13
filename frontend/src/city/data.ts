@@ -24,6 +24,8 @@ export interface AssetEffects {
   greyScandalReduction?: number;
   developmentDiscount?: number;
   takeoverCompensation?: number;
+  // Passive: one unused action is banked and carried into your next turn.
+  carryAction?: number;
 }
 
 export interface District { id: DistrictId; title: string; icon: string; color: string; description: string }
@@ -43,7 +45,7 @@ export const DISTRICTS: District[] = [
 
 export const ROLES: RoleCard[] = [
   { id: "capitalist", title: "Капиталист", icon: "💼", color: "#d4af37", passive: "Новый район −1$; Деловой центр +1$; деловые условия всегда активны.", power: "Ускоренное финансирование: 3◆ → +1 инвестиционное действие.", districts: ["business"] },
-  { id: "politician", title: "Политик", icon: "🏛️", color: "#4f7de0", passive: "Жильё +1$; административные объекты дают влияние; административная связь всегда активна.", power: "Налог района: 5◆ → 1$ за каждый городской объект. Скандал: 2◆.", districts: ["residential"] },
+  { id: "politician", title: "Политик", icon: "🏛️", color: "#4f7de0", passive: "Жильё +1$; административные объекты дают влияние; базовые +1◆/раунд и +1◆ за каждые 2 жилых объекта.", power: "Налог района: 4◆ → 1$ за каждый городской объект. Скандал: 2◆.", districts: ["residential"] },
   { id: "journalist", title: "Журналист", icon: "📰", color: "#32a86a", passive: "Скандалы превращаются во влияние; может создавать скандалы себе и соперникам.", power: "Публикация: 3◆ → цели +1 скандал.", districts: [] },
   { id: "fraudster", title: "Аферист", icon: "🎭", color: "#aa68ee", passive: "4 действия; Технокластер +1$; камбэк и поддельные роли.", power: "Криптоскам, очистка скандалов и подделка документов.", districts: ["tech"] },
   { id: "mafia", title: "Мафиози", icon: "🔪", color: "#b84343", passive: "Серый сектор +1$; Крыша дешевле; получает дань с районного меньшинства.", power: "Рэкет, сжечь связи или замять дело.", districts: ["shadows"] },
@@ -95,6 +97,7 @@ export const ASSETS: AssetCard[] = [
   { id:"press_centre", title:"Национальный пресс-центр", district:"government", rarity:"rare", cost:10, income:2, influence:2, text:"+2$ к доходу, пока вы Журналист.", tags:["media","government"], effects:{roleBonus:{role:"journalist",value:2}} },
   { id:"regulator", title:"Федеральное агентство развития", district:"government", rarity:"epic", cost:12, income:2, influence:3, text:"+1$ за Политика и +2$ при наличии объекта Делового центра.", tags:["government","finance"], effects:{roleBonus:{role:"politician",value:1},districtBonus:{district:"business",value:2}} },
   { id:"anticorruption", title:"Антикоррупционное агентство", district:"government", rarity:"legendary", cost:15, income:0, influence:3, text:"Не приносит базовый доход; в начале каждого хода снимает 1 ваш скандал.", tags:["government"], effects:{scandalReduction:1} },
+  { id:"mayor_secretariat", title:"Секретариат мэра", district:"government", rarity:"legendary", cost:16, income:1, influence:2, text:"Пассив: одно неиспользованное действие сохраняется и переносится на следующий ход.", tags:["government"], effects:{carryAction:1} },
 
   // Серый сектор.
   { id:"cash", title:"Сеть наличных обменников", district:"shadows", rarity:"common", cost:4, income:2, influence:0, text:"При покупке +2$ и +1 скандал; открывает отмывание.", tags:["grey"], effects:{purchase:{money:2,scandals:1}} },
@@ -116,12 +119,14 @@ export const ASSETS: AssetCard[] = [
   // Деловой центр (доп.).
   { id:"insurance_agency", title:"Страховое агентство", district:"business", rarity:"common", cost:5, income:3, influence:0, text:"Надёжный денежный поток без условий.", tags:["finance"] },
   { id:"trading_terminal", title:"Биржевой терминал", district:"business", rarity:"uncommon", cost:8, income:2, influence:1, text:"+2$ при наличии объекта Технокластера.", tags:["finance"], effects:{districtBonus:{district:"tech",value:2}} },
+  { id:"board_of_directors", title:"Совет директоров", district:"business", rarity:"uncommon", cost:8, income:1, influence:2, text:"+1◆ за раунд при наличии Административного объекта.", tags:["finance","politics"], effects:{influenceBonus:{value:1,district:"government"}} },
   { id:"business_club", title:"Деловой клуб", district:"business", rarity:"rare", cost:9, income:2, influence:1, text:"+2$ пока вы Капиталист и +2$ пока вы Политик.", tags:["finance","politics"], effects:{roleBonuses:[{role:"capitalist",value:2},{role:"politician",value:2}]} },
   { id:"conglomerate_hq", title:"Штаб-квартира конгломерата", district:"business", rarity:"legendary", cost:17, income:1, influence:2, text:"+1$ за каждый район, где у вас есть объект: Спальный, Промзона, Технокластер, Административный, Серый сектор.", tags:["finance","infrastructure"], effects:{districtLinks:[{district:"residential",value:1},{district:"industrial",value:1},{district:"tech",value:1},{district:"government",value:1},{district:"shadows",value:1}]} },
 
   // Промзона (доп.).
   { id:"metal_base", title:"Металлобаза", district:"industrial", rarity:"common", cost:5, income:3, influence:0, text:"Недорогой промышленный доход без условий.", tags:["production"] },
   { id:"power_hub", title:"Энергоузел", district:"industrial", rarity:"uncommon", cost:8, income:3, influence:0, text:"+2$ при наличии объекта Технокластера.", tags:["energy"], effects:{districtBonus:{district:"tech",value:2}} },
+  { id:"union_council", title:"Профсоюзный центр", district:"industrial", rarity:"uncommon", cost:8, income:2, influence:1, text:"+1◆ за раунд при наличии объекта Спального района.", tags:["production","politics"], effects:{influenceBonus:{value:1,district:"residential"}} },
   { id:"defence_contract", title:"Оборонный подряд", district:"industrial", rarity:"rare", cost:10, income:3, influence:1, text:"+2$ пока вы Силовик и +2$ пока вы Мафиози.", tags:["production","security"], effects:{roleBonuses:[{role:"military",value:2},{role:"mafia",value:2}]} },
   { id:"industrial_cluster", title:"Промышленный кластер", district:"industrial", rarity:"epic", cost:13, income:3, influence:0, text:"+1$ за каждый район, где у вас есть объект: Спальный, Деловой центр, Серый сектор.", tags:["production","infrastructure"], effects:{districtLinks:[{district:"residential",value:1},{district:"business",value:1},{district:"shadows",value:1}]} },
 
@@ -134,12 +139,14 @@ export const ASSETS: AssetCard[] = [
   // Административный квартал (доп.).
   { id:"passport_office", title:"Паспортный стол", district:"government", rarity:"common", cost:5, income:1, influence:2, text:"Недорогой источник влияния.", tags:["government"] },
   { id:"city_prosecutor", title:"Городская прокуратура", district:"government", rarity:"uncommon", cost:8, income:2, influence:1, text:"+2$ при наличии объекта Серого сектора.", tags:["government"], effects:{districtBonus:{district:"shadows",value:2}} },
+  { id:"analytics_bureau", title:"Аналитическое бюро", district:"government", rarity:"uncommon", cost:8, income:1, influence:2, text:"+1◆ за раунд при наличии объекта Технокластера.", tags:["data","government"], effects:{influenceBonus:{value:1,district:"tech"}} },
   { id:"licensing_department", title:"Департамент лицензий", district:"government", rarity:"rare", cost:10, income:2, influence:2, text:"+2$ пока вы Политик и +2$ пока вы Силовик.", tags:["government","security"], effects:{roleBonuses:[{role:"politician",value:2},{role:"military",value:2}]} },
   { id:"city_management_centre", title:"Центр городского управления", district:"government", rarity:"epic", cost:12, income:1, influence:2, text:"+1$ за каждый район, где у вас есть объект: Спальный, Деловой центр, Промзона, Технокластер.", tags:["government","infrastructure"], effects:{districtLinks:[{district:"residential",value:1},{district:"business",value:1},{district:"industrial",value:1},{district:"tech",value:1}]} },
 
   // Серый сектор (доп.).
   { id:"underground_casino", title:"Подпольное казино", district:"shadows", rarity:"common", cost:5, income:3, influence:0, text:"При покупке +1 скандал; высокий серый доход.", tags:["grey"] },
   { id:"cashout_office", title:"Обнальная контора", district:"shadows", rarity:"uncommon", cost:7, income:2, influence:0, text:"При покупке +1 скандал; +2$ при наличии объекта Делового центра.", tags:["grey","finance"], effects:{districtBonus:{district:"business",value:2}} },
+  { id:"influence_broker", title:"Торговец компроматом", district:"shadows", rarity:"rare", cost:9, income:1, influence:2, text:"+1◆ за раунд при наличии Административного объекта; усиленный источник влияния.", tags:["grey","government"], effects:{influenceBonus:{value:1,district:"government"}} },
   { id:"protection_racket", title:"Крышевание бизнеса", district:"shadows", rarity:"rare", cost:9, income:2, influence:1, text:"При покупке +1 скандал; +2$ пока вы Мафиози и +2$ пока вы Силовик.", tags:["grey","security"], effects:{roleBonuses:[{role:"mafia",value:2},{role:"military",value:2}]} },
   { id:"shadow_logistics", title:"Теневая логистическая сеть", district:"shadows", rarity:"epic", cost:12, income:3, influence:0, text:"При покупке +1 скандал; +1$ за каждый район, где у вас есть объект: Промзона, Технокластер, Административный квартал.", tags:["grey","logistics"], effects:{districtLinks:[{district:"industrial",value:1},{district:"tech",value:1},{district:"government",value:1}]} },
 ];
