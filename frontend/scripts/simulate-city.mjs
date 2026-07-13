@@ -7,6 +7,7 @@ import { runInNewContext } from "node:vm";
 const ROLE_IDS = ["capitalist", "politician", "journalist", "fraudster", "mafia", "military"];
 const STRATEGIC_ROLES = ["capitalist", "politician", "fraudster", "mafia", "military"];
 const DISTRICTS = ["residential", "business", "industrial", "tech", "government", "shadows"];
+const DIFFICULTIES = ["easy", "medium", "hard"];
 const CAPACITY_COST = { 3: 6, 4: 10, 5: 15 };
 const dataSource=readFileSync(new URL("../src/city/data.ts",import.meta.url),"utf8");
 const assetSource=dataSource.match(/export const ASSETS: AssetCard\[\] = (\[[\s\S]*?\n\]);/)?.[1];
@@ -59,11 +60,11 @@ function addScandal(p,n){
 }
 
 function simulate(seed,{rounds=15,seats=4,rolePrice=5,difficulties=[]}={}){
-  const R=rng(seed), players=Array.from({length:seats},(_,id)=>({id,diff:difficulties[id]==="hard"?"hard":"medium",money:10,inf:2,sc:0,roofs:0,role:null,tempRole:null,jail:0,assets:[],hand:[],cap:3,projects:0,gained:0,banked:0,history:new Set(),cardHistory:new Set(),cardPlayedHistory:new Set(),switches:0,debt:0,roleShield:0,scandalShield:0,zoning:null,marketDiscount:0,upgradeDiscount:0,cardBuys:0,freeCards:0,cardPlays:0}));
+  const R=rng(seed), players=Array.from({length:seats},(_,id)=>({id,diff:DIFFICULTIES.includes(difficulties[id])?difficulties[id]:"medium",money:10,inf:2,sc:0,roofs:0,role:null,tempRole:null,jail:0,assets:[],hand:[],cap:3,projects:0,gained:0,banked:0,history:new Set(),cardHistory:new Set(),cardPlayedHistory:new Set(),switches:0,debt:0,roleShield:0,scandalShield:0,zoning:null,marketDiscount:0,upgradeDiscount:0,cardBuys:0,freeCards:0,cardPlays:0}));
   const levels=Object.fromEntries(DISTRICTS.map(d=>[d,0]));
   const firstTaken=Object.fromEntries(ROLE_IDS.map(r=>[r,null]));
   const gameStart=Math.floor(R()*players.length);
-  let deck=shuffle(ASSETS,R), market=deck.splice(0,6), actionDeck=shuffle(ACTIONS,R), actionMarket=actionDeck.splice(0,3), eventDeck=shuffle(EVENTS,R), event=eventDeck.shift();
+  let turnClock=0,deck=shuffle(ASSETS,R),market=deck.splice(0,6).map(a=>({...a,expiresAt:seats*2})),actionDeck=shuffle(ACTIONS,R),actionMarket=actionDeck.splice(0,3),eventDeck=shuffle(EVENTS,R),event=eventDeck.shift();
   const holder=r=>players.find(p=>p.role===r);
   const takeRole=(p,r,round)=>{
     const current=holder(r),cost=current?rolePrice*2:rolePrice;
@@ -110,13 +111,17 @@ function simulate(seed,{rounds=15,seats=4,rolePrice=5,difficulties=[]}={}){
   };
 
   for(let round=1;round<=rounds;round++){
-    const roundStart=(gameStart+round-1)%players.length;
+    const roundStart=gameStart;
+    if(round>1){const available=shuffle([...actionDeck,...actionMarket],R);actionMarket=available.splice(0,3);actionDeck=available}
     for(let offset=0;offset<players.length;offset++){
       const p=players[(roundStart+offset)%players.length];
+      const expired=market.filter(a=>a.expiresAt<=turnClock);
+      if(expired.length){const expiredSet=new Set(expired);market=market.filter(a=>!expiredSet.has(a));for(let n=0;n<expired.length&&deck.length;n++)market.push({...deck.shift(),expiresAt:turnClock+seats*2})}
       const hard=p.diff==="hard";
+      const codex=p.diff==="medium",horizon=rounds-round+1,hzPlan=Math.min(horizon,codex?10:hard?8:5);
       // Hard bots play MORE disciplined: switch roles only on a clear edge, buy only strong
       // cards, replace assets only for big gains, and expand capacity only for premium picks.
-      const switchThreshold=hard?4:3, cardBuyThreshold=hard?7:6, replaceGain=hard?6:5, capBuyValue=hard?5:4;
+      const switchThreshold=codex?5:hard?4:3, cardBuyThreshold=codex?5.5:hard?7:6, replaceGain=codex?2:hard?6:5, capBuyValue=codex?0:hard?5:4;
       p.tempRole=null;p.marketDiscount=0;p.upgradeDiscount=0;
       if(!p.role&&p.sc>0)p.sc--;
       const jailed=p.jail>0;p.jail=Math.max(0,p.jail-1);p.sc=Math.max(0,p.sc-effectTotal(p,"scandalReduction"));p.roofs=Math.min(roofLimit(p),p.roofs+effectTotal(p,"turnRoof"));
@@ -127,7 +132,7 @@ function simulate(seed,{rounds=15,seats=4,rolePrice=5,difficulties=[]}={}){
         const maxEnemyScandals=Math.max(0,...players.filter(x=>x.id!==p.id).map(x=>x.sc));
         const comeback=place===players.length||(place>=3&&gap>=10);
         let strategic=[...STRATEGIC_ROLES].sort((a,b)=>roleUtility(p,b,comeback,maxEnemyScandals)-roleUtility(p,a,comeback,maxEnemyScandals))[0];
-        if(comeback)strategic=maxEnemyScandals>0&&roleUtility(p,"military",true,maxEnemyScandals)>=roleUtility(p,"fraudster",true,maxEnemyScandals)?"military":"fraudster";
+        if(comeback&&!codex)strategic=maxEnemyScandals>0&&roleUtility(p,"military",true,maxEnemyScandals)>=roleUtility(p,"fraudster",true,maxEnemyScandals)?"military":"fraudster";
         const leader=ranked.find(x=>x.id!==p.id),strategicHolder=holder(strategic);
         const scandalTarget=players.filter(x=>x.id!==p.id).sort((a,b)=>b.sc-a.sc||score(b)-score(a))[0];
         const pendingTargetCard=p.hand.find(c=>c.targeted),cardTarget=pendingTargetCard?.kind==="role_pressure"?ranked.find(x=>x.id!==p.id&&x.role):pendingTargetCard?.kind==="remove_upgrade"?ranked.find(x=>x.id!==p.id&&x.assets.some(a=>a.auto||a.scaled)):leader;
@@ -138,7 +143,7 @@ function simulate(seed,{rounds=15,seats=4,rolePrice=5,difficulties=[]}={}){
 
         if(p.role==="politician"&&!used.polClean&&p.sc>0&&p.inf>=2){p.inf-=2;p.sc--;used.polClean=true;continue}
         if(p.role==="politician"&&!used.tax&&p.inf>=4){const revenue=Math.max(...DISTRICTS.map(d=>players.reduce((s,x)=>s+count(x,d),0)));if(revenue>=4){p.inf-=4;p.money+=revenue;used.tax=true;continue}}
-        if(p.role==="capitalist"&&!used.capital&&p.inf>=3&&p.money>=4){p.inf-=3;investments++;used.capital=true;continue}
+        if(p.role==="capitalist"&&!used.capital&&p.inf>=3&&p.money>=4&&(!codex||horizon>1)){p.inf-=3;investments++;used.capital=true;continue}
         if(p.role==="journalist"&&!used.inflate&&target&&p.sc<4){addScandal(p,1);addScandal(target,1);used.inflate=true;continue}
         if(p.role==="journalist"&&!used.publish&&target&&p.inf>=3){p.inf-=3;addScandal(target,1);used.publish=true;continue}
         if(p.role==="mafia"&&!used.mafiaClean&&p.sc>=2&&(p.roofs>0||(p.money>=3&&count(p,"government")>0))){if(p.roofs>0)p.roofs--;else p.money-=3;p.sc=Math.max(0,p.sc-2);used.mafiaClean=true;continue}
@@ -151,7 +156,7 @@ function simulate(seed,{rounds=15,seats=4,rolePrice=5,difficulties=[]}={}){
 
         if(actions>0&&p.sc<5){
           const currentUtility=p.role?roleUtility(p,p.role,comeback,maxEnemyScandals):-2;
-          if(p.role!==strategic&&(p.role===null||roleUtility(p,strategic,comeback,maxEnemyScandals)>=currentUtility+switchThreshold||comeback)){
+          if(p.role!==strategic&&(p.role===null||roleUtility(p,strategic,comeback,maxEnemyScandals)>=currentUtility+switchThreshold||(comeback&&!codex))){
             const h=holder(strategic),cost=h?rolePrice*2:rolePrice;
             if(p.inf>=cost&&takeRole(p,strategic,round)){actions--;continue}
             if(h&&h.id!==p.id&&p.role!=="journalist"&&!holder("journalist")&&p.inf>=rolePrice&&takeRole(p,"journalist",round)){actions--;continue}
@@ -159,43 +164,64 @@ function simulate(seed,{rounds=15,seats=4,rolePrice=5,difficulties=[]}={}){
         }
         if(actions>0&&p.role==="fraudster"&&!used.crypto&&p.assets.some(a=>a.id==="crypto"&&!a.blocked)&&p.sc<=3){const amount=Math.max(1,Math.min(comeback?2:1,4-p.sc));let gained=0;for(const x of players)if(x.id!==p.id){const paid=Math.min(amount,x.money);x.money-=paid;gained+=paid}p.money+=gained;addScandal(p,Math.max(0,amount-effectTotal(p,"greyScandalReduction")));used.crypto=true;actions--;continue}
 
-        if(actions>0&&p.money>=3&&p.inf>=1&&p.hand.length<3){const purchaseValue=c=>(c.kind==="deep_clean"||c.kind==="influence_to_cash")&&p.inf<3?-10:c.kind==="influence"&&p.money<5?-10:cardUtility(p,c,target,comeback,cardDistrict),bestCard=[...actionMarket].sort((a,b)=>purchaseValue(b)-purchaseValue(a))[0];if(bestCard&&purchaseValue(bestCard)>=cardBuyThreshold){p.money-=3;p.inf--;p.hand.push(bestCard);p.cardBuys++;p.cardHistory.add(bestCard.id);actionMarket.splice(actionMarket.indexOf(bestCard),1);if(actionDeck.length)actionMarket.push(actionDeck.shift());actions--;continue}}
+        if(actions>0&&p.money>=3&&p.inf>=1&&p.hand.length<3){const purchaseValue=c=>(c.kind==="deep_clean"||c.kind==="influence_to_cash")&&p.inf<3?-10:c.kind==="influence"&&p.money<5?-10:cardUtility(p,c,target,comeback,cardDistrict),bestCard=[...actionMarket].sort((a,b)=>purchaseValue(b)-purchaseValue(a))[0];if(bestCard&&purchaseValue(bestCard)>=cardBuyThreshold){p.money-=3;p.inf--;p.hand.push(bestCard);p.cardBuys++;p.cardHistory.add(bestCard.id);actionMarket.splice(actionMarket.indexOf(bestCard),1);actions--;continue}}
 
-        const marketValue=a=>{const c=count(p,a.d),completion=c===1?5:c===3?7:c===2?2:0,roleMatch=({capitalist:"business",politician:"residential",fraudster:"tech",mafia:"shadows",military:"industrial"}[strategic]===a.d)?3:0,b=a.effects?.districtBonus,condition=b&&hasDistrict(p,b.district)?b.value*2:0,linked=a.effects?.roleBonus?.role===strategic?(a.effects.roleBonus.value*3):0,rarity=({common:0,uncommon:1,rare:2,epic:4,legendary:6}[a.rarity]??0),strong=(a.effects?.extraActions??0)*16+(a.effects?.extraInvestmentActions??0)*10+(a.effects?.scandalReduction??0)*7+(a.effects?.maintenanceReduction??0)*3+(a.effects?.roofCapacity??0)*3+(a.effects?.turnRoof??0)*4+(a.effects?.greyScandalReduction??0)*5,grey=a.tags.includes("grey")&&p.role!=="fraudster"&&p.role!=="mafia"?p.sc*2+2:0;return a.income*2.5-price(p,a)+a.inf+completion+roleMatch+condition+linked+rarity+strong-grey};
+        const marketValue=a=>{
+          const c=count(p,a.d);
+          if(codex){
+            const future=c+1,districtIncome=future>=4?2:future>=2?1:0,roleDistrict=({capitalist:"business",politician:"residential",fraudster:"tech",mafia:"shadows",military:"industrial"}[strategic]===a.d)?1:0,e=a.effects??{};
+            const linked=d=>hasDistrict(p,d)||a.d===d;
+            let conditional=e.eventBonus?.eventId===event.id?e.eventBonus.value:0;
+            if(e.districtBonus){const b=e.districtBonus;conditional+=b.perObject?Math.max(0,count(p,b.district)+(a.d===b.district?1:0)-(b.excludeSelf&&a.d===b.district?1:0)+(b.virtualRole===strategic?1:0))*b.value:linked(b.district)?b.value:0}
+            if(e.roleBonus?.role===strategic)conditional+=e.roleBonus.value;
+            for(const rb of e.roleBonuses??[])if(rb.role===strategic)conditional+=rb.value;
+            for(const dl of e.districtLinks??[])if(linked(dl.district))conditional+=dl.value;
+            const passive=e.influenceBonus&&(!e.influenceBonus.role||e.influenceBonus.role===strategic)&&(!e.influenceBonus.district||linked(e.influenceBonus.district))?e.influenceBonus.value:0;
+            const maintenanceSaved=Math.min(e.maintenanceReduction??0,p.assets.length+1),recurring=a.income+districtIncome+roleDistrict+conditional+passive+maintenanceSaved-1;
+            const engines=(e.extraActions??0)*2.5+(e.extraInvestmentActions??0)*2+(e.carryAction??0)*1.5;
+            const defence=(e.scandalReduction??0)*(p.sc>=2?2:.75)+(e.turnRoof??0)*1+(e.greyScandalReduction??0)*(p.assets.filter(x=>x.tags.includes("grey")).length+1);
+            const buy=e.purchase??{},immediate=a.inf+(buy.money??0)+(buy.influence??0)+assetValue(a)+(buy.roofs?1.5:0)+(buy.card?2:0),scandals=buy.scandals??(a.tags.includes("grey")?1:0),risk=scandals*(p.sc>=3?5:2);
+            return immediate+(recurring+engines+defence)*hzPlan-price(p,a)-risk-2;
+          }
+          const completion=c===1?5:c===3?7:c===2?2:0,roleMatch=({capitalist:"business",politician:"residential",fraudster:"tech",mafia:"shadows",military:"industrial"}[strategic]===a.d)?3:0,b=a.effects?.districtBonus,condition=b&&hasDistrict(p,b.district)?b.value*2:0,linked=a.effects?.roleBonus?.role===strategic?(a.effects.roleBonus.value*3):0,rarity=({common:0,uncommon:1,rare:2,epic:4,legendary:6}[a.rarity]??0),strong=(a.effects?.extraActions??0)*16+(a.effects?.extraInvestmentActions??0)*10+(a.effects?.scandalReduction??0)*7+(a.effects?.maintenanceReduction??0)*3+(a.effects?.roofCapacity??0)*3+(a.effects?.turnRoof??0)*4+(a.effects?.greyScandalReduction??0)*5,grey=a.tags.includes("grey")&&p.role!=="fraudster"&&p.role!=="mafia"?p.sc*2+2:0;return a.income*2.5-price(p,a)+a.inf+completion+roleMatch+condition+linked+rarity+strong-grey
+        };
         const affordable=market.filter(a=>price(p,a)<=p.money).sort((a,b)=>marketValue(b)-marketValue(a)),best=affordable[0];
         const canInvest=actions>0||investments>0,spendInvest=()=>{if(investments>0)investments--;else actions--};
-        if(canInvest&&best&&p.assets.length<p.cap){const cost=price(p,best),buy=best.effects?.purchase??{};p.money-=cost-(buy.money??0);p.inf+=best.inf+(buy.influence??0);p.assets.push({...best,auto:false,scaled:false,blocked:false});market.splice(market.indexOf(best),1);if(buy.roofs)p.roofs=Math.min(roofLimit(p),p.roofs+buy.roofs);if(buy.card&&p.hand.length<3&&(actionDeck.length||actionMarket.length)){const free=actionDeck.length?actionDeck.shift():actionMarket.shift();p.hand.push(free);p.cardHistory.add(free.id);p.freeCards++}const raw=buy.scandals??(best.tags.includes("grey")?1:0);addScandal(p,Math.max(0,raw-(best.tags.includes("grey")?effectTotal(p,"greyScandalReduction"):0)));p.marketDiscount=0;spendInvest();continue}
+        if(canInvest&&best&&p.assets.length<p.cap&&(!codex||marketValue(best)>=0)){const cost=price(p,best),buy=best.effects?.purchase??{};p.money-=cost-(buy.money??0);p.inf+=best.inf+(buy.influence??0);p.assets.push({...best,auto:false,scaled:false,blocked:false});market.splice(market.indexOf(best),1);if(deck.length)market.push({...deck.shift(),expiresAt:turnClock+seats*2});if(buy.roofs)p.roofs=Math.min(roofLimit(p),p.roofs+buy.roofs);if(buy.card&&p.hand.length<3&&(actionDeck.length||actionMarket.length)){const free=actionDeck.length?actionDeck.shift():actionMarket.shift();p.hand.push(free);p.cardHistory.add(free.id);p.freeCards++}const raw=buy.scandals??(best.tags.includes("grey")?1:0);addScandal(p,Math.max(0,raw-(best.tags.includes("grey")?effectTotal(p,"greyScandalReduction"):0)));p.marketDiscount=0;spendInvest();continue}
         const capCost=CAPACITY_COST[p.cap];if(canInvest&&best&&p.assets.length>=p.cap&&capCost&&p.money>=capCost&&marketValue(best)>=capBuyValue){p.money-=capCost;p.cap++;spendInvest();continue}
         if(actions>0&&best&&p.assets.length>=p.cap){const weakest=[...p.assets].sort((a,b)=>(marketValue(a)+(a.auto||a.scaled?4:0))-(marketValue(b)+(b.auto||b.scaled?4:0)))[0],gain=marketValue(best)-marketValue(weakest)-(weakest.auto||weakest.scaled?4:0);if(gain>=replaceGain&&p.money+assetValue(weakest)>=price(p,best)){p.money+=assetValue(weakest);p.assets.splice(p.assets.indexOf(weakest),1);actions--;continue}}
         const developable=DISTRICTS.filter(d=>count(p,d)>=2&&levels[d]<2).sort((a,b)=>count(p,b)-count(p,a))[0];if(actions>0&&p.money>=2&&developable){p.money-=2;p.inf++;levels[developable]++;actions--;continue}
         const upgradeable=p.assets.filter(a=>!a.scaled&&!a.auto&&!a.blocked),automation=[...upgradeable].sort((a,b)=>synergyIncome(p,b,event)-synergyIncome(p,a,event))[0],autoCost=Math.max(1,5-p.upgradeDiscount);if(canInvest&&p.money>=autoCost&&automation&&synergyIncome(p,automation,event)>0){p.money-=autoCost;automation.auto=true;p.upgradeDiscount=0;spendInvest();continue}
         const scale=[...upgradeable].sort((a,b)=>b.income-a.income)[0],scaleCost=Math.max(1,4-p.upgradeDiscount);if(canInvest&&p.money>=scaleCost&&scale){p.money-=scaleCost;scale.scaled=true;p.upgradeDiscount=0;spendInvest();continue}
+        if(actions>0&&codex&&p.inf>=3){const holderCost=holder(strategic)&&holder(strategic)?.id!==p.id?rolePrice*2:p.role?0:rolePrice,spare=p.inf-holderCost;if(spare>=3&&(horizon<=3||!best||marketValue(best)<0)){p.inf-=3;p.projects++;actions--;continue}}
         if(actions>0&&p.inf<(holder(strategic)?rolePrice*2:rolePrice)&&p.money>=2){p.money-=2;p.inf+=2;actions--;continue}
         if(actions>0){p.money+=2;actions--;continue}
       }
       if(!jailed&&actions>0&&effectTotal(p,"carryAction")>0)p.banked=1;
       p.tempRole=null;p.marketDiscount=0;p.upgradeDiscount=0;
+      turnClock++;
     }
 
     const incomes=new Map(players.map(p=>[p.id,-Math.max(0,p.assets.length-effectTotal(p,"maintenanceReduction"))+p.assets.reduce((s,a)=>s+(a.blocked?0:Math.floor((a.income+(a.scaled?2:0))*(1+levels[a.d]*.25))+synergyIncome(p,a,event)+(event.gIncome??0)),0)]));
     for(const mafia of players.filter(p=>p.role==="mafia")){let tribute=0;for(const p of players){if(p.id===mafia.id)continue;let levy=0;for(const d of DISTRICTS){const max=Math.max(...players.map(x=>count(x,d)));if(count(p,d)<max)levy+=p.assets.filter(a=>a.d===d&&!a.blocked).length}const paid=Math.min(Math.max(0,incomes.get(p.id)),levy);incomes.set(p.id,incomes.get(p.id)-paid);tribute+=paid}incomes.set(mafia.id,incomes.get(mafia.id)+tribute)}
     for(const p of players){const newsLimit=p.assets.some(a=>a.id==="data")?3:2,news=p.role==="journalist"?Math.min(newsLimit,players.filter(x=>x.id!==p.id).reduce((s,x)=>s+x.gained,0)):0,rating=p.role==="journalist"?Math.min(4,p.sc):0;p.money=Math.max(0,p.money+incomes.get(p.id)-p.debt);p.inf+=passiveInfluence(p)+news+rating;p.debt=0;p.zoning=null;p.gained=0;for(const a of p.assets)a.blocked=false}
-    if(round<rounds){while(market.length<6&&deck.length)market.push(deck.shift());if(!eventDeck.length)eventDeck=shuffle(EVENTS,R);event=eventDeck.shift()}
+    if(round<rounds){if(!eventDeck.length)eventDeck=shuffle(EVENTS,R);event=eventDeck.shift()}
   }
-  const ranked=rank();return {ranked,firstTaken,winner:ranked[0]};
+  const ranked=rank();return {ranked,firstTaken,winner:ranked[0],gameStart};
 }
 
 function batch(games,rounds,seats=4,rolePrice=5,difficulties=[]){
-  const roleWins=Object.fromEntries(ROLE_IDS.map(r=>[r,0])),firstSum=Object.fromEntries(ROLE_IDS.map(r=>[r,0])),firstCount=Object.fromEntries(ROLE_IDS.map(r=>[r,0])),seatWins=[0,0,0,0];
+  const roleWins=Object.fromEntries(ROLE_IDS.map(r=>[r,0])),firstSum=Object.fromEntries(ROLE_IDS.map(r=>[r,0])),firstCount=Object.fromEntries(ROLE_IDS.map(r=>[r,0])),seatWins=[0,0,0,0],turnOrderWins=[0,0,0,0];
   const rarityTotals={common:0,uncommon:0,rare:0,epic:0,legendary:0},assetWinCredits=Object.fromEntries(ASSETS.map(a=>[a.id,0])),cardWinCredits=Object.fromEntries(ACTIONS.map(c=>[c.id,0]));
   let scoreSum=0,gapSum=0,winnerRoles=0,winnerSwitches=0,winnerAssets=0,winnerCapacity=0,winnersWithLegendary=0,totalCardBuys=0,totalFreeCards=0,totalCardPlays=0,winnerCardBuys=0,winnerCardPlays=0;
   // Per-difficulty win tracking so hard-vs-medium match-ups are comparable.
-  const diffWins={medium:0,hard:0},diffSeats={medium:0,hard:0};
-  seats=Math.max(2,seats);const seatDiff=Array.from({length:seats},(_,i)=>difficulties[i]==="hard"?"hard":"medium");
+  const diffWins=Object.fromEntries(DIFFICULTIES.map(d=>[d,0])),diffSeats=Object.fromEntries(DIFFICULTIES.map(d=>[d,0]));
+  seats=Math.max(2,seats);const seatDiff=Array.from({length:seats},(_,i)=>DIFFICULTIES.includes(difficulties[i])?difficulties[i]:"medium");
   for(let i=0;i<seats;i++)diffSeats[seatDiff[i]]++;
   seatWins.length=seats;seatWins.fill(0);
+  turnOrderWins.length=seats;turnOrderWins.fill(0);
   for(let i=1;i<=games;i++){
-    const result=simulate(i*7919+rounds*104729,{rounds,seats,rolePrice,difficulties:seatDiff});const w=result.winner;seatWins[w.id]++;diffWins[seatDiff[w.id]]++;scoreSum+=score(w);gapSum+=score(result.ranked[0])-score(result.ranked[1]);winnerRoles+=w.history.size;winnerSwitches+=w.switches;winnerAssets+=w.assets.length;winnerCapacity+=w.cap;
+    const result=simulate(i*7919+rounds*104729,{rounds,seats,rolePrice,difficulties:seatDiff});const w=result.winner;seatWins[w.id]++;turnOrderWins[(w.id-result.gameStart+seats)%seats]++;diffWins[seatDiff[w.id]]++;scoreSum+=score(w);gapSum+=score(result.ranked[0])-score(result.ranked[1]);winnerRoles+=w.history.size;winnerSwitches+=w.switches;winnerAssets+=w.assets.length;winnerCapacity+=w.cap;
     if(w.assets.some(a=>a.rarity==="legendary"))winnersWithLegendary++;for(const a of w.assets){rarityTotals[a.rarity]++;assetWinCredits[a.id]++}
     for(const p of result.ranked){totalCardBuys+=p.cardBuys;totalFreeCards+=p.freeCards;totalCardPlays+=p.cardPlays}winnerCardBuys+=w.cardBuys;winnerCardPlays+=w.cardPlays;for(const id of w.cardPlayedHistory)cardWinCredits[id]++;
     for(const r of w.history)roleWins[r]++;
@@ -205,15 +231,15 @@ function batch(games,rounds,seats=4,rolePrice=5,difficulties=[]){
   const topWinnerObjects=Object.entries(assetWinCredits).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([id,n])=>({id,winCreditPct:pct(n)}));
   const topWinnerCards=Object.entries(cardWinCredits).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([id,n])=>({id,winCreditPct:pct(n)}));
   // Win rate per seat normalised by how many seats used each difficulty.
-  const diffWinRate=Object.fromEntries(["medium","hard"].map(d=>[d,diffSeats[d]?+(diffWins[d]/games*100).toFixed(1):null]));
-  const diffWinPerSeat=Object.fromEntries(["medium","hard"].map(d=>[d,diffSeats[d]?+(diffWins[d]/(games*diffSeats[d])*100).toFixed(1):null]));
-  return {games,rounds,seatDifficulties:seatDiff,difficultyWinPct:diffWinRate,difficultyWinPctPerSeat:diffWinPerSeat,avgWinnerScore:avg(scoreSum),avgVictoryGap:avg(gapSum),avgWinnerRoles:avg(winnerRoles),avgWinnerSwitches:avg(winnerSwitches),avgWinnerAssets:avg(winnerAssets),avgWinnerCapacity:avg(winnerCapacity),cards:{avgPaidBuysPerPlayer:+(totalCardBuys/(games*seats)).toFixed(2),avgFreeCardsPerPlayer:+(totalFreeCards/(games*seats)).toFixed(2),avgPlaysPerPlayer:+(totalCardPlays/(games*seats)).toFixed(2),playRatePct:+(totalCardPlays/Math.max(1,totalCardBuys+totalFreeCards)*100).toFixed(1),avgWinnerPaidBuys:avg(winnerCardBuys),avgWinnerPlays:avg(winnerCardPlays),topWinnerCards},winnerLegendaryPct:pct(winnersWithLegendary),avgWinnerRarities:Object.fromEntries(Object.entries(rarityTotals).map(([r,n])=>[r,avg(n)])),topWinnerObjects,seatWinPct:seatWins.map(pct),winnerRoleCreditPct:Object.fromEntries(ROLE_IDS.map(r=>[r,pct(roleWins[r])])),firstRoleRound:Object.fromEntries(ROLE_IDS.map(r=>[r,firstCount[r]?+(firstSum[r]/firstCount[r]).toFixed(2):null])),roleSeenPct:Object.fromEntries(ROLE_IDS.map(r=>[r,pct(firstCount[r])]))};
+  const diffWinRate=Object.fromEntries(DIFFICULTIES.map(d=>[d,diffSeats[d]?+(diffWins[d]/games*100).toFixed(1):null]));
+  const diffWinPerSeat=Object.fromEntries(DIFFICULTIES.map(d=>[d,diffSeats[d]?+(diffWins[d]/(games*diffSeats[d])*100).toFixed(1):null]));
+  return {games,rounds,seatDifficulties:seatDiff,difficultyWinPct:diffWinRate,difficultyWinPctPerSeat:diffWinPerSeat,avgWinnerScore:avg(scoreSum),avgVictoryGap:avg(gapSum),avgWinnerRoles:avg(winnerRoles),avgWinnerSwitches:avg(winnerSwitches),avgWinnerAssets:avg(winnerAssets),avgWinnerCapacity:avg(winnerCapacity),cards:{avgPaidBuysPerPlayer:+(totalCardBuys/(games*seats)).toFixed(2),avgFreeCardsPerPlayer:+(totalFreeCards/(games*seats)).toFixed(2),avgPlaysPerPlayer:+(totalCardPlays/(games*seats)).toFixed(2),playRatePct:+(totalCardPlays/Math.max(1,totalCardBuys+totalFreeCards)*100).toFixed(1),avgWinnerPaidBuys:avg(winnerCardBuys),avgWinnerPlays:avg(winnerCardPlays),topWinnerCards},winnerLegendaryPct:pct(winnersWithLegendary),avgWinnerRarities:Object.fromEntries(Object.entries(rarityTotals).map(([r,n])=>[r,avg(n)])),topWinnerObjects,seatWinPct:seatWins.map(pct),turnOrderWinPct:turnOrderWins.map(pct),winnerRoleCreditPct:Object.fromEntries(ROLE_IDS.map(r=>[r,pct(roleWins[r])])),firstRoleRound:Object.fromEntries(ROLE_IDS.map(r=>[r,firstCount[r]?+(firstSum[r]/firstCount[r]).toFixed(2):null])),roleSeenPct:Object.fromEntries(ROLE_IDS.map(r=>[r,pct(firstCount[r])]))};
 }
 
 const games=Number(process.argv[2]??3000),durations=(process.argv[3]?process.argv[3].split(",").map(Number):[10,12,15,18,20]);
 const seats=Number(process.argv[4]??4),rolePrice=Number(process.argv[5]??5);
-// Optional 6th arg: comma-separated per-seat difficulty spec, e.g. "medium,hard,medium,hard".
+// Optional 6th arg: comma-separated per-seat profile spec, e.g. "easy,medium,hard".
 // Shorter lists repeat to fill all seats; unknown values fall back to "medium".
 const rawDiff=process.argv[6]?process.argv[6].split(",").map(s=>s.trim().toLowerCase()):[];
-const difficulties=Array.from({length:seats},(_,i)=>{const d=rawDiff.length?rawDiff[i%rawDiff.length]:"medium";return d==="hard"?"hard":"medium";});
+const difficulties=Array.from({length:seats},(_,i)=>{const d=rawDiff.length?rawDiff[i%rawDiff.length]:"medium";return DIFFICULTIES.includes(d)?d:"medium";});
 console.log(JSON.stringify({model:"current universal browser-bot strategy",settings:{seats,rolePrice,difficulties},results:durations.map(rounds=>batch(games,rounds,seats,rolePrice,difficulties))},null,2));

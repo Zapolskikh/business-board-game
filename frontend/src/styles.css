@@ -393,8 +393,10 @@ select {
 .roster-slot-hint { color:var(--text-dim); font-size:13px; }
 .roster-remove { margin-left:auto; padding:3px 9px; color:#f85149; }
 .bot-badge { margin-left:6px; padding:0 5px; font-size:9px; font-weight:700; border-radius:8px; letter-spacing:.04em; vertical-align:middle; }
-.bot-badge.diff-medium { color:#c9b5f5; background:rgba(155,110,231,.18); border:1px solid rgba(155,110,231,.5); }
+.bot-badge.diff-easy { color:#c9b5f5; background:rgba(155,110,231,.18); border:1px solid rgba(155,110,231,.5); }
+.bot-badge.diff-medium { color:#9ee6c2; background:rgba(46,160,110,.18); border:1px solid rgba(46,160,110,.55); }
 .bot-badge.diff-hard { color:#ffb3b3; background:rgba(248,81,73,.18); border:1px solid rgba(248,81,73,.55); }
+.market-card .market-expiry { color:#e3b341; font-weight:600; }
 .city-head { display:flex; justify-content:space-between; align-items:center; gap:12px; max-width:1600px; margin:auto; }
 .city-head-title { flex:0 0 auto; }
 .city-head h1 { font-size:24px; }.city-head h1 small { color:#9b6ee7; font-size:12px; }.city-head p { margin:4px 0 10px; color:var(--text-dim); }
