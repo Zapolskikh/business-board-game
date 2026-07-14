@@ -75,7 +75,7 @@ h1, h2, h3, p { margin-top: 0; }
 
 .city-layout { display: grid; max-width: 1600px; margin: auto; grid-template-columns: minmax(560px, 1fr) minmax(500px, 600px); gap: 8px; align-items: start; }
 .city-main-col, .city-side { display: flex; min-width: 0; flex-direction: column; gap: 8px; }
-.city-side { position: sticky; top: 8px; max-height: calc(100vh - 16px); overflow-y: auto; scrollbar-width: thin; }
+.city-side { position: static; max-height: none; overflow: visible; }
 .city-map, .city-actions, .city-log, .business-board, .city-cards, .city-finish {
   padding: 10px;
   background: color-mix(in srgb, var(--city-panel), transparent 3%);
