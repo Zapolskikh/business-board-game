@@ -311,19 +311,35 @@ function BusinessBoard({ viewed, me, game, meta, assets, legal, viewingOther, bu
 }) {
   const actionFor = (type: string, uid: string, kind?: string) => legal.find(action => action.type === type && action.payload.asset_uid === uid && (!kind || action.payload.kind === kind));
   const upgradeDiscount = numberValue(game.turn_flags.upgrade_discount);
+  const rolesMap = new Map(meta.roles.map(r => [r.id, r]));
+  const getRoleSynergy = (assetMeta?: AssetMeta): string | null => {
+    if (!assetMeta?.effects) return null;
+    const parts: string[] = [];
+    const rb = assetMeta.effects.roleBonus as { role: string; value: number } | undefined;
+    const rbs = assetMeta.effects.roleBonuses as { role: string; value: number }[] | undefined;
+    if (rb) { const r = rolesMap.get(rb.role); if (r) parts.push(`${r.icon} ${r.title} +${rb.value}$`); }
+    if (rbs) { for (const item of rbs) { const r = rolesMap.get(item.role); if (r) parts.push(`${r.icon} ${r.title} +${item.value}$`); } }
+    return parts.length ? parts.join(" · ") : null;
+  };
   return <section className="business-board">
     <h2>{viewingOther ? `Бизнес: ${viewed.name}` : "Ваш бизнес"} <small>слоты {viewed.assets.length}/{viewed.capacity}</small></h2>
-    <div className="active-bonuses"><strong>Активные бонусы</strong><ul>{activeBonuses(viewed, game, meta, assets).map(text => <li key={text}>{text}</li>)}</ul></div>
-    <div className="owned-grid">{viewed.assets.map((owned, index) => <OwnedAssetCard key={owned.uid} owned={owned} index={index} owner={viewed} asset={assets.get(owned.card_id)} viewingOther={viewingOther} busy={busy} automateCost={Math.max(1, 5 - upgradeDiscount)} scaleCost={Math.max(1, 4 - upgradeDiscount)} automate={actionFor("improve_asset", owned.uid, "automate")} scale={actionFor("improve_asset", owned.uid, "scale")} sell={actionFor("sell_asset", owned.uid)} onAction={onAction} />)}{!viewed.assets.length && <p className="empty-business">У игрока пока нет объектов.</p>}</div>
+    <div className="active-bonuses"><strong>Активные бонусы</strong><ul>{activeBonuses(viewed, game, meta, assets).map(item => <li key={item.text} className={item.active ? "bonus-active" : "bonus-inactive"}>{item.text}</li>)}</ul></div>
+    <div className="owned-grid">{viewed.assets.map((owned, index) => {
+      const assetMeta = assets.get(owned.card_id);
+      const districtInfo = meta.districts.find(d => d.id === assetMeta?.district);
+      return <OwnedAssetCard key={owned.uid} owned={owned} index={index} owner={viewed} asset={assetMeta} districtInfo={districtInfo} roleSynergy={getRoleSynergy(assetMeta)} viewingOther={viewingOther} busy={busy} automateCost={Math.max(1, 5 - upgradeDiscount)} scaleCost={Math.max(1, 4 - upgradeDiscount)} automate={actionFor("improve_asset", owned.uid, "automate")} scale={actionFor("improve_asset", owned.uid, "scale")} sell={actionFor("sell_asset", owned.uid)} onAction={onAction} />;
+    })}{!viewed.assets.length && <p className="empty-business">У игрока пока нет объектов.</p>}</div>
     {!viewingOther && me.assets.length >= me.capacity && <p className="capacity-warning">Все слоты заняты: расширьте бизнес или продайте объект.</p>}
   </section>;
 }
 
-function OwnedAssetCard({ owned, index, owner, asset, viewingOther, busy, automateCost, scaleCost, automate, scale, sell, onAction }: {
+function OwnedAssetCard({ owned, index, owner, asset, districtInfo, roleSynergy, viewingOther, busy, automateCost, scaleCost, automate, scale, sell, onAction }: {
   owned: OwnedAsset;
   index: number;
   owner: PlayerState;
   asset?: AssetMeta;
+  districtInfo?: { title: string; icon: string; color: string };
+  roleSynergy?: string | null;
   viewingOther: boolean;
   busy: boolean;
   automateCost: number;
@@ -337,8 +353,13 @@ function OwnedAssetCard({ owned, index, owner, asset, viewingOther, busy, automa
   const managed = index < owner.capacity;
   const sellValue = Math.floor(asset.cost / 2) + Number(owned.automated) * 2 + Number(owned.scaled) * 2;
   return <article className={`owned-asset rarity-${asset.rarity} ${owned.blocked ? "blocked" : ""} ${!managed ? "unmanaged" : ""}`}>
-    <header><span className="rarity-badge">{rarityLabels[asset.rarity]}</span><span>{owned.blocked ? "🔒 заблокирован" : owned.automated ? "⚙ автоматизирован" : owned.scaled ? "🔧 модернизирован" : "работает"}</span></header>
+    <header>
+      <span className="rarity-badge">{rarityLabels[asset.rarity]}</span>
+      {districtInfo && <span className="asset-district" style={{ color: districtInfo.color }}>{districtInfo.icon} {districtInfo.title}</span>}
+      <span>{owned.blocked ? "🔒 заблокирован" : owned.automated ? "⚙ автоматизирован" : owned.scaled ? "🔧 модернизирован" : "работает"}</span>
+    </header>
     <h3>{asset.title}</h3><p>{asset.income}$ базовый доход · ◆{asset.influence}</p><small>{asset.text}</small>
+    {roleSynergy && <small className="role-synergy">🏷️ {roleSynergy}</small>}
     {!viewingOther && <div className="owned-actions">
       <button disabled={busy || !automate} onClick={() => automate && void onAction(automate)} title="Автоматизация удваивает районную синергию, ролевой и специальный бонус объекта, а также его активный бонус влияния. Базовый доход не удваивается. Объект можно улучшить только один раз."><strong>⚙ Автоматизация · {automateCost}$</strong><small>Удваивает бонусы объекта</small></button>
       <button disabled={busy || !scale} onClick={() => scale && void onAction(scale)} title="Масштабирование навсегда добавляет +2$ к базовому доходу объекта. Объект можно улучшить только один раз."><strong>🔧 Масштабирование · {scaleCost}$</strong><small>+2$ к базовому доходу</small></button>

@@ -195,24 +195,26 @@ export function describeEvent(event: DomainEvent, game: GameState, meta: CityMet
   return `${prefix}${verb}`;
 }
 
-export function activeBonuses(player: PlayerState, game: GameState, meta: CityMeta, assets: Map<string, AssetMeta>): string[] {
+export function activeBonuses(player: PlayerState, game: GameState, meta: CityMeta, assets: Map<string, AssetMeta>): { text: string; active: boolean }[] {
   const role = meta.roles.find(item => item.id === player.role);
   const event = meta.events.find(item => item.id === game.event_id);
-  const result = [
-    role ? `Роль «${role.title}»: ${role.passive}` : "Роль отсутствует.",
-    event ? `Событие «${event.title}»: ${event.text}` : "Город работает в обычном режиме.",
+  const result: { text: string; active: boolean }[] = [
+    role
+      ? { text: `Роль «${role.title}»: ${role.passive}`, active: true }
+      : { text: "Роль отсутствует.", active: false },
+    { text: event ? `Событие «${event.title}»: ${event.text}` : "Город работает в обычном режиме.", active: true },
   ];
   for (const district of meta.districts) {
     const count = districtCount(player, district.id, assets);
     const level = player.district_levels[district.id] ?? 0;
-    if (count >= 2) result.push(`${district.title}: ${count}/4 объекта, районная синергия активна.`);
-    if (level > 0) result.push(`${district.title}: развитие ${"★".repeat(level)}${"☆".repeat(2 - level)}, +${level * 25}% к базовому доходу.`);
+    if (count >= 2) result.push({ text: `${district.title}: ${count}/4 объекта, районная синергия активна.`, active: true });
+    if (level > 0) result.push({ text: `${district.title}: развитие ${"★".repeat(level)}${"☆".repeat(2 - level)}, +${level * 25}% к базовому доходу.`, active: true });
   }
-  if (player.debt > 0) result.push(`Мостовой кредит: −${player.debt}$ при ближайшей выплате.`);
-  if (player.role_shields > 0) result.push(`Судебный запрет защитит роль: ${player.role_shields}.`);
-  if (player.scandal_shields > 0) result.push(`Репутационный резерв отменит следующее получение скандалов.`);
-  if (player.copied_role) result.push(`Временный мандат: ${meta.roles.find(item => item.id === player.copied_role)?.title ?? player.copied_role}.`);
-  result.push(`Содержание бизнеса: −${Math.max(0, player.assets.length - maintenanceReduction(player, assets))}$ в конце раунда.`);
+  if (player.debt > 0) result.push({ text: `Мостовой кредит: −${player.debt}$ при ближайшей выплате.`, active: false });
+  if (player.role_shields > 0) result.push({ text: `Судебный запрет защитит роль: ${player.role_shields}.`, active: true });
+  if (player.scandal_shields > 0) result.push({ text: `Репутационный резерв отменит следующее получение скандалов.`, active: true });
+  if (player.copied_role) result.push({ text: `Временный мандат: ${meta.roles.find(item => item.id === player.copied_role)?.title ?? player.copied_role}.`, active: true });
+  result.push({ text: `Содержание бизнеса: −${Math.max(0, player.assets.length - maintenanceReduction(player, assets))}$ в конце раунда.`, active: false });
   return result;
 }
 
