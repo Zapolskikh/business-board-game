@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from city_bots import bot_policy_label
 from city_engine.constants import DISTRICT_IDS, ROLE_IDS
 from city_engine.content import load_catalog
 
@@ -29,7 +30,7 @@ def render_markdown(result: dict[str, Any]) -> str:
         f"- Раундов: {config.rounds}",
         f"- Игроков: {config.players}",
         f"- Цена роли: {config.role_price}◆; переворот: {config.role_price * 3}◆",
-        f"- Боты: {', '.join(config.bots)}",
+        f"- Боты: {', '.join(bot_policy_label(bot) for bot in config.bots)}",
         f"- Специалист: {specialist}",
         f"- Seed: {config.seed}",
         "",
@@ -45,8 +46,10 @@ def render_markdown(result: dict[str, Any]) -> str:
         "|---|---:|",
     ]
     lines.extend(f"| {seat} | {value}% |" for seat, value in result["seat_win_pct"].items())
-    lines.extend(["", "### Win rate по сложности", "", "| Bot policy | Победы |", "|---|---:|"])
-    lines.extend(f"| {difficulty} | {value}% |" for difficulty, value in result["difficulty_win_pct"].items())
+    lines.extend(["", "### Win rate по bot policy", "", "| Бот | Победы |", "|---|---:|"])
+    lines.extend(
+        f"| {bot_policy_label(difficulty)} | {value}% |" for difficulty, value in result["difficulty_win_pct"].items()
+    )
     lines.extend(["", "## Роли", "", "| Роль | Встречалась | Win rate финального владельца |", "|---|---:|---:|"])
     for role in ROLE_IDS:
         win_rate = result["final_role_win_rate_pct"][role]

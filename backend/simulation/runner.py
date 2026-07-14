@@ -9,7 +9,15 @@ from dataclasses import dataclass
 from typing import Any
 
 from city_bots import choose_bot_command
-from city_engine.constants import BOT_DIFFICULTIES, DISTRICT_IDS, ROLE_IDS
+from city_engine.constants import (
+    BOT_DIFFICULTIES,
+    DISTRICT_IDS,
+    MAX_ROLE_PRICE,
+    MAX_ROUNDS,
+    MIN_ROLE_PRICE,
+    MIN_ROUNDS,
+    ROLE_IDS,
+)
 from city_engine.engine import CityEngine
 from city_engine.factory import GameSettings, PlayerSetup, create_game_from_catalog
 from city_engine.models import GameState
@@ -32,10 +40,18 @@ class SimulationConfig:
             raise ValueError("games must be positive")
         if not 2 <= self.players <= 6:
             raise ValueError("players must be between 2 and 6")
+        if not MIN_ROUNDS <= self.rounds <= MAX_ROUNDS:
+            raise ValueError(f"rounds must be between {MIN_ROUNDS} and {MAX_ROUNDS}")
+        if not MIN_ROLE_PRICE <= self.role_price <= MAX_ROLE_PRICE:
+            raise ValueError(f"role-price must be between {MIN_ROLE_PRICE} and {MAX_ROLE_PRICE}")
         if len(self.bots) != self.players:
-            raise ValueError("bots must contain exactly one difficulty per player")
+            raise ValueError(
+                f"bots must contain exactly one policy per player: expected {self.players}, got {len(self.bots)}"
+            )
         if any(bot not in BOT_DIFFICULTIES for bot in self.bots):
             raise ValueError("unknown bot difficulty")
+        if (self.specialist_position is None) != (self.specialist_role is None):
+            raise ValueError("specialist position and role must be set together")
         if self.specialist_position is not None:
             if not 1 <= self.specialist_position <= self.players:
                 raise ValueError("specialist position is 1-based and must reference a player")
@@ -140,6 +156,7 @@ def aggregate_results(config: SimulationConfig, games: list[dict[str, Any]]) -> 
     start_wins = 0
     difficulty_seats = Counter()
     difficulty_wins = Counter()
+    seat_scores = Counter()
     final_role_seats = Counter()
     final_role_wins = Counter()
     role_seen_games = Counter()
@@ -158,6 +175,7 @@ def aggregate_results(config: SimulationConfig, games: list[dict[str, Any]]) -> 
         start_wins += int(winner_id == game["starting_player_id"])
         for player in game["players"]:
             won = player["id"] == winner_id
+            seat_scores[player["id"]] += player["score"]
             difficulty_seats[player["difficulty"]] += 1
             difficulty_wins[player["difficulty"]] += int(won)
             if player["role"]:
@@ -199,11 +217,17 @@ def aggregate_results(config: SimulationConfig, games: list[dict[str, Any]]) -> 
         "seat_win_pct": {
             f"seat-{index}": percent(seat_wins[f"seat-{index}"]) for index in range(1, config.players + 1)
         },
+        "seat_wins": {f"seat-{index}": seat_wins[f"seat-{index}"] for index in range(1, config.players + 1)},
+        "seat_avg_score": {
+            f"seat-{index}": round(seat_scores[f"seat-{index}"] / count, 2) for index in range(1, config.players + 1)
+        },
         "difficulty_win_pct": {
             difficulty: percent(difficulty_wins[difficulty], difficulty_seats[difficulty])
             for difficulty in BOT_DIFFICULTIES
             if difficulty_seats[difficulty]
         },
+        "difficulty_seats": dict(difficulty_seats),
+        "difficulty_wins": dict(difficulty_wins),
         "final_role_win_rate_pct": {
             role: percent(final_role_wins[role], final_role_seats[role]) if final_role_seats[role] else None
             for role in ROLE_IDS

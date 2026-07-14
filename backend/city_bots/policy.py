@@ -39,6 +39,37 @@ PROFILES = {
     "hard": PolicyProfile(horizon=6, aggression=0.45, risk_penalty=2.0, role_focus=1.7, defence=1.5),
 }
 
+BOT_POLICY_NAMES = {
+    "easy": "Олег",
+    "medium": "Codex",
+    "hard": "Claude",
+}
+
+BOT_POLICY_ALIASES = {
+    **{difficulty: difficulty for difficulty in PROFILES},
+    "oleg": "easy",
+    "олег": "easy",
+    "codex": "medium",
+    "кодекс": "medium",
+    "claude": "hard",
+    "клод": "hard",
+}
+
+
+def normalize_bot_policy(value: str) -> str:
+    """Return the persisted difficulty for a human-friendly bot policy name."""
+
+    key = value.strip().lower()
+    try:
+        return BOT_POLICY_ALIASES[key]
+    except KeyError as exc:
+        allowed = "easy/oleg, medium/codex, hard/claude"
+        raise ValueError(f"unknown bot policy {value!r}; expected {allowed}") from exc
+
+
+def bot_policy_label(difficulty: str) -> str:
+    return f"{BOT_POLICY_NAMES[difficulty]} ({difficulty})"
+
 
 @dataclass(frozen=True, slots=True)
 class BotDecision:

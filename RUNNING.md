@@ -38,7 +38,7 @@ npm.cmd --prefix frontend run build
 Полный балансный smoke через production-движок:
 
 ```powershell
-.\.venv\Scripts\python.exe -m simulation.cli --games=10 --rounds=15 --players=4 --role-price=3 --bots=easy,medium,medium,hard --workers=2
+.\.venv\Scripts\python.exe -m simulation.cli --games=10 --rounds=15 --players=4 --role-price=3 --bots=oleg,codex,codex,claude --workers=2
 ```
 
 ## Upstash Redis

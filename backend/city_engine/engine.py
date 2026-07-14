@@ -1040,11 +1040,11 @@ class CityEngine:
             return
         leader = self.ranking(state)[0].id == target.id
         money_demand = (
-            3
+            2
             + self.district_count(player, "shadows")
             + self.district_count(player, "residential")
             + int(state.turn_flags.get("mafia_operation_bonus", 0))
-            + floor(state.round_number * 2 / 3)
+            + floor(state.round_number * 2 / 4)
             + (3 if leader else 0)
         )
         influence_demand = self.district_count(player, "government")

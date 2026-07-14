@@ -200,6 +200,30 @@ def test_journalist_powers_use_scandal_rules() -> None:
     assert state.player_by_id(target.id).scandals == 2
 
 
+def test_mafia_racket_has_two_money_base_before_scaling() -> None:
+    engine = CityEngine()
+    state = make_state()
+    mafia = state.current_player
+    target = next(player for player in state.players if player.id != mafia.id)
+    mafia.role = "mafia"
+    mafia.money = 30
+    target.money = 20
+    state.round_number = 6
+    give_asset(state, mafia, "cash")
+
+    state = run(
+        engine,
+        state,
+        "use_role_power",
+        {"power": "mafia_racket", "target_id": target.id},
+    )
+
+    # 2 base + 1 active Shadows asset + floor(6 * 2 / 3) = 7 money.
+    assert state.current_player.money == 37
+    assert state.player_by_id(target.id).money == 13
+    assert state.current_player.scandals == 1
+
+
 def test_military_sanction_confiscates_asset_at_four_scandals() -> None:
     engine = CityEngine()
     state = make_state()
