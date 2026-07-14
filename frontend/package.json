@@ -3,11 +3,10 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Простой 2D браузерный клиент для сатирической бизнес-игры.",
+  "description": "React-клиент пошаговой стратегии «Город влияния».",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "sim:city": "node scripts/simulate-city.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -19,10 +19,10 @@
       "problemMatcher": []
     },
     {
-      "label": "backend: run simulation (500 games)",
+      "label": "simulation: production smoke (10 games)",
       "type": "shell",
-      "command": "${workspaceFolder}/.venv/Scripts/python.exe -m simulation.cli --games 500 --board board_72 --seed 42",
-      "options": { "cwd": "${workspaceFolder}/backend" },
+      "command": "${workspaceFolder}/.venv/Scripts/python.exe -m simulation.cli --games=10 --rounds=15 --players=4 --role-price=3 --bots=easy,medium,medium,hard --workers=2",
+      "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": []
     },
     {

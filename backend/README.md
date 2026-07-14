@@ -1,80 +1,42 @@
-# Backend: движок, симуляция и API
+# Backend «Города влияния»
 
-Три Python-пакета, запускаются из каталога `backend/`:
+Backend разделён на независимые слои:
 
-| Пакет | Назначение | Зависит от |
-| --- | --- | --- |
-| `game_engine` | Чистая логика игры: правила, клетки, роли, состояние. | стандартная библиотека |
-| `simulation` | Боты и прогон партий для поиска дисбаланса. | `game_engine` |
-| `app` | FastAPI-приложение (REST поверх движка). | `game_engine` |
+- `city_engine` — чистый домен без FastAPI и Redis;
+- `city_bots` — оценка только легальных переходов движка;
+- `simulation` — production-партии и Markdown-отчёты;
+- `city_rooms` — lobby, scrypt-пароли и `RoomRepository`;
+- `app` — FastAPI REST-адаптер.
 
-Данные (роли, клетки, поля, баланс) — в [data/](data/), это JSON. Числа и контент меняются
-без изменения кода.
+`city_engine.apply(state, command)` не изменяет входной snapshot и возвращает новый `GameState` с
+доменными событиями. Человек, серверный бот и симулятор проходят один и тот же путь команд.
 
-## Установка
-
-```bash
-cd backend
-python -m venv .venv
-.venv\Scripts\activate            # Windows (Linux/macOS: source .venv/bin/activate)
-pip install -r requirements.txt -r requirements-dev.txt
-```
-
-## Команды
-
-```bash
-pytest                                  # тесты движка и симуляции
-python -m simulation.cli --games 500    # прогон 500 партий + отчёт по балансу
-uvicorn app.main:app --reload           # REST API на :8000
-```
-
-## Поток «действие → состояние»
+## REST
 
 ```text
-клиент/бот  --ACTION-->  GameEngine.apply_action()  --> {state, events}
+GET    /api/city/meta
+GET    /api/city/rooms
+POST   /api/city/rooms
+GET    /api/city/rooms/{room_id}
+POST   /api/city/rooms/{room_id}/join
+POST   /api/city/rooms/{room_id}/seats
+POST   /api/city/rooms/{room_id}/start
+GET    /api/city/rooms/{room_id}/state?viewer_id=...&after_revision=...
+POST   /api/city/rooms/{room_id}/commands
 ```
 
-Когда движку нужно решение игрока (купить/не купить, выбрать цель), он выставляет
-`state.pending_decision` с вариантами. И человек в браузере, и бот отвечают одинаковым
-действием `RESOLVE_DECISION` с выбранным `option_id`. Благодаря этому один код обслуживает
-и реальную игру, и симуляцию.
+Закрытые запросы требуют пароль комнаты. Команды дополнительно проверяют человеческое место,
+`expected_revision` и `command_id`. Проекция скрывает RNG, порядок колод, пароли и руки соперников.
 
-## Как добавить новую клетку
+Memory-репозиторий используется локально и в тестах. `UpstashRoomRepository` хранит JSON, обновляет
+его атомарным compare-and-set по revision и применяет TTL по статусу комнаты.
 
-1. Реализуйте класс-поведение в одном из модулей `game_engine/cells/*.py`
-   (или создайте новый файл и импортируйте его в `game_engine/cells/__init__.py`):
+## Проверки
 
-   ```python
-   from game_engine.cells.base import BaseCell
-   from game_engine.registry import register_cell
+Из корня проекта:
 
-   @register_cell("my_market")
-   class MyMarketCell(BaseCell):
-       def on_land(self, engine, player, cell):
-           engine.grant_money(player, engine.balance.ring_value("fillers.bonus", cell.ring),
-                              reason="Рынок: бонус")
-   ```
-
-2. Добавьте метаданные типа в [data/cells.json](data/cells.json) (заголовок, покупаемость,
-   теги ролей, параметры).
-3. Добавьте клетку в раскладку поля [data/boards/board_72.json](data/boards/board_72.json)
-   (счётчик в распределении круга) — генератор поля сам её разместит.
-
-Готово: движок, боты и UI подхватят клетку автоматически.
-
-## Как добавить роль
-
-1. Добавьте роль в [data/roles.json](data/roles.json).
-2. В нужных клетках обработайте её в методе `role_effect`/`on_land` (ветка по `player.role`).
-
-## Как поменять размер поля
-
-Отредактируйте распределение в [data/boards/board_72.json](data/boards/board_72.json) или
-создайте новый файл `data/boards/board_XX.json` и запустите симуляцию с
-`--board board_XX`. Ключи `ring_sizes` и `distribution` задают число клеток и их состав.
-
-## Как менять баланс
-
-Все числа — в [data/balance.json](data/balance.json): бонусы Start/банка по кругам, цены
-объектов, штрафы, множители казино, цена Крыши, условия победы. Прогоняйте
-`python -m simulation.cli` после изменений, чтобы увидеть эффект на win-rate ролей.
+```powershell
+.\.venv\Scripts\python.exe -m pytest backend/tests -q
+.\.venv\Scripts\python.exe -m ruff check backend
+.\.venv\Scripts\python.exe -m ruff format --check backend
+```

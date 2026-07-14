@@ -1,84 +1,38 @@
-# Сатирическая бизнес-игра
+# Город влияния
 
-Прототип пошаговой сатирической настольной/цифровой бизнес-игры про деньги, власть,
-криминал, репутацию и риск. Игроки перемещаются по полю из трёх концентрических кругов,
-покупают объекты, борются за временные уникальные роли и используют PvP-механики.
+Пошаговая браузерная стратегия о деньгах, влиянии, районах и борьбе за роли. Ветка
+`production-game-engine` переводит игру на авторитетный серверный движок и постоянные комнаты.
 
-Дизайн-концепт: [satirical_business_game_design.md](satirical_business_game_design.md).
-
-## Ключевые архитектурные принципы
-
-Проект спроектирован под **расширение** и **симуляцию**:
-
-1. **Логика игры отделена от UI и сети.** Пакет `game_engine` — чистый Python без зависимостей
-   от FastAPI/веба. Его можно запускать в тестах и симуляциях.
-2. **Данные вместо хардкода.** Клетки, роли, раскладки поля и все числа баланса лежат в JSON
-   (`backend/data/`). Поменять размер поля или цены можно без изменения кода.
-3. **Реестр клеток (registry).** Новый тип клетки = новый класс + регистрация. Движок сам
-   подхватывает поведение по ключу типа.
-4. **Модель "действие → состояние + события".** Клиент (браузер или бот) шлёт действие,
-   сервер возвращает новое состояние и список событий. Решения игрока моделируются как
-   `pending_decision`, поэтому один и тот же код обслуживает и человека, и бота.
-5. **Симуляция.** Боты принимают случайные решения; прогон тысяч партий собирает статистику
-   (win-rate по ролям, средний капитал, банкротства) для поиска дисбаланса ролей/объектов.
-
-## Структура репозитория
+## Архитектура
 
 ```text
-business-board-game/
-  satirical_business_game_design.md   # дизайн-документ (источник правды по правилам)
-  README.md                           # этот файл
-  backend/                            # Python: движок, симуляция, FastAPI
-    game_engine/                      # чистая логика игры (без веба)
-    simulation/                       # боты, прогон партий, статистика
-    app/                              # FastAPI-приложение (REST)
-    data/                             # JSON: роли, клетки, поля, баланс
-    tests/                            # pytest
-  frontend/                           # React + Vite (простой 2D-клиент)
+React/Vite -> REST -> FastAPI -> CityRoomService -> city_engine
+                                      |
+                              Memory / Upstash Redis
 ```
+
+- `backend/city_engine/` — единственная реализация правил, состояния, replay и RNG;
+- `backend/city_bots/` — политики easy (Олег), medium (Codex), hard (Claude) и specialist;
+- `backend/simulation/` — массовые партии через тот же движок и те же bot policy;
+- `backend/city_rooms/` — lobby, пароли, места, optimistic locking и хранилища;
+- `backend/app/` — REST API и HTTP hardening;
+- `frontend/src/online/` — React-клиент без локальной мутации правил;
+- `PRODUCTION_CITY_PLAN.md` — полный план и оставшиеся внешние шаги релиза.
+
+Старая игра с кубиком и локальная TypeScript-копия «Города» удалены. Канонический контент находится
+в `backend/city_engine/content/catalog.json` и отдаётся клиенту через `GET /api/city/meta`.
 
 ## Быстрый старт
 
-### Backend
+Команды для Windows находятся в [RUNNING.md](RUNNING.md), команды балансных прогонов — в
+[SIMULATION_COMMANDS.md](SIMULATION_COMMANDS.md).
 
-```bash
-cd backend
-python -m venv .venv
-# Windows:
-.venv\Scripts\activate
-# Linux/macOS:
-# source .venv/bin/activate
-pip install -r requirements.txt -r requirements-dev.txt
+После запуска backend:
 
-# запустить тесты
-pytest
+- API: <http://127.0.0.1:8000/api/city>;
+- Swagger: <http://127.0.0.1:8000/docs>;
+- liveness: <http://127.0.0.1:8000/health>;
+- readiness хранилища: <http://127.0.0.1:8000/ready>.
 
-# прогнать симуляцию (например, 500 партий) и увидеть баланс ролей
-python -m simulation.cli --games 500 --board board_72 --seed 42
-
-# запустить API-сервер
-uvicorn app.main:app --reload
-```
-
-API будет доступно на <http://127.0.0.1:8000> (Swagger — <http://127.0.0.1:8000/docs>).
-
-### Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Клиент откроется на <http://127.0.0.1:5173> и будет обращаться к backend на порт 8000.
-
-## Дорожная карта (см. дизайн-документ, раздел 15)
-
-- [x] Milestone 1: движок правил без UI + симуляция в тестах.
-- [x] Milestone 4 (частично): прогон симуляций и статистика баланса.
-- [x] Milestone 2 (базово): web-доска, панель игрока, кнопки действий, лог событий.
-- [ ] Milestone 3: мультиплеер по ссылке (lobby/rooms/WebSocket).
-- [ ] Расширение: Gate между кругами, ещё покупаемые объекты, карты «?», банкротство,
-      условия победы, полный числовой баланс.
-
-Как добавлять контент — см. [backend/README.md](backend/README.md).
+При наличии `UPSTASH_REDIS_REST_URL/TOKEN` или `KV_REST_API_URL/TOKEN` комнаты автоматически
+сохраняются в Upstash. `ROOM_STORE=memory` принудительно включает локальный режим.

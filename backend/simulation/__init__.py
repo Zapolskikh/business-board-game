@@ -1,5 +1,5 @@
-"""Simulation package: self-playing bots and batch game runners.
+"""Production simulations running the same engine and bot policies as REST rooms."""
 
-Used to detect balance problems by playing thousands of games with random
-decisions and aggregating win-rates and economy stats per role/object.
-"""
+from simulation.runner import SimulationConfig, run_batch, simulate_game
+
+__all__ = ["SimulationConfig", "run_batch", "simulate_game"]

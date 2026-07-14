@@ -5,27 +5,25 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "business-board-game-backend"
 version = "0.1.0"
-description = "Backend, game engine and simulation for the satirical business board game prototype."
+description = "Authoritative backend, game engine and simulation for City of Influence."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.110,<1.0",
     "uvicorn[standard]>=0.29,<1.0",
     "pydantic>=2.6,<3.0",
+    "upstash-redis>=1.0,<2.0",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0,<9.0", "httpx>=0.27,<1.0", "ruff>=0.4,<1.0"]
 
-[project.scripts]
-bbg-sim = "simulation.cli:main"
-
-[tool.setuptools]
-packages = ["game_engine", "simulation", "app"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*", "city_bots*", "city_engine*", "city_rooms*", "simulation*"]
 
 [tool.setuptools.package-data]
-# Data files live outside the packages (backend/data), loaded via config_loader
-# using paths relative to the backend root, so no package-data is required here.
+city_engine = ["content/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

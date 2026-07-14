@@ -1,44 +1,67 @@
-# Запуск проекта
-cd /c/Zapolskikh/business-board-game/frontend && npm run dev
-## Первый запуск (однократно)
+# Запуск «Города влияния»
 
-```bash
-# Создать виртуальное окружение и установить зависимости Python
+Все команды выполняются из корня проекта в PowerShell.
+
+## Первый запуск
+
+```powershell
 python -m venv .venv
-.venv/Scripts/python.exe -m pip install -r backend/requirements.txt -r backend/requirements-dev.txt -e backend/
-
-# Установить зависимости Node.js
-cd frontend && npm install && cd ..
+.\.venv\Scripts\python.exe -m pip install -e ".\backend[dev]"
+npm.cmd --prefix frontend install
 ```
 
-## Запуск (каждый раз)
+## Локальная разработка
 
-Открыть **два терминала**:
+Терминал 1 — backend:
 
-**Терминал 1 — бэкенд (FastAPI) **
-```bash
-cd backend
-../.venv/Scripts/python.exe -m uvicorn app.main:app --reload --port 8000
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --app-dir backend --reload --port 8000
 ```
 
-**Терминал 2 — фронтенд (Vite)**
-```bash
-cd frontend
-npm run dev
+Терминал 2 — frontend:
+
+```powershell
+npm.cmd --prefix frontend run dev
 ```
 
-Открыть в браузере: **http://localhost:5173**
+Открыть <http://localhost:5173>. Swagger доступен на <http://localhost:8000/docs>.
 
-## Тесты
+## Проверки
 
-```bash
-cd backend
-../.venv/Scripts/python.exe -m pytest
+```powershell
+.\.venv\Scripts\python.exe -m pytest backend/tests -q
+.\.venv\Scripts\python.exe -m ruff check backend
+.\.venv\Scripts\python.exe -m ruff format --check backend
+npm.cmd --prefix frontend run build
 ```
 
-## Симуляция (500 игр)
+Полный балансный smoke через production-движок:
 
-```bash
-cd backend
-../.venv/Scripts/python.exe -m simulation.cli --games 500 --board board_72 --seed 42
+```powershell
+.\.venv\Scripts\python.exe -m simulation.cli --games=10 --rounds=15 --players=4 --role-price=3 --bots=easy,medium,medium,hard --workers=2
 ```
+
+## Upstash Redis
+
+Локально можно переключить комнаты с памяти на Upstash:
+
+```powershell
+$env:ROOM_STORE="upstash"
+$env:UPSTASH_REDIS_REST_URL="https://...upstash.io"
+$env:UPSTASH_REDIS_REST_TOKEN="..."
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --app-dir backend --reload --port 8000
+```
+
+Секреты не добавлять в `.env`, отслеживаемый Git, или в исходный код.
+
+Для старой Vercel KV-интеграции также распознаются `KV_REST_API_URL` и `KV_REST_API_TOKEN`.
+
+## Vercel локально
+
+При установленном Vercel CLI оба service можно поднять из корня одной командой:
+
+```powershell
+vercel dev -L
+```
+
+Пошаговый production checklist находится в [DEPLOYMENT.md](DEPLOYMENT.md).
