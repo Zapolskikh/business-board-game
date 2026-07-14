@@ -75,13 +75,19 @@ export interface PendingDecision {
 }
 
 export interface GameState {
+  schema_version?: number;
+  rules_version?: string;
+  content_version?: string;
   game_id: string;
   revision: number;
   status: "playing" | "finished";
   max_rounds: number;
   role_price: number;
   round_number: number;
+  starting_player_index?: number;
   current_player_index: number;
+  turns_taken_in_round?: number;
+  turn_serial?: number;
   actions_left: number;
   investment_actions: number;
   event_id: string;
@@ -110,10 +116,31 @@ export interface RoomView extends RoomSummary {
 
 export interface DistrictMeta { id: string; title: string; icon: string; color: string; description: string }
 export interface RoleMeta { id: string; title: string; icon: string; color: string; passive: string; power: string; districts: string[] }
-export interface AssetMeta { id: string; title: string; district: string; rarity: string; cost: number; income: number; influence: number; text: string; tags: string[] }
+export interface AssetMeta {
+  id: string;
+  title: string;
+  district: string;
+  rarity: string;
+  cost: number;
+  income: number;
+  influence: number;
+  text: string;
+  tags: string[];
+  effects?: Record<string, unknown>;
+}
 export interface ActionMeta { id: string; title: string; tone: string; text: string; kind: string; value: number; targeted?: boolean }
-export interface EventMeta { id: string; title: string; text: string }
+export interface EventMeta {
+  id: string;
+  title: string;
+  text: string;
+  district?: string;
+  incomeMultiplier?: number;
+  marketDiscount?: number;
+  globalIncome?: number;
+  globalMarketDiscount?: number;
+}
 export interface CityMeta {
+  schema_version?: number;
   content_version: string;
   districts: DistrictMeta[];
   roles: RoleMeta[];
