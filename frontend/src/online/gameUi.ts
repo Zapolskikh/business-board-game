@@ -169,30 +169,311 @@ const eventVerbs: Record<string, string> = {
   game_finished: "Партия завершена",
 };
 
-export function describeEvent(event: DomainEvent, game: GameState, meta: CityMeta): string {
-  const actor = game.players.find(player => player.id === event.actor_id)?.name;
+// Colours assigned to players by seat order — must match Game.tsx rendering.
+export const playerColors = ["#58a6ff", "#3fb950", "#f0883e", "#d65db1", "#e3b341", "#9b6ee7"];
+
+export function playerColor(game: GameState, playerId: string | null | undefined): string {
+  if (!playerId) return "var(--city-dim)";
+  const index = game.players.findIndex(player => player.id === playerId);
+  return index >= 0 ? playerColors[index % playerColors.length] : "var(--city-dim)";
+}
+
+// A log line is a list of segments so the UI can colour player names and numbers.
+export type LogSegment =
+  | { kind: "text"; text: string }
+  | { kind: "player"; text: string; color: string }
+  | { kind: "num"; text: string; tone: "good" | "bad" | "neutral" };
+
+const txt = (text: string): LogSegment => ({ kind: "text", text });
+const num = (text: string, tone: "good" | "bad" | "neutral" = "neutral"): LogSegment => ({ kind: "num", text, tone });
+
+function playerSeg(game: GameState, playerId: string | null | undefined): LogSegment {
+  const player = game.players.find(item => item.id === playerId);
+  return { kind: "player", text: player?.name ?? "—", color: playerColor(game, playerId) };
+}
+
+function signed(value: number, glyph: string, positiveIsGood = true): LogSegment {
+  const sign = value > 0 ? "+" : "−";
+  const tone: "good" | "bad" | "neutral" = value === 0 ? "neutral" : (value > 0) === positiveIsGood ? "good" : "bad";
+  return num(`${sign}${Math.abs(value)}${glyph}`, tone);
+}
+
+// Per-player resource deltas recorded by the engine ({money, influence, scandals, roofs}).
+function deltaSegments(game: GameState, deltas: Record<string, unknown> | undefined): LogSegment[] {
+  if (!deltas || typeof deltas !== "object") return [];
+  const segments: LogSegment[] = [];
+  const entries = Object.entries(deltas as Record<string, Record<string, unknown>>);
+  entries.forEach(([playerId, change], index) => {
+    const money = numberValue(change.money);
+    const influence = numberValue(change.influence);
+    const scandals = numberValue(change.scandals);
+    const roofs = numberValue(change.roofs);
+    if (!money && !influence && !scandals && !roofs) return;
+    if (segments.length > 0 || index > 0) segments.push(txt("; "));
+    segments.push(playerSeg(game, playerId), txt(" "));
+    const parts: LogSegment[] = [];
+    if (money) parts.push(signed(money, "$"));
+    if (influence) parts.push(signed(influence, "◆"));
+    if (scandals) parts.push(signed(scandals, "⚠", false));
+    if (roofs) parts.push(signed(roofs, "🛡"));
+    parts.forEach((part, i) => {
+      if (i > 0) segments.push(txt(" "));
+      segments.push(part);
+    });
+  });
+  return segments.length > 0 ? [txt(" ["), ...segments, txt("]")] : [];
+}
+
+export function describeEventSegments(event: DomainEvent, game: GameState, meta: CityMeta): LogSegment[] {
   const data = event.data;
-  const prefix = actor ? `${actor} ` : "";
+  const actorSeg = playerSeg(game, event.actor_id);
+  const hasActor = !!event.actor_id;
   const assetId = stringValue(data.asset_id);
   const cardId = stringValue(data.card_id);
   const roleId = stringValue(data.role_id);
   const targetId = stringValue(data.target_id);
-  const target = game.players.find(player => player.id === targetId)?.name;
-  const asset = meta.assets.find(item => item.id === assetId)?.title;
+  const target = game.players.find(player => player.id === targetId);
+  const owner = game.players.find(player => player.id === event.actor_id);
+  const assetUid = stringValue(data.asset_uid);
+  const ownedTitle = owner?.assets.find(item => item.uid === assetUid)?.card_id;
+  const asset = meta.assets.find(item => item.id === (assetId || ownedTitle))?.title;
   const card = meta.action_cards.find(item => item.id === cardId)?.title;
   const role = meta.roles.find(item => item.id === roleId)?.title;
-  if (event.type === "asset_bought") return `${prefix}покупает «${asset ?? assetId}» за ${data.cost ?? "?"}$`;
-  if (event.type === "asset_sold") return `${prefix}продаёт «${asset ?? assetId}» за ${data.value ?? data.money ?? "?"}$`;
-  if (event.type === "action_card_bought") return `${prefix}покупает карту «${card ?? cardId}»`;
-  if (event.type === "action_card_played") return `${prefix}разыгрывает «${card ?? cardId}»${target ? ` против ${target}` : ""}`;
-  if (event.type === "role_claimed" || event.type === "role_taken") return `${prefix}${eventVerbs[event.type]} «${role ?? roleId}»`;
-  if (event.type === "basic_action") return `${prefix}${data.kind === "work" ? "берёт городской заказ" : "проводит кампанию"}`;
-  if (event.type === "round_settled") return `Выплаты за раунд ${data.round_number}`;
-  if (event.type === "turn_started") return `${prefix}начинает ход · раунд ${data.round_number}`;
-  if (event.type === "turn_ended") return `${prefix}завершает ход`;
-  if (event.type === "game_finished") return `Партия завершена · победитель ${game.players.find(player => player.id === data.winner_id)?.name ?? "определён"}`;
-  const verb = eventVerbs[event.type] ?? event.type.split("_").join(" ");
-  return `${prefix}${verb}`;
+  const district = meta.districts.find(item => item.id === stringValue(data.district))?.title;
+  const deltas = deltaSegments(game, data.deltas as Record<string, unknown> | undefined);
+  const lead = (...tail: LogSegment[]): LogSegment[] => [actorSeg, ...tail];
+
+  switch (event.type) {
+    case "game_created":
+      return [txt("🎬 Партия началась")];
+    case "turn_started": {
+      const actions = numberValue(data.actions);
+      const invest = numberValue(data.investment_actions);
+      return lead(
+        txt(` начинает ход · раунд ${numberValue(data.round_number)} · `),
+        num(`${actions}⚡`, "neutral"),
+        ...(invest > 0 ? [txt(" +"), num(`${invest}💼`, "neutral")] : []),
+      );
+    }
+    case "turn_ended":
+      return lead(txt(" завершает ход"));
+    case "round_started":
+      return [txt(`▶️ Новый раунд ${numberValue(data.round_number)}`)];
+    case "round_settled": {
+      const incomes = (data.incomes as Record<string, unknown>) ?? {};
+      const segments: LogSegment[] = [txt(`💰 Выплаты за раунд ${numberValue(data.round_number)}: `)];
+      const entries = Object.entries(incomes);
+      entries.forEach(([playerId, value], index) => {
+        if (index > 0) segments.push(txt(", "));
+        segments.push(playerSeg(game, playerId), txt(" "), signed(numberValue(value), "$"));
+      });
+      return segments;
+    }
+    case "basic_action":
+      return data.kind === "work"
+        ? lead(txt(" берёт городской заказ ("), num("+2$", "good"), txt(`, стало ${numberValue(data.money)}$)`))
+        : lead(txt(" проводит кампанию ("), num("2$→2◆", "good"), txt(`, стало ${numberValue(data.influence)}◆)`));
+    case "city_project_created":
+      return lead(txt(" запускает городской проект ("), num("3◆ → +6 очков", "good"), txt(`, проектов: ${numberValue(data.projects)})`));
+    case "capacity_bought":
+      return lead(txt(` расширяет бизнес до ${numberValue(data.capacity)} слотов (`), signed(-numberValue(data.cost), "$"), txt(")"));
+    case "roof_bought":
+      return lead(txt(" покупает Крышу ("), signed(-numberValue(data.cost), "$"), txt(`, крыш: ${numberValue(data.roofs)})`));
+    case "crisis_pr":
+      return lead(txt(" антикризисный PR ("), num("−4$", "bad"), txt(", "), num("−1⚠", "good"), txt(`, осталось ${numberValue(data.scandals)}⚠)`));
+    case "asset_bought":
+      return lead(txt(` покупает «${asset ?? assetId}» за `), num(`${numberValue(data.cost)}$`, "bad"));
+    case "asset_sold":
+      return lead(txt(` продаёт «${asset ?? "объект"}» за `), num(`${numberValue(data.value)}$`, "good"));
+    case "asset_improved":
+      return lead(txt(` ${data.kind === "automate" ? "автоматизирует" : "модернизирует"} «${asset ?? "объект"}» (`), signed(-numberValue(data.cost), "$"), txt(")"));
+    case "district_developed":
+      return lead(txt(` развивает район «${district ?? stringValue(data.district)}» до ${numberValue(data.level)}★ (`), signed(-numberValue(data.cost), "$"), txt(", "), num("+1◆", "good"), txt(")"));
+    case "role_claimed":
+    case "role_taken": {
+      const tail: LogSegment[] = [txt(` получает роль «${role ?? roleId}» (`), signed(-numberValue(data.cost), "◆"), txt(")")];
+      const prev = stringValue(data.previous_holder_id);
+      if (prev) tail.push(txt(" — перехват у "), playerSeg(game, prev));
+      return lead(...tail);
+    }
+    case "role_takeover_blocked":
+      return lead(txt(` не смог захватить «${role ?? roleId}» — блок (${data.by === "roof" ? "Крыша" : "запрет"})`));
+    case "action_card_bought":
+      return lead(txt(` покупает карту «${card ?? cardId}»`));
+    case "free_action_card_drawn":
+      return lead(txt(` бесплатно получает карту «${card ?? cardId}»`));
+    case "action_card_played": {
+      const tail: LogSegment[] = [txt(` разыгрывает «${card ?? cardId}»`)];
+      if (target) tail.push(txt(" против "), playerSeg(game, targetId));
+      if (data.deferred) tail.push(txt(" (ждёт решения Крыши)"));
+      return lead(...tail, ...deltas);
+    }
+    case "action_card_converted":
+      return lead(txt(` конвертирует «${card ?? cardId}» → `), num(data.into === "money" ? "+1$" : "+1◆", "good"));
+    case "targeted_card_resolved":
+      return lead(txt(` эффект «${card ?? cardId}» на `), playerSeg(game, targetId), ...deltas);
+    case "targeted_effect_blocked":
+      return lead(txt(" отражает атаку Крышей"));
+    case "market_rotated":
+      return [txt("🔄 Рынок объектов обновился")];
+    case "action_market_rotated":
+      return [txt("🔄 Рынок карт обновился")];
+    case "grey_operation_resolved": {
+      const chance = Math.round(numberValue(data.chance) * 100);
+      const tail: LogSegment[] = [txt(` ${greyOperationLabels[assetId] ?? assetId}`)];
+      if (target) tail.push(txt(" → "), playerSeg(game, targetId));
+      tail.push(txt(": "), data.success ? num("успех", "good") : num("провал", "bad"), txt(` (${chance}%)`));
+      return lead(...tail, ...deltas);
+    }
+    case "role_power_used": {
+      const tail: LogSegment[] = [txt(` ${powerLabels[stringValue(data.power)] ?? stringValue(data.power)}`)];
+      if (target) tail.push(txt(" → "), playerSeg(game, targetId));
+      else if (district) tail.push(txt(` · ${district}`));
+      return lead(...tail, ...deltas);
+    }
+    case "game_finished": {
+      const scores = (data.scores as Record<string, unknown>) ?? {};
+      const winnerId = stringValue(data.winner_id);
+      return [txt("🏆 Партия завершена · победитель "), playerSeg(game, winnerId), txt(` (${numberValue(scores[winnerId])} очков)`)];
+    }
+    default: {
+      const verb = eventVerbs[event.type] ?? event.type.split("_").join(" ");
+      return hasActor ? lead(txt(` ${verb}`)) : [txt(verb)];
+    }
+  }
+}
+
+export function describeEvent(event: DomainEvent, game: GameState, meta: CityMeta): string {
+  return describeEventSegments(event, game, meta)
+    .map(segment => segment.text)
+    .join("");
+}
+
+// A single bonus line for an object card. `active` → condition met for the owner right now
+// (rendered green); `boosted` → value already doubled by automation.
+export interface AssetEffectLine { text: string; active: boolean; boosted: boolean }
+
+const roleDistrictMap: Record<string, string> = {
+  capitalist: "business",
+  politician: "residential",
+  fraudster: "tech",
+  mafia: "shadows",
+  military: "industrial",
+};
+
+// Reverse lookup: which role gains the flat +1$ synergy from an object of a given district.
+const districtRoleMap: Record<string, string> = Object.fromEntries(
+  Object.entries(roleDistrictMap).map(([role, district]) => [district, role]),
+);
+
+/** Build the full, numeric breakdown of an object's bonuses for its card. */
+export function assetEffectLines(
+  asset: AssetMeta,
+  owner: PlayerState,
+  game: GameState,
+  meta: CityMeta,
+  assets: Map<string, AssetMeta>,
+  options?: { automated?: boolean; includeSynergy?: boolean },
+): AssetEffectLine[] {
+  const automated = options?.automated ?? false;
+  const includeSynergy = options?.includeSynergy ?? false;
+  const effects = (asset.effects ?? {}) as Record<string, unknown>;
+  const lines: AssetEffectLine[] = [];
+  const districtTitle = (id: string): string => meta.districts.find(item => item.id === id)?.title ?? id;
+  const roleTitle = (id: string): string => meta.roles.find(item => item.id === id)?.title ?? id;
+  const hasRole = (role: string): boolean => owner.role === role || owner.copied_role === role;
+  const hasLink = (district: string): boolean =>
+    districtCount(owner, district, assets) > 0
+    || (district === "business" && hasRole("capitalist"))
+    || (district === "government" && hasRole("politician"));
+  const doubled = (base: number): number => (automated ? base * 2 : base);
+
+  // Generic district + role synergy (only for owned cards, where it is not shown elsewhere).
+  if (includeSynergy) {
+    const count = districtCount(owner, asset.district, assets);
+    const synergy = count >= 4 ? 2 : count >= 2 ? 1 : 0;
+    if (synergy > 0) {
+      lines.push({ text: `+${doubled(synergy)}$ синергия района «${districtTitle(asset.district)}» (${count}/4)`, active: true, boosted: automated });
+    }
+    // The district's matching role always grants +1$ — shown for every object of that district,
+    // active only while you actually hold the role (this is the "sector → role" bonus).
+    const synergyRole = districtRoleMap[asset.district];
+    if (synergyRole) {
+      lines.push({ text: `+${doubled(1)}$ пока вы «${roleTitle(synergyRole)}» (синергия сектора)`, active: hasRole(synergyRole), boosted: automated });
+    }
+  }
+
+  const eventBonus = effects.eventBonus as { eventId: string; value: number } | undefined;
+  if (eventBonus) {
+    const eventTitle = meta.events.find(item => item.id === eventBonus.eventId)?.title ?? eventBonus.eventId;
+    lines.push({ text: `+${doubled(eventBonus.value)}$/раунд во время события «${eventTitle}»`, active: game.event_id === eventBonus.eventId, boosted: automated });
+  }
+
+  const influenceBonus = effects.influenceBonus as { value: number; district?: string; role?: string } | undefined;
+  if (influenceBonus) {
+    const roleOk = !influenceBonus.role || hasRole(influenceBonus.role);
+    const districtOk = !influenceBonus.district || hasLink(influenceBonus.district);
+    const cond = [
+      influenceBonus.district ? `объект «${districtTitle(influenceBonus.district)}»` : "",
+      influenceBonus.role ? `роль «${roleTitle(influenceBonus.role)}»` : "",
+    ].filter(Boolean).join(" и ");
+    lines.push({ text: `+${doubled(influenceBonus.value)}◆/раунд${cond ? ` при наличии ${cond}` : ""}`, active: roleOk && districtOk, boosted: automated });
+  }
+
+  const districtBonus = effects.districtBonus as
+    | { district: string; value: number; perObject?: boolean; excludeSelf?: boolean; virtualRole?: string }
+    | undefined;
+  if (districtBonus) {
+    if (districtBonus.perObject) {
+      const adjust = districtBonus.excludeSelf && asset.district === districtBonus.district ? 1 : 0;
+      const virtual = districtBonus.virtualRole && hasRole(districtBonus.virtualRole) ? 1 : 0;
+      const count = Math.max(0, districtCount(owner, districtBonus.district, assets) - adjust + virtual);
+      const per = doubled(districtBonus.value);
+      lines.push({ text: `+${per}$ за каждый объект «${districtTitle(districtBonus.district)}» · сейчас ${count} → +${per * count}$`, active: count > 0, boosted: automated });
+    } else {
+      lines.push({ text: `+${doubled(districtBonus.value)}$ при наличии объекта «${districtTitle(districtBonus.district)}»`, active: hasLink(districtBonus.district), boosted: automated });
+    }
+  }
+
+  const roleBonus = effects.roleBonus as { role: string; value: number } | undefined;
+  if (roleBonus) {
+    lines.push({ text: `+${doubled(roleBonus.value)}$ пока вы «${roleTitle(roleBonus.role)}»`, active: hasRole(roleBonus.role), boosted: automated });
+  }
+  for (const bonus of (effects.roleBonuses as { role: string; value: number }[] | undefined) ?? []) {
+    lines.push({ text: `+${doubled(bonus.value)}$ пока вы «${roleTitle(bonus.role)}»`, active: hasRole(bonus.role), boosted: automated });
+  }
+  for (const link of (effects.districtLinks as { district: string; value: number }[] | undefined) ?? []) {
+    lines.push({ text: `+${doubled(link.value)}$ при наличии «${districtTitle(link.district)}»`, active: hasLink(link.district), boosted: automated });
+  }
+
+  const passive: [string, string][] = [];
+  const maintenance = numberValue(effects.maintenanceReduction);
+  if (maintenance) passive.push([`Первые ${maintenance} объектов не требуют содержания`, "true"]);
+  if (numberValue(effects.extraActions)) passive.push([`+1 обычное действие в начале хода`, "true"]);
+  if (numberValue(effects.extraInvestmentActions)) passive.push([`+1 инвестиционное действие в начале хода`, "true"]);
+  if (numberValue(effects.turnRoof)) passive.push([`+1 Крыша в начале каждого хода`, "true"]);
+  if (numberValue(effects.roofCapacity)) passive.push([`+${numberValue(effects.roofCapacity)} к пределу Крыш`, "true"]);
+  if (numberValue(effects.scandalReduction)) passive.push([`−${numberValue(effects.scandalReduction)} скандал в начале хода`, "true"]);
+  if (numberValue(effects.greyScandalReduction)) passive.push([`−${numberValue(effects.greyScandalReduction)} скандала от серых операций`, "true"]);
+  if (numberValue(effects.carryAction)) passive.push([`Переносит 1 неистраченное действие на следующий ход`, "true"]);
+  if (numberValue(effects.takeoverCompensation)) passive.push([`+${numberValue(effects.takeoverCompensation)}◆, если у вас перехватят роль`, "true"]);
+  if (numberValue(effects.developmentDiscount)) passive.push([`−${numberValue(effects.developmentDiscount)}$ к стоимости развития района`, "true"]);
+  for (const [text] of passive) lines.push({ text, active: true, boosted: false });
+
+  const purchase = effects.purchase as
+    | { money?: number; influence?: number; roofs?: number; card?: boolean; scandals?: number }
+    | undefined;
+  if (purchase) {
+    const parts: string[] = [];
+    if (purchase.money) parts.push(`${purchase.money > 0 ? "+" : "−"}${Math.abs(purchase.money)}$`);
+    if (purchase.influence) parts.push(`+${purchase.influence}◆`);
+    if (purchase.roofs) parts.push(`+${purchase.roofs} Крыша`);
+    if (purchase.card) parts.push(`карта действия`);
+    if (purchase.scandals) parts.push(`+${purchase.scandals} скандал`);
+    if (parts.length) lines.push({ text: `При покупке: ${parts.join(", ")}`, active: false, boosted: false });
+  }
+
+  return lines;
 }
 
 export function activeBonuses(player: PlayerState, game: GameState, meta: CityMeta, assets: Map<string, AssetMeta>): { text: string; active: boolean }[] {

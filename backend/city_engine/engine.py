@@ -453,6 +453,30 @@ class CityEngine:
             raise IllegalActionError("no actions left")
         state.actions_left -= 1
 
+    def _resource_snapshot(self, state: GameState) -> dict[str, tuple[int, int, int, int]]:
+        """Capture money / influence / scandals / roofs for every player."""
+        return {
+            player.id: (player.money, player.influence, player.scandals, player.roofs)
+            for player in state.players
+        }
+
+    def _resource_deltas(
+        self, state: GameState, before: dict[str, tuple[int, int, int, int]]
+    ) -> dict[str, dict[str, int]]:
+        """Compute per-player resource changes since ``before`` snapshot (only non-zero)."""
+        deltas: dict[str, dict[str, int]] = {}
+        for player in state.players:
+            base = before.get(player.id, (player.money, player.influence, player.scandals, player.roofs))
+            change = {
+                "money": player.money - base[0],
+                "influence": player.influence - base[1],
+                "scandals": player.scandals - base[2],
+                "roofs": player.roofs - base[3],
+            }
+            if any(change.values()):
+                deltas[player.id] = change
+        return deltas
+
     def _basic_action(self, state: GameState, command: Command) -> None:
         kind = command.payload.get("kind")
         player = state.current_player
@@ -715,33 +739,24 @@ class CityEngine:
 
         player.hand.remove(held)
         self._mark_flag(state, "card_played")
+        before = self._resource_snapshot(state)
         if card.targeted and target is not None:
             self._apply_attacker_card_bonus(state, player, target, card)
             if target.roofs > 0:
-                state.pending_decision = PendingDecision(
-                    id=f"decision:{state.revision + 1}:{len(state.event_log) + 1}",
-                    actor_id=target.id,
-                    type="roof_defence",
-                    options=["use_roof", "accept"],
-                    context={
-                        "source": "action_card",
-                        "attacker_id": player.id,
-                        "target_id": target.id,
-                        "card_id": card.id,
-                    },
-                )
-                state.append_event(
-                    "decision_requested",
-                    target.id,
-                    decision_id=state.pending_decision.id,
-                    decision_type="roof_defence",
-                    source_card_id=card.id,
-                )
+                # Roof automatically absorbs the incoming effect — no player decision.
+                target.roofs -= 1
+                state.append_event("targeted_effect_blocked", target.id, card_id=card.id, by="roof")
             else:
                 self._apply_targeted_card_effect(state, player, target, card)
         else:
             self._apply_self_card_effect(state, player, card, command)
-        state.append_event("action_card_played", player.id, card_id=card.id, target_id=target.id if target else None)
+        state.append_event(
+            "action_card_played",
+            player.id,
+            card_id=card.id,
+            target_id=target.id if target else None,
+            deltas=self._resource_deltas(state, before),
+        )
 
     def _validate_card_target(self, card: ActionCardDefinition, target: PlayerState) -> None:
         if card.kind == "role_pressure" and target.role is None:
@@ -880,6 +895,7 @@ class CityEngine:
         card: ActionCardDefinition,
     ) -> None:
         kind = card.kind
+        before = self._resource_snapshot(state)
         if kind == "scandal":
             self.add_scandal(target, card.value)
         elif kind == "fine":
@@ -921,6 +937,7 @@ class CityEngine:
             attacker.id,
             card_id=card.id,
             target_id=target.id,
+            deltas=self._resource_deltas(state, before),
         )
 
     def _resolve_decision(self, state: GameState, command: Command) -> None:
@@ -954,6 +971,7 @@ class CityEngine:
     def _use_role_power(self, state: GameState, command: Command) -> None:
         player = state.current_player
         power = self._payload_string(command, "power")
+        before = self._resource_snapshot(state)
         if power == "capitalist_financing":
             self._require_role(player, "capitalist")
             self._once_per_turn(state, power)
@@ -1019,7 +1037,14 @@ class CityEngine:
             self._fraudster_forge(state, command)
         else:
             raise InvalidCommandError(f"unsupported role power: {power}")
-        state.append_event("role_power_used", player.id, power=power)
+        state.append_event(
+            "role_power_used",
+            player.id,
+            power=power,
+            target_id=command.payload.get("target_id"),
+            district=command.payload.get("district"),
+            deltas=self._resource_deltas(state, before),
+        )
 
     def _once_per_turn(self, state: GameState, power: str) -> None:
         key = f"used:{power}"
@@ -1138,20 +1163,12 @@ class CityEngine:
         role_id = self._payload_string(command, "role_id")
         if role_id not in ROLE_IDS:
             raise InvalidCommandError(f"unknown role: {role_id}")
-        if state.actions_left < 4 or player.influence < 5:
-            raise IllegalActionError("forgery requires 4 actions and 5 influence")
-        state.actions_left -= 4
+        if player.influence < 5:
+            raise IllegalActionError("forgery requires 5 influence")
+        self._spend_action(state)
         player.influence -= 5
-        chance = min(0.9, 0.5 + self.district_count(player, "tech") * 0.1)
-        if GameRNG(state.rng).chance(chance):
-            player.pending_role = role_id
-        else:
-            player.role = None
-            player.copied_role = None
-            player.pending_role = None
-            player.roofs = max(0, player.roofs - 1)
-            player.scandals = 3
-            player.jail_turns = 1
+        self.add_scandal(player, 2)
+        player.pending_role = role_id
 
     def _grey_operation(self, state: GameState, command: Command) -> None:
         player = state.current_player
@@ -1168,6 +1185,7 @@ class CityEngine:
         if asset_id == "cash" and player.influence < 2:
             raise IllegalActionError("laundering requires 2 influence")
         self._spend_action(state)
+        before = self._resource_snapshot(state)
 
         place = next(index for index, ranked in enumerate(self.ranking(state), start=1) if ranked.id == player.id)
         fraud_bonus = [0, 0.05, 0.1, 0.2][min(3, place - 1)] if self.has_role(player, "fraudster") else 0
@@ -1194,6 +1212,7 @@ class CityEngine:
             target_id=target.id if target else None,
             success=success,
             chance=chance,
+            deltas=self._resource_deltas(state, before),
         )
 
     def _resolve_grey_success(

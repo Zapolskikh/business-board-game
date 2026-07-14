@@ -88,7 +88,7 @@ def test_buy_action_card_removes_it_without_refill() -> None:
     assert (next_player.money, next_player.influence) == (17, 9)
 
 
-def test_targeted_card_waits_for_human_roof_decision() -> None:
+def test_targeted_card_auto_blocked_by_roof() -> None:
     engine = CityEngine()
     state = make_state()
     attacker = state.current_player
@@ -102,28 +102,18 @@ def test_targeted_card_waits_for_human_roof_decision() -> None:
         "play_action_card",
         {"card_uid": held.uid, "target_id": target.id},
     )
-    assert state.pending_decision is not None
-    assert state.player_by_id(target.id).money == 10
-    decision_id = state.pending_decision.id
-
-    state = run(
-        engine,
-        state,
-        "resolve_decision",
-        {"decision_id": decision_id, "option": "accept"},
-        actor_id=target.id,
-    )
+    # The roof absorbs the effect automatically: no pending decision, money intact, roof spent.
     assert state.pending_decision is None
-    assert state.player_by_id(target.id).money == 6
-    assert state.player_by_id(target.id).roofs == 1
+    assert state.player_by_id(target.id).money == 10
+    assert state.player_by_id(target.id).roofs == 0
 
 
-def test_targeted_card_can_be_cancelled_with_roof() -> None:
+def test_targeted_card_hits_target_without_roof() -> None:
     engine = CityEngine()
     state = make_state()
     attacker = state.current_player
     target = next(player for player in state.players if player.id != attacker.id)
-    target.roofs = 1
+    target.roofs = 0
     held = give_card(state, attacker, "kompromat")
     state = run(
         engine,
@@ -131,16 +121,8 @@ def test_targeted_card_can_be_cancelled_with_roof() -> None:
         "play_action_card",
         {"card_uid": held.uid, "target_id": target.id},
     )
-    decision_id = state.pending_decision.id  # type: ignore[union-attr]
-    state = run(
-        engine,
-        state,
-        "resolve_decision",
-        {"decision_id": decision_id, "option": "use_roof"},
-        actor_id=target.id,
-    )
-    assert state.player_by_id(target.id).scandals == 0
-    assert state.player_by_id(target.id).roofs == 0
+    assert state.pending_decision is None
+    assert state.player_by_id(target.id).scandals > 0
 
 
 def test_deal_cards_apply_discounts_and_only_one_card_per_turn() -> None:
@@ -218,9 +200,9 @@ def test_mafia_racket_has_two_money_base_before_scaling() -> None:
         {"power": "mafia_racket", "target_id": target.id},
     )
 
-    # 2 base + 1 active Shadows asset + floor(6 * 2 / 3) = 7 money.
-    assert state.current_player.money == 37
-    assert state.player_by_id(target.id).money == 13
+    # 2 base + 1 active Shadows asset + floor(6 * 2 / 4) = 6 money (target is not the leader).
+    assert state.current_player.money == 36
+    assert state.player_by_id(target.id).money == 14
     assert state.current_player.scandals == 1
 
 
@@ -274,6 +256,7 @@ def test_fraudster_forgery_is_deterministic() -> None:
     player = state.current_player
     player.role = "fraudster"
     player.influence = 10
+    player.scandals = 0
     state.actions_left = 4
     state.rng.state = 0
     state = run(
@@ -283,8 +266,10 @@ def test_fraudster_forgery_is_deterministic() -> None:
         {"power": "fraudster_forge", "role_id": "capitalist"},
     )
     assert state.current_player.pending_role == "capitalist"
+    # Forgery now costs a single action, 5 influence and 2 scandals.
     assert state.current_player.influence == 5
-    assert state.actions_left == 0
+    assert state.current_player.scandals == 2
+    assert state.actions_left == 3
 
 
 @pytest.mark.parametrize("card_id", list(load_catalog().action_cards))

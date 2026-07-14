@@ -4,8 +4,9 @@ import {
   actionIdentity,
   actionLabel,
   activeBonuses,
+  assetEffectLines,
   capacityLabel,
-  describeEvent,
+  describeEventSegments,
   difficultyLabels,
   districtCount,
   greyOperationLabels,
@@ -51,15 +52,15 @@ const powerDescriptions: Record<string, string> = {
   capitalist_financing: "Один раз за ход: потратить 3◆ и получить 1 инвестиционное действие для покупки объекта, слота или улучшения.",
   politician_tax: "Один раз за ход: потратить 4◆ и получить по 1$ за каждый объект всех игроков в выбранном районе.",
   politician_cleanup: "Один раз за ход: потратить 2◆ и снять 1 свой скандал.",
-  journalist_inflate: "Один раз за ход: вы и выбранный соперник получаете по 1 скандалу.",
+  journalist_inflate: "Один раз за ход: вы и выбранный соперник получаете по 1 скандалу. Внимание: на 5 скандалах теряется роль, на 6 — тюрьма (пропуск хода).",
   journalist_publish: "Один раз за ход: потратить 3◆ и дать выбранному сопернику 1 скандал.",
   mafia_racket: "Один раз за ход и за 1 действие: нужен активный объект Серого сектора. Базово отбирает до 2$, сумма растёт от раунда, ваших объектов и лидерства цели; её Крыша отменяет рэкет.",
   mafia_sweep: "Один раз за ход и за 1 действие: потратить 1 Крышу, после чего каждый игрок теряет по 1 Крыше.",
   mafia_cleanup: "Один раз за ход: снять до 2 скандалов, потратив 1 Крышу либо 3$ при наличии административного объекта.",
   military_sanction: "Один раз за ход и за 1 действие: цель должна иметь минимум 2 скандала. Снимает ей скандал и взыскивает деньги либо объект; Крыша принимает удар.",
   fraudster_cleanup: "За 1 действие снять 1 свой скандал.",
-  fraudster_crypto_scam: "Один раз за ход и за 1 действие: нужна активная Городская криптобиржа. Украсть у каждого соперника выбранную сумму и получить столько же скандалов.",
-  fraudster_forge: "Один раз за ход: потратить 4 действия и 5◆. Шанс получить выбранную роль растёт на 10% за объект Технокластера, максимум 90%.",
+  fraudster_crypto_scam: "Один раз за ход и за 1 действие: нужна активная Городская криптобиржа. Украсть у каждого соперника выбранную сумму и получить столько же скандалов (Аферист — на 1 меньше со снижением). Внимание: на 5 скандалах теряется роль, на 6 — тюрьма (пропуск хода), поэтому большая сумма может вас посадить.",
+  fraudster_forge: "Один раз за ход: 1 действие, 5◆ и +2 скандала — гарантированно получить выбранную роль со следующего хода. Внимание: если два скандала доведут вас до 5 — роль потеряется, до 6 — тюрьма.",
 };
 
 const greyOperationInfo: Record<string, { asset: string; effect: (round: number) => string; chance: number; failure: string }> = {
@@ -67,25 +68,25 @@ const greyOperationInfo: Record<string, { asset: string; effect: (round: number)
     asset: "Сеть наличных обменников",
     effect: round => `2◆ → ${5 + round}$`,
     chance: 85,
-    failure: "При провале: −3$ и −3◆, плюс скандалы.",
+    failure: "При успехе: +1 скандал. При провале: −3$ и −3◆. Скандалы: Аферист +1, остальные +2. На 5 скандалах теряется роль, на 6 — тюрьма.",
   },
   market: {
     asset: "Ночной рынок",
     effect: round => `украсть у цели до ${3 + Math.floor(round / 2)}$`,
     chance: 75,
-    failure: "При провале теряется Крыша, если она есть, и добавляются скандалы.",
+    failure: "При успехе: +1 скандал. При провале теряется Крыша, если она есть. Скандалы: Аферист +1, остальные +2. На 5 скандалах теряется роль, на 6 — тюрьма.",
   },
   crypto: {
     asset: "Городская криптобиржа",
     effect: round => `получить ${6 + round}$ и лишить лидера до ${2 + Math.floor(round / 2)}$`,
     chance: 60,
-    failure: "При провале: −5$, сбрасываются улучшения криптобиржи и добавляются скандалы.",
+    failure: "При успехе: +2 скандала. При провале: −5$ и сброс улучшений криптобиржи. Скандалы при провале: Аферист +1, остальные +3. На 5 скандалах теряется роль, на 6 — тюрьма.",
   },
   datacenter: {
     asset: "Нелегальный дата-центр",
     effect: () => "заблокировать самый доходный объект выбранного соперника на раунд",
     chance: 55,
-    failure: "При провале дата-центр блокируется, теряет улучшение и добавляет скандалы.",
+    failure: "При успехе: +2 скандала. При провале дата-центр блокируется и теряет улучшение. Скандалы при провале: Аферист +1, остальные +3. На 5 скандалах теряется роль, на 6 — тюрьма.",
   },
 };
 
@@ -257,9 +258,13 @@ function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selected
           const buy = buyActions.get(item.uid);
           const remaining = Math.max(0, item.expires_at_turn - (game.turn_serial ?? 0));
           const price = marketPrice(game, me, asset, meta);
+          const effectLines = assetEffectLines(asset, me, game, meta, assets, { includeSynergy: true });
           return <button className={`market-card rarity-${asset.rarity}`} disabled={busy || viewingOther || !buy} onClick={event => { event.stopPropagation(); if (buy) void onAction(buy); }} title={`Купить за ${price}$. Занимает свободный слот и расходует обычное либо инвестиционное действие. ${asset.text}`} key={item.uid}>
             <span className="rarity-badge">{rarityLabels[asset.rarity] ?? asset.rarity}</span><b>{asset.title}</b>
-            <span>{price}$ · доход {asset.income}$ · ◆{asset.influence}</span><small>{asset.text}</small><small className="market-expiry">⏳ ещё {remaining} ходов</small>
+            <span>{price}$ · доход {asset.income}$ · ◆{asset.influence}</span>
+            {asset.text && <small className="asset-summary">{asset.text}</small>}
+            {effectLines.length > 0 && <ul className="asset-effects">{effectLines.map((line, index) => <li key={index} className={line.active ? "effect-active" : "effect-idle"}>{line.text}{line.boosted && <span className="effect-boost">⚙×2</span>}</li>)}</ul>}
+            <small className="market-expiry">⏳ ещё {remaining} ходов</small>
           </button>;
         }) : <span className="empty-district">На рынке пока нет объектов района</span>}</div>
       </article>;
@@ -311,35 +316,26 @@ function BusinessBoard({ viewed, me, game, meta, assets, legal, viewingOther, bu
 }) {
   const actionFor = (type: string, uid: string, kind?: string) => legal.find(action => action.type === type && action.payload.asset_uid === uid && (!kind || action.payload.kind === kind));
   const upgradeDiscount = numberValue(game.turn_flags.upgrade_discount);
-  const rolesMap = new Map(meta.roles.map(r => [r.id, r]));
-  const getRoleSynergy = (assetMeta?: AssetMeta): string | null => {
-    if (!assetMeta?.effects) return null;
-    const parts: string[] = [];
-    const rb = assetMeta.effects.roleBonus as { role: string; value: number } | undefined;
-    const rbs = assetMeta.effects.roleBonuses as { role: string; value: number }[] | undefined;
-    if (rb) { const r = rolesMap.get(rb.role); if (r) parts.push(`${r.icon} ${r.title} +${rb.value}$`); }
-    if (rbs) { for (const item of rbs) { const r = rolesMap.get(item.role); if (r) parts.push(`${r.icon} ${r.title} +${item.value}$`); } }
-    return parts.length ? parts.join(" · ") : null;
-  };
   return <section className="business-board">
     <h2>{viewingOther ? `Бизнес: ${viewed.name}` : "Ваш бизнес"} <small>слоты {viewed.assets.length}/{viewed.capacity}</small></h2>
     <div className="active-bonuses"><strong>Активные бонусы</strong><ul>{activeBonuses(viewed, game, meta, assets).map(item => <li key={item.text} className={item.active ? "bonus-active" : "bonus-inactive"}>{item.text}</li>)}</ul></div>
     <div className="owned-grid">{viewed.assets.map((owned, index) => {
       const assetMeta = assets.get(owned.card_id);
       const districtInfo = meta.districts.find(d => d.id === assetMeta?.district);
-      return <OwnedAssetCard key={owned.uid} owned={owned} index={index} owner={viewed} asset={assetMeta} districtInfo={districtInfo} roleSynergy={getRoleSynergy(assetMeta)} viewingOther={viewingOther} busy={busy} automateCost={Math.max(1, 5 - upgradeDiscount)} scaleCost={Math.max(1, 4 - upgradeDiscount)} automate={actionFor("improve_asset", owned.uid, "automate")} scale={actionFor("improve_asset", owned.uid, "scale")} sell={actionFor("sell_asset", owned.uid)} onAction={onAction} />;
+      const effectLines = assetMeta ? assetEffectLines(assetMeta, viewed, game, meta, assets, { automated: owned.automated, includeSynergy: true }) : [];
+      return <OwnedAssetCard key={owned.uid} owned={owned} index={index} owner={viewed} asset={assetMeta} districtInfo={districtInfo} effectLines={effectLines} viewingOther={viewingOther} busy={busy} automateCost={Math.max(1, 5 - upgradeDiscount)} scaleCost={Math.max(1, 4 - upgradeDiscount)} automate={actionFor("improve_asset", owned.uid, "automate")} scale={actionFor("improve_asset", owned.uid, "scale")} sell={actionFor("sell_asset", owned.uid)} onAction={onAction} />;
     })}{!viewed.assets.length && <p className="empty-business">У игрока пока нет объектов.</p>}</div>
     {!viewingOther && me.assets.length >= me.capacity && <p className="capacity-warning">Все слоты заняты: расширьте бизнес или продайте объект.</p>}
   </section>;
 }
 
-function OwnedAssetCard({ owned, index, owner, asset, districtInfo, roleSynergy, viewingOther, busy, automateCost, scaleCost, automate, scale, sell, onAction }: {
+function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines, viewingOther, busy, automateCost, scaleCost, automate, scale, sell, onAction }: {
   owned: OwnedAsset;
   index: number;
   owner: PlayerState;
   asset?: AssetMeta;
   districtInfo?: { title: string; icon: string; color: string };
-  roleSynergy?: string | null;
+  effectLines: { text: string; active: boolean; boosted: boolean }[];
   viewingOther: boolean;
   busy: boolean;
   automateCost: number;
@@ -358,8 +354,10 @@ function OwnedAssetCard({ owned, index, owner, asset, districtInfo, roleSynergy,
       {districtInfo && <span className="asset-district" style={{ color: districtInfo.color }}>{districtInfo.icon} {districtInfo.title}</span>}
       <span>{owned.blocked ? "🔒 заблокирован" : owned.automated ? "⚙ автоматизирован" : owned.scaled ? "🔧 модернизирован" : "работает"}</span>
     </header>
-    <h3>{asset.title}</h3><p>{asset.income}$ базовый доход · ◆{asset.influence}</p><small>{asset.text}</small>
-    {roleSynergy && <small className="role-synergy">🏷️ {roleSynergy}</small>}
+    <h3>{asset.title}</h3>
+    <p>{asset.income + (owned.scaled ? 2 : 0)}$ доход{owned.scaled ? ` (базовый ${asset.income}$ +2 масштаб)` : ""} · ◆{asset.influence}</p>
+    {asset.text && <small className="asset-summary">{asset.text}</small>}
+    {effectLines.length > 0 && <ul className="asset-effects">{effectLines.map((line, i) => <li key={i} className={line.active ? "effect-active" : "effect-idle"}>{line.text}{line.boosted && <span className="effect-boost">⚙×2</span>}</li>)}</ul>}
     {!viewingOther && <div className="owned-actions">
       <button disabled={busy || !automate} onClick={() => automate && void onAction(automate)} title="Автоматизация удваивает районную синергию, ролевой и специальный бонус объекта, а также его активный бонус влияния. Базовый доход не удваивается. Объект можно улучшить только один раз."><strong>⚙ Автоматизация · {automateCost}$</strong><small>Удваивает бонусы объекта</small></button>
       <button disabled={busy || !scale} onClick={() => scale && void onAction(scale)} title="Масштабирование навсегда добавляет +2$ к базовому доходу объекта. Объект можно улучшить только один раз."><strong>🔧 Масштабирование · {scaleCost}$</strong><small>+2$ к базовому доходу</small></button>
@@ -452,7 +450,11 @@ function ActionButton({ action, context, busy, onAction }: { action: LegalAction
 }
 
 function Chronicle({ game, meta }: { game: GameState; meta: CityMeta }) {
-  return <aside className="city-log"><h2>📜 Хроника <small>события партии</small></h2><div className="log-scroll">{[...game.event_log].reverse().slice(0, 80).map(event => <p className={`log-entry ${event.actor_id ? "log-player" : "log-system"}`} key={event.seq}><b>#{event.seq}</b> {describeEvent(event, game, meta)}</p>)}</div></aside>;
+  return <aside className="city-log"><h2>📜 Хроника <small>события партии</small></h2><div className="log-scroll">{[...game.event_log].reverse().slice(0, 80).map(event => <p className={`log-entry ${event.actor_id ? "log-player" : "log-system"}`} key={event.seq}><b>#{event.seq}</b>{" "}{describeEventSegments(event, game, meta).map((segment, index) => {
+    if (segment.kind === "player") return <span className="log-name" style={{ color: segment.color }} key={index}>{segment.text}</span>;
+    if (segment.kind === "num") return <span className={`log-num log-num-${segment.tone}`} key={index}>{segment.text}</span>;
+    return <span key={index}>{segment.text}</span>;
+  })}</p>)}</div></aside>;
 }
 
 function ChoiceModal({ choice, game, labelContext, busy, onClose, onAction }: {
