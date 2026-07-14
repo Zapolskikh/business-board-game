@@ -13,6 +13,7 @@ export function RoomBrowser({ onOpen }: Props) {
   const [rolePrice, setRolePrice] = useState(3);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const reload = async () => {
     try { setRooms(await cityApi.rooms()); setError(""); }
@@ -28,6 +29,18 @@ export function RoomBrowser({ onOpen }: Props) {
       onOpen(room.id, password);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Не удалось создать комнату"); }
     finally { setBusy(false); }
+  };
+
+  const remove = async (room: RoomSummary) => {
+    const roomPassword = window.prompt(`Введите пароль комнаты «${room.name}», чтобы удалить её:`);
+    if (roomPassword === null) return;
+    if (roomPassword.length < 4) { setError("Для удаления нужен пароль комнаты"); return; }
+    setDeletingId(room.id); setError("");
+    try {
+      await cityApi.remove(room.id, roomPassword);
+      setRooms(current => current.filter(item => item.id !== room.id));
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Не удалось удалить комнату"); }
+    finally { setDeletingId(null); }
   };
 
   return <main className="online-shell">
@@ -47,10 +60,13 @@ export function RoomBrowser({ onOpen }: Props) {
       <div className="section-title"><h2>Активные комнаты</h2><button onClick={reload}>Обновить</button></div>
       {error && <p className="error">{error}</p>}
       {!rooms.length ? <p className="muted">Пока нет активных комнат.</p> : rooms.map(room =>
-        <button className="room-row" onClick={() => onOpen(room.id)} key={room.id}>
-          <span><strong>{room.name}</strong><small>{room.status === "waiting" ? "Лобби" : "Игра идёт"}</small></span>
-          <span>{room.players}/{room.capacity} · людей {room.humans}</span>
-        </button>)}
+        <article className="room-row" key={room.id}>
+          <button className="room-open" onClick={() => onOpen(room.id)}>
+            <span><strong>{room.name}</strong><small>{room.status === "waiting" ? "Лобби" : "Игра идёт"}</small></span>
+            <span>{room.players}/{room.capacity} · людей {room.humans}</span>
+          </button>
+          <button className="room-delete danger" disabled={deletingId === room.id} onClick={() => void remove(room)} title="Удалить комнату по паролю" aria-label={`Удалить комнату ${room.name}`}>{deletingId === room.id ? "…" : "🗑"}</button>
+        </article>)}
     </section>
   </main>;
 }

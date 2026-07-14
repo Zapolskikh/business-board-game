@@ -14,6 +14,8 @@
    - `KV_REST_API_URL` + `KV_REST_API_TOKEN`.
 4. Установить `ROOM_STORE=upstash`. На Vercel приложение также намеренно откажется создавать комнаты,
    если persistent credentials отсутствуют, вместо незаметного хранения в памяти функции.
+   По умолчанию inactivity TTL равен 1800 секундам. Его можно изменить через `ROOM_INACTIVITY_SECONDS`;
+   чтение списка и polling игры не считаются активностью.
 5. Включить Fluid Compute и разместить функцию как можно ближе к primary region Upstash.
 6. Привязать домен после успешного preview smoke.
 

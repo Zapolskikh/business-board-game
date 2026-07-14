@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from city_engine.commands import Command
-from city_rooms.errors import RoomAccessError, RoomConflictError
+from city_rooms.errors import RoomAccessError, RoomConflictError, RoomNotFoundError
 from city_rooms.models import RoomState
 from city_rooms.repository import InMemoryRoomRepository
 from city_rooms.security import hash_password, verify_password
 from city_rooms.service import CityRoomService
+from city_rooms.upstash import UpstashRoomRepository
 from city_rooms.views import room_view
 
 
@@ -44,6 +46,31 @@ def test_wrong_password_cannot_join() -> None:
     room = service.create_room(name="Private", password="secret")
     with pytest.raises(RoomAccessError):
         service.join(room.id, password="wrong", seat_index=0, player_name="Intruder")
+
+
+def test_room_deletion_requires_password_and_removes_room() -> None:
+    service = CityRoomService(InMemoryRoomRepository())
+    room = service.create_room(name="Temporary", password="secret")
+    with pytest.raises(RoomAccessError):
+        service.delete_room(room.id, password="wrong")
+    assert service.get_room(room.id).name == "Temporary"
+
+    service.delete_room(room.id, password="secret")
+    with pytest.raises(RoomNotFoundError):
+        service.get_room(room.id)
+
+
+def test_upstash_room_inactivity_defaults_to_thirty_minutes(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ROOM_INACTIVITY_SECONDS", raising=False)
+    monkeypatch.delenv("ROOM_TTL_WAITING", raising=False)
+    service = CityRoomService(InMemoryRoomRepository())
+    room = service.create_room(name="Expiring", password="secret")
+    now = datetime.now(UTC)
+    room.updated_at = (now - timedelta(minutes=31)).isoformat()
+    assert UpstashRoomRepository._ttl("waiting") == 1800
+    assert UpstashRoomRepository._inactive(room, now.timestamp())
+    room.updated_at = (now - timedelta(minutes=29)).isoformat()
+    assert not UpstashRoomRepository._inactive(room, now.timestamp())
 
 
 def test_password_holder_can_reconnect_to_existing_human_seat() -> None:

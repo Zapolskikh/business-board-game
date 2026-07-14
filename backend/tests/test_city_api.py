@@ -92,6 +92,36 @@ def test_oversized_request_is_rejected_before_json_parsing() -> None:
     assert response.status_code == 413
 
 
+def test_room_can_be_deleted_only_with_its_password() -> None:
+    service = CityRoomService(InMemoryRoomRepository())
+    app.dependency_overrides[get_room_service] = lambda: service
+    client = TestClient(app)
+    try:
+        created = client.post(
+            "/api/city/rooms",
+            json={"name": "Delete me", "password": "secret", "capacity": 2},
+        ).json()
+        room_id = created["id"]
+        denied = client.request(
+            "DELETE",
+            f"/api/city/rooms/{room_id}",
+            json={"password": "wrong"},
+        )
+        assert denied.status_code == 403
+        assert client.get(f"/api/city/rooms/{room_id}").status_code == 200
+
+        deleted = client.request(
+            "DELETE",
+            f"/api/city/rooms/{room_id}",
+            json={"password": "secret"},
+        )
+        assert deleted.status_code == 204
+        assert deleted.content == b""
+        assert client.get(f"/api/city/rooms/{room_id}").status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_rest_room_can_reach_a_persisted_final_state() -> None:
     service = CityRoomService(InMemoryRoomRepository())
     app.dependency_overrides[get_room_service] = lambda: service

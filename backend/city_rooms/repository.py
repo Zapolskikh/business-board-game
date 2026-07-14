@@ -21,6 +21,8 @@ class RoomRepository(Protocol):
 
     def save(self, room: RoomState, expected_revision: int) -> None: ...
 
+    def delete(self, room_id: str) -> None: ...
+
 
 class InMemoryRoomRepository:
     """Thread-safe repository with the same optimistic-lock contract as Redis."""
@@ -67,3 +69,9 @@ class InMemoryRoomRepository:
             if room.revision != expected_revision + 1:
                 raise RoomConflictError("saved room must increment revision exactly once")
             self._rooms[room.id] = deepcopy(room)
+
+    def delete(self, room_id: str) -> None:
+        with self._lock:
+            if room_id not in self._rooms:
+                raise RoomNotFoundError("room not found")
+            del self._rooms[room_id]

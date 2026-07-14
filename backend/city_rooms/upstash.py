@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import time
+from datetime import datetime
 from typing import Any
 
 from city_rooms.errors import RoomConflictError, RoomNotFoundError
@@ -30,6 +31,25 @@ if ARGV[5] == 'finished' then
 else
   redis.call('ZADD', KEYS[2], ARGV[3], ARGV[4])
 end
+return 1
+"""
+_DELETE_SCRIPT = """
+local existed = redis.call('EXISTS', KEYS[1])
+redis.call('DEL', KEYS[1], KEYS[2])
+redis.call('ZREM', KEYS[3], ARGV[1])
+return existed
+"""
+_DELETE_IF_REVISION_SCRIPT = """
+local current = redis.call('GET', KEYS[1])
+if not current then
+  redis.call('DEL', KEYS[2])
+  redis.call('ZREM', KEYS[3], ARGV[1])
+  return -1
+end
+local state = cjson.decode(current)
+if tonumber(state['revision']) ~= tonumber(ARGV[2]) then return 0 end
+redis.call('DEL', KEYS[1], KEYS[2])
+redis.call('ZREM', KEYS[3], ARGV[1])
 return 1
 """
 
@@ -60,9 +80,14 @@ class UpstashRoomRepository:
 
     @staticmethod
     def _ttl(status: str) -> int:
-        defaults = {"waiting": 86_400, "playing": 2_592_000, "finished": 604_800}
         variable = f"ROOM_TTL_{status.upper()}"
-        return max(300, int(os.getenv(variable, defaults[status])))
+        default = os.getenv("ROOM_INACTIVITY_SECONDS", "1800")
+        return max(300, int(os.getenv(variable, default)))
+
+    @staticmethod
+    def _inactive(room: RoomState, now: float | None = None) -> bool:
+        updated_at = datetime.fromisoformat(room.updated_at).timestamp()
+        return updated_at <= (time.time() if now is None else now) - UpstashRoomRepository._ttl(room.status)
 
     def create(self, room: RoomState) -> None:
         room.validate()
@@ -105,18 +130,25 @@ class UpstashRoomRepository:
         values = pipeline.exec()
         rooms: list[RoomState] = []
         stale: list[str] = []
+        expired: list[tuple[str, int]] = []
+        now = time.time()
         for room_id, raw in zip(room_ids, values, strict=True):
             if raw is None:
                 stale.append(str(room_id))
                 continue
             data = raw if isinstance(raw, dict) else json.loads(raw)
             room = RoomState.from_dict(data)
+            if self._inactive(room, now):
+                expired.append((str(room_id), room.revision))
+                continue
             if room.status != "finished":
                 rooms.append(room)
             if len(rooms) >= limit:
                 break
         if stale:
             self.redis.zrem(_INDEX_KEY, *stale)
+        for room_id, revision in expired:
+            self._delete_if_revision(room_id, revision)
         return rooms
 
     def save(self, room: RoomState, expected_revision: int) -> None:
@@ -138,3 +170,21 @@ class UpstashRoomRepository:
             raise RoomNotFoundError("room not found")
         if int(saved) != 1:
             raise RoomConflictError("room changed; reload and retry")
+
+    def delete(self, room_id: str) -> None:
+        deleted = self.redis.eval(
+            _DELETE_SCRIPT,
+            keys=[self._key(room_id), self._revision_key(room_id), _INDEX_KEY],
+            args=[room_id],
+        )
+        if int(deleted) != 1:
+            raise RoomNotFoundError("room not found")
+
+    def _delete_if_revision(self, room_id: str, revision: int) -> bool:
+        """Delete stale data only if no command refreshed it after the list read."""
+        deleted = self.redis.eval(
+            _DELETE_IF_REVISION_SCRIPT,
+            keys=[self._key(room_id), self._revision_key(room_id), _INDEX_KEY],
+            args=[room_id, str(revision)],
+        )
+        return int(deleted) != 0

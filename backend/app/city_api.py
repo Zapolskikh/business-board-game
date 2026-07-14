@@ -6,7 +6,7 @@ import os
 from functools import lru_cache
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, Header, Query, status
+from fastapi import APIRouter, Depends, Header, Query, Response, status
 from pydantic import BaseModel, Field
 
 from city_engine.commands import Command
@@ -44,6 +44,10 @@ class SeatRequest(BaseModel):
 class StartRoomRequest(BaseModel):
     password: str = Field(min_length=4, max_length=128)
     seed: int | None = Field(default=None, ge=0, le=2**32 - 1)
+
+
+class DeleteRoomRequest(BaseModel):
+    password: str = Field(min_length=4, max_length=128)
 
 
 class CommandRequest(BaseModel):
@@ -100,6 +104,16 @@ def get_room(
 ) -> dict[str, Any]:
     room = service.get_room(room_id)
     return {**room.public_summary(), "seats": [seat.to_dict() for seat in room.seats]}
+
+
+@router.delete("/rooms/{room_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_room(
+    room_id: str,
+    request: DeleteRoomRequest,
+    service: CityRoomService = Depends(get_room_service),
+) -> Response:
+    service.delete_room(room_id, password=request.password)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/rooms/{room_id}/join")

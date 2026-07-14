@@ -11,6 +11,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     try { message = (await response.json() as { detail?: string }).detail ?? message; } catch { /* noop */ }
     throw new ApiError(response.status, message);
   }
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 
@@ -24,6 +25,11 @@ export const cityApi = {
   meta: () => request<CityMeta>("/api/city/meta"),
   rooms: () => request<RoomSummary[]>("/api/city/rooms"),
   room: (id: string) => request<RoomView>(`/api/city/rooms/${id}`),
+  remove: (id: string, password: string) => request<void>(`/api/city/rooms/${id}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  }),
   create: (body: { name: string; password: string; capacity: number; max_rounds: number; role_price: number }) =>
     request<RoomView>("/api/city/rooms", json(body)),
   join: (id: string, body: { password: string; seat_index: number; player_name: string }) =>

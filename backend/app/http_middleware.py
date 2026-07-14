@@ -66,6 +66,8 @@ def _rule_for(request: Request) -> tuple[str, RateRule] | None:
         return "private-state", RateRule(300)
     if request.method == "POST" and request.url.path.endswith("/commands"):
         return "game-command", RateRule(120)
+    if request.method == "DELETE":
+        return "room-auth-write", RateRule(40)
     if request.method == "POST":
         return "room-auth-write", RateRule(40)
     return None
@@ -74,7 +76,7 @@ def _rule_for(request: Request) -> tuple[str, RateRule] | None:
 async def harden_http(request: Request, call_next) -> Response:  # type: ignore[no-untyped-def]
     request_id = request.headers.get("x-request-id") or secrets.token_hex(8)
     content_length = request.headers.get("content-length")
-    if request.method in {"POST", "PUT", "PATCH"} and content_length:
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"} and content_length:
         try:
             if int(content_length) > 65_536:
                 return JSONResponse(status_code=413, content={"detail": "request body is too large"})

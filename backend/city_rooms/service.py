@@ -66,6 +66,11 @@ class CityRoomService:
     def get_revision(self, room_id: str) -> int:
         return self.repository.get_revision(room_id)
 
+    def delete_room(self, room_id: str, *, password: str) -> None:
+        room = self.repository.get(room_id)
+        self._authorize(room, password)
+        self.repository.delete(room_id)
+
     def authorize_viewer(self, room: RoomState, password: str, viewer_id: str | None) -> None:
         """Authorize a private game projection without exposing bot-only seats."""
         self._authorize(room, password)

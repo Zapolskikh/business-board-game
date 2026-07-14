@@ -35,8 +35,10 @@ h1, h2, h3, p { margin-top: 0; }
 .create-room { margin-bottom: 1rem; }
 .form-grid { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: .75rem; align-items: end; }
 .room-list { display: grid; gap: .6rem; }
-.room-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .8rem; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; }
-.room-row strong { display: block; }
+.room-row { display: flex; align-items: stretch; gap: .5rem; padding: .35rem; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; }
+.room-open { display: flex; min-width: 0; padding: .45rem; flex: 1; align-items: center; justify-content: space-between; gap: 1rem; text-align: left; background: transparent; border-color: transparent; }
+.room-open strong { display: block; }.room-open small { display: block; color: var(--muted); }
+.room-delete { width: 42px; padding: .45rem; flex: 0 0 42px; font-size: 1rem; }
 .error, .game-error { color: #ffc2c2; }
 .error { margin: .7rem 0; padding: .65rem .8rem; background: rgba(255,107,107,.09); border: 1px solid #703a43; border-radius: 8px; }
 .lobby-auth { display: grid; grid-template-columns: 1fr 1fr auto; gap: .7rem; align-items: end; margin-bottom: 1rem; }
@@ -207,7 +209,7 @@ h1, h2, h3, p { margin-top: 0; }
 @media (max-width: 600px) {
   .online-shell, .game-shell { padding: .55rem; }
   .form-grid, .lobby-auth { grid-template-columns: 1fr; }
-  .room-row { align-items: stretch; flex-direction: column; }
+  .room-open { align-items: flex-start; flex-direction: column; gap: .2rem; }
   .city-game { padding: 6px; }
   .district-grid, .action-market, .hand-grid, .owned-grid, .choice-list, .help-grid { grid-template-columns: 1fr; }
   .city-players { grid-template-columns: 1fr 1fr; }

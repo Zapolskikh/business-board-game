@@ -29,7 +29,10 @@ POST   /api/city/rooms/{room_id}/commands
 `expected_revision` и `command_id`. Проекция скрывает RNG, порядок колод, пароли и руки соперников.
 
 Memory-репозиторий используется локально и в тестах. `UpstashRoomRepository` хранит JSON, обновляет
-его атомарным compare-and-set по revision и применяет TTL по статусу комнаты.
+его атомарным compare-and-set по revision и применяет inactivity TTL. По умолчанию комната целиком удаляется
+через 30 минут после последнего изменения; polling срок не продлевает. Значение настраивается через
+`ROOM_INACTIVITY_SECONDS`, а `ROOM_TTL_WAITING`, `ROOM_TTL_PLAYING`, `ROOM_TTL_FINISHED` могут переопределить
+его для отдельного статуса.
 
 ## Проверки
 
