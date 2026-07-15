@@ -404,12 +404,3 @@ export function buildRulesHtml(meta: CityMeta, rolePrice: number): string {
 </body>
 </html>`;
 }
-
-export function openRulesTab(meta: CityMeta, rolePrice: number): void {
-  const html = buildRulesHtml(meta, rolePrice);
-  const win = window.open("", "_blank", "noopener");
-  if (!win) return;
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
-}

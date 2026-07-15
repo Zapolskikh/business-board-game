@@ -219,6 +219,11 @@ h1, h2, h3, p { margin-top: 0; }
 .choice-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }.choice-list button { display: flex; min-height: 54px; align-items: center; gap: 8px; text-align: left; }.choice-list button span:last-child { display: flex; flex-direction: column; gap: 2px; }.choice-list small { color: var(--city-dim); }.choice-avatar { font-size: 20px; }
 .help-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; }.help-grid article { padding: 10px; background: var(--city-panel-2); border: 1px solid var(--city-border); border-radius: 7px; }.help-grid h3 { margin: 0 0 5px; }.help-grid p { margin: 0; color: var(--city-dim); font-size: 11px; line-height: 1.5; }
 
+.rules-fullscreen { position: fixed; z-index: 1000; inset: 0; display: flex; flex-direction: column; background: var(--bg, #0b1017); }
+.rules-close { position: fixed; z-index: 1001; top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); padding: 9px 14px; font-size: 14px; font-weight: 600; color: #fff; background: #d43b52; border: 1px solid #ff7b8f; border-radius: 8px; box-shadow: 0 6px 20px #0007; cursor: pointer; }
+.rules-close:hover { background: #e5455e; }
+.rules-frame { flex: 1; width: 100%; height: 100%; border: 0; background: #0b1017; }
+
 @media (max-width: 900px) {
   .form-grid { grid-template-columns: 1fr 1fr; }
   .city-head { align-items: stretch; flex-direction: column; }
@@ -229,13 +234,45 @@ h1, h2, h3, p { margin-top: 0; }
 }
 
 @media (max-width: 600px) {
-  .online-shell, .game-shell { padding: .55rem; }
+  .online-shell, .game-shell { padding: .4rem; }
   .form-grid, .lobby-auth { grid-template-columns: 1fr; }
   .room-open { align-items: flex-start; flex-direction: column; gap: .2rem; }
-  .city-game { padding: 6px; }
-  .district-grid, .action-market, .hand-grid, .owned-grid, .choice-list, .help-grid { grid-template-columns: 1fr; }
-  .city-players { grid-template-columns: 1fr 1fr; }
-  .district-level { float: none; margin-left: 5px; }
+  .city-game { padding: 5px; }
+
+  /* Tighter outer + inner spacing so more fits on a phone screen */
+  .city-layout, .city-main-col, .city-side { gap: 5px; }
+  .city-map, .city-actions, .city-log, .business-board, .city-cards, .city-finish { padding: 7px; border-radius: 8px; }
+  .city-map h2, .city-actions h2, .city-log h2, .business-board h2 { margin: 0 0 5px; font-size: 14px; }
+  .city-cards { gap: 4px; }
+
+  /* Single-column heavy grids */
+  .action-market, .hand-grid, .choice-list, .help-grid { grid-template-columns: 1fr; }
+  .district-grid { grid-template-columns: 1fr; gap: 5px; }
+  .owned-grid { grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 5px; }
+  .city-players { grid-template-columns: 1fr 1fr; gap: 4px; }
   .role-market, .action-group, .role-powers { grid-template-columns: 1fr; }
+  .action-group { gap: 4px; }
   .action-group .group-title, .action-group > p, .action-group .role-market, .action-group .role-powers, .role-powers > strong, .role-powers > small { grid-column: 1; }
+
+  /* Denser cards */
+  .district { min-height: 0; padding: 7px; }
+  .district h3 { font-size: 14px; }
+  .district > p { margin: 0 0 5px; }
+  .district-level { float: none; margin-left: 5px; }
+  .market-cards { gap: 4px; }
+  .market-card { min-width: 0; padding: 6px; flex-basis: 100%; }
+  .city-player { padding: 6px 7px; }
+  .owned-asset { padding: 6px; }
+  .owned-asset h3 { margin: 5px 0 2px; }
+  .owned-asset > small { min-height: 0; }
+  .owned-actions { margin-top: 5px; }
+  .active-bonuses { padding: 7px; }
+
+  /* Header + log */
+  .city-event { min-height: 40px; padding: 5px 9px; }
+  .log-scroll { max-height: 220px; }
+  .log-entry { padding: 5px 6px; }
+
+  /* Fullscreen rules close button a touch smaller */
+  .rules-close { padding: 8px 12px; font-size: 13px; }
 }

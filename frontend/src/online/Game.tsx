@@ -17,7 +17,7 @@ import {
   scoreOf,
   stringValue,
 } from "./gameUi";
-import { openRulesTab } from "./rulesDocument";
+import { buildRulesHtml } from "./rulesDocument";
 import type {
   ActionMeta,
   AssetMeta,
@@ -98,6 +98,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
   const [selectedDistrict, setSelectedDistrict] = useState(meta.districts[0]?.id ?? "business");
   const [viewedPlayerId, setViewedPlayerId] = useState(playerId);
   const [choice, setChoice] = useState<ChoiceState | null>(null);
+  const [showRules, setShowRules] = useState(false);
 
   const assets = useMemo(() => new Map(meta.assets.map(asset => [asset.id, asset])), [meta.assets]);
   const cards = useMemo(() => new Map(meta.action_cards.map(card => [card.id, card])), [meta.action_cards]);
@@ -172,7 +173,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
       <div className="city-event" title="Событие действует всю партию">
         <strong>📰 {event?.title ?? game.event_id}</strong><span>{event?.text}</span>
       </div>
-      <div className="city-head-buttons"><button onClick={() => openRulesTab(meta, game.role_price)}>📖 Правила</button><button onClick={onExit}>← Комнаты</button></div>
+      <div className="city-head-buttons"><button onClick={() => setShowRules(true)}>📖 Правила</button><button onClick={onExit}>← Комнаты</button></div>
     </header>
 
     {error && <p className="game-error">{error}</p>}
@@ -200,6 +201,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
     </main>
 
     {choice && <ChoiceModal choice={choice} game={game} labelContext={labelContext} busy={busy} onClose={() => setChoice(null)} onAction={send} />}
+    {showRules && <RulesModal html={buildRulesHtml(meta, game.role_price)} onClose={() => setShowRules(false)} />}
   </div>;
 }
 
@@ -456,6 +458,20 @@ function Chronicle({ game, meta }: { game: GameState; meta: CityMeta }) {
     if (segment.kind === "num") return <span className={`log-num log-num-${segment.tone}`} key={index}>{segment.text}</span>;
     return <span key={index}>{segment.text}</span>;
   })}</p>)}</div></aside>;
+}
+
+function RulesModal({ html, onClose }: { html: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = previous; };
+  }, [onClose]);
+  return <div className="rules-fullscreen" role="dialog" aria-modal="true" aria-label="Правила игры">
+    <button className="rules-close" onClick={onClose} aria-label="Закрыть правила">✕ Закрыть</button>
+    <iframe className="rules-frame" srcDoc={html} title="Правила игры" />
+  </div>;
 }
 
 function ChoiceModal({ choice, game, labelContext, busy, onClose, onAction }: {
