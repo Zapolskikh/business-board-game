@@ -38,7 +38,7 @@ interface Props {
 }
 
 interface ChoiceState { title: string; actions: LegalAction[] }
-type MobileGameTab = "players" | "city" | "actions" | "log";
+type MobileGameTab = "city" | "players" | "actions" | "log" | "menu";
 
 const playerColors = ["#58a6ff", "#3fb950", "#f0883e", "#d65db1", "#e3b341", "#9b6ee7"];
 const rolePowers: Record<string, string[]> = {
@@ -101,6 +101,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
   const [choice, setChoice] = useState<ChoiceState | null>(null);
   const [showRules, setShowRules] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileGameTab>("city");
+  const [showMobileEvent, setShowMobileEvent] = useState(false);
 
   const selectMobileTab = useCallback((tab: MobileGameTab) => {
     setMobileTab(tab);
@@ -175,7 +176,8 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
     <header className="city-head">
       <div className="city-head-title">
         <h1>Город влияния <small>online release</small> <span className="game-version">v{__GAME_VERSION__}</span></h1>
-        <p>{room.name} · Раунд {game.round_number}/{game.max_rounds} · Ход: <b>{current.name}</b> · Действий: <b>{game.actions_left}</b>{game.investment_actions > 0 && <> · Инвестиционных: <b className="investment-actions">{game.investment_actions}</b></>}</p>
+        <p>{room.name} · Раунд {game.round_number}/{game.max_rounds} · Ход: <b>{current.name}</b> · Действий: <b>{game.actions_left}</b>{game.investment_actions > 0 && <> · Инвестиционных: <b className="investment-actions">{game.investment_actions}</b></>}<button className="mobile-event-trigger" onClick={() => setShowMobileEvent(value => !value)} aria-expanded={showMobileEvent}> · 📅 {event?.title ?? game.event_id}</button></p>
+        {showMobileEvent && <button className="mobile-event-detail" onClick={() => setShowMobileEvent(false)}><strong>{event?.title ?? game.event_id}</strong><span>{event?.text}</span></button>}
       </div>
       <div className="city-event" title="Событие действует всю партию">
         <strong>📰 {event?.title ?? game.event_id}</strong><span>{event?.text}</span>
@@ -188,7 +190,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
 
     <main className="city-layout" data-mobile-tab={mobileTab}>
       <div className="city-main-col">
-        <PlayerStrip game={game} viewedId={viewed.id} playerId={playerId} assets={assets} roles={roles} onView={id => { setViewedPlayerId(id); selectMobileTab("city"); }} />
+        <PlayerStrip game={game} viewedId={viewed.id} playerId={playerId} assets={assets} roles={roles} onView={setViewedPlayerId} />
         <DistrictMarket
           game={game} meta={meta} me={me} viewed={viewed} viewingOther={viewingOther} assets={assets}
           selectedDistrict={selectedDistrict} onSelectDistrict={setSelectedDistrict}
@@ -205,6 +207,12 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
         />
         <Chronicle game={game} meta={meta} />
       </div>
+
+      <section className="mobile-game-menu">
+        <h2>Меню</h2>
+        <button onClick={() => setShowRules(true)}><span>📖</span><strong>Правила игры</strong><small>Механики, роли, объекты и события</small></button>
+        <button onClick={onExit}><span>🏠</span><strong>Вернуться в комнаты</strong><small>Выйти из текущего игрового экрана</small></button>
+      </section>
     </main>
 
     <MobileGameTabs active={mobileTab} onChange={selectMobileTab} actions={game.actions_left} events={game.event_log.length} />
@@ -221,10 +229,11 @@ function MobileGameTabs({ active, onChange, actions, events }: {
   events: number;
 }) {
   const tabs: { id: MobileGameTab; icon: string; label: string; badge?: number }[] = [
-    { id: "players", icon: "👥", label: "Игроки" },
     { id: "city", icon: "🏙️", label: "Город" },
-    { id: "actions", icon: "🎛️", label: "Действия", badge: actions > 0 ? actions : undefined },
+    { id: "players", icon: "👥", label: "Игроки" },
+    { id: "actions", icon: "🎛️", label: "Ход", badge: actions > 0 ? actions : undefined },
     { id: "log", icon: "📜", label: "Хроника", badge: events > 0 ? Math.min(events, 99) : undefined },
+    { id: "menu", icon: "☰", label: "Меню" },
   ];
   return <nav className="mobile-game-tabs" aria-label="Разделы игры">{tabs.map(tab => <button
     key={tab.id}

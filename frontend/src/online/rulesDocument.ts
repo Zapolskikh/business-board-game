@@ -215,6 +215,24 @@ export function buildRulesHtml(meta: CityMeta, rolePrice: number): string {
   .kpi span { font-size: 12px; color: var(--dim); }
   code { padding: 1px 5px; background: #0a0f16; border: 1px solid var(--border); border-radius: 5px; font-size: 13px; }
   footer { max-width: 1180px; margin: 0 auto; padding: 0 24px; color: var(--dim); font-size: 12px; text-align: center; }
+  @media (max-width: 700px) {
+    body { padding-bottom: 40px; font-size: 14px; line-height: 1.55; }
+    header.hero { padding: 72px 16px 20px; }
+    header.hero h1 { font-size: 26px; }
+    header.hero p { font-size: 13px; }
+    .layout { display: block; padding: 12px 10px; }
+    nav.toc { position: static; margin-bottom: 12px; padding: 12px; }
+    nav.toc a { padding: 6px 4px; }
+    section { margin-bottom: 14px; padding: 14px 12px; border-radius: 10px; }
+    section > h2 { font-size: 19px; }
+    .cols, .role-grid, .kpi { grid-template-columns: 1fr; }
+    .box, .role-card { padding: 11px; }
+    table { display: block; max-width: 100%; overflow-x: auto; font-size: 12px; -webkit-overflow-scrolling: touch; }
+    th, td { padding: 6px 7px; }
+    td.name { white-space: normal; min-width: 150px; }
+    td.effect { min-width: 220px; }
+    footer { padding: 0 12px; }
+  }
 </style>
 </head>
 <body>
