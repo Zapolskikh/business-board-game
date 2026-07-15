@@ -38,6 +38,7 @@ interface Props {
 }
 
 interface ChoiceState { title: string; actions: LegalAction[] }
+type MobileGameTab = "players" | "city" | "actions" | "log";
 
 const playerColors = ["#58a6ff", "#3fb950", "#f0883e", "#d65db1", "#e3b341", "#9b6ee7"];
 const rolePowers: Record<string, string[]> = {
@@ -99,6 +100,12 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
   const [viewedPlayerId, setViewedPlayerId] = useState(playerId);
   const [choice, setChoice] = useState<ChoiceState | null>(null);
   const [showRules, setShowRules] = useState(false);
+  const [mobileTab, setMobileTab] = useState<MobileGameTab>("city");
+
+  const selectMobileTab = useCallback((tab: MobileGameTab) => {
+    setMobileTab(tab);
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, []);
 
   const assets = useMemo(() => new Map(meta.assets.map(asset => [asset.id, asset])), [meta.assets]);
   const cards = useMemo(() => new Map(meta.action_cards.map(card => [card.id, card])), [meta.action_cards]);
@@ -179,9 +186,9 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
     {error && <p className="game-error">{error}</p>}
     {game.status === "finished" && <FinishPanel ranking={ranking} scores={game.final_scores} assets={assets} onExit={onExit} />}
 
-    <main className="city-layout">
+    <main className="city-layout" data-mobile-tab={mobileTab}>
       <div className="city-main-col">
-        <PlayerStrip game={game} viewedId={viewed.id} playerId={playerId} assets={assets} roles={roles} onView={setViewedPlayerId} />
+        <PlayerStrip game={game} viewedId={viewed.id} playerId={playerId} assets={assets} roles={roles} onView={id => { setViewedPlayerId(id); selectMobileTab("city"); }} />
         <DistrictMarket
           game={game} meta={meta} me={me} viewed={viewed} viewingOther={viewingOther} assets={assets}
           selectedDistrict={selectedDistrict} onSelectDistrict={setSelectedDistrict}
@@ -200,9 +207,34 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
       </div>
     </main>
 
+    <MobileGameTabs active={mobileTab} onChange={selectMobileTab} actions={game.actions_left} events={game.event_log.length} />
+
     {choice && <ChoiceModal choice={choice} game={game} labelContext={labelContext} busy={busy} onClose={() => setChoice(null)} onAction={send} />}
     {showRules && <RulesModal html={buildRulesHtml(meta, game.role_price)} onClose={() => setShowRules(false)} />}
   </div>;
+}
+
+function MobileGameTabs({ active, onChange, actions, events }: {
+  active: MobileGameTab;
+  onChange: (tab: MobileGameTab) => void;
+  actions: number;
+  events: number;
+}) {
+  const tabs: { id: MobileGameTab; icon: string; label: string; badge?: number }[] = [
+    { id: "players", icon: "👥", label: "Игроки" },
+    { id: "city", icon: "🏙️", label: "Город" },
+    { id: "actions", icon: "🎛️", label: "Действия", badge: actions > 0 ? actions : undefined },
+    { id: "log", icon: "📜", label: "Хроника", badge: events > 0 ? Math.min(events, 99) : undefined },
+  ];
+  return <nav className="mobile-game-tabs" aria-label="Разделы игры">{tabs.map(tab => <button
+    key={tab.id}
+    className={`mobile-game-tab ${active === tab.id ? "active" : ""}`}
+    onClick={() => onChange(tab.id)}
+    aria-current={active === tab.id ? "page" : undefined}
+  >
+    <span className="mobile-tab-icon">{tab.icon}{tab.badge !== undefined && <i>{tab.badge}</i>}</span>
+    <span>{tab.label}</span>
+  </button>)}</nav>;
 }
 
 function PlayerStrip({ game, viewedId, playerId, assets, roles, onView }: {

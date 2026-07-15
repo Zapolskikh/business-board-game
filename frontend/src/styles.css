@@ -224,6 +224,8 @@ h1, h2, h3, p { margin-top: 0; }
 .rules-close:hover { background: #e5455e; }
 .rules-frame { flex: 1; width: 100%; height: 100%; border: 0; background: #0b1017; }
 
+.mobile-game-tabs { display: none; }
+
 @media (max-width: 900px) {
   .form-grid { grid-template-columns: 1fr 1fr; }
   .city-head { align-items: stretch; flex-direction: column; }
@@ -275,4 +277,76 @@ h1, h2, h3, p { margin-top: 0; }
 
   /* Fullscreen rules close button a touch smaller */
   .rules-close { padding: 8px 12px; font-size: 13px; }
+}
+
+/* Portrait phone: one focused section at a time, selected from a persistent tab bar. */
+@media (max-width: 720px) and (orientation: portrait) {
+  .city-game { min-height: 100dvh; padding-bottom: calc(66px + env(safe-area-inset-bottom)); }
+  .city-layout { display: block; }
+
+  .city-layout[data-mobile-tab] > .city-main-col,
+  .city-layout[data-mobile-tab] > .city-side { display: none; }
+
+  .city-layout[data-mobile-tab="players"] > .city-main-col { display: block; }
+  .city-layout[data-mobile-tab="players"] .city-main-col > :not(.city-players) { display: none; }
+
+  .city-layout[data-mobile-tab="city"] > .city-main-col { display: flex; }
+  .city-layout[data-mobile-tab="city"] .city-players { display: none; }
+
+  .city-layout[data-mobile-tab="actions"] > .city-side,
+  .city-layout[data-mobile-tab="log"] > .city-side { display: block; }
+  .city-layout[data-mobile-tab="actions"] .city-log { display: none; }
+  .city-layout[data-mobile-tab="log"] .city-actions { display: none; }
+  .city-layout[data-mobile-tab="log"] .city-log { display: block; }
+  .city-layout[data-mobile-tab="log"] .log-scroll { max-height: none; }
+
+  .mobile-game-tabs {
+    position: fixed;
+    z-index: 90;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    min-height: 58px;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: color-mix(in srgb, var(--city-panel), transparent 2%);
+    border-top: 1px solid var(--city-border);
+    box-shadow: 0 -7px 24px rgba(0,0,0,.42);
+  }
+  .mobile-game-tab {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    min-height: 58px;
+    padding: 5px 2px;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 3px;
+    color: var(--city-dim);
+    background: transparent;
+    border: 0;
+    border-top: 2px solid transparent;
+    border-radius: 0;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .mobile-game-tab.active { color: #dcecff; background: rgba(88,166,255,.11); border-top-color: #58a6ff; }
+  .mobile-tab-icon { position: relative; font-size: 20px; line-height: 1; }
+  .mobile-tab-icon i {
+    position: absolute;
+    top: -7px;
+    left: calc(100% - 3px);
+    min-width: 15px;
+    padding: 1px 4px;
+    color: #fff;
+    background: #347dce;
+    border: 2px solid var(--city-panel);
+    border-radius: 10px;
+    font-size: 8px;
+    font-style: normal;
+    line-height: 12px;
+    text-align: center;
+  }
 }
