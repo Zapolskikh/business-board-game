@@ -17,6 +17,7 @@ import {
   scoreOf,
   stringValue,
 } from "./gameUi";
+import { openRulesTab } from "./rulesDocument";
 import type {
   ActionMeta,
   AssetMeta,
@@ -97,7 +98,6 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
   const [selectedDistrict, setSelectedDistrict] = useState(meta.districts[0]?.id ?? "business");
   const [viewedPlayerId, setViewedPlayerId] = useState(playerId);
   const [choice, setChoice] = useState<ChoiceState | null>(null);
-  const [showRules, setShowRules] = useState(false);
 
   const assets = useMemo(() => new Map(meta.assets.map(asset => [asset.id, asset])), [meta.assets]);
   const cards = useMemo(() => new Map(meta.action_cards.map(card => [card.id, card])), [meta.action_cards]);
@@ -172,7 +172,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
       <div className="city-event" title="Событие действует всю партию">
         <strong>📰 {event?.title ?? game.event_id}</strong><span>{event?.text}</span>
       </div>
-      <div className="city-head-buttons"><button onClick={() => setShowRules(value => !value)}>📖 Правила</button><button onClick={onExit}>← Комнаты</button></div>
+      <div className="city-head-buttons"><button onClick={() => openRulesTab(meta, game.role_price)}>📖 Правила</button><button onClick={onExit}>← Комнаты</button></div>
     </header>
 
     {error && <p className="game-error">{error}</p>}
@@ -199,7 +199,6 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
       </div>
     </main>
 
-    {showRules && <Rules rolePrice={game.role_price} onClose={() => setShowRules(false)} />}
     {choice && <ChoiceModal choice={choice} game={game} labelContext={labelContext} busy={busy} onClose={() => setChoice(null)} onAction={send} />}
   </div>;
 }
@@ -476,8 +475,4 @@ function ChoiceModal({ choice, game, labelContext, busy, onClose, onAction }: {
 
 function FinishPanel({ ranking, scores, assets, onExit }: { ranking: PlayerState[]; scores?: Record<string, number>; assets: Map<string, AssetMeta>; onExit: () => void }) {
   return <section className="city-finish"><h2>🏆 Итоги города</h2><div>{ranking.map((player, index) => <p key={player.id}><b>{index + 1}. {player.name}</b><span>{scores?.[player.id] ?? scoreOf(player, assets)} очков</span></p>)}</div><button className="primary" onClick={onExit}>Вернуться к комнатам</button></section>;
-}
-
-function Rules({ rolePrice, onClose }: { rolePrice: number; onClose: () => void }) {
-  return <div className="modal-backdrop" role="presentation" onMouseDown={onClose}><section className="rules-modal panel" role="dialog" aria-modal="true" onMouseDown={event => event.stopPropagation()}><header><h2>Как играть</h2><button onClick={onClose}>✕</button></header><div className="help-grid"><article><h3>Цель</h3><p>К концу партии набрать больше очков: деньги, влияние, объекты, проекты и роль увеличивают результат, скандалы уменьшают.</p></article><article><h3>Ход</h3><p>Обычные действия расходуются на город, роли, защиту и серые операции. Инвестиционные — только на объекты, слоты и улучшения.</p></article><article><h3>Районы</h3><p>Два объекта включают синергию +1$, четыре — +2$. Развитие района повышает базовый доход объектов всем игрокам.</p></article><article><h3>Роли</h3><p>Свободная роль стоит {rolePrice}◆, захват занятой — {rolePrice * 3}◆. Роли дают пассивный бонус и уникальные способности.</p></article><article><h3>Карты</h3><p>Покупка стоит 3$ + 1◆ и действие. Карта хранится в руке, разыгрывается бесплатно либо конвертируется в ресурс.</p></article><article><h3>Крыша и скандалы</h3><p>Крыша защищает от направленных эффектов и страхует серые операции. При 5 скандалах роль теряется, следующий ведёт в тюрьму.</p></article></div></section></div>;
 }
