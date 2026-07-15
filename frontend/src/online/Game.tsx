@@ -99,6 +99,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
   const [viewedPlayerId, setViewedPlayerId] = useState(playerId);
   const [choice, setChoice] = useState<ChoiceState | null>(null);
   const [showRules, setShowRules] = useState(false);
+  const [mobileTab, setMobileTab] = useState<MobileTab>("map");
 
   const assets = useMemo(() => new Map(meta.assets.map(asset => [asset.id, asset])), [meta.assets]);
   const cards = useMemo(() => new Map(meta.action_cards.map(card => [card.id, card])), [meta.action_cards]);
@@ -179,7 +180,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
     {error && <p className="game-error">{error}</p>}
     {game.status === "finished" && <FinishPanel ranking={ranking} scores={game.final_scores} assets={assets} onExit={onExit} />}
 
-    <main className="city-layout">
+    <main className="city-layout" data-mobtab={mobileTab}>
       <div className="city-main-col">
         <PlayerStrip game={game} viewedId={viewed.id} playerId={playerId} assets={assets} roles={roles} onView={setViewedPlayerId} />
         <DistrictMarket
@@ -200,9 +201,28 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
       </div>
     </main>
 
+    <MobileTabBar active={mobileTab} onChange={setMobileTab} actionsLeft={game.status === "playing" ? game.actions_left : 0} logCount={game.event_log.length} />
+
     {choice && <ChoiceModal choice={choice} game={game} labelContext={labelContext} busy={busy} onClose={() => setChoice(null)} onAction={send} />}
     {showRules && <RulesModal html={buildRulesHtml(meta, game.role_price)} onClose={() => setShowRules(false)} />}
   </div>;
+}
+
+type MobileTab = "map" | "biz" | "act" | "log";
+
+function MobileTabBar({ active, onChange, actionsLeft, logCount }: { active: MobileTab; onChange: (tab: MobileTab) => void; actionsLeft: number; logCount: number }) {
+  const tabs: { id: MobileTab; icon: string; label: string; badge?: number }[] = [
+    { id: "map", icon: "🏙️", label: "Карта" },
+    { id: "biz", icon: "💼", label: "Бизнес" },
+    { id: "act", icon: "🎛️", label: "Ход", badge: actionsLeft > 0 ? actionsLeft : undefined },
+    { id: "log", icon: "📜", label: "Лог", badge: logCount > 0 ? logCount : undefined },
+  ];
+  return <nav className="mob-tabbar" aria-label="Разделы игры">{tabs.map(tab => (
+    <button key={tab.id} className={`mob-tab ${active === tab.id ? "active" : ""}`} onClick={() => onChange(tab.id)} aria-current={active === tab.id}>
+      <span className="mob-tab-icon">{tab.icon}{tab.badge !== undefined && <i className={`mob-badge ${tab.id === "act" ? "hot" : ""}`}>{tab.badge > 99 ? "99+" : tab.badge}</i>}</span>
+      <span className="mob-tab-label">{tab.label}</span>
+    </button>
+  ))}</nav>;
 }
 
 function PlayerStrip({ game, viewedId, playerId, assets, roles, onView }: {
