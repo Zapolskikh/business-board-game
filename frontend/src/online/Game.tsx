@@ -261,9 +261,10 @@ function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selected
           const effectLines = assetEffectLines(asset, me, game, meta, assets, { includeSynergy: true });
           return <button className={`market-card rarity-${asset.rarity}`} disabled={busy || viewingOther || !buy} onClick={event => { event.stopPropagation(); if (buy) void onAction(buy); }} title={`Купить за ${price}$. Занимает свободный слот и расходует обычное либо инвестиционное действие. ${asset.text}`} key={item.uid}>
             <span className="rarity-badge">{rarityLabels[asset.rarity] ?? asset.rarity}</span><b>{asset.title}</b>
-            <span>{price}$ · доход {asset.income}$ · ◆{asset.influence}</span>
-            {asset.text && <small className="asset-summary">{asset.text}</small>}
-            {effectLines.length > 0 && <ul className="asset-effects">{effectLines.map((line, index) => <li key={index} className={line.active ? "effect-active" : "effect-idle"}>{line.text}{line.boosted && <span className="effect-boost">⚙×2</span>}</li>)}</ul>}
+            <span className="asset-stats">{price}$ · доход <b className={asset.income > 0 ? "stat-income on" : "stat-income"}>{asset.income}$</b> · <b className={asset.influence > 0 ? "stat-inf on" : "stat-inf"}>◆{asset.influence}</b></span>
+            {effectLines.length > 0
+              ? <ul className="asset-effects">{effectLines.map((line, index) => <li key={index} className={line.active ? "effect-active" : "effect-idle"}>{line.text}{line.boosted && <span className="effect-boost">⚙×2</span>}</li>)}</ul>
+              : asset.text && <small className="asset-summary">{asset.text}</small>}
             <small className="market-expiry">⏳ ещё {remaining} ходов</small>
           </button>;
         }) : <span className="empty-district">На рынке пока нет объектов района</span>}</div>
@@ -355,9 +356,10 @@ function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines,
       <span>{owned.blocked ? "🔒 заблокирован" : owned.automated ? "⚙ автоматизирован" : owned.scaled ? "🔧 модернизирован" : "работает"}</span>
     </header>
     <h3>{asset.title}</h3>
-    <p>{asset.income + (owned.scaled ? 2 : 0)}$ доход{owned.scaled ? ` (базовый ${asset.income}$ +2 масштаб)` : ""} · ◆{asset.influence}</p>
-    {asset.text && <small className="asset-summary">{asset.text}</small>}
-    {effectLines.length > 0 && <ul className="asset-effects">{effectLines.map((line, i) => <li key={i} className={line.active ? "effect-active" : "effect-idle"}>{line.text}{line.boosted && <span className="effect-boost">⚙×2</span>}</li>)}</ul>}
+    <p className="asset-stats"><b className="stat-income on">{asset.income + (owned.scaled ? 2 : 0)}$</b> доход{owned.scaled ? ` (базовый ${asset.income}$ +2 масштаб)` : ""} · <b className={asset.influence > 0 ? "stat-inf on" : "stat-inf"}>◆{asset.influence}</b></p>
+    {effectLines.length > 0
+      ? <ul className="asset-effects">{effectLines.map((line, i) => <li key={i} className={line.active ? "effect-active" : "effect-idle"}>{line.text}{line.boosted && <span className="effect-boost">⚙×2</span>}</li>)}</ul>
+      : asset.text && <small className="asset-summary">{asset.text}</small>}
     {!viewingOther && <div className="owned-actions">
       <button disabled={busy || !automate} onClick={() => automate && void onAction(automate)} title="Автоматизация удваивает районную синергию, ролевой и специальный бонус объекта, а также его активный бонус влияния. Базовый доход не удваивается. Объект можно улучшить только один раз."><strong>⚙ Автоматизация · {automateCost}$</strong><small>Удваивает бонусы объекта</small></button>
       <button disabled={busy || !scale} onClick={() => scale && void onAction(scale)} title="Масштабирование навсегда добавляет +2$ к базовому доходу объекта. Объект можно улучшить только один раз."><strong>🔧 Масштабирование · {scaleCost}$</strong><small>+2$ к базовому доходу</small></button>
