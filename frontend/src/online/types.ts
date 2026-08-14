@@ -66,14 +66,6 @@ export interface DomainEvent {
   data: Record<string, unknown>;
 }
 
-export interface PendingDecision {
-  id: string;
-  actor_id: string;
-  type: string;
-  options: string[];
-  context: Record<string, unknown>;
-}
-
 export interface GameState {
   schema_version?: number;
   rules_version?: string;
@@ -95,7 +87,6 @@ export interface GameState {
   market: MarketAsset[];
   action_market: string[];
   turn_flags: Record<string, unknown>;
-  pending_decision: PendingDecision | null;
   event_log: DomainEvent[];
   market_deck_count: number;
   action_deck_count: number;

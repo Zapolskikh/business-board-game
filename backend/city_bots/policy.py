@@ -116,8 +116,6 @@ def _action_utility(
 ) -> float:
     action_type = str(action["type"])
     payload = dict(action.get("payload") or {})
-    if action_type == "resolve_decision":
-        return _decision_utility(state, player, payload, profile)
     if action_type == "end_turn":
         return -100.0 if state.actions_left > 0 or state.investment_actions > 0 else 0.0
     if action_type == "grey_operation":
@@ -255,22 +253,6 @@ def _strategic_action_bonus(
     elif action_type == "city_project":
         bonus += 2 if state.max_rounds - state.round_number <= 3 else -1
     return bonus
-
-
-def _decision_utility(
-    state: GameState,
-    player: PlayerState,
-    payload: dict[str, Any],
-    profile: PolicyProfile,
-) -> float:
-    option = payload.get("option")
-    if option != "use_roof":
-        return 0.0
-    decision = state.pending_decision
-    card_id = str(decision.context.get("card_id", "")) if decision else ""
-    severe = card_id in {"kompromat", "controlled_leak", "smear_campaign", "asset_freeze", "antitrust"}
-    role_defence = player.preferred_role is not None and player.role == player.preferred_role
-    return 10.0 if severe or role_defence else 2.0 * profile.defence
 
 
 def _grey_operation_utility(

@@ -35,7 +35,7 @@ def test_all_bot_game_finishes_through_authoritative_engine() -> None:
     for _ in range(1_500):
         if state.status == "finished":
             break
-        actor_id = state.pending_decision.actor_id if state.pending_decision else state.current_player.id
+        actor_id = state.current_player.id
         decision = choose_bot_command(engine, state, actor_id)
         state = engine.apply(state, decision.command).state
     assert state.status == "finished"

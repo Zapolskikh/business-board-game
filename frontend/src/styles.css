@@ -196,8 +196,7 @@ h1, h2, h3, p { margin-top: 0; }
 .role-powers { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; padding: 7px; background: rgba(155,110,231,.06); border: 1px solid #6e568e; border-radius: 6px; }
 .role-powers > strong, .role-powers > small { grid-column: 1 / -1; }.role-powers > small { color: var(--city-dim); font-size: 9px; }
 .role-powers button { padding: 6px; font-size: 10px; }
-.bot-action-note, .pending-decision { margin: 0; padding: 7px 9px; color: #b8d4ee; background: #10233a; border: 1px solid #34699b; border-radius: 6px; font-size: 10px; }
-.pending-decision { display: grid; gap: 5px; color: #ffe19a; background: rgba(227,179,65,.08); border-color: #8c712a; }.pending-decision button { text-align: left; }
+.bot-action-note { margin: 0; padding: 7px 9px; color: #b8d4ee; background: #10233a; border: 1px solid #34699b; border-radius: 6px; font-size: 10px; }
 .end-turn { width: 100%; color: #e8fff0; border-color: #4ebd7b !important; font-weight: 800; }
 
 .city-log h2 { display: flex; align-items: baseline; gap: 8px; }.city-log h2 small { color: var(--city-dim); font-size: 9px; font-weight: 400; text-transform: none; }
@@ -283,6 +282,15 @@ h1, h2, h3, p { margin-top: 0; }
 /* Portrait phone: one focused section at a time, selected from a persistent tab bar. */
 @media (max-width: 720px) and (orientation: portrait) {
   .city-game { min-height: 100dvh; padding-bottom: calc(66px + env(safe-area-inset-bottom)); }
+  /* Lift the error toast clear of the fixed tab bar, and above it, so failures stay readable.
+     Stays below .modal-backdrop (z-index 100) so dialogs still cover it. */
+  .game-error {
+    z-index: 95;
+    right: 10px;
+    bottom: calc(66px + env(safe-area-inset-bottom));
+    left: 10px;
+    max-width: none;
+  }
   .city-head { gap: 4px; }
   .city-head h1 { font-size: 18px; }
   .city-head p { margin-top: 3px; font-size: 10px; line-height: 1.45; }
@@ -325,6 +333,9 @@ h1, h2, h3, p { margin-top: 0; }
   .city-layout[data-mobile-tab="players"] > .city-main-col { display: flex; }
   .city-layout[data-mobile-tab="players"] .city-map,
   .city-layout[data-mobile-tab="players"] .action-market { display: none; }
+  /* The card market lives on the "city" tab, so drop its wording where only the hand is shown. */
+  .city-layout[data-mobile-tab="players"] .city-cards .group-hint,
+  .city-layout[data-mobile-tab="players"] .card-rule-market { display: none; }
 
   .city-layout[data-mobile-tab="actions"] > .city-side,
   .city-layout[data-mobile-tab="log"] > .city-side { display: block; }

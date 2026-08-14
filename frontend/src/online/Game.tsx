@@ -14,6 +14,7 @@ import {
   numberValue,
   powerLabels,
   rarityLabels,
+  roofCost,
   scoreOf,
   stringValue,
 } from "./gameUi";
@@ -76,19 +77,19 @@ const greyOperationInfo: Record<string, { asset: string; effect: (round: number)
     asset: "Ночной рынок",
     effect: round => `украсть у цели до ${3 + Math.floor(round / 2)}$`,
     chance: 75,
-    failure: "При успехе: +1 скандал. При провале теряется Крыша, если она есть. Скандалы: Аферист +1, остальные +2. На 5 скандалах теряется роль, на 6 — тюрьма.",
+    failure: "Крыша цели тратится и полностью отменяет кражу. При успехе: +1 скандал. При провале теряется Крыша, если она есть. Скандалы: Аферист +1, остальные +2. На 5 скандалах теряется роль, на 6 — тюрьма.",
   },
   crypto: {
     asset: "Городская криптобиржа",
     effect: round => `получить ${6 + round}$ и лишить лидера до ${2 + Math.floor(round / 2)}$`,
     chance: 60,
-    failure: "При успехе: +2 скандала. При провале: −5$ и сброс улучшений криптобиржи. Скандалы при провале: Аферист +1, остальные +3. На 5 скандалах теряется роль, на 6 — тюрьма.",
+    failure: "Свой доход вы получаете всегда, но Крыша лидера тратится и отменяет списание с него. При успехе: +2 скандала. При провале: −5$ и сброс улучшений криптобиржи. Скандалы при провале: Аферист +1, остальные +3. На 5 скандалах теряется роль, на 6 — тюрьма.",
   },
   datacenter: {
     asset: "Нелегальный дата-центр",
     effect: () => "заблокировать самый доходный объект выбранного соперника на раунд",
     chance: 55,
-    failure: "При успехе: +2 скандала. При провале дата-центр блокируется и теряет улучшение. Скандалы при провале: Аферист +1, остальные +3. На 5 скандалах теряется роль, на 6 — тюрьма.",
+    failure: "Крыша цели тратится и полностью отменяет блокировку. При успехе: +2 скандала. При провале дата-центр блокируется и теряет улучшение. Скандалы при провале: Аферист +1, остальные +3. На 5 скандалах теряется роль, на 6 — тюрьма.",
   },
 };
 
@@ -102,6 +103,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
   const [showRules, setShowRules] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileGameTab>("city");
   const [showMobileEvent, setShowMobileEvent] = useState(false);
+  const [seenEvents, setSeenEvents] = useState<number | null>(null);
 
   const selectMobileTab = useCallback((tab: MobileGameTab) => {
     setMobileTab(tab);
@@ -132,6 +134,16 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
     document.addEventListener("visibilitychange", onVisibility);
     return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisibility); };
   }, [reload, room?.game?.status, room?.revision]);
+
+  // Chronicle badge counts entries added since the log was last on screen. The baseline is
+  // taken on first load so joining a game in progress does not show a wall of old events.
+  const logCount = room?.game?.event_log.length ?? 0;
+  const hasGame = Boolean(room?.game);
+  useEffect(() => {
+    if (!hasGame) return;
+    setSeenEvents(seen => (seen === null || mobileTab === "log" ? logCount : seen));
+  }, [hasGame, logCount, mobileTab]);
+  const unseenEvents = seenEvents === null ? 0 : Math.max(0, logCount - seenEvents);
 
   const send = useCallback(async (action: LegalAction) => {
     if (!room?.game || busy) return;
@@ -203,7 +215,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
       <div className="city-side">
         <DecisionPanel
           game={game} me={me} meta={meta} roles={roles} districts={districts} legal={legal}
-          selectedDistrict={selectedDistrict} busy={busy} onAction={send} onOffer={offer} labelContext={labelContext}
+          selectedDistrict={selectedDistrict} busy={busy} onAction={send} onOffer={offer}
         />
         <Chronicle game={game} meta={meta} />
       </div>
@@ -215,7 +227,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
       </section>
     </main>
 
-    <MobileGameTabs active={mobileTab} onChange={selectMobileTab} actions={game.actions_left} events={game.event_log.length} />
+    <MobileGameTabs active={mobileTab} onChange={selectMobileTab} actions={game.actions_left} events={unseenEvents} />
 
     {choice && <ChoiceModal choice={choice} game={game} labelContext={labelContext} busy={busy} onClose={() => setChoice(null)} onAction={send} />}
     {showRules && <RulesModal html={buildRulesHtml(meta, game.role_price)} onClose={() => setShowRules(false)} />}
@@ -330,7 +342,7 @@ function CardDesk({ game, me, cards, legal, buyActions, busy, onAction, onOffer,
   const convertFor = (uid: string, into: string) => legal.find(action => action.type === "convert_action_card" && action.payload.card_uid === uid && action.payload.into === into);
   return <section className="city-cards action-group g-cards">
     <h3 className="group-title">🃏 Карты <span className="group-hint">3$ + 1◆ + действие · резерв {game.action_deck_count}</span></h3>
-    <p className="dim card-rule">Рынок обновляется каждый раунд. Розыгрыш бесплатный. Рука {me.hand?.length ?? 0}/3.</p>
+    <p className="dim card-rule"><span className="card-rule-market">Рынок обновляется каждый раунд. </span>Розыгрыш бесплатный. Рука {me.hand?.length ?? 0}/3.</p>
     <div className="action-market">{game.action_market.map(cardId => { const card = cards.get(cardId); const buy = buyActions.get(cardId); return <button className={`action-card market-action tone-${card?.tone}`} disabled={busy || !buy} onClick={() => buy && void onAction(buy)} title={`Покупка стоит 3$ + 1◆ и расходует 1 действие. ${card?.text ?? ""}`} key={cardId}><strong>{card?.title}<em>купить</em></strong><small>{card?.text}</small></button>; })}</div>
     <div className="hand-grid">{me.hand?.map(held => {
       const card = cards.get(held.card_id);
@@ -410,7 +422,7 @@ function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines,
   </article>;
 }
 
-function DecisionPanel({ game, me, meta, roles, districts, legal, selectedDistrict, busy, onAction, onOffer, labelContext }: {
+function DecisionPanel({ game, me, meta, roles, districts, legal, selectedDistrict, busy, onAction, onOffer }: {
   game: GameState;
   me: PlayerState;
   meta: CityMeta;
@@ -421,13 +433,11 @@ function DecisionPanel({ game, me, meta, roles, districts, legal, selectedDistri
   busy: boolean;
   onAction: (action: LegalAction) => Promise<void>;
   onOffer: (title: string, actions: LegalAction[]) => void;
-  labelContext: Parameters<typeof actionLabel>[1];
 }) {
   const find = (type: string, predicate?: (action: LegalAction) => boolean) => legal.find(action => action.type === type && (!predicate || predicate(action)));
   const all = (type: string, predicate?: (action: LegalAction) => boolean) => legal.filter(action => action.type === type && (!predicate || predicate(action)));
   const current = game.players[game.current_player_index];
   const endTurn = find("end_turn");
-  const resolve = all("resolve_decision");
   const roleHolder = (roleId: string) => game.players.find(player => player.role === roleId);
   const roleCost = (roleId: string) => roleHolder(roleId) ? game.role_price * 3 : game.role_price;
   const districtAction = find("develop_district", action => action.payload.district === selectedDistrict);
@@ -451,7 +461,6 @@ function DecisionPanel({ game, me, meta, roles, districts, legal, selectedDistri
     <div className="actions-head"><h2>🎛️ Решения</h2><div className={`action-tokens ${game.actions_left === 0 ? "spent" : ""}`}><span className="token-label">Действий</span><span className="token-dots">{Array.from({ length: dotCount }).map((_, index) => <i className={index < game.actions_left ? "on" : "off"} key={index} />)}</span><b>{game.actions_left}</b>{game.investment_actions > 0 && <span className="token-invest">+{game.investment_actions} 💼</span>}</div></div>
     {busy && <p className="bot-action-note">Сервер выполняет команду и ходы ботов…</p>}
     {!busy && legal.length === 0 && game.status === "playing" && <p className="bot-action-note">Ожидаем ход игрока <b>{current.name}</b>.</p>}
-    {game.pending_decision && <div className="pending-decision"><strong>Требуется решение</strong><span>{game.pending_decision.type === "roof_defence" ? "Использовать Крышу для защиты?" : game.pending_decision.type}</span>{resolve.map(action => <ActionButton action={action} context={labelContext} busy={busy} onAction={onAction} key={actionIdentity(action)} />)}</div>}
 
     <div className="action-group g-city"><h3 className="group-title">🏙️ Город <span className="group-hint">доход и развитие</span></h3>
       <StaticAction action={find("basic_action", item => item.payload.kind === "work")} label="💵 Городской заказ: +2$" tooltip="Потратить 1 обычное действие и сразу получить 2$." busy={busy} onAction={onAction} />
@@ -479,18 +488,13 @@ function DecisionPanel({ game, me, meta, roles, districts, legal, selectedDistri
       return <button className="described-action" disabled={busy || variants.length === 0} onClick={() => onOffer(label, variants)} title={`Требуется «${info.asset}». Эффект при успехе: ${effect}. Базовый шанс успеха ${info.chance}%; у Афериста он может быть выше. ${info.failure} Страховка при провале тратит 1 Крышу и отменяет денежный либо объектный штраф, но скандалы всё равно начисляются и действие расходуется.`} key={assetId}><strong>{label}</strong><small>{variants.length ? `${effect} · шанс от ${info.chance}%` : greyRequirement(assetId)}</small></button>;
     })}</div>
 
-    <div className="action-group g-defence"><h3 className="group-title">🛡️ Защита и репутация</h3><StaticAction action={find("crisis_pr")} label="🧯 Антикризисный PR: 4$ → −1⚠" tooltip="Потратить 1 обычное действие и 4$, чтобы снять 1 свой скандал." busy={busy} onAction={onAction} /><StaticAction action={find("buy_roof")} label={`🛡️ Купить Крышу (${me.role === "mafia" ? 2 : 3}$)`} tooltip="Потратить 1 обычное действие и деньги. Крыша может отменить направленную карту, поглотить рэкет или застраховать провал серой операции; обычно лимит 1, у Мафиози 2." busy={busy} onAction={onAction} /></div>
+    <div className="action-group g-defence"><h3 className="group-title">🛡️ Защита и репутация</h3><StaticAction action={find("crisis_pr")} label="🧯 Антикризисный PR: 4$ → −1⚠" tooltip="Потратить 1 обычное действие и 4$, чтобы снять 1 свой скандал." busy={busy} onAction={onAction} /><StaticAction action={find("buy_roof")} label={`🛡️ Купить Крышу (${roofCost(me)}$)`} tooltip="Потратить 1 обычное действие и деньги. Крыша может отменить направленную карту, поглотить рэкет или застраховать провал серой операции; обычно лимит 1, у Мафиози 2." busy={busy} onAction={onAction} /></div>
     <button className="end-turn" disabled={busy || !endTurn} onClick={() => endTurn && void onAction(endTurn)} title="Завершить текущий ход. Неиспользованные обычные действия пропадут, кроме разрешённого переносимого действия; затем сервер выполнит ходы ботов.">✅ Завершить ход</button>
   </aside>;
 }
 
 function StaticAction({ action, label, tooltip, busy, onAction }: { action?: LegalAction; label: string; tooltip: string; busy: boolean; onAction: (action: LegalAction) => Promise<void> }) {
   return <button disabled={busy || !action} onClick={() => action && void onAction(action)} title={tooltip}>{label}</button>;
-}
-
-function ActionButton({ action, context, busy, onAction }: { action: LegalAction; context: Parameters<typeof actionLabel>[1]; busy: boolean; onAction: (action: LegalAction) => Promise<void> }) {
-  const label = actionLabel(action, context);
-  return <button disabled={busy} onClick={() => void onAction(action)} title={label}>{label}</button>;
 }
 
 function Chronicle({ game, meta }: { game: GameState; meta: CityMeta }) {

@@ -85,7 +85,7 @@ def simulate_game(config: SimulationConfig, game_index: int) -> GameState:
     for _ in range(guard):
         if state.status == "finished":
             return state
-        actor_id = state.pending_decision.actor_id if state.pending_decision else state.current_player.id
+        actor_id = state.current_player.id
         decision = choose_bot_command(engine, state, actor_id)
         state = engine.apply(state, decision.command).state
     raise RuntimeError(f"simulation game {game_index} exceeded {guard} commands")

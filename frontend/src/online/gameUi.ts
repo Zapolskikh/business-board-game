@@ -78,6 +78,11 @@ export function marketPrice(game: GameState, player: PlayerState, asset: AssetMe
   return Math.max(1, asset.cost - discount);
 }
 
+// Matches the engine, which checks the copied role too: a forged mafia mandate also pays 2$.
+export function roofCost(player: PlayerState): number {
+  return player.role === "mafia" || player.copied_role === "mafia" ? 2 : 3;
+}
+
 export function capacityLabel(player: PlayerState): string {
   if (player.capacity >= 6) return "Максимум 6 слотов";
   return `Слот ${player.capacity + 1}: ${capacityCosts[player.capacity] ?? "?"}$`;
@@ -106,7 +111,7 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
   if (action.type === "end_turn") return "Завершить ход";
   if (action.type === "city_project") return "Городской проект: 3◆ → 6 очков";
   if (action.type === "buy_capacity") return capacityLabel(player);
-  if (action.type === "buy_roof") return `Купить Крышу (${player.role === "mafia" ? 2 : 3}$)`;
+  if (action.type === "buy_roof") return `Купить Крышу (${roofCost(player)}$)`;
   if (action.type === "crisis_pr") return "Антикризисный PR: 4$ → −1⚠";
   if (action.type === "claim_role") return `${role?.icon ?? "🏷️"} ${role?.title ?? payload.role_id}`;
   if (action.type === "buy_asset") {
@@ -138,7 +143,6 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
     const details = target ? ` → ${target.name}` : district ? ` · ${district.title}` : role ? ` · ${role.title}` : payload.amount ? ` · ${payload.amount}⚠` : payload.method ? ` · ${payload.method === "roof" ? "Крышей" : "деньгами"}` : "";
     return `${powerLabels[stringValue(payload.power)] ?? payload.power}${details}`;
   }
-  if (action.type === "resolve_decision") return payload.option === "use_roof" ? "Потратить Крышу и отменить эффект" : "Принять эффект";
   return action.type;
 }
 
@@ -166,6 +170,7 @@ const eventVerbs: Record<string, string> = {
   market_rotated: "Рынок объектов обновился",
   grey_operation: "проводит серую операцию",
   role_power_used: "использует способность роли",
+  player_jailed: "арестован",
   game_finished: "Партия завершена",
 };
 
@@ -314,6 +319,8 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       return lead(txt(` эффект «${card ?? cardId}» на `), playerSeg(game, targetId), ...deltas);
     case "targeted_effect_blocked":
       return lead(txt(" отражает атаку Крышей"));
+    case "player_jailed":
+      return lead(txt(" арестован: 6 скандалов, ход прерван, скандалы сброшены до "), num("3⚠", "neutral"));
     case "market_rotated":
       return [txt("🔄 Рынок объектов обновился")];
     case "action_market_rotated":
@@ -381,7 +388,10 @@ export function assetEffectLines(
   const lines: AssetEffectLine[] = [];
   const districtTitle = (id: string): string => meta.districts.find(item => item.id === id)?.title ?? id;
   const roleTitle = (id: string): string => meta.roles.find(item => item.id === id)?.title ?? id;
-  const hasRole = (role: string): boolean => owner.role === role || owner.copied_role === role;
+  // Income and influence are paid out when the round is settled, after a forged mandate has
+  // already expired (the engine clears copied_role when the turn ends), so only the main role
+  // counts for these lines — unlike purchase discounts, which resolve during the turn.
+  const hasRole = (role: string): boolean => owner.role === role;
   const hasLink = (district: string): boolean =>
     districtCount(owner, district, assets) > 0
     || (district === "business" && hasRole("capitalist"))

@@ -203,7 +203,7 @@ class CityRoomService:
             if game.status == "finished":
                 room.status = "finished"
                 return
-            actor_id = game.pending_decision.actor_id if game.pending_decision is not None else game.current_player.id
+            actor_id = game.current_player.id
             seat = next((item for item in room.seats if item.player_id == actor_id), None)
             if seat is None:
                 raise RoomValidationError(f"game player {actor_id} has no room seat")

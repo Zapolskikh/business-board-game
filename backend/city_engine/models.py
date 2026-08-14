@@ -89,34 +89,6 @@ class HeldCard:
 
 
 @dataclass(slots=True)
-class PendingDecision:
-    id: str
-    actor_id: str
-    type: str
-    options: list[str]
-    context: dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "id": self.id,
-            "actor_id": self.actor_id,
-            "type": self.type,
-            "options": list(self.options),
-            "context": deepcopy(self.context),
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> PendingDecision:
-        return cls(
-            id=str(data["id"]),
-            actor_id=str(data["actor_id"]),
-            type=str(data["type"]),
-            options=[str(option) for option in data["options"]],
-            context=dict(data.get("context") or {}),
-        )
-
-
-@dataclass(slots=True)
 class PlayerState:
     id: str
     name: str
@@ -251,7 +223,6 @@ class GameState:
     action_market: list[str] = field(default_factory=list)
     turn_flags: dict[str, Any] = field(default_factory=dict)
     antitrust_active: bool = False
-    pending_decision: PendingDecision | None = None
     final_scores: dict[str, int] = field(default_factory=dict)
     processed_command_ids: list[str] = field(default_factory=list)
     command_log: list[dict[str, Any]] = field(default_factory=list)
@@ -282,7 +253,6 @@ class GameState:
         cloned.processed_command_ids = list(self.processed_command_ids)
         cloned.command_log = list(self.command_log)
         cloned.event_log = list(self.event_log)
-        cloned.pending_decision = deepcopy(self.pending_decision)
         return cloned
 
     def append_event(self, event_type: str, actor_id: str | None = None, **data: Any) -> DomainEvent:
@@ -319,13 +289,6 @@ class GameState:
             raise StateValidationError("max_rounds is outside supported bounds")
         if not MIN_ROLE_PRICE <= self.role_price <= MAX_ROLE_PRICE:
             raise StateValidationError("role_price is outside supported bounds")
-        if self.pending_decision is not None:
-            if self.pending_decision.actor_id not in ids:
-                raise StateValidationError("pending decision actor is not a player")
-            if not self.pending_decision.options or len(self.pending_decision.options) != len(
-                set(self.pending_decision.options)
-            ):
-                raise StateValidationError("pending decision options must be non-empty and unique")
         if self.final_scores and set(self.final_scores) != set(ids):
             raise StateValidationError("final scores must contain every player exactly once")
 
@@ -379,7 +342,6 @@ class GameState:
             "action_market": list(self.action_market),
             "turn_flags": deepcopy(self.turn_flags),
             "antitrust_active": self.antitrust_active,
-            "pending_decision": self.pending_decision.to_dict() if self.pending_decision else None,
             "final_scores": dict(self.final_scores),
             "processed_command_ids": list(self.processed_command_ids),
             "command_log": deepcopy(self.command_log),
@@ -413,9 +375,6 @@ class GameState:
             action_market=[str(item) for item in data.get("action_market", [])],
             turn_flags=dict(data.get("turn_flags") or {}),
             antitrust_active=bool(data.get("antitrust_active", False)),
-            pending_decision=(
-                PendingDecision.from_dict(data["pending_decision"]) if data.get("pending_decision") else None
-            ),
             final_scores={str(key): int(value) for key, value in (data.get("final_scores") or {}).items()},
             processed_command_ids=[str(item) for item in data.get("processed_command_ids", [])],
             command_log=[dict(item) for item in data.get("command_log", [])],

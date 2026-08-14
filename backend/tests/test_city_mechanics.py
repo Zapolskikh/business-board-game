@@ -102,8 +102,7 @@ def test_targeted_card_auto_blocked_by_roof() -> None:
         "play_action_card",
         {"card_uid": held.uid, "target_id": target.id},
     )
-    # The roof absorbs the effect automatically: no pending decision, money intact, roof spent.
-    assert state.pending_decision is None
+    # The roof absorbs the effect automatically, with no decision asked: money intact, roof spent.
     assert state.player_by_id(target.id).money == 10
     assert state.player_by_id(target.id).roofs == 0
 
@@ -121,7 +120,6 @@ def test_targeted_card_hits_target_without_roof() -> None:
         "play_action_card",
         {"card_uid": held.uid, "target_id": target.id},
     )
-    assert state.pending_decision is None
     assert state.player_by_id(target.id).scandals > 0
 
 
@@ -137,6 +135,79 @@ def test_deal_cards_apply_discounts_and_only_one_card_per_turn() -> None:
     assert engine.asset_price(state, state.current_player, state.market[0].card_id) == max(1, original_price - 4)
     legal = engine.legal_actions(state, state.current_player.id)
     assert not any(action["type"] == "play_action_card" for action in legal)
+
+
+def test_sixth_scandal_jails_the_actor_and_burns_the_rest_of_the_turn() -> None:
+    engine = CityEngine()
+    state = make_state()
+    actor = state.current_player
+    target = next(player for player in state.players if player.id != actor.id)
+    # A double-scandal card charges the attacker one scandal before the target is touched.
+    held = give_card(state, actor, "controlled_leak")
+    actor.scandals = 5
+    give_asset(state, actor, "mayor_secretariat")  # carryAction must not rescue the lost actions
+
+    state = run(engine, state, "play_action_card", {"card_uid": held.uid, "target_id": target.id})
+
+    jailed = state.player_by_id(actor.id)
+    assert jailed.scandals == 3
+    assert jailed.jail_turns == 1
+    assert jailed.banked_actions == 0
+    assert state.current_player.id == target.id
+    assert any(event.type == "player_jailed" for event in state.event_log)
+
+    # The jail turn itself grants a single action.
+    state = run(engine, state, "end_turn")
+    assert state.current_player.id == actor.id
+    assert state.actions_left == 1
+
+
+def settled_sources(state) -> dict:
+    settled = next(event for event in state.event_log if event.type == "round_settled")
+    return settled.data["income_sources"]
+
+
+def test_journalist_earns_two_money_per_standing_rival_scandal() -> None:
+    engine = CityEngine()
+    state = make_state()
+    journalist = state.current_player
+    rival = next(player for player in state.players if player.id != journalist.id)
+    journalist.role = "journalist"
+    rival.role = "military"  # a role holder keeps scandals: no automatic shedding at turn start
+    rival.scandals = 3
+
+    state = run(engine, state, "end_turn")
+    state = run(engine, state, "end_turn")
+
+    assert settled_sources(state)[journalist.id]["journalist"] == 6
+
+
+def test_mafia_levy_needs_only_presence_in_the_district() -> None:
+    engine = CityEngine()
+    state = create_game_from_catalog(
+        "mafia-levy",
+        [PlayerSetup("p1", "Mafia"), PlayerSetup("p2", "Victim"), PlayerSetup("p3", "Baron")],
+        seed=7,
+    )
+    mafia, victim, baron = state.players
+    mafia.role = "mafia"
+    # Two shadow objects for the mafia, one for the victim — and a third player owns more than both,
+    # so the old strict-majority rule would have collected nothing.
+    give_asset(state, mafia, "underground_casino")
+    give_asset(state, mafia, "cash")
+    give_asset(state, victim, "market")
+    give_asset(state, victim, "housing")
+    give_asset(state, victim, "pharmacy_chain")
+    for card_id in ("underground_casino", "cash", "market"):
+        give_asset(state, baron, card_id)
+
+    for _ in state.players:
+        state = run(engine, state, "end_turn")
+
+    sources = settled_sources(state)
+    assert sources[mafia.id]["mafia_tribute"] == 2  # 2$ for the victim's single shadow object
+    assert sources[victim.id]["mafia_tribute"] == -2
+    assert sources[baron.id]["mafia_tribute"] == 0  # the baron outnumbers the mafia, so pays nothing
 
 
 def test_capitalist_and_politician_powers() -> None:

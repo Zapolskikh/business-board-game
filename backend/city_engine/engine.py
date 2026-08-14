@@ -19,7 +19,6 @@ from city_engine.models import (
     HeldCard,
     MarketAsset,
     OwnedAsset,
-    PendingDecision,
     PlayerState,
     Transition,
 )
@@ -46,7 +45,6 @@ class CityEngine:
             "play_action_card": self._play_action_card,
             "use_role_power": self._use_role_power,
             "grey_operation": self._grey_operation,
-            "resolve_decision": self._resolve_decision,
             "claim_role": self._claim_role,
             "end_turn": self._end_turn,
         }
@@ -61,13 +59,8 @@ class CityEngine:
             return Transition(state=state.clone(), events=[])
         if state.status != "playing":
             raise IllegalActionError("the game is already finished")
-        if state.pending_decision is not None:
-            if command.type != "resolve_decision" or command.actor_id != state.pending_decision.actor_id:
-                raise IllegalActionError("the game is waiting for another player's decision")
-        elif command.actor_id != state.current_player.id:
+        if command.actor_id != state.current_player.id:
             raise IllegalActionError("only the current player may act")
-        elif command.type == "resolve_decision":
-            raise IllegalActionError("there is no pending decision")
         handler = self._handlers.get(command.type)
         if handler is None:
             raise InvalidCommandError(f"unsupported command: {command.type}")
@@ -75,6 +68,7 @@ class CityEngine:
         next_state = state.clone()
         event_start = len(next_state.event_log)
         handler(next_state, command)
+        self._enforce_jail_interrupt(next_state, command)
         next_state.command_log.append(command.to_dict())
         next_state.revision += 1
         if command.command_id:
@@ -93,21 +87,9 @@ class CityEngine:
     ) -> list[tuple[dict[str, Any], Transition]]:
         if state.status != "playing":
             return []
-        if state.pending_decision is not None:
-            if actor_id != state.pending_decision.actor_id:
-                return []
-            candidates = [
-                Command(
-                    type="resolve_decision",
-                    actor_id=actor_id,
-                    payload={"decision_id": state.pending_decision.id, "option": option},
-                )
-                for option in state.pending_decision.options
-            ]
-        elif actor_id != state.current_player.id:
+        if actor_id != state.current_player.id:
             return []
-        else:
-            candidates = self._candidate_commands(state, actor_id)
+        candidates = self._candidate_commands(state, actor_id)
 
         actions: list[tuple[dict[str, Any], Transition]] = []
         for candidate in candidates:
@@ -455,10 +437,7 @@ class CityEngine:
 
     def _resource_snapshot(self, state: GameState) -> dict[str, tuple[int, int, int, int]]:
         """Capture money / influence / scandals / roofs for every player."""
-        return {
-            player.id: (player.money, player.influence, player.scandals, player.roofs)
-            for player in state.players
-        }
+        return {player.id: (player.money, player.influence, player.scandals, player.roofs) for player in state.players}
 
     def _resource_deltas(
         self, state: GameState, before: dict[str, tuple[int, int, int, int]]
@@ -850,7 +829,7 @@ class CityEngine:
             state.investment_actions += card.value
         elif kind == "comeback":
             is_last = self.ranking(state)[-1].id == player.id
-            player.money += state.round_number * 2 if is_last else 3
+            player.money += state.round_number * card.value if is_last else 3
         elif kind == "influence_to_cash":
             player.influence -= 2
             player.money += card.value
@@ -939,30 +918,6 @@ class CityEngine:
             target_id=target.id,
             deltas=self._resource_deltas(state, before),
         )
-
-    def _resolve_decision(self, state: GameState, command: Command) -> None:
-        decision = state.pending_decision
-        if decision is None:
-            raise IllegalActionError("there is no pending decision")
-        if command.payload.get("decision_id") != decision.id:
-            raise IllegalActionError("decision id does not match the pending decision")
-        option = self._payload_string(command, "option")
-        if option not in decision.options:
-            raise InvalidCommandError("unknown decision option")
-        if decision.type != "roof_defence" or decision.context.get("source") != "action_card":
-            raise InvalidCommandError(f"unsupported pending decision: {decision.type}")
-        target = state.player_by_id(str(decision.context["target_id"]))
-        attacker = state.player_by_id(str(decision.context["attacker_id"]))
-        card = self.action_card(str(decision.context["card_id"]))
-        state.pending_decision = None
-        if option == "use_roof":
-            if target.roofs < 1:
-                raise IllegalActionError("the target no longer has a roof")
-            target.roofs -= 1
-            state.append_event("targeted_effect_blocked", target.id, card_id=card.id, by="roof")
-        else:
-            self._apply_targeted_card_effect(state, attacker, target, card)
-        state.append_event("decision_resolved", target.id, decision_id=decision.id, option=option)
 
     def _require_role(self, player: PlayerState, role_id: str) -> None:
         if not self.has_role(player, role_id):
@@ -1231,6 +1186,7 @@ class CityEngine:
             if target.roofs > 0:
                 target.roofs -= 1
                 player.money += comeback
+                state.append_event("targeted_effect_blocked", target.id, asset_id=asset_id, by="roof")
             else:
                 stolen = min(cap, target.money)
                 target.money -= stolen
@@ -1241,11 +1197,17 @@ class CityEngine:
             if leader.id != player.id:
                 if leader.roofs > 0:
                     leader.roofs -= 1
+                    state.append_event("targeted_effect_blocked", leader.id, asset_id=asset_id, by="roof")
                 else:
                     leader.money = max(0, leader.money - (2 + floor(state.round_number / 2)))
         elif asset_id == "datacenter" and target is not None:
             player.money += comeback
-            max(target.assets, key=lambda asset: self.owned_definition(asset).income).blocked = True
+            if target.roofs > 0:
+                # A roof absorbs any incoming negative effect, hacking included.
+                target.roofs -= 1
+                state.append_event("targeted_effect_blocked", target.id, asset_id=asset_id, by="roof")
+            else:
+                max(target.assets, key=lambda asset: self.owned_definition(asset).income).blocked = True
 
     def _resolve_grey_failure(
         self,
@@ -1304,6 +1266,25 @@ class CityEngine:
             player.pending_role = None
         else:
             player.scandals = next_value
+
+    def _enforce_jail_interrupt(self, state: GameState, command: Command) -> None:
+        """A sixth scandal jails the actor at once: the rest of their turn is forfeited.
+
+        ``_prepare_current_player`` decrements ``jail_turns`` when a turn starts, so a
+        positive counter on the acting player can only mean they were jailed mid-turn.
+        Unused actions burn — including the one ``carryAction`` would normally bank —
+        and the turn passes on immediately. A player jailed by somebody else's command
+        is not the current player, so their own turn is untouched.
+        """
+        if command.type == "end_turn" or state.status != "playing":
+            return
+        player = state.current_player
+        if player.jail_turns < 1:
+            return
+        state.actions_left = 0
+        state.investment_actions = 0
+        state.append_event("player_jailed", player.id, round_number=state.round_number)
+        self._end_turn(state, command)
 
     def _end_turn(self, state: GameState, command: Command) -> None:
         player = state.current_player
@@ -1425,11 +1406,9 @@ class CityEngine:
                 levy = 0
                 for district in DISTRICT_IDS:
                     mafia_count = self.district_count(mafia, district)
-                    controls = mafia_count > 0 and all(
-                        other.id == mafia.id or self.district_count(other, district) < mafia_count
-                        for other in state.players
-                    )
-                    if controls and self.district_count(victim, district) < mafia_count:
+                    # Presence is enough: the mafia levies every rival it outnumbers in a district
+                    # where it owns something, even when a third player owns more there.
+                    if mafia_count > 0 and self.district_count(victim, district) < mafia_count:
                         levy += (
                             sum(
                                 self.owned_definition(asset).district == district and not asset.blocked
@@ -1456,8 +1435,9 @@ class CityEngine:
                 else 0
             )
             rating = min(4, player.scandals) if journalist else 0
+            # 2$ per scandal still standing on a rival when the round is settled.
             journalist_cash = (
-                sum(other.scandals for other in state.players if other.id != player.id) if journalist else 0
+                2 * sum(other.scandals for other in state.players if other.id != player.id) if journalist else 0
             )
             income_sources[player.id]["journalist"] = journalist_cash
             player.money = max(0, player.money + incomes[player.id] + journalist_cash - player.debt)
