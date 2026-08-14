@@ -39,9 +39,12 @@ class FixedWindowLimiter:
             self._counts[key] += 1
             count = self._counts[key]
             if self._checks % 512 == 0:
-                self._counts = {
-                    stored_key: value for stored_key, value in self._counts.items() if stored_key[2] >= window - 1
-                }
+                # Rebuild as a defaultdict: a plain comprehension would drop the default factory
+                # and every later key would raise KeyError on the increment above.
+                self._counts = defaultdict(
+                    int,
+                    {stored_key: value for stored_key, value in self._counts.items() if stored_key[2] >= window - 1},
+                )
         retry_after = max(1, int((window + 1) * rule.window_seconds - timestamp))
         return count <= rule.limit, retry_after
 
