@@ -69,9 +69,6 @@ h1, h2, h3, p { margin-top: 0; }
 .game-version { color: var(--city-dim); font-size: 10px; font-weight: 400; }
 .city-head p { margin: 5px 0 0; color: var(--city-dim); font-size: 12px; }
 .investment-actions { color: #70d7ff; }
-.city-event { display: flex; flex: 1 1 auto; min-width: 0; min-height: 47px; padding: 6px 12px; flex-direction: column; justify-content: center; gap: 2px; background: #222b3b; border: 1px solid #51617c; border-radius: 8px; }
-.city-event strong { color: #f2c14e; font-size: 13px; }
-.city-event span { overflow: hidden; color: var(--city-dim); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .city-head-buttons { display: flex; flex: 0 0 auto; gap: 6px; }
 .city-head-buttons button { padding: 9px 12px; }
 
@@ -262,7 +259,7 @@ h1, h2, h3, p { margin-top: 0; }
 .rules-frame { flex: 1; width: 100%; height: 100%; border: 0; background: #0b1017; }
 
 .mobile-game-tabs { display: none; }
-.mobile-event-trigger, .mobile-event-detail, .mobile-game-menu { display: none; }
+.mobile-game-menu { display: none; }
 
 @media (max-width: 900px) {
   .form-grid { grid-template-columns: 1fr 1fr; }
@@ -309,8 +306,7 @@ h1, h2, h3, p { margin-top: 0; }
   .active-bonuses { padding: 7px; }
 
   /* Header + log */
-  .city-event { min-height: 40px; padding: 5px 9px; }
-  .log-scroll { max-height: 220px; }
+    .log-scroll { max-height: 220px; }
   .log-entry { padding: 5px 6px; }
 
   /* Fullscreen rules close button a touch smaller */
@@ -332,32 +328,7 @@ h1, h2, h3, p { margin-top: 0; }
   .city-head { gap: 4px; }
   .city-head h1 { font-size: 18px; }
   .city-head p { margin-top: 3px; font-size: 10px; line-height: 1.45; }
-  .city-event, .city-head-buttons { display: none; }
-  .mobile-event-trigger {
-    display: inline;
-    width: auto;
-    padding: 0;
-    color: #e3b341;
-    background: none;
-    border: 0;
-    border-radius: 0;
-    font-size: inherit;
-    text-align: left;
-  }
-  .mobile-event-detail {
-    display: flex;
-    width: 100%;
-    margin-top: 5px;
-    padding: 7px 9px;
-    flex-direction: column;
-    gap: 2px;
-    color: var(--text);
-    background: #222b3b;
-    border-color: #51617c;
-    text-align: left;
-  }
-  .mobile-event-detail strong { color: #e3b341; font-size: 11px; }
-  .mobile-event-detail span { color: var(--city-dim); font-size: 10px; line-height: 1.4; }
+  .city-head-buttons { display: none; }
   .city-layout { display: block; }
 
   .city-layout[data-mobile-tab] > .city-main-col,
