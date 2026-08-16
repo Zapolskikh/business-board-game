@@ -12,6 +12,7 @@ from math import floor
 from typing import Any
 
 from city_engine.commands import Command
+from city_engine.constants import MARKET_REROLL_COST
 from city_engine.engine import CityEngine
 from city_engine.models import GameState, PlayerState
 
@@ -43,6 +44,9 @@ PROFILES = {
     "hard": PolicyProfile(horizon=6, aggression=0.45, risk_penalty=2.0, role_focus=1.7, defence=1.5),
     "expert": PolicyProfile(horizon=7, aggression=0.30, risk_penalty=1.8, role_focus=1.0, defence=1.0, planning=1.0),
 }
+
+# Money a planning bot is happy to hold; everything above reads as capital it failed to deploy.
+CASH_COMFORT = 30
 
 BOT_POLICY_NAMES = {
     "easy": "Олег",
@@ -159,7 +163,14 @@ def _position_value(
     defence = (player.roofs + player.role_shields + player.scandal_shields) * profile.defence
     role_value = _role_position_value(engine, state, player, player.role, profile)
     hand_value = sum(_card_value(engine, card.card_id, player) for card in player.hand) * 0.35
-    return engine.score(player) + recurring * horizon * 0.55 + defence + role_value + hand_value - scandal_risk
+    # Money counts toward the score at 10$ = 1 point, so simply holding it looks profitable and
+    # every sink — a slot, an object, a project — reads as a net loss. A bot finished a measured
+    # match sitting on 296$ and three slots, converting two dollars at a time through campaign.
+    # Above a working balance the drag almost cancels that 0.1/$, leaving spending clearly better.
+    cash_drag = max(0, player.money - CASH_COMFORT) * 0.09 * profile.planning
+    return (
+        engine.score(player) + recurring * horizon * 0.55 + defence + role_value + hand_value - scandal_risk - cash_drag
+    )
 
 
 def _role_position_value(
@@ -260,7 +271,16 @@ def _strategic_action_bonus(
     bonus = 0.0
     if action_type == "claim_role":
         role_id = str(payload["role_id"])
-        bonus += _role_utility(engine, state, player, role_id) * 0.5
+        gain = _role_utility(engine, state, player, role_id)
+        if player.role and profile.planning:
+            # Swapping means giving up what you hold: a bot traded the strongest role in the game
+            # for a middling one in round three, paying influence and an action for a downgrade.
+            gain -= _role_utility(engine, state, player, player.role)
+        bonus += gain * 0.5
+        holder = engine.role_holder(state, role_id)
+        if holder is not None and profile.planning and (holder.roofs > 0 or holder.role_shields > 0):
+            # The defence is face-up, so a blocked takeover is a knowingly wasted action.
+            bonus -= 6.0
         if role_id == preferred:
             bonus += 12 * profile.role_focus
         elif preferred is not None:
@@ -315,9 +335,21 @@ def _strategic_action_bonus(
             bonus -= 1.5 if player.money > 25 else 0.0
         else:
             bonus += 1.0 if _affordable_projects(engine, state, player) else 0.0
+    elif action_type == "buy_capacity" and profile.planning:
+        # An empty slot is worth the object that will fill it, and the bot has the money by now.
+        best = max((engine.asset_value_of(item.card_id) for item in state.market), default=3)
+        bonus += best * 0.8 + min(4.0, player.money / 25)
     elif action_type == "reroll_market":
-        affordable = sum(1 for item in state.market if player.money >= engine.asset_price(state, player, item.card_id))
-        bonus += 2.0 if affordable == 0 and len(player.assets) < player.capacity else -1.5
+        # Rerolling is for "I have money and the market has nothing", not for "I am broke" —
+        # the old rule rewarded exactly the useless case and bots burned 2$ at the end of a turn.
+        worst_owned = min((engine.asset_value(asset) for asset in player.assets), default=0)
+        upgrade_on_offer = any(
+            engine.asset_value_of(item.card_id) > worst_owned
+            and player.money >= engine.asset_price(state, player, item.card_id)
+            for item in state.market
+        )
+        spare = player.money >= MARKET_REROLL_COST + 5
+        bonus += 2.0 if spare and not upgrade_on_offer else -2.0
     elif action_type == "replace_asset":
         # Swapping a cheap early object for a stronger one is the whole point of the mechanic,
         # but it must not become a treadmill: only a real jump in value is worth the action.
@@ -325,6 +357,9 @@ def _strategic_action_bonus(
         owned = next(item for item in player.assets if item.uid == payload["asset_uid"])
         gain = engine.asset_value_of(market.card_id) - engine.asset_value(owned)
         bonus += gain * 1.5 - 1.0
+        if gain < 0 and profile.planning:
+            # Downgrading an epic to a common for a little income costs real points.
+            bonus -= 4.0
     return bonus
 
 

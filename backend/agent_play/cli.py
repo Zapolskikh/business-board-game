@@ -37,6 +37,7 @@ from agent_play.render import (
     resolve_action,
 )
 from agent_play.session import Session, session_dir
+from city_engine.constants import BOT_DIFFICULTIES
 
 
 def parse_value(raw: str) -> Any:
@@ -358,7 +359,7 @@ def build_parser() -> argparse.ArgumentParser:
     new.add_argument("--password", default="agentplay", help="room password (4+ chars)")
     new.add_argument("--capacity", type=int, default=4, help="total seats")
     new.add_argument("--bots", type=int, default=3, help="bot seats to fill from the end")
-    new.add_argument("--difficulty", default="medium", choices=("easy", "medium", "hard"))
+    new.add_argument("--difficulty", default="expert", choices=BOT_DIFFICULTIES)
     new.add_argument("--bot-role", default=None, help="preferred role for every bot")
     new.add_argument("--rounds", type=int, default=15, help="rounds in the game")
     new.add_argument("--role-price", type=int, default=3, help="influence price of a free role")
