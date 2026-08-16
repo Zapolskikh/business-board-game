@@ -43,6 +43,7 @@ def test_production_simulation_reports_engine_games() -> None:
     result = run_batch(config)
     assert result["games"] == 2
     assert set(result["avg_winner_income_sources"]) == {
+        "antitrust",
         "debt",
         "journalist",
         "mafia_tribute",

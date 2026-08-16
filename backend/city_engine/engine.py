@@ -7,12 +7,35 @@ as dispatch handlers here, never in FastAPI or React.
 
 from __future__ import annotations
 
-from math import floor
+from math import ceil, floor
 from typing import Any
 
 from city_engine.commands import Command
-from city_engine.constants import CAPACITY_COSTS, DISTRICT_IDS, MAX_CAPACITY, ROLE_IDS
-from city_engine.content import ActionCardDefinition, AssetDefinition, ContentCatalog, load_catalog
+from city_engine.constants import (
+    ACTION_CARD_COST,
+    AUTOMATION_COST,
+    CAPACITY_COSTS,
+    CARD_DISCARD_VALUE,
+    CRISIS_PR_INFLUENCE,
+    DISTRICT_IDS,
+    INFLUENCE_PER_POINT,
+    JOURNALIST_SCANDAL_LIMIT,
+    MAINTENANCE_PER_ASSET,
+    MARKET_REROLL_COST,
+    MAX_CAPACITY,
+    MAX_REPEATABLE_PROJECTS,
+    MONEY_PER_POINT,
+    PROJECT_BOARD_SIZE,
+    PROJECT_REROLL_COST,
+    ROLE_IDS,
+)
+from city_engine.content import (
+    ActionCardDefinition,
+    AssetDefinition,
+    ContentCatalog,
+    ProjectDefinition,
+    load_catalog,
+)
 from city_engine.errors import CityEngineError, IllegalActionError, InvalidCommandError, StaleRevisionError
 from city_engine.models import (
     GameState,
@@ -24,8 +47,6 @@ from city_engine.models import (
 )
 from city_engine.rng import GameRNG
 
-RARITY_MIN_ROUND = {"common": 1, "uncommon": 2, "rare": 3, "epic": 4, "legendary": 5}
-
 
 class CityEngine:
     def __init__(self, catalog: ContentCatalog | None = None) -> None:
@@ -36,7 +57,11 @@ class CityEngine:
             "buy_capacity": self._buy_capacity,
             "buy_roof": self._buy_roof,
             "buy_asset": self._buy_asset,
-            "improve_asset": self._improve_asset,
+            "replace_asset": self._replace_asset,
+            "reroll_market": self._reroll_market,
+            "reroll_projects": self._reroll_projects,
+            "buy_automation": self._buy_automation,
+            "move_automation": self._move_automation,
             "sell_asset": self._sell_asset,
             "develop_district": self._develop_district,
             "crisis_pr": self._crisis_pr,
@@ -114,13 +139,15 @@ class CityEngine:
             candidates.append(Command(type="basic_action", actor_id=actor_id, payload={"kind": "work"}))
             if player.money >= 2:
                 candidates.append(Command(type="basic_action", actor_id=actor_id, payload={"kind": "campaign"}))
-            if player.influence >= 3:
-                candidates.append(Command(type="city_project", actor_id=actor_id))
-            if player.roofs < self.roof_limit(player) and player.money >= (2 if self.has_role(player, "mafia") else 3):
+            candidates.extend(
+                Command(type="city_project", actor_id=actor_id, payload={"project_id": project_id})
+                for project_id in [*state.project_board, *self.catalog.repeatable_project_ids()]
+            )
+            if player.roofs < self.roof_limit(player) and player.money >= self.roof_price(state, player):
                 candidates.append(Command(type="buy_roof", actor_id=actor_id))
-            if player.money >= 4 and player.scandals > 0:
+            if player.influence >= CRISIS_PR_INFLUENCE and player.scandals > 0:
                 candidates.append(Command(type="crisis_pr", actor_id=actor_id))
-            if player.scandals < 5:
+            if player.scandals < self.scandal_limit(player):
                 candidates.extend(
                     Command(type="claim_role", actor_id=actor_id, payload={"role_id": role_id})
                     for role_id in ROLE_IDS
@@ -131,6 +158,13 @@ class CityEngine:
         if can_invest:
             if player.capacity < MAX_CAPACITY and player.money >= CAPACITY_COSTS.get(player.capacity, 10**9):
                 candidates.append(Command(type="buy_capacity", actor_id=actor_id))
+            if not player.automation_owned and player.money >= AUTOMATION_COST:
+                candidates.extend(
+                    Command(type="buy_automation", actor_id=actor_id, payload={"asset_uid": owned.uid})
+                    for owned in player.assets
+                )
+                if not player.assets:
+                    candidates.append(Command(type="buy_automation", actor_id=actor_id))
             if len(player.assets) < player.capacity:
                 candidates.extend(
                     Command(
@@ -142,20 +176,21 @@ class CityEngine:
                     if player.money >= self.asset_price(state, player, market_asset.card_id)
                 )
         for owned in player.assets:
-            if can_invest and not owned.automated and not owned.scaled:
+            # Moving the token costs nothing, so it stays available with an empty action counter.
+            if player.automation_owned and player.automation_uid != owned.uid:
+                candidates.append(Command(type="move_automation", actor_id=actor_id, payload={"asset_uid": owned.uid}))
+            # Only with full slots: while a slot is free, buying keeps both objects for the same
+            # money, and offering every owned × market pair buried the action list in noise.
+            if can_invest and len(player.assets) >= player.capacity:
                 candidates.extend(
-                    [
-                        Command(
-                            type="improve_asset",
-                            actor_id=actor_id,
-                            payload={"asset_uid": owned.uid, "kind": "automate"},
-                        ),
-                        Command(
-                            type="improve_asset",
-                            actor_id=actor_id,
-                            payload={"asset_uid": owned.uid, "kind": "scale"},
-                        ),
-                    ]
+                    Command(
+                        type="replace_asset",
+                        actor_id=actor_id,
+                        payload={"asset_uid": owned.uid, "market_uid": market_asset.uid},
+                    )
+                    for market_asset in state.market
+                    if player.money
+                    >= max(0, self.asset_price(state, player, market_asset.card_id) - self.asset_refund(owned))
                 )
             if can_act:
                 candidates.append(
@@ -171,11 +206,13 @@ class CityEngine:
                 for district in DISTRICT_IDS
                 if self.district_count(player, district) >= 2 and player.district_levels[district] < 2
             )
-            if player.money >= 3 and player.influence >= 1 and len(player.hand) < 3:
-                candidates.extend(
-                    Command(type="buy_action_card", actor_id=actor_id, payload={"card_id": card_id})
-                    for card_id in state.action_market
-                )
+        # Rerolling costs money only, so it stays available with no actions left.
+        if player.money >= MARKET_REROLL_COST:
+            candidates.append(Command(type="reroll_market", actor_id=actor_id))
+        if player.money >= PROJECT_REROLL_COST and state.project_deck:
+            candidates.append(Command(type="reroll_projects", actor_id=actor_id))
+        if can_act and player.money >= ACTION_CARD_COST and player.influence >= 1 and len(player.hand) < 3:
+            candidates.append(Command(type="buy_action_card", actor_id=actor_id))
         for held in player.hand:
             candidates.extend(
                 Command(
@@ -214,10 +251,34 @@ class CityEngine:
                     )
                     for role_id in ROLE_IDS
                 )
+            elif card.kind == "project":
+                candidates.extend(
+                    Command(
+                        type="play_action_card",
+                        actor_id=actor_id,
+                        payload={"card_uid": held.uid, "project_id": project_id},
+                    )
+                    for project_id in state.project_board
+                )
+            elif card.kind == "automation":
+                candidates.extend(
+                    Command(
+                        type="play_action_card",
+                        actor_id=actor_id,
+                        payload={"card_uid": held.uid, "asset_uid": owned.uid},
+                    )
+                    for owned in player.assets
+                )
+                if not player.assets:
+                    candidates.append(
+                        Command(type="play_action_card", actor_id=actor_id, payload={"card_uid": held.uid})
+                    )
             else:
                 candidates.append(Command(type="play_action_card", actor_id=actor_id, payload={"card_uid": held.uid}))
         candidates.extend(self._role_power_candidates(state, actor_id))
         active_asset_ids = {asset.card_id for asset in player.assets if not asset.blocked}
+        # Insuring a failure spends a roof, so without one the flag silently did nothing.
+        protect_options = (False, True) if player.roofs > 0 else (False,)
         for asset_id in ("cash", "crypto"):
             if not can_act or asset_id not in active_asset_ids:
                 continue
@@ -227,7 +288,7 @@ class CityEngine:
                     actor_id=actor_id,
                     payload={"asset_id": asset_id, "protect_failure": protect},
                 )
-                for protect in (False, True)
+                for protect in protect_options
             )
         for asset_id in ("market", "datacenter"):
             if not can_act or asset_id not in active_asset_ids:
@@ -245,7 +306,7 @@ class CityEngine:
                             "protect_failure": protect,
                         },
                     )
-                    for protect in (False, True)
+                    for protect in protect_options
                 )
         return candidates
 
@@ -372,8 +433,78 @@ class CityEngine:
         except KeyError as exc:
             raise InvalidCommandError(f"unknown action card: {card_id}") from exc
 
+    def project(self, project_id: str) -> ProjectDefinition:
+        try:
+            return self.catalog.projects[project_id]
+        except KeyError as exc:
+            raise InvalidCommandError(f"unknown city project: {project_id}") from exc
+
+    def project_requirement_met(self, player: PlayerState, project: ProjectDefinition) -> bool:
+        """Every condition is a count of things already on the table, so a player can read it."""
+        requirement = project.requirement
+        kind = str(requirement.get("type", "none"))
+        needed = int(requirement.get("count", 1))
+        if kind == "none":
+            return True
+        if kind == "assets":
+            return len(player.assets) >= needed
+        if kind == "automation":
+            return player.automation_owned
+        if kind == "role":
+            role_id = requirement.get("role")
+            return self.has_role(player, str(role_id)) if role_id else player.role is not None
+        if kind == "max_scandals":
+            return player.scandals <= needed
+        if kind == "district_objects":
+            return self.district_count(player, str(requirement["district"])) >= needed
+        if kind == "district_depth":
+            return max(self.district_count(player, district) for district in DISTRICT_IDS) >= needed
+        if kind == "distinct_districts":
+            return sum(self.district_count(player, district) > 0 for district in DISTRICT_IDS) >= needed
+        if kind == "tag_objects":
+            tag = str(requirement["tag"])
+            return sum(tag in self.owned_definition(asset).tags for asset in player.assets) >= needed
+        raise InvalidCommandError(f"unknown project requirement: {kind}")
+
     def asset_value(self, owned: OwnedAsset) -> int:
-        return floor(self.owned_definition(owned).cost / 2) + (2 if owned.automated else 0) + (2 if owned.scaled else 0)
+        return self.asset_value_of(owned.card_id)
+
+    def asset_value_of(self, card_id: str) -> int:
+        """Points an object is worth: half its price.
+
+        A flat rarity ladder was tried here and measured worse — it cut what a dollar buys in
+        points, so objects stopped soaking up income and the bots ended games sitting on 500$.
+        Objects are the main money sink and have to stay one; the late replacement arbitrage is
+        a separate problem and needs a fix that does not also break the sink.
+        """
+        return floor(self.asset(card_id).cost / 2)
+
+    def asset_refund(self, owned: OwnedAsset) -> int:
+        """What selling or replacing an object pays back, in money."""
+        return floor(self.owned_definition(owned).cost / 2)
+
+    def is_automated(self, player: PlayerState, owned: OwnedAsset) -> bool:
+        """Whether the player's single automation token is currently working on this object."""
+        return player.automation_uid == owned.uid and not player.automation_disabled
+
+    def automated_asset(self, player: PlayerState) -> OwnedAsset | None:
+        return next((asset for asset in player.assets if asset.uid == player.automation_uid), None)
+
+    def automation_preview(self, state: GameState, player: PlayerState) -> dict[str, int]:
+        """Round income for every possible home of the token, so the client shows the delta.
+
+        Moving the token is free and repeatable, which only reads as a decision if the payoff of
+        each option is on screen. Computed server-side for the same reason market prices are.
+        """
+        if not player.automation_owned:
+            return {}
+        original = player.automation_uid
+        preview: dict[str, int] = {}
+        for asset in player.assets:
+            player.automation_uid = asset.uid
+            preview[asset.uid] = self._round_income(state, player)
+        player.automation_uid = original
+        return preview
 
     @staticmethod
     def _flag(state: GameState, key: str) -> bool:
@@ -404,12 +535,28 @@ class CityEngine:
         return count + int(player.zoning_district == district)
 
     def effect_total(self, player: PlayerState, key: str) -> int:
-        return sum(
+        """Passive bonuses from objects and from completed projects share one vocabulary.
+
+        A project perk cannot be blocked or confiscated, which is exactly why perks are the
+        reward for a finished project rather than another income line.
+        """
+        assets = sum(
             int(self.owned_definition(asset).effects.get(key, 0)) for asset in player.assets if not asset.blocked
         )
+        perks = sum(self.project(project_id).perk.get(key, 0) for project_id in player.projects)
+        return assets + perks
 
     def roof_limit(self, player: PlayerState) -> int:
         return (2 if self.has_role(player, "mafia") else 1) + self.effect_total(player, "roofCapacity")
+
+    def roof_price(self, state: GameState, player: PlayerState) -> int:
+        """Roof cost grows with the round: a flat 3$ blanked late attacks worth ten times that."""
+        base = 3 + floor((state.round_number - 1) / 2)
+        return base - 1 if self.has_role(player, "mafia") else base
+
+    def market_prices(self, state: GameState, player: PlayerState) -> dict[str, int]:
+        """Viewer-specific market prices, so clients never re-implement ``asset_price``."""
+        return {item.uid: self.asset_price(state, player, item.card_id) for item in state.market}
 
     def asset_price(self, state: GameState, player: PlayerState, card_id: str) -> int:
         asset = self.asset(card_id)
@@ -473,13 +620,76 @@ class CityEngine:
         state.append_event("basic_action", player.id, kind=kind, money=player.money, influence=player.influence)
 
     def _city_project(self, state: GameState, command: Command) -> None:
+        """Projects are a shared board: taking one denies it to everybody else for the whole game."""
         player = state.current_player
-        if player.influence < 3:
-            raise IllegalActionError("city project requires 3 influence")
+        project_id = self._payload_string(command, "project_id")
+        project = self.project(project_id)
+        if project.repeatable:
+            taken = sum(1 for item in player.projects if self.project(item).repeatable)
+            if taken >= MAX_REPEATABLE_PROJECTS:
+                raise IllegalActionError(f"initiatives are limited to {MAX_REPEATABLE_PROJECTS} per game")
+        elif project_id not in state.project_board:
+            raise IllegalActionError("this project is not on the city board")
+        if player.influence < project.cost_influence or player.money < project.cost_money:
+            raise IllegalActionError("not enough resources for the project")
+        if not self.project_requirement_met(player, project):
+            raise IllegalActionError("the project condition is not met")
         self._spend_action(state)
-        player.influence -= 3
-        player.projects += 1
-        state.append_event("city_project_created", player.id, projects=player.projects)
+        player.influence -= project.cost_influence
+        player.money -= project.cost_money
+        player.projects.append(project_id)
+        if not project.repeatable:
+            state.project_board = [item for item in state.project_board if item != project_id]
+            self._refill_project_board(state)
+        state.append_event(
+            "city_project_taken",
+            player.id,
+            project_id=project_id,
+            points=project.points,
+            cost_influence=project.cost_influence,
+            cost_money=project.cost_money,
+        )
+
+    def _refill_project_board(self, state: GameState) -> None:
+        while len(state.project_board) < PROJECT_BOARD_SIZE and state.project_deck:
+            state.project_board.append(state.project_deck.pop(0))
+
+    def _reroll_projects(self, state: GameState, command: Command) -> None:
+        """Push the oldest project to the bottom of the deck for money, without an action.
+
+        Rotation already recycles a project instead of removing it, so this cannot drain the deck:
+        it only buys you a different offer when nothing on the board fits your portfolio.
+        """
+        player = state.current_player
+        if self._flag(state, "projects_rerolled"):
+            raise IllegalActionError("the project board has already been rerolled this turn")
+        if player.money < PROJECT_REROLL_COST:
+            raise IllegalActionError("not enough money to reroll the project board")
+        if not state.project_deck:
+            raise IllegalActionError("the project deck is empty")
+        self._mark_flag(state, "projects_rerolled")
+        player.money -= PROJECT_REROLL_COST
+        self._rotate_project_board(state, cost=PROJECT_REROLL_COST, actor_id=player.id)
+
+    def _rotate_project_board(self, state: GameState, *, cost: int = 0, actor_id: str | None = None) -> None:
+        """One project leaves the board every round: the longest-standing one goes to the bottom.
+
+        Without this the board silently jams: four projects nobody can satisfy sit there for the
+        rest of the game and the score engine stops existing. It also puts a clock on a project
+        you want but cannot afford yet.
+        """
+        if not state.project_deck or not state.project_board:
+            return
+        expired = state.project_board.pop(0)
+        state.project_deck.append(expired)
+        self._refill_project_board(state)
+        state.append_event(
+            "project_board_rotated",
+            actor_id,
+            expired_project_id=expired,
+            project_board=list(state.project_board),
+            cost=cost,
+        )
 
     def _buy_capacity(self, state: GameState, command: Command) -> None:
         player = state.current_player
@@ -495,7 +705,7 @@ class CityEngine:
 
     def _buy_roof(self, state: GameState, command: Command) -> None:
         player = state.current_player
-        cost = 2 if self.has_role(player, "mafia") else 3
+        cost = self.roof_price(state, player)
         if player.roofs >= self.roof_limit(player):
             raise IllegalActionError("roof limit reached")
         if player.money < cost:
@@ -513,21 +723,26 @@ class CityEngine:
         holder = self.role_holder(state, role_id)
         if holder is player:
             raise IllegalActionError("player already owns this role")
-        if player.scandals >= 5:
-            raise IllegalActionError("a player with 5 scandals cannot claim a role")
+        if player.scandals >= self.scandal_limit(player):
+            raise IllegalActionError("a player at the scandal limit cannot claim a role")
         cost = state.role_price * 3 if holder else state.role_price
         if player.influence < cost:
             raise IllegalActionError("not enough influence for the role")
         self._spend_action(state)
         player.influence -= cost
 
+        # A blocked takeover costs the attempt (the action) and the defender's shield, but the
+        # influence comes back: paying full price for nothing was a silent 3-point tax, and in the
+        # arena game it decided a match that finished four points apart.
         if holder and holder.role_shields > 0:
             holder.role_shields -= 1
-            state.append_event("role_takeover_blocked", player.id, role_id=role_id, by="role_shield")
+            player.influence += cost
+            state.append_event("role_takeover_blocked", player.id, role_id=role_id, by="role_shield", refund=cost)
             return
         if holder and holder.roofs > 0:
             holder.roofs -= 1
-            state.append_event("role_takeover_blocked", player.id, role_id=role_id, by="roof")
+            player.influence += cost
+            state.append_event("role_takeover_blocked", player.id, role_id=role_id, by="roof", refund=cost)
             return
         if holder:
             compensation = sum(
@@ -559,12 +774,30 @@ class CityEngine:
         if player.money < cost:
             raise IllegalActionError("not enough money for the asset")
         self._spend_action(state, investment_allowed=True)
+        before = self._resource_snapshot(state)
         player.money -= cost
+        self._gain_asset(state, player, market_asset, asset)
+        # Deltas carry the grey-tag scandal and the purchase bonuses, which have no events of their own.
+        state.append_event(
+            "asset_bought",
+            player.id,
+            asset_id=asset.id,
+            market_uid=market_uid,
+            cost=cost,
+            deltas=self._resource_deltas(state, before),
+        )
+
+    def _gain_asset(
+        self,
+        state: GameState,
+        player: PlayerState,
+        market_asset: MarketAsset,
+        asset: AssetDefinition,
+    ) -> None:
+        """Move a market object into a portfolio and pay out its purchase bonuses."""
         player.influence += asset.influence
-        if state.event_id == "election" and asset.district == "government":
-            player.influence += asset.influence
         player.assets.append(OwnedAsset(uid=market_asset.uid, card_id=asset.id))
-        state.market = [item for item in state.market if item.uid != market_uid]
+        state.market = [item for item in state.market if item.uid != market_asset.uid]
         state.turn_flags["market_discount"] = 0
 
         purchase = asset.effects.get("purchase", {})
@@ -585,29 +818,78 @@ class CityEngine:
         reduction = self.effect_total(player, "greyScandalReduction") if "grey" in asset.tags else 0
         self.add_scandal(player, max(0, raw_scandals - reduction))
         self._refill_market(state, 1)
-        state.append_event("asset_bought", player.id, asset_id=asset.id, market_uid=market_uid, cost=cost)
 
-    def _improve_asset(self, state: GameState, command: Command) -> None:
+    def _reroll_market(self, state: GameState, command: Command) -> None:
+        """Money into market quality, once per turn, without spending an action.
+
+        The market used to rotate only on a timer nobody controlled, so a plan longer than the
+        current turn was impossible and spare cash had nowhere to go. This is the unbounded sink.
+        """
         player = state.current_player
-        asset_uid = self._payload_string(command, "asset_uid")
-        kind = self._payload_string(command, "kind")
-        if kind not in {"automate", "scale"}:
-            raise InvalidCommandError("improvement kind must be automate or scale")
-        owned = next((asset for asset in player.assets if asset.uid == asset_uid), None)
-        if owned is None:
-            raise IllegalActionError("asset is not owned by the player")
-        if owned.automated or owned.scaled:
-            raise IllegalActionError("asset is already improved")
-        discount = int(state.turn_flags.get("upgrade_discount", 0))
-        cost = max(1, (5 if kind == "automate" else 4) - discount)
-        if player.money < cost:
-            raise IllegalActionError("not enough money for the improvement")
+        if self._flag(state, "market_rerolled"):
+            raise IllegalActionError("the market has already been rerolled this turn")
+        if player.money < MARKET_REROLL_COST:
+            raise IllegalActionError("not enough money to reroll the market")
+        if not state.market and not state.market_deck:
+            raise IllegalActionError("there is nothing left to reroll")
+        self._mark_flag(state, "market_rerolled")
+        player.money -= MARKET_REROLL_COST
+        replaced = len(state.market)
+        state.market_deck.extend(item.card_id for item in state.market)
+        state.market = []
+        GameRNG(state.rng).shuffle(state.market_deck)
+        self._refill_market(state, replaced)
+        state.append_event(
+            "market_rerolled",
+            player.id,
+            cost=MARKET_REROLL_COST,
+            card_ids=[item.card_id for item in state.market],
+        )
+
+    def _buy_automation(self, state: GameState, command: Command) -> None:
+        """The token is bought once; after that every move is free."""
+        player = state.current_player
+        if player.automation_owned:
+            raise IllegalActionError("the automation token is already owned")
+        if player.money < AUTOMATION_COST:
+            raise IllegalActionError("not enough money for the automation token")
         self._spend_action(state, investment_allowed=True)
-        player.money -= cost
-        owned.automated = kind == "automate"
-        owned.scaled = kind == "scale"
-        state.turn_flags["upgrade_discount"] = 0
-        state.append_event("asset_improved", player.id, asset_uid=asset_uid, kind=kind, cost=cost)
+        player.money -= AUTOMATION_COST
+        player.automation_owned = True
+        target = self._optional_payload_string(command, "asset_uid")
+        if target is not None:
+            self._place_automation(player, target)
+        state.append_event(
+            "automation_bought",
+            player.id,
+            cost=AUTOMATION_COST,
+            asset_uid=player.automation_uid,
+        )
+
+    def _move_automation(self, state: GameState, command: Command) -> None:
+        """Free, once per turn: the point is that the best home shifts as the portfolio does."""
+        player = state.current_player
+        if not player.automation_owned:
+            raise IllegalActionError("the automation token has not been bought")
+        if self._flag(state, "automation_moved"):
+            raise IllegalActionError("the automation token has already been moved this turn")
+        asset_uid = self._payload_string(command, "asset_uid")
+        if asset_uid == player.automation_uid:
+            raise IllegalActionError("the automation token is already on this object")
+        self._mark_flag(state, "automation_moved")
+        previous = player.automation_uid
+        self._place_automation(player, asset_uid)
+        state.append_event("automation_moved", player.id, asset_uid=asset_uid, previous_asset_uid=previous)
+
+    def _place_automation(self, player: PlayerState, asset_uid: str) -> None:
+        if not any(asset.uid == asset_uid for asset in player.assets):
+            raise IllegalActionError("asset is not owned by the player")
+        player.automation_uid = asset_uid
+
+    @staticmethod
+    def _optional_payload_string(command: Command, key: str) -> str | None:
+        value = command.payload.get(key)
+        return value if isinstance(value, str) and value else None
 
     def _sell_asset(self, state: GameState, command: Command) -> None:
         player = state.current_player
@@ -616,10 +898,62 @@ class CityEngine:
         if owned is None:
             raise IllegalActionError("asset is not owned by the player")
         self._spend_action(state)
-        value = self.asset_value(owned)
-        player.assets = [asset for asset in player.assets if asset.uid != asset_uid]
+        value = self.asset_refund(owned)
+        self._drop_asset(player, owned)
         player.money += value
         state.append_event("asset_sold", player.id, asset_uid=asset_uid, value=value)
+
+    def _replace_asset(self, state: GameState, command: Command) -> None:
+        """Swap an owned object for one from the market in a single action, paying the difference.
+
+        Selling and buying separately cost two actions and half the object's value, so in 25
+        measured games not a single object ever left a portfolio: six slots filled with cheap
+        early cards by round six and froze. Rebuilding has to be one move to exist at all.
+        """
+        player = state.current_player
+        market_uid = self._payload_string(command, "market_uid")
+        asset_uid = self._payload_string(command, "asset_uid")
+        market_asset = next((item for item in state.market if item.uid == market_uid), None)
+        if market_asset is None:
+            raise IllegalActionError("asset is no longer on the market")
+        owned = next((asset for asset in player.assets if asset.uid == asset_uid), None)
+        if owned is None:
+            raise IllegalActionError("asset is not owned by the player")
+        if len(player.assets) < player.capacity:
+            raise IllegalActionError("a replacement is only for full slots — buy the object instead")
+        bought = self.asset(market_asset.card_id)
+        price = self.asset_price(state, player, bought.id)
+        refund = self.asset_refund(owned)
+        net = max(0, price - refund)
+        if player.money < net:
+            raise IllegalActionError("not enough money for the replacement")
+        self._spend_action(state, investment_allowed=True)
+        before = self._resource_snapshot(state)
+        automated = self.is_automated(player, owned)
+        self._drop_asset(player, owned)
+        player.money += refund - price
+        self._gain_asset(state, player, market_asset, bought)
+        # The token follows the swap: rebuilding must not silently cost the engine a round.
+        if automated and player.automation_owned:
+            player.automation_uid = market_asset.uid
+        state.append_event(
+            "asset_replaced",
+            player.id,
+            asset_uid=asset_uid,
+            sold_asset_id=owned.card_id,
+            asset_id=bought.id,
+            market_uid=market_uid,
+            price=price,
+            refund=refund,
+            deltas=self._resource_deltas(state, before),
+        )
+
+    @staticmethod
+    def _drop_asset(player: PlayerState, owned: OwnedAsset) -> None:
+        """Remove an object and free the token if it was working there."""
+        player.assets = [asset for asset in player.assets if asset.uid != owned.uid]
+        if player.automation_uid == owned.uid:
+            player.automation_uid = None
 
     def _develop_district(self, state: GameState, command: Command) -> None:
         player = state.current_player
@@ -647,43 +981,56 @@ class CityEngine:
         )
 
     def _crisis_pr(self, state: GameState, command: Command) -> None:
+        """Cleaning a scandal is priced in influence, not money.
+
+        At 10$ = 1 point the old 4$ price made cleanup cost 0.4 points to erase a 1-point scandal,
+        so scandals erased themselves and the whole attack layer stopped biting. Influence is the
+        scarce currency, so cleanup now competes with projects and roles for it.
+        """
         player = state.current_player
-        if player.money < 4 or player.scandals < 1:
-            raise IllegalActionError("crisis PR requires 4 money and at least one scandal")
+        if player.influence < CRISIS_PR_INFLUENCE or player.scandals < 1:
+            raise IllegalActionError(f"crisis PR requires {CRISIS_PR_INFLUENCE} influence and at least one scandal")
         self._spend_action(state)
-        player.money -= 4
+        player.influence -= CRISIS_PR_INFLUENCE
         player.scandals -= 1
-        state.append_event("crisis_pr", player.id, scandals=player.scandals)
+        state.append_event("crisis_pr", player.id, cost=CRISIS_PR_INFLUENCE, scandals=player.scandals)
 
     def _draw_action_card(self, state: GameState, player: PlayerState) -> HeldCard | None:
-        if len(player.hand) >= 3:
+        if len(player.hand) >= 3 or not state.action_deck:
             return None
-        card_id: str | None = None
-        if state.action_deck:
-            card_id = state.action_deck.pop(0)
-        elif state.action_market:
-            card_id = state.action_market.pop(0)
-        if card_id is None:
-            return None
+        card_id = state.action_deck.pop(0)
         held = HeldCard(uid=f"card:{card_id}", card_id=card_id)
         player.hand.append(held)
         return held
 
     def _buy_action_card(self, state: GameState, command: Command) -> None:
+        """A blind draw for an action.
+
+        Cards used to be a face-up market bought without spending an action, which made buying
+        the influence card strictly better than the campaign action — 5$ into 3◆ for free while
+        the basic action gave 2◆ and ate a turn slot. Now the card is random and costs the action,
+        so it competes honestly, and a bad draw is cushioned by a stronger discard.
+        """
         player = state.current_player
-        card_id = self._payload_string(command, "card_id")
-        if card_id not in state.action_market:
-            raise IllegalActionError("action card is no longer on the market")
         if len(player.hand) >= 3:
             raise IllegalActionError("action-card hand limit reached")
-        if player.money < 3 or player.influence < 1:
-            raise IllegalActionError("action card requires 3 money and 1 influence")
+        if player.money < ACTION_CARD_COST or player.influence < 1:
+            raise IllegalActionError(f"an action card requires {ACTION_CARD_COST} money and 1 influence")
+        if not state.action_deck:
+            raise IllegalActionError("the action deck is empty")
         self._spend_action(state)
-        state.action_market.remove(card_id)
-        player.money -= 3
+        player.money -= ACTION_CARD_COST
         player.influence -= 1
-        player.hand.append(HeldCard(uid=f"card:{card_id}", card_id=card_id))
-        state.append_event("action_card_bought", player.id, card_id=card_id)
+        # Two cards, because one blind card never beat a project for the same action: the whole
+        # card layer was played exactly once across a full fifteen-round match.
+        drawn = [card for card in (self._draw_action_card(state, player) for _ in range(2)) if card]
+        state.append_event(
+            "action_card_bought",
+            player.id,
+            card_id=drawn[0].card_id,
+            card_ids=[card.card_id for card in drawn],
+            cost=ACTION_CARD_COST,
+        )
 
     def _convert_action_card(self, state: GameState, command: Command) -> None:
         player = state.current_player
@@ -695,11 +1042,15 @@ class CityEngine:
         if held is None:
             raise IllegalActionError("action card is not in the player's hand")
         player.hand.remove(held)
+        # Softens a blind draw: returning a single unit made the discard a pure loss on a card
+        # that cost 3$ and 1◆, so nobody ever used it on purpose.
         if into == "money":
-            player.money += 1
+            player.money += CARD_DISCARD_VALUE
         else:
-            player.influence += 1
-        state.append_event("action_card_converted", player.id, card_id=held.card_id, into=into)
+            player.influence += CARD_DISCARD_VALUE
+        state.append_event(
+            "action_card_converted", player.id, card_id=held.card_id, into=into, value=CARD_DISCARD_VALUE
+        )
 
     def _play_action_card(self, state: GameState, command: Command) -> None:
         player = state.current_player
@@ -742,8 +1093,8 @@ class CityEngine:
             raise IllegalActionError("role pressure requires a role holder")
         if card.kind == "freeze" and not target.assets:
             raise IllegalActionError("freeze requires a target asset")
-        if card.kind == "remove_upgrade" and not any(asset.automated or asset.scaled for asset in target.assets):
-            raise IllegalActionError("target has no asset improvements")
+        if card.kind == "remove_upgrade" and (target.automation_uid is None or target.automation_disabled):
+            raise IllegalActionError("target has no working automation")
 
     def _validate_card_costs(
         self,
@@ -777,12 +1128,16 @@ class CityEngine:
                 raise IllegalActionError("temporary mandate requires another valid role")
         if card.kind == "market_discount" and (len(player.assets) >= player.capacity or not state.market):
             raise IllegalActionError("there is no available object purchase")
-        if card.kind == "upgrade_discount" and not any(
-            not asset.automated and not asset.scaled for asset in player.assets
-        ):
-            raise IllegalActionError("there is no asset to improve")
+        if card.kind == "automation" and player.automation_owned:
+            raise IllegalActionError("the automation token is already owned")
         if card.kind == "unblock" and not any(asset.blocked for asset in player.assets):
             raise IllegalActionError("there is no blocked asset")
+        if card.kind == "project":
+            project_id = self._payload_string(command, "project_id")
+            if self.project(project_id).repeatable or project_id not in state.project_board:
+                raise IllegalActionError("this card takes a project from the city board")
+            if not self.project_requirement_met(player, self.project(project_id)):
+                raise IllegalActionError("the project condition is not met")
 
     def _apply_self_card_effect(
         self,
@@ -813,8 +1168,11 @@ class CityEngine:
             player.influence += card.value
         elif kind == "market_discount":
             state.turn_flags["market_discount"] = card.value
-        elif kind == "upgrade_discount":
-            state.turn_flags["upgrade_discount"] = card.value
+        elif kind == "automation":
+            player.automation_owned = True
+            target = self._optional_payload_string(command, "asset_uid")
+            if target is not None:
+                self._place_automation(player, target)
         elif kind == "zoning":
             player.zoning_district = str(command.payload["district"])
         elif kind == "develop":
@@ -834,7 +1192,24 @@ class CityEngine:
             player.influence -= 2
             player.money += card.value
         elif kind == "project":
-            player.projects += 1
+            # The card pays the influence, not the condition: the project still has to be earned.
+            project_id = str(command.payload["project_id"])
+            project = self.project(project_id)
+            if player.money < project.cost_money:
+                raise IllegalActionError("not enough money for the project")
+            player.money -= project.cost_money
+            state.project_board = [item for item in state.project_board if item != project_id]
+            player.projects.append(project_id)
+            self._refill_project_board(state)
+            state.append_event(
+                "city_project_taken",
+                player.id,
+                project_id=project_id,
+                points=project.points,
+                cost_influence=0,
+                cost_money=project.cost_money,
+                source_card_id=card.id,
+            )
         elif kind == "role_shield":
             player.role_shields += 1
         elif kind == "scandal_shield":
@@ -847,6 +1222,18 @@ class CityEngine:
             blocked.blocked = False
         elif kind == "antitrust":
             state.antitrust_active = True
+            # Halves income for every player holding 4+ objects in one district at settlement, the
+            # player who played it included. Nothing else would announce that.
+            state.append_event(
+                "antitrust_activated",
+                player.id,
+                round_number=state.round_number,
+                affected_player_ids=[
+                    other.id
+                    for other in state.players
+                    if any(self.district_count(other, district) >= 4 for district in DISTRICT_IDS)
+                ],
+            )
         else:
             raise InvalidCommandError(f"unsupported non-targeted card kind: {kind}")
 
@@ -896,16 +1283,18 @@ class CityEngine:
         elif kind == "blackmail":
             target.influence = max(0, target.influence - card.value)
         elif kind == "freeze":
-            max(target.assets, key=lambda asset: self.owned_definition(asset).income).blocked = True
+            frozen = max(target.assets, key=lambda asset: self.owned_definition(asset).income)
+            frozen.blocked = True
+            self._log_asset_state_change(state, target, frozen, change="blocked", source=card.id)
         elif kind == "expose":
             self.add_scandal(target, 1)
         elif kind == "remove_upgrade":
-            upgraded = max(
-                (asset for asset in target.assets if asset.automated or asset.scaled),
-                key=self.asset_value,
-            )
-            upgraded.automated = False
-            upgraded.scaled = False
+            # The token is not destroyed — a single card must not switch off the whole engine for
+            # good. It stops working until the round is settled, like a blocked object.
+            target.automation_disabled = True
+            automated = self.automated_asset(target)
+            if automated is not None:
+                self._log_asset_state_change(state, target, automated, change="automation_disabled", source=card.id)
         elif kind == "mixed_fine":
             target.money = max(0, target.money - 2)
             target.influence = max(0, target.influence - 1)
@@ -962,9 +1351,14 @@ class CityEngine:
                 if player.influence < 3:
                     raise IllegalActionError("publication requires 3 influence")
                 player.influence -= 3
-                self.add_scandal(target, 1)
             else:
+                # The self-scandal is your own choice, so a roof never cancels it.
                 self.add_scandal(player, 1)
+            # Every other targeted effect checks the roof; these two used to punch straight through.
+            if target.roofs > 0:
+                target.roofs -= 1
+                state.append_event("targeted_effect_blocked", target.id, power=power, by="roof")
+            else:
                 self.add_scandal(target, 1)
         elif power == "mafia_racket":
             self._mafia_racket(state, command)
@@ -998,6 +1392,10 @@ class CityEngine:
             power=power,
             target_id=command.payload.get("target_id"),
             district=command.payload.get("district"),
+            # Deltas only cover money/influence/scandals/roofs, so an extra action was invisible:
+            # two agents in two matches independently concluded the capitalist power did nothing.
+            investment_actions=state.investment_actions,
+            actions_left=state.actions_left,
             deltas=self._resource_deltas(state, before),
         )
 
@@ -1056,6 +1454,50 @@ class CityEngine:
             raise InvalidCommandError("mafia cleanup method must be roof or money")
         player.scandals = max(0, player.scandals - 2)
 
+    def _log_asset_state_change(
+        self,
+        state: GameState,
+        owner: PlayerState,
+        asset: OwnedAsset,
+        *,
+        change: str,
+        source: str,
+        **extra: Any,
+    ) -> None:
+        """Blocking an object or stripping its upgrade moves no resource, so log it explicitly."""
+        state.append_event(
+            "asset_state_changed",
+            owner.id,
+            asset_id=asset.card_id,
+            asset_uid=asset.uid,
+            change=change,
+            source=source,
+            **extra,
+        )
+
+    def _log_asset_taken(
+        self,
+        state: GameState,
+        actor: PlayerState,
+        victim: PlayerState,
+        asset: OwnedAsset,
+        *,
+        reason: str,
+        resolution: str,
+    ) -> None:
+        """Record an object changing hands: ``deltas`` cannot show it, so nothing else would."""
+        state.append_event(
+            "asset_confiscated",
+            actor.id,
+            asset_id=asset.card_id,
+            asset_uid=asset.uid,
+            victim_id=victim.id,
+            value=self.asset_value(asset),
+            refund=self.asset_refund(asset),
+            reason=reason,
+            resolution=resolution,
+        )
+
     def _military_sanction(self, state: GameState, command: Command) -> None:
         player = state.current_player
         self._require_role(player, "military")
@@ -1065,27 +1507,41 @@ class CityEngine:
             raise IllegalActionError("sanction requires a target with at least two scandals")
         self._spend_action(state)
         confiscated: OwnedAsset | None = None
+        landed = False
         if target.roofs > 0:
             target.roofs -= 1
+            state.append_event("targeted_effect_blocked", target.id, power="military_sanction", by="roof")
         elif target.scandals <= 3:
             seized = min(target.money, 3 + state.round_number)
             target.money -= seized
             player.money += seized
+            landed = True
         elif len(target.assets) > 1:
             confiscated = max(target.assets, key=self.asset_value)
-            target.assets.remove(confiscated)
-        target.scandals = max(0, target.scandals - 1)
+            self._drop_asset(target, confiscated)
+            landed = True
+        # "Case closed" only when the sanction actually landed. A roof absorbs the whole effect, so
+        # it must not also clean the target's record — that used to make attacking a rival helpful,
+        # and made sitting on 4 scandals safer than sitting on 2.
+        if landed:
+            target.scandals = max(0, target.scandals - 1)
         if confiscated is not None:
+            resolution = "seized"
             if len(player.assets) < player.capacity:
                 player.assets.append(confiscated)
             else:
                 weakest = min(player.assets, key=self.asset_value)
                 if self.asset_value(confiscated) > self.asset_value(weakest):
-                    player.assets.remove(weakest)
-                    player.money += self.asset_value(weakest)
+                    self._drop_asset(player, weakest)
+                    player.money += self.asset_refund(weakest)
                     player.assets.append(confiscated)
+                    resolution = "swapped"
                 else:
-                    player.money += self.asset_value(confiscated)
+                    player.money += self.asset_refund(confiscated)
+                    resolution = "cashed"
+            # Asset transfers move no resource the deltas cover, so without this event an object
+            # vanished from a portfolio with nothing in the chronicle to explain it.
+            self._log_asset_taken(state, player, target, confiscated, reason="military_sanction", resolution=resolution)
 
     def _fraudster_crypto_scam(self, state: GameState, command: Command) -> None:
         player = state.current_player
@@ -1207,7 +1663,9 @@ class CityEngine:
                 target.roofs -= 1
                 state.append_event("targeted_effect_blocked", target.id, asset_id=asset_id, by="roof")
             else:
-                max(target.assets, key=lambda asset: self.owned_definition(asset).income).blocked = True
+                hacked = max(target.assets, key=lambda asset: self.owned_definition(asset).income)
+                hacked.blocked = True
+                self._log_asset_state_change(state, target, hacked, change="blocked", source=asset_id)
 
     def _resolve_grey_failure(
         self,
@@ -1228,20 +1686,34 @@ class CityEngine:
         elif asset_id == "crypto":
             player.money = max(0, player.money - 5)
             for asset in player.assets:
-                if asset.card_id == "crypto":
-                    asset.automated = False
-                    asset.scaled = False
+                if asset.card_id == "crypto" and self.is_automated(player, asset):
+                    player.automation_disabled = True
+                    self._log_asset_state_change(
+                        state, player, asset, change="automation_disabled", source="crypto_failure"
+                    )
         elif asset_id == "datacenter":
             for asset in player.assets:
                 if asset.card_id == "datacenter":
+                    automated = self.is_automated(player, asset)
                     asset.blocked = True
-                    asset.automated = False
-                    asset.scaled = False
+                    if automated:
+                        player.automation_disabled = True
+                    change = "blocked_and_automation_disabled" if automated else "blocked"
+                    self._log_asset_state_change(state, player, asset, change=change, source="datacenter_failure")
         failure_scandals = 1 if self.has_role(player, "fraudster") else 3 if asset_id in {"crypto", "datacenter"} else 2
         self.add_scandal(
             player,
             max(0, failure_scandals - self.effect_total(player, "greyScandalReduction")),
         )
+
+    def scandal_limit(self, player: PlayerState) -> int:
+        """At how many scandals the role is lost. Jail follows one step later.
+
+        The journalist earns influence for their own scandals, so the ordinary limit of five put
+        their best line permanently one point from collapse — and only a rare pair of perks made
+        it survivable at all.
+        """
+        return JOURNALIST_SCANDAL_LIMIT if self.has_role(player, "journalist") else 5
 
     def add_scandal(self, player: PlayerState, amount: int) -> None:
         if amount <= 0:
@@ -1250,17 +1722,18 @@ class CityEngine:
         if player.scandal_shields > 0:
             player.scandal_shields -= 1
             return
+        limit = self.scandal_limit(player)
         next_value = player.scandals + amount
         player.scandal_gained_this_round += amount
-        if next_value >= 6:
+        if next_value >= limit + 1:
             player.scandals = 3
             player.role = None
             player.copied_role = None
             player.pending_role = None
             player.roofs = max(0, player.roofs - 1)
             player.jail_turns = 1
-        elif next_value >= 5:
-            player.scandals = 5
+        elif next_value >= limit:
+            player.scandals = limit
             player.role = None
             player.copied_role = None
             player.pending_role = None
@@ -1298,7 +1771,7 @@ class CityEngine:
 
         if state.turns_taken_in_round < len(state.players) - 1:
             state.turns_taken_in_round += 1
-            state.current_player_index = (state.current_player_index + 1) % len(state.players)
+            state.current_player_index = self._seat_of(state, state.turn_order[state.turns_taken_in_round])
             state.turn_serial += 1
             self._rotate_expired_market(state)
             self._prepare_current_player(state)
@@ -1319,13 +1792,38 @@ class CityEngine:
 
         state.round_number += 1
         state.turns_taken_in_round = 0
-        state.current_player_index = state.starting_player_index
+        self._set_turn_order(state)
         state.turn_serial += 1
         state.antitrust_active = False
         self._rotate_expired_market(state)
-        self._rotate_action_market(state)
+        self._shuffle_action_deck(state)
+        self._rotate_project_board(state)
         self._prepare_current_player(state)
         state.append_event("round_started", round_number=state.round_number, player_id=state.current_player.id)
+
+    @staticmethod
+    def _seat_of(state: GameState, player_id: str) -> int:
+        return next(index for index, player in enumerate(state.players) if player.id == player_id)
+
+    def _set_turn_order(self, state: GameState) -> None:
+        """The trailing player opens the round and gets first pick of the market.
+
+        Catch-up through access instead of cash: it costs the leader tempo without slowing the
+        player who is behind, and it replaces a starting seat that used to be drawn once and then
+        played first for all fifteen rounds.
+        """
+        # Ties break in favour of whoever played later last round, so equal scores rotate the
+        # advantage instead of freezing it on the lowest seat — early rounds are all ties, and a
+        # fixed seat order there looked like the standings rule was not working at all.
+        previous = state.turn_order or [player.id for player in state.players]
+        order = sorted(
+            state.players,
+            key=lambda player: (self.score(player), -previous.index(player.id) if player.id in previous else 0),
+        )
+        state.turn_order = [player.id for player in order]
+        state.starting_player_index = self._seat_of(state, state.turn_order[0])
+        state.current_player_index = state.starting_player_index
+        state.append_event("turn_order_set", round_number=state.round_number, order=list(state.turn_order))
 
     def _prepare_current_player(self, state: GameState) -> None:
         player = state.current_player
@@ -1366,7 +1864,7 @@ class CityEngine:
         remaining: list[str] = []
         for card_id in state.market_deck:
             asset = self.asset(card_id)
-            if len(drawn) < needed and state.round_number >= RARITY_MIN_ROUND[asset.rarity]:
+            if len(drawn) < needed and state.round_number >= self.catalog.rarity_min_round[asset.rarity]:
                 drawn.append(card_id)
             else:
                 remaining.append(card_id)
@@ -1380,18 +1878,19 @@ class CityEngine:
             for card_id in drawn
         )
 
-    def _rotate_action_market(self, state: GameState) -> None:
-        available = [*state.action_deck, *state.action_market]
-        GameRNG(state.rng).shuffle(available)
-        state.action_market = available[:3]
-        state.action_deck = available[3:]
-        state.append_event("action_market_rotated", card_ids=list(state.action_market))
+    def _shuffle_action_deck(self, state: GameState) -> None:
+        """Cards are a blind draw, so the only thing to maintain is a shuffled deck."""
+        GameRNG(state.rng).shuffle(state.action_deck)
 
     def _settle_round(self, state: GameState) -> None:
-        incomes = {player.id: self._round_income(state, player) for player in state.players}
+        # `operations` is the gross figure and `antitrust` the separate penalty, so the breakdown
+        # still sums to the wallet change while naming the cause of a sudden collapse.
+        antitrust_losses: dict[str, int] = {}
+        incomes = {player.id: self._round_income(state, player, antitrust_losses) for player in state.players}
         income_sources = {
             player.id: {
-                "operations": incomes[player.id],
+                "operations": incomes[player.id] + antitrust_losses.get(player.id, 0),
+                "antitrust": -antitrust_losses.get(player.id, 0),
                 "mafia_tribute": 0,
                 "journalist": 0,
                 "debt": -player.debt,
@@ -1423,6 +1922,7 @@ class CityEngine:
             incomes[mafia.id] += tribute
             income_sources[mafia.id]["mafia_tribute"] += tribute
 
+        influence_sources: dict[str, dict[str, int]] = {}
         for player in state.players:
             journalist = player.role == "journalist"
             news_limit = 3 if any(asset.card_id == "data" for asset in player.assets) else 2
@@ -1441,11 +1941,16 @@ class CityEngine:
             )
             income_sources[player.id]["journalist"] = journalist_cash
             player.money = max(0, player.money + incomes[player.id] + journalist_cash - player.debt)
-            player.influence += self.passive_influence(player) + news + rating
+            passive = self.passive_influence(player)
+            # Influence was settled silently: players had to diff their own state to see where
+            # a politician's passive or a journalist's rating came from.
+            influence_sources[player.id] = {"passive": passive, "news": news, "rating": rating}
+            player.influence += passive + news + rating
             player.debt = 0
             player.zoning_district = None
             player.scandal_gained_this_round = 0
             player.copied_role = None
+            player.automation_disabled = False
             for asset in player.assets:
                 asset.blocked = False
         state.append_event(
@@ -1453,29 +1958,53 @@ class CityEngine:
             round_number=state.round_number,
             incomes=incomes,
             income_sources=income_sources,
+            influence_sources=influence_sources,
         )
 
-    def _round_income(self, state: GameState, player: PlayerState) -> int:
-        maintenance = max(0, len(player.assets) - self.effect_total(player, "maintenanceReduction"))
-        income = -maintenance
+    def _round_income(
+        self,
+        state: GameState,
+        player: PlayerState,
+        antitrust_losses: dict[str, int] | None = None,
+    ) -> int:
+        # The automated object pays no maintenance, so the token is worth a little even on a card
+        # with no printed effects to double.
+        exempt = 1 if self.automated_asset(player) is not None and not player.automation_disabled else 0
+        maintenance = MAINTENANCE_PER_ASSET * max(
+            0, len(player.assets) - exempt - self.effect_total(player, "maintenanceReduction")
+        )
+        income = self.effect_total(player, "passiveMoney") - maintenance
         event = self.catalog.events[state.event_id]
         for owned in player.assets:
             if owned.blocked:
                 continue
             asset = self.owned_definition(owned)
             event_multiplier = event.income_multiplier if event.district == asset.district else 1
-            base = floor(
-                (asset.income + (2 if owned.scaled else 0))
-                * (1 + player.district_levels[asset.district] * 0.25)
-                * (event_multiplier or 1)
-            )
+            base = asset.income
+            # +25% per development level, each level rounded up on its own. A single floor over the
+            # whole product paid nothing for the first level on every 1-3$ object, and the early
+            # market is made of exactly those, so the step was dead by definition.
+            for _ in range(player.district_levels[asset.district]):
+                base = ceil(base * 1.25)
+            base = floor(base * (event_multiplier or 1))
             object_income = base + self.object_synergy_income(state, player, owned) + event.global_income
             if state.antitrust_active and self.district_count(player, asset.district) >= 4:
-                object_income = floor(object_income / 2)
+                halved = floor(object_income / 2)
+                if antitrust_losses is not None:
+                    antitrust_losses[player.id] = antitrust_losses.get(player.id, 0) + (object_income - halved)
+                object_income = halved
             income += object_income
         return income
 
     def object_synergy_income(self, state: GameState, player: PlayerState, owned: OwnedAsset) -> int:
+        """The automation token doubles everything the object earns.
+
+        Doubling only the printed effects made the token too weak to buy: in the arena game three
+        players owned one and not one of them ever moved it, because the payoff never justified
+        the 6$ and the action. It multiplies the whole bonus again — but now it is a single object
+        out of six rather than every object, so it no longer drives the mono-district meta the way
+        per-object automation did.
+        """
         asset = self.owned_definition(owned)
         count = self.district_count(player, asset.district)
         district_bonus = 2 if count >= 4 else 1 if count >= 2 else 0
@@ -1490,7 +2019,7 @@ class CityEngine:
             any(self.has_role(player, role) and district == asset.district for role, district in supported.items())
         )
         special = self._special_income(state, player, owned)
-        return (district_bonus + role_bonus + special) * (2 if owned.automated else 1)
+        return (district_bonus + role_bonus + special) * (2 if self.is_automated(player, owned) else 1)
 
     def _special_income(self, state: GameState, player: PlayerState, owned: OwnedAsset) -> int:
         asset = self.owned_definition(owned)
@@ -1531,15 +2060,11 @@ class CityEngine:
         )
 
     def passive_influence(self, player: PlayerState) -> int:
-        def multiplier(asset: OwnedAsset) -> int:
-            return 2 if asset.automated else 1
-
         active = [asset for asset in player.assets if not asset.blocked]
         administrative = 0
         if self.has_role(player, "politician"):
-            administrative = sum(
-                multiplier(asset) for asset in active if self.owned_definition(asset).district == "government"
-            )
+            # Role synergy, so the automation token does not double it — same rule as income.
+            administrative = sum(1 for asset in active if self.owned_definition(asset).district == "government")
             administrative += 1 + floor(
                 sum(self.owned_definition(asset).district == "residential" for asset in active) / 2
             )
@@ -1551,22 +2076,43 @@ class CityEngine:
             active_role = not bonus.get("role") or self.has_role(player, bonus["role"])
             active_district = not bonus.get("district") or self.has_district_link(player, bonus["district"])
             if active_role and active_district:
-                object_effects += int(bonus["value"]) * multiplier(owned)
-        return administrative + object_effects
+                # The object's own printed bonus, so automation does double it.
+                object_effects += int(bonus["value"]) * (2 if self.is_automated(player, owned) else 1)
+        return administrative + object_effects + self.effect_total(player, "passiveInfluence")
 
     def score(self, player: PlayerState) -> int:
-        asset_score = sum(
-            floor(self.owned_definition(asset).cost / 2) + (2 if asset.automated else 0) + (2 if asset.scaled else 0)
-            for asset in player.assets
-        )
+        """Points come from what you built, not from what you hoarded.
+
+        Money and influence used to convert 1:1, which made ``work`` (+2$ for one action) a
+        competitive scoring move — 60% of every bot game was spent pressing it, and 90% of the
+        final score was the untouched wallet. Both are fuel now: they convert at a deliberately
+        poor rate, so a round's income is only worth what it buys.
+        """
+        asset_score = sum(self.asset_value(asset) for asset in player.assets)
         return (
-            player.money
-            + player.influence
+            player.money // MONEY_PER_POINT
+            + player.influence // INFLUENCE_PER_POINT
             + asset_score
-            + player.projects * 6
+            + self.project_points(player)
             + (3 if player.role else 0)
             - player.scandals
         )
+
+    def score_breakdown(self, player: PlayerState) -> dict[str, int]:
+        """Same numbers as ``score``, itemised — the client must never re-derive the formula."""
+        asset_score = sum(self.asset_value(asset) for asset in player.assets)
+        return {
+            "money": player.money // MONEY_PER_POINT,
+            "influence": player.influence // INFLUENCE_PER_POINT,
+            "assets": asset_score,
+            "projects": self.project_points(player),
+            "role": 3 if player.role else 0,
+            "scandals": -player.scandals,
+            "total": self.score(player),
+        }
+
+    def project_points(self, player: PlayerState) -> int:
+        return sum(self.project(project_id).points for project_id in player.projects)
 
     def ranking(self, state: GameState) -> list[PlayerState]:
         return sorted(state.players, key=self.score, reverse=True)

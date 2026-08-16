@@ -10,9 +10,13 @@ import {
   difficultyLabels,
   districtCount,
   greyOperationLabels,
+  influencePerPoint,
   marketPrice,
-  numberValue,
+  marketRerollCost,
+  moneyPerPoint,
   powerLabels,
+  projectPerkText,
+  projectRequirementText,
   rarityLabels,
   roofCost,
   scoreOf,
@@ -27,6 +31,7 @@ import type {
   LegalAction,
   OwnedAsset,
   PlayerState,
+  ProjectMeta,
   RoomView,
 } from "./types";
 
@@ -52,7 +57,7 @@ const rolePowers: Record<string, string[]> = {
 };
 
 const powerDescriptions: Record<string, string> = {
-  capitalist_financing: "Один раз за ход: потратить 3◆ и получить 1 инвестиционное действие для покупки объекта, слота или улучшения.",
+  capitalist_financing: "Один раз за ход: потратить 3◆ и получить 1 инвестиционное действие для покупки объекта, слота, замены объекта или жетона автоматизации.",
   politician_tax: "Один раз за ход: потратить 4◆ и получить по 1$ за каждый объект всех игроков в выбранном районе.",
   politician_cleanup: "Один раз за ход: потратить 2◆ и снять 1 свой скандал.",
   journalist_inflate: "Один раз за ход: вы и выбранный соперник получаете по 1 скандалу. Внимание: на 5 скандалах теряется роль, на 6 — тюрьма (пропуск хода).",
@@ -83,13 +88,13 @@ const greyOperationInfo: Record<string, { asset: string; effect: (round: number)
     asset: "Городская криптобиржа",
     effect: round => `получить ${6 + round}$ и лишить лидера до ${2 + Math.floor(round / 2)}$`,
     chance: 60,
-    failure: "Свой доход вы получаете всегда, но Крыша лидера тратится и отменяет списание с него. При успехе: +2 скандала. При провале: −5$ и сброс улучшений криптобиржи. Скандалы при провале: Аферист +1, остальные +3. На 5 скандалах теряется роль, на 6 — тюрьма.",
+    failure: "Свой доход вы получаете всегда, но Крыша лидера тратится и отменяет списание с него. При успехе: +2 скандала. При провале: −5$, а жетон автоматизации на криптобирже выключается до выплаты раунда. Скандалы при провале: Аферист +1, остальные +3. На 5 скандалах теряется роль, на 6 — тюрьма.",
   },
   datacenter: {
     asset: "Нелегальный дата-центр",
     effect: () => "заблокировать самый доходный объект выбранного соперника на раунд",
     chance: 55,
-    failure: "Крыша цели тратится и полностью отменяет блокировку. При успехе: +2 скандала. При провале дата-центр блокируется и теряет улучшение. Скандалы при провале: Аферист +1, остальные +3. На 5 скандалах теряется роль, на 6 — тюрьма.",
+    failure: "Крыша цели тратится и полностью отменяет блокировку. При успехе: +2 скандала. При провале дата-центр блокируется, а стоящий на нём жетон автоматизации выключается до выплаты раунда. Скандалы при провале: Аферист +1, остальные +3. На 5 скандалах теряется роль, на 6 — тюрьма.",
   },
 };
 
@@ -102,7 +107,6 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
   const [choice, setChoice] = useState<ChoiceState | null>(null);
   const [showRules, setShowRules] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileGameTab>("city");
-  const [showMobileEvent, setShowMobileEvent] = useState(false);
   const [seenEvents, setSeenEvents] = useState<number | null>(null);
 
   const selectMobileTab = useCallback((tab: MobileGameTab) => {
@@ -114,6 +118,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
   const cards = useMemo(() => new Map(meta.action_cards.map(card => [card.id, card])), [meta.action_cards]);
   const roles = useMemo(() => new Map(meta.roles.map(role => [role.id, role])), [meta.roles]);
   const districts = useMemo(() => new Map(meta.districts.map(district => [district.id, district])), [meta.districts]);
+  const projects = useMemo(() => new Map(meta.projects.map(project => [project.id, project])), [meta.projects]);
 
   const reload = useCallback(async (afterRevision?: number) => {
     try {
@@ -169,9 +174,8 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
   const current = game.players[game.current_player_index];
   const viewed = game.players.find(player => player.id === viewedPlayerId) ?? me;
   const viewingOther = viewed.id !== me.id;
-  const event = meta.events.find(item => item.id === game.event_id);
   const legal = room.legal_actions ?? [];
-  const labelContext = { game, player: me, assets, cards, roles, districts };
+  const labelContext = { game, player: me, assets, cards, roles, districts, projects };
 
   const matching = (type: string, predicate?: (action: LegalAction) => boolean) =>
     legal.filter(action => action.type === type && (!predicate || predicate(action)));
@@ -181,35 +185,33 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
   };
 
   const buyActions = new Map(matching("buy_asset").map(action => [stringValue(action.payload.market_uid), action]));
-  const buyCardActions = new Map(matching("buy_action_card").map(action => [stringValue(action.payload.card_id), action]));
-  const ranking = [...game.players].sort((a, b) => (game.final_scores?.[b.id] ?? scoreOf(b, assets)) - (game.final_scores?.[a.id] ?? scoreOf(a, assets)));
+  const buyCardAction = matching("buy_action_card")[0];
+  const projectActions = new Map(matching("city_project").map(action => [stringValue(action.payload.project_id), action]));
+  const ranking = [...game.players].sort((a, b) => scoreOf(game, b) - scoreOf(game, a));
 
   return <div className="city-game">
     <header className="city-head">
       <div className="city-head-title">
         <h1>Город влияния <small>online release</small> <span className="game-version">v{__GAME_VERSION__}</span></h1>
-        <p>{room.name} · Раунд {game.round_number}/{game.max_rounds} · Ход: <b>{current.name}</b> · Действий: <b>{game.actions_left}</b>{game.investment_actions > 0 && <> · Инвестиционных: <b className="investment-actions">{game.investment_actions}</b></>}<button className="mobile-event-trigger" onClick={() => setShowMobileEvent(value => !value)} aria-expanded={showMobileEvent}> · 📅 {event?.title ?? game.event_id}</button></p>
-        {showMobileEvent && <button className="mobile-event-detail" onClick={() => setShowMobileEvent(false)}><strong>{event?.title ?? game.event_id}</strong><span>{event?.text}</span></button>}
-      </div>
-      <div className="city-event" title="Событие действует всю партию">
-        <strong>📰 {event?.title ?? game.event_id}</strong><span>{event?.text}</span>
+        <p>{room.name} · Раунд {game.round_number}/{game.max_rounds} · Ход: <b>{current.name}</b> · Действий: <b>{game.actions_left}</b>{game.investment_actions > 0 && <> · Инвестиционных: <b className="investment-actions">{game.investment_actions}</b></>}</p>
       </div>
       <div className="city-head-buttons"><button onClick={() => setShowRules(true)}>📖 Правила</button><button onClick={onExit}>← Комнаты</button></div>
     </header>
 
     {error && <p className="game-error">{error}</p>}
-    {game.status === "finished" && <FinishPanel ranking={ranking} scores={game.final_scores} assets={assets} onExit={onExit} />}
+    {game.status === "finished" && <FinishPanel game={game} ranking={ranking} onExit={onExit} />}
 
     <main className="city-layout" data-mobile-tab={mobileTab}>
       <div className="city-main-col">
-        <PlayerStrip game={game} viewedId={viewed.id} playerId={playerId} assets={assets} roles={roles} onView={setViewedPlayerId} />
+        <PlayerStrip game={game} viewedId={viewed.id} playerId={playerId} roles={roles} onView={setViewedPlayerId} />
+        <ProjectBoard game={game} meta={meta} me={me} projects={projects} actions={projectActions} reroll={matching("reroll_projects")[0]} busy={busy} onAction={send} />
         <DistrictMarket
           game={game} meta={meta} me={me} viewed={viewed} viewingOther={viewingOther} assets={assets}
           selectedDistrict={selectedDistrict} onSelectDistrict={setSelectedDistrict}
-          buyActions={buyActions} busy={busy} onAction={send}
+          buyActions={buyActions} reroll={matching("reroll_market")[0]} busy={busy} onAction={send}
         />
-        {!viewingOther && <CardDesk game={game} me={me} cards={cards} legal={legal} buyActions={buyCardActions} busy={busy} onAction={send} onOffer={offer} labelContext={labelContext} />}
-        <BusinessBoard viewed={viewed} me={me} game={game} meta={meta} assets={assets} legal={legal} viewingOther={viewingOther} busy={busy} onAction={send} />
+        {!viewingOther && <CardDesk game={game} me={me} cards={cards} legal={legal} buyCard={buyCardAction} busy={busy} onAction={send} onOffer={offer} labelContext={labelContext} />}
+        <BusinessBoard viewed={viewed} me={me} game={game} meta={meta} assets={assets} legal={legal} viewingOther={viewingOther} busy={busy} onAction={send} onOffer={offer} />
       </div>
 
       <div className="city-side">
@@ -258,33 +260,100 @@ function MobileGameTabs({ active, onChange, actions, events }: {
   </button>)}</nav>;
 }
 
-function PlayerStrip({ game, viewedId, playerId, assets, roles, onView }: {
+function PlayerStrip({ game, viewedId, playerId, roles, onView }: {
   game: GameState;
   viewedId: string;
   playerId: string;
-  assets: Map<string, AssetMeta>;
   roles: Map<string, { title: string; icon: string; color: string }>;
   onView: (id: string) => void;
 }) {
   const current = game.players[game.current_player_index];
-  return <section className="city-players">{game.players.map((player, index) => {
+  const order = game.turn_order ?? [];
+  const seat = new Map(game.players.map((player, index) => [player.id, index]));
+  // Panel order follows the round's turn order — the trailing player opens the round, so the strip
+  // has to re-sort itself when the standings change, or "who is next" is unreadable.
+  const strip = order.length === game.players.length
+    ? order.map(id => game.players.find(player => player.id === id)!).filter(Boolean)
+    : game.players;
+  return <section className="city-players">{strip.map(player => {
     const role = roles.get(player.role ?? "");
     const preferred = roles.get(player.preferred_role ?? "");
-    const color = playerColors[index % playerColors.length];
+    const color = playerColors[(seat.get(player.id) ?? 0) % playerColors.length];
+    const position = order.indexOf(player.id);
+    const done = position >= 0 && position < (game.turns_taken_in_round ?? 0);
     return <button
-      className={`city-player scandal-${Math.min(6, player.scandals)} ${player.id === current.id ? "active" : ""} ${player.id === viewedId ? "viewed" : ""} ${player.id === playerId ? "mine" : ""}`}
-      style={{ "--player": color } as CSSProperties} onClick={() => onView(player.id)} title={`Показать бизнес игрока «${player.name}»`} key={player.id}
+      className={`city-player scandal-${Math.min(6, player.scandals)} ${player.id === current.id ? "active" : ""} ${player.id === viewedId ? "viewed" : ""} ${player.id === playerId ? "mine" : ""} ${done ? "turn-done" : ""}`}
+      style={{ "--player": color } as CSSProperties} onClick={() => onView(player.id)} title={`Показать бизнес игрока «${player.name}». Порядок хода в раунде: ${position + 1}. Раунд начинает последний в рейтинге.`} key={player.id}
     >
-      <b><span className="player-name"><span className="player-avatar" style={{ borderColor: role?.color ?? "#3d4757" }}>{role?.icon ?? "👤"}</span><span style={{ color }}>{player.name}</span>{player.is_bot && <span className={`bot-badge diff-${player.difficulty}`}>{difficultyLabels[player.difficulty] ?? player.difficulty}</span>}</span><em>🎲 {player.turns} · {scoreOf(player, assets)} оч.</em></b>
+      <b><span className="player-name">{position >= 0 && <span className="turn-position" title="Очередь хода в этом раунде">{position + 1}</span>}<span className="player-avatar" style={{ borderColor: role?.color ?? "#3d4757" }}>{role?.icon ?? "👤"}</span><span style={{ color }}>{player.name}</span>{player.is_bot && <span className={`bot-badge diff-${player.difficulty}`}>{difficultyLabels[player.difficulty] ?? player.difficulty}</span>}</span><em>🎲 {player.turns} · {scoreOf(game, player)} оч.</em></b>
       <span>💰 {player.money}　◆ {player.influence}　⚠ {player.scandals}/6　🛡 {player.roofs}</span>
-      <small>{role?.title ?? "без роли"} · объектов {player.assets.length}/{player.capacity}{preferred ? ` · цель ${preferred.icon} ${preferred.title}` : ""}</small>
+      <small>{role?.title ?? "без роли"} · объектов {player.assets.length}/{player.capacity} · проектов {player.projects.length}{preferred ? ` · цель ${preferred.icon} ${preferred.title}` : ""}</small>
       {player.jail_turns > 0 && <small className="scandal-status">ТЮРЬМА: ходов {player.jail_turns}</small>}
       {player.id === viewedId && player.id !== playerId && <small className="viewing-badge">👁 просмотр бизнеса</small>}
     </button>;
   })}</section>;
 }
 
-function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selectedDistrict, onSelectDistrict, buyActions, busy, onAction }: {
+function ProjectBoard({ game, meta, me, projects, actions, reroll, busy, onAction }: {
+  game: GameState;
+  meta: CityMeta;
+  me: PlayerState;
+  projects: Map<string, ProjectMeta>;
+  actions: Map<string, LegalAction>;
+  reroll?: LegalAction;
+  busy: boolean;
+  onAction: (action: LegalAction) => Promise<void>;
+}) {
+  const taken = new Map<string, PlayerState>();
+  for (const player of game.players) for (const projectId of player.projects) taken.set(projectId, player);
+  const mine = me.projects.map(id => projects.get(id)).filter(Boolean) as ProjectMeta[];
+  const minePoints = mine.reduce((sum, project) => sum + project.points, 0);
+  const initiatives = meta.projects.filter(project => project.repeatable);
+  return <section className="city-projects">
+    <h2>🏗️ Городские проекты <small>главный источник очков · в колоде ещё {game.project_deck_count} · один проект уходит под низ колоды каждый раунд</small>
+      <button className="market-reroll" disabled={busy || !reroll} onClick={() => reroll && void onAction(reroll)} title="Отправить самый давний проект под низ колоды и добрать новый. Действие не расходуется, один раз за ход.">🔄 Обновить доску</button>
+    </h2>
+    <p className="dim card-rule">Проект уникален: кто взял — тот и забрал очки, остальным он больше недоступен. Взятие стоит 1 обычное действие, влияние и деньги; условие проверяется по вашим объектам.</p>
+    <div className="project-grid">{game.project_board.map((projectId, index) => {
+      const project = projects.get(projectId);
+      if (!project) return null;
+      const action = actions.get(projectId);
+      // Exactly one project rotates out per round, always the longest-standing one.
+      const leaving = index === 0;
+      const affordable = me.influence >= project.cost_influence && me.money >= project.cost_money;
+      return <button
+        className={`project-card ${action ? "available" : "locked"}`}
+        disabled={busy || !action}
+        onClick={() => action && void onAction(action)}
+        title={`${project.text} Цена: ${project.cost_influence}◆ и ${project.cost_money}$ плюс 1 обычное действие. Условие: ${projectRequirementText(project, meta)}. Награда: ${project.points} очков и постоянный бонус — ${projectPerkText(project)}.`}
+        key={projectId}
+      >
+        <strong>{project.title}<em>{project.points} очков</em></strong>
+        <span className="project-cost">{project.cost_influence}◆ + {project.cost_money}${leaving && <i className="project-leaving"> ⏳ уходит в конце раунда</i>}</span>
+        <small className={action ? "project-condition met" : "project-condition"}>
+          {action ? "✅ " : affordable ? "🔒 " : "💸 "}{projectRequirementText(project, meta)}
+        </small>
+        <small className="project-perk">🎁 {projectPerkText(project)}</small>
+      </button>;
+    })}{game.project_board.length === 0 && <p className="empty-district">Проекты в городе закончились.</p>}</div>
+    {initiatives.length > 0 && <>
+      {/* The floor: always available, any number of times, priced worse than a real project — so
+          the last rounds always have somewhere to put money and influence. */}
+      <h3 className="group-title">Всегда доступны <span className="group-hint">берутся сколько угодно раз</span></h3>
+      <div className="project-grid">{initiatives.map(project => {
+        const action = actions.get(project.id);
+        return <button className={`project-card repeatable ${action ? "available" : "locked"}`} disabled={busy || !action} onClick={() => action && void onAction(action)} title={`${project.text} Цена: ${project.cost_influence}◆ и ${project.cost_money}$ плюс 1 обычное действие.`} key={project.id}>
+          <strong>{project.title}<em>{project.points} очков</em></strong>
+          <span className="project-cost">{project.cost_influence}◆ + {project.cost_money}$</span>
+          <small className="project-condition met">♾ без условия, сколько угодно раз</small>
+        </button>;
+      })}</div>
+    </>}
+    <p className="project-mine">Ваши проекты: {mine.length ? `${mine.map(project => project.title).join(", ")} — ${minePoints} очков` : "пока ни одного"}</p>
+  </section>;
+}
+
+function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selectedDistrict, onSelectDistrict, buyActions, reroll, busy, onAction }: {
   game: GameState;
   meta: CityMeta;
   me: PlayerState;
@@ -294,11 +363,14 @@ function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selected
   selectedDistrict: string;
   onSelectDistrict: (id: string) => void;
   buyActions: Map<string, LegalAction>;
+  reroll?: LegalAction;
   busy: boolean;
   onAction: (action: LegalAction) => Promise<void>;
 }) {
   return <section className="city-map">
-    <h2>Районы и рынок <small className="market-remaining">уникальных объектов в колоде: {game.market_deck_count}</small></h2>
+    <h2>Районы и рынок <small className="market-remaining">уникальных объектов в колоде: {game.market_deck_count}</small>
+      <button className="market-reroll" disabled={busy || !reroll} onClick={() => reroll && void onAction(reroll)} title={`Обновить сразу все шесть позиций рынка за ${marketRerollCost(meta)}$. Действие не расходуется, один реролл за ход.`}>🔄 Обновить рынок · {marketRerollCost(meta)}$</button>
+    </h2>
     <div className="district-grid">{meta.districts.map(district => {
       const count = districtCount(viewed, district.id, assets);
       const level = viewed.district_levels[district.id] ?? 0;
@@ -311,11 +383,12 @@ function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selected
           if (!asset) return null;
           const buy = buyActions.get(item.uid);
           const remaining = Math.max(0, item.expires_at_turn - (game.turn_serial ?? 0));
-          const price = marketPrice(game, me, asset, meta);
+          const price = marketPrice(asset, item);
           const effectLines = assetEffectLines(asset, me, game, meta, assets, { includeSynergy: true });
-          return <button className={`market-card rarity-${asset.rarity}`} disabled={busy || viewingOther || !buy} onClick={event => { event.stopPropagation(); if (buy) void onAction(buy); }} title={`Купить за ${price}$. Занимает свободный слот и расходует обычное либо инвестиционное действие. ${asset.text}`} key={item.uid}>
+          return <button className={`market-card rarity-${asset.rarity}`} disabled={busy || viewingOther || !buy} onClick={event => { event.stopPropagation(); if (buy) void onAction(buy); }} title={`Купить за ${price}$. Занимает свободный слот и расходует обычное либо инвестиционное действие.${asset.influence > 0 ? ` Даёт ${asset.influence}◆ разово в момент покупки.` : ""} ${asset.text}`} key={item.uid}>
             <span className="rarity-badge">{rarityLabels[asset.rarity] ?? asset.rarity}</span><b>{asset.title}</b>
-            <span className="asset-stats">{price}$ · доход <b className={asset.income > 0 ? "stat-income on" : "stat-income"}>{asset.income}$</b> · <b className={asset.influence > 0 ? "stat-inf on" : "stat-inf"}>◆{asset.influence}</b></span>
+            {asset.tags.length > 0 && <span className="asset-tags">{asset.tags.map(tag => <i key={tag}>{tag}</i>)}</span>}
+            <span className="asset-stats">{price}$ · доход <b className={asset.income > 0 ? "stat-income on" : "stat-income"}>{asset.income}$</b>/раунд{asset.influence > 0 && <> · <b className="stat-inf on">+{asset.influence}◆</b> разово</>}</span>
             {effectLines.length > 0
               ? <ul className="asset-effects">{effectLines.map((line, index) => <li key={index} className={line.active ? "effect-active" : "effect-idle"}>{line.text}{line.boosted && <span className="effect-boost">⚙×2</span>}</li>)}</ul>
               : asset.text && <small className="asset-summary">{asset.text}</small>}
@@ -327,12 +400,12 @@ function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selected
   </section>;
 }
 
-function CardDesk({ game, me, cards, legal, buyActions, busy, onAction, onOffer, labelContext }: {
+function CardDesk({ game, me, cards, legal, buyCard, busy, onAction, onOffer, labelContext }: {
   game: GameState;
   me: PlayerState;
   cards: Map<string, ActionMeta>;
   legal: LegalAction[];
-  buyActions: Map<string, LegalAction>;
+  buyCard?: LegalAction;
   busy: boolean;
   onAction: (action: LegalAction) => Promise<void>;
   onOffer: (title: string, actions: LegalAction[]) => void;
@@ -341,9 +414,11 @@ function CardDesk({ game, me, cards, legal, buyActions, busy, onAction, onOffer,
   const playFor = (uid: string) => legal.filter(action => action.type === "play_action_card" && action.payload.card_uid === uid);
   const convertFor = (uid: string, into: string) => legal.find(action => action.type === "convert_action_card" && action.payload.card_uid === uid && action.payload.into === into);
   return <section className="city-cards action-group g-cards">
-    <h3 className="group-title">🃏 Карты <span className="group-hint">3$ + 1◆ + действие · резерв {game.action_deck_count}</span></h3>
-    <p className="dim card-rule"><span className="card-rule-market">Рынок обновляется каждый раунд. </span>Розыгрыш бесплатный. Рука {me.hand?.length ?? 0}/3.</p>
-    <div className="action-market">{game.action_market.map(cardId => { const card = cards.get(cardId); const buy = buyActions.get(cardId); return <button className={`action-card market-action tone-${card?.tone}`} disabled={busy || !buy} onClick={() => buy && void onAction(buy)} title={`Покупка стоит 3$ + 1◆ и расходует 1 действие. ${card?.text ?? ""}`} key={cardId}><strong>{card?.title}<em>купить</em></strong><small>{card?.text}</small></button>; })}</div>
+    <h3 className="group-title">🃏 Карты <span className="group-hint">3$ + 1◆ и 1 действие · в колоде {game.action_deck_count}</span></h3>
+    {/* A face-up market bought without an action made the influence card strictly better than
+        the campaign action. The draw is blind and costs an action; the discard cushions it. */}
+    <p className="dim card-rule">За одно действие вы тянете <b>две</b> случайные карты. Розыгрыш бесплатный, одна карта за ход. Рука {me.hand?.length ?? 0}/3.</p>
+    <div className="action-market"><button className="action-card market-action tone-deal" disabled={busy || !buyCard} onClick={() => buyCard && void onAction(buyCard)} title="Потратить 1 обычное действие, 3$ и 1◆ и вытянуть две случайные карты из колоды (в руке максимум 3)."><strong>Вытянуть 2 карты<em>3$ + 1◆ + действие</em></strong><small>Случайные из колоды ({game.action_deck_count} осталось)</small></button></div>
     <div className="hand-grid">{me.hand?.map(held => {
       const card = cards.get(held.card_id);
       const variants = playFor(held.uid);
@@ -351,14 +426,14 @@ function CardDesk({ game, me, cards, legal, buyActions, busy, onAction, onOffer,
       const influence = convertFor(held.uid, "influence");
       return <article className={`hand-card tone-${card?.tone}`} key={held.uid}>
         <button className="action-card" disabled={busy || variants.length === 0} onClick={() => onOffer(`«${card?.title}» — выберите вариант`, variants)} title={`Разыграть бесплатно; разрешена одна карта за ход. ${card?.text ?? ""}`}><strong>{card?.title}<em>{variants.length > 1 ? "выбрать" : "сыграть"}</em></strong><small>{card?.text}</small></button>
-        <div><button disabled={busy || !money} onClick={() => money && void onAction(money)} title="Удалить карту из руки и сразу получить 1$; действие не расходуется.">Продать +1$</button><button disabled={busy || !influence} onClick={() => influence && void onAction(influence)} title="Удалить карту из руки и сразу получить 1◆; действие не расходуется.">Сбросить +1◆</button></div>
+        <div><button disabled={busy || !money} onClick={() => money && void onAction(money)} title="Удалить карту из руки и сразу получить 2$; действие не расходуется.">Продать +2$</button><button disabled={busy || !influence} onClick={() => influence && void onAction(influence)} title="Удалить карту из руки и сразу получить 2◆; действие не расходуется.">Сбросить +2◆</button></div>
         {variants.length > 1 && <small className="variant-preview">{variants.slice(0, 2).map(action => actionLabel(action, labelContext)).join(" · ")}</small>}
       </article>;
     })}{!me.hand?.length && <p className="empty-hand">В руке нет карт</p>}</div>
   </section>;
 }
 
-function BusinessBoard({ viewed, me, game, meta, assets, legal, viewingOther, busy, onAction }: {
+function BusinessBoard({ viewed, me, game, meta, assets, legal, viewingOther, busy, onAction, onOffer }: {
   viewed: PlayerState;
   me: PlayerState;
   game: GameState;
@@ -368,23 +443,33 @@ function BusinessBoard({ viewed, me, game, meta, assets, legal, viewingOther, bu
   viewingOther: boolean;
   busy: boolean;
   onAction: (action: LegalAction) => Promise<void>;
+  onOffer: (title: string, actions: LegalAction[]) => void;
 }) {
-  const actionFor = (type: string, uid: string, kind?: string) => legal.find(action => action.type === type && action.payload.asset_uid === uid && (!kind || action.payload.kind === kind));
-  const upgradeDiscount = numberValue(game.turn_flags.upgrade_discount);
+  const actionFor = (type: string, uid: string) => legal.find(action => action.type === type && action.payload.asset_uid === uid);
+  const replacementsFor = (uid: string) => legal.filter(action => action.type === "replace_asset" && action.payload.asset_uid === uid);
+  const currentIncome = viewed.automation_uid ? game.automation_preview?.[viewed.automation_uid] : undefined;
   return <section className="business-board">
     <h2>{viewingOther ? `Бизнес: ${viewed.name}` : "Ваш бизнес"} <small>слоты {viewed.assets.length}/{viewed.capacity}</small></h2>
     <div className="active-bonuses"><strong>Активные бонусы</strong><ul>{activeBonuses(viewed, game, meta, assets).map(item => <li key={item.text} className={item.active ? "bonus-active" : "bonus-inactive"}>{item.text}</li>)}</ul></div>
     <div className="owned-grid">{viewed.assets.map((owned, index) => {
       const assetMeta = assets.get(owned.card_id);
       const districtInfo = meta.districts.find(d => d.id === assetMeta?.district);
-      const effectLines = assetMeta ? assetEffectLines(assetMeta, viewed, game, meta, assets, { automated: owned.automated, includeSynergy: true }) : [];
-      return <OwnedAssetCard key={owned.uid} owned={owned} index={index} owner={viewed} asset={assetMeta} districtInfo={districtInfo} effectLines={effectLines} viewingOther={viewingOther} busy={busy} automateCost={Math.max(1, 5 - upgradeDiscount)} scaleCost={Math.max(1, 4 - upgradeDiscount)} automate={actionFor("improve_asset", owned.uid, "automate")} scale={actionFor("improve_asset", owned.uid, "scale")} sell={actionFor("sell_asset", owned.uid)} onAction={onAction} />;
+      const automated = viewed.automation_uid === owned.uid;
+      const effectLines = assetMeta ? assetEffectLines(assetMeta, viewed, game, meta, assets, { automated: automated && !viewed.automation_disabled, includeSynergy: true }) : [];
+      return <OwnedAssetCard
+        key={owned.uid} owned={owned} index={index} owner={viewed} asset={assetMeta} districtInfo={districtInfo}
+        effectLines={effectLines} viewingOther={viewingOther} busy={busy} automated={automated}
+        incomeHere={game.automation_preview?.[owned.uid]} incomeNow={currentIncome}
+        automate={actionFor("buy_automation", owned.uid) ?? actionFor("move_automation", owned.uid)}
+        replacements={replacementsFor(owned.uid)} sell={actionFor("sell_asset", owned.uid)}
+        onAction={onAction} onOffer={onOffer}
+      />;
     })}{!viewed.assets.length && <p className="empty-business">У игрока пока нет объектов.</p>}</div>
-    {!viewingOther && me.assets.length >= me.capacity && <p className="capacity-warning">Все слоты заняты: расширьте бизнес или продайте объект.</p>}
+    {!viewingOther && me.assets.length >= me.capacity && <p className="capacity-warning">Все слоты заняты: расширьте бизнес или замените объект на более сильный.</p>}
   </section>;
 }
 
-function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines, viewingOther, busy, automateCost, scaleCost, automate, scale, sell, onAction }: {
+function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines, viewingOther, busy, automated, incomeHere, incomeNow, automate, replacements, sell, onAction, onOffer }: {
   owned: OwnedAsset;
   index: number;
   owner: PlayerState;
@@ -393,30 +478,44 @@ function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines,
   effectLines: { text: string; active: boolean; boosted: boolean }[];
   viewingOther: boolean;
   busy: boolean;
-  automateCost: number;
-  scaleCost: number;
+  automated: boolean;
+  incomeHere?: number;
+  incomeNow?: number;
   automate?: LegalAction;
-  scale?: LegalAction;
+  replacements: LegalAction[];
   sell?: LegalAction;
   onAction: (action: LegalAction) => Promise<void>;
+  onOffer: (title: string, actions: LegalAction[]) => void;
 }) {
   if (!asset) return null;
   const managed = index < owner.capacity;
-  const sellValue = Math.floor(asset.cost / 2) + Number(owned.automated) * 2 + Number(owned.scaled) * 2;
-  return <article className={`owned-asset rarity-${asset.rarity} ${owned.blocked ? "blocked" : ""} ${!managed ? "unmanaged" : ""}`}>
+  const sellValue = Math.floor(asset.cost / 2);
+  // Moving the token is free, so the payoff of every option is printed on the card itself.
+  const delta = incomeHere !== undefined && incomeNow !== undefined ? incomeHere - incomeNow : undefined;
+  const status = owned.blocked ? "🔒 заблокирован"
+    : automated ? (owner.automation_disabled ? "⚙ жетон не работает до выплаты" : "⚙ жетон автоматизации")
+    : "работает";
+  return <article className={`owned-asset rarity-${asset.rarity} ${owned.blocked ? "blocked" : ""} ${!managed ? "unmanaged" : ""} ${automated ? "automated" : ""}`}>
     <header>
       <span className="rarity-badge">{rarityLabels[asset.rarity]}</span>
       {districtInfo && <span className="asset-district" style={{ color: districtInfo.color }}>{districtInfo.icon} {districtInfo.title}</span>}
-      <span>{owned.blocked ? "🔒 заблокирован" : owned.automated ? "⚙ автоматизирован" : owned.scaled ? "🔧 модернизирован" : "работает"}</span>
+      <span>{status}</span>
     </header>
     <h3>{asset.title}</h3>
-    <p className="asset-stats"><b className="stat-income on">{asset.income + (owned.scaled ? 2 : 0)}$</b> доход{owned.scaled ? ` (базовый ${asset.income}$ +2 масштаб)` : ""} · <b className={asset.influence > 0 ? "stat-inf on" : "stat-inf"}>◆{asset.influence}</b></p>
+    {asset.tags.length > 0 && <span className="asset-tags">{asset.tags.map(tag => <i key={tag}>{tag}</i>)}</span>}
+    {/* No ◆ here: the influence on a card is a one-off purchase bonus, already collected. */}
+    <p className="asset-stats"><b className="stat-income on">{asset.income}$</b> доход/раунд</p>
     {effectLines.length > 0
       ? <ul className="asset-effects">{effectLines.map((line, i) => <li key={i} className={line.active ? "effect-active" : "effect-idle"}>{line.text}{line.boosted && <span className="effect-boost">⚙×2</span>}</li>)}</ul>
       : asset.text && <small className="asset-summary">{asset.text}</small>}
     {!viewingOther && <div className="owned-actions">
-      <button disabled={busy || !automate} onClick={() => automate && void onAction(automate)} title="Автоматизация удваивает районную синергию, ролевой и специальный бонус объекта, а также его активный бонус влияния. Базовый доход не удваивается. Объект можно улучшить только один раз."><strong>⚙ Автоматизация · {automateCost}$</strong><small>Удваивает бонусы объекта</small></button>
-      <button disabled={busy || !scale} onClick={() => scale && void onAction(scale)} title="Масштабирование навсегда добавляет +2$ к базовому доходу объекта. Объект можно улучшить только один раз."><strong>🔧 Масштабирование · {scaleCost}$</strong><small>+2$ к базовому доходу</small></button>
+      {!automated && <button disabled={busy || !automate} onClick={() => automate && void onAction(automate)} title="Жетон автоматизации удваивает собственные бонусы объекта (кросс-районные, ролевые, влияние) и снимает с него содержание. Районная и ролевая синергия не удваиваются. Перенос бесплатный, один раз за ход.">
+        <strong>⚙ Жетон сюда{incomeHere !== undefined ? ` · ${incomeHere}$/раунд` : ""}</strong>
+        <small>{delta !== undefined ? `${delta >= 0 ? "+" : "−"}${Math.abs(delta)}$ к доходу` : "автоматизация"}</small>
+      </button>}
+      <button disabled={busy || replacements.length === 0} onClick={() => onOffer(`Заменить «${asset.title}» — выберите объект с рынка`, replacements)} title={`Обменять объект на любой с рынка за одно действие: возврат ${sellValue}$ зачитывается в цену, доплачивается только разница. Жетон автоматизации переезжает на новый объект.`}>
+        <strong>♻ Заменить · возврат {sellValue}$</strong><small>{replacements.length ? `${replacements.length} вариантов на рынке` : "нет доступных"}</small>
+      </button>
       <button className="danger" disabled={busy || !sell} onClick={() => sell && void onAction(sell)} title={`Продать объект за ${sellValue}$. Продажа расходует 1 обычное действие и освобождает слот.`}>Продать · {sellValue}$</button>
     </div>}
   </article>;
@@ -462,12 +561,14 @@ function DecisionPanel({ game, me, meta, roles, districts, legal, selectedDistri
     {busy && <p className="bot-action-note">Сервер выполняет команду и ходы ботов…</p>}
     {!busy && legal.length === 0 && game.status === "playing" && <p className="bot-action-note">Ожидаем ход игрока <b>{current.name}</b>.</p>}
 
+    <ScorePanel game={game} me={me} meta={meta} />
+
     <div className="action-group g-city"><h3 className="group-title">🏙️ Город <span className="group-hint">доход и развитие</span></h3>
-      <StaticAction action={find("basic_action", item => item.payload.kind === "work")} label="💵 Городской заказ: +2$" tooltip="Потратить 1 обычное действие и сразу получить 2$." busy={busy} onAction={onAction} />
-      <StaticAction action={find("basic_action", item => item.payload.kind === "campaign")} label="📣 Кампания: 2$ → 2◆" tooltip="Потратить 1 обычное действие и 2$, чтобы сразу получить 2◆ влияния." busy={busy} onAction={onAction} />
-      <StaticAction action={find("city_project")} label="🏗️ Городской проект: 3◆ → 6 очков" tooltip="Потратить 1 обычное действие и 3◆. Проект навсегда добавляет 6 очков к итоговому результату." busy={busy} onAction={onAction} />
+      <StaticAction action={find("basic_action", item => item.payload.kind === "work")} label="💵 Городской заказ: +2$" tooltip={`Потратить 1 обычное действие и сразу получить 2$. Деньги — топливо: в конце партии ${moneyPerPoint(meta)}$ дают лишь 1 очко, поэтому копить их невыгодно.`} busy={busy} onAction={onAction} />
+      <StaticAction action={find("basic_action", item => item.payload.kind === "campaign")} label="📣 Кампания: 2$ → 2◆" tooltip="Потратить 1 обычное действие и 2$, чтобы сразу получить 2◆ влияния. Влияние нужно для проектов и ролей." busy={busy} onAction={onAction} />
+      <StaticAction action={find("reroll_market")} label={`🔄 Обновить рынок: ${marketRerollCost(meta)}$`} tooltip="Полностью сменить шесть позиций рынка объектов. Действие не расходуется, один раз за ход." busy={busy} onAction={onAction} />
       <StaticAction action={find("buy_capacity")} label={`📦 ${capacityLabel(me)}`} tooltip="Купить постоянный дополнительный слот бизнеса. Можно потратить обычное либо инвестиционное действие; максимум 6 слотов." busy={busy} onAction={onAction} />
-      <StaticAction action={districtAction} label={`⭐ Развить «${districts.get(selectedDistrict)?.title}»`} tooltip="Нужно минимум 2 своих объекта в выбранном районе. Потратить 1 действие и до 2$: +25% к базовому доходу всех ваших объектов района и +1◆. Максимум 2 уровня." busy={busy} onAction={onAction} />
+      <StaticAction action={districtAction} label={`⭐ Развить «${districts.get(selectedDistrict)?.title}»`} tooltip="Нужно минимум 2 своих объекта в выбранном районе. Потратить 1 действие и до 2$: +25% к базовому доходу всех ваших объектов района с округлением вверх (то есть минимум +1$ каждому) и +1◆. Максимум 2 уровня; уровень личный и соперникам ничего не даёт." busy={busy} onAction={onAction} />
     </div>
 
     <div className="action-group g-roles"><h3 className="group-title">🏷️ Роли <span className="group-hint">свободная {game.role_price}◆ · переворот {game.role_price * 3}◆</span></h3><div className="role-market">{meta.roles.map(role => {
@@ -488,9 +589,30 @@ function DecisionPanel({ game, me, meta, roles, districts, legal, selectedDistri
       return <button className="described-action" disabled={busy || variants.length === 0} onClick={() => onOffer(label, variants)} title={`Требуется «${info.asset}». Эффект при успехе: ${effect}. Базовый шанс успеха ${info.chance}%; у Афериста он может быть выше. ${info.failure} Страховка при провале тратит 1 Крышу и отменяет денежный либо объектный штраф, но скандалы всё равно начисляются и действие расходуется.`} key={assetId}><strong>{label}</strong><small>{variants.length ? `${effect} · шанс от ${info.chance}%` : greyRequirement(assetId)}</small></button>;
     })}</div>
 
-    <div className="action-group g-defence"><h3 className="group-title">🛡️ Защита и репутация</h3><StaticAction action={find("crisis_pr")} label="🧯 Антикризисный PR: 4$ → −1⚠" tooltip="Потратить 1 обычное действие и 4$, чтобы снять 1 свой скандал." busy={busy} onAction={onAction} /><StaticAction action={find("buy_roof")} label={`🛡️ Купить Крышу (${roofCost(me)}$)`} tooltip="Потратить 1 обычное действие и деньги. Крыша может отменить направленную карту, поглотить рэкет или застраховать провал серой операции; обычно лимит 1, у Мафиози 2." busy={busy} onAction={onAction} /></div>
+    <div className="action-group g-defence"><h3 className="group-title">🛡️ Защита и репутация</h3><StaticAction action={find("crisis_pr")} label="🧯 Антикризисный PR: 4$ → −1⚠" tooltip="Потратить 1 обычное действие и 3◆, чтобы снять 1 свой скандал. Цена в влиянии, а не в деньгах: деньги слишком дёшевы в очках, чтобы скандал что-то значил." busy={busy} onAction={onAction} /><StaticAction action={find("buy_roof")} label={`🛡️ Купить Крышу (${roofCost(me, game)}$)`} tooltip={`Потратить 1 обычное действие и ${roofCost(me, game)}$. Цена растёт на 1$ каждые два раунда. Крыша может отменить направленную карту, поглотить рэкет или застраховать провал серой операции; обычно лимит 1, у Мафиози 2.`} busy={busy} onAction={onAction} /></div>
     <button className="end-turn" disabled={busy || !endTurn} onClick={() => endTurn && void onAction(endTurn)} title="Завершить текущий ход. Неиспользованные обычные действия пропадут, кроме разрешённого переносимого действия; затем сервер выполнит ходы ботов.">✅ Завершить ход</button>
   </aside>;
+}
+
+// Money converts at a rate now, so the conversion has to be on screen from the first turn —
+// nobody should discover in the final scoring that their 200$ were worth 20 points.
+function ScorePanel({ game, me, meta }: { game: GameState; me: PlayerState; meta: CityMeta }) {
+  const score = game.score_breakdown?.[me.id];
+  if (!score) return null;
+  const rows: { label: string; value: number; hint: string }[] = [
+    { label: "🏗️ Проекты", value: score.projects, hint: "Городские проекты — главный источник очков" },
+    { label: "🏢 Объекты", value: score.assets, hint: "Половина цены объекта: дорогие карточки дают больше очков" },
+    { label: "🏷️ Роль", value: score.role, hint: "3 очка, пока роль у вас" },
+    { label: `💰 ${me.money}$`, value: score.money, hint: `Деньги — топливо: ${moneyPerPoint(meta)}$ дают 1 очко` },
+    { label: `◆ ${me.influence}`, value: score.influence, hint: `Влияние: ${influencePerPoint(meta)}◆ дают 1 очко` },
+    { label: "⚠ Скандалы", value: score.scandals, hint: "Минус очко за каждый скандал" },
+  ];
+  return <div className="score-panel">
+    <h3 className="group-title">🏆 Мой счёт <span className="group-hint">{score.total} очков</span></h3>
+    <ul>{rows.map(row => <li key={row.label} title={row.hint} className={row.value === 0 ? "score-zero" : ""}>
+      <span>{row.label}</span><b>{row.value > 0 ? `+${row.value}` : row.value}</b>
+    </li>)}</ul>
+  </div>;
 }
 
 function StaticAction({ action, label, tooltip, busy, onAction }: { action?: LegalAction; label: string; tooltip: string; busy: boolean; onAction: (action: LegalAction) => Promise<void> }) {
@@ -534,6 +656,13 @@ function ChoiceModal({ choice, game, labelContext, busy, onClose, onAction }: {
   })}</div></section></div>;
 }
 
-function FinishPanel({ ranking, scores, assets, onExit }: { ranking: PlayerState[]; scores?: Record<string, number>; assets: Map<string, AssetMeta>; onExit: () => void }) {
-  return <section className="city-finish"><h2>🏆 Итоги города</h2><div>{ranking.map((player, index) => <p key={player.id}><b>{index + 1}. {player.name}</b><span>{scores?.[player.id] ?? scoreOf(player, assets)} очков</span></p>)}</div><button className="primary" onClick={onExit}>Вернуться к комнатам</button></section>;
+function FinishPanel({ game, ranking, onExit }: { game: GameState; ranking: PlayerState[]; onExit: () => void }) {
+  return <section className="city-finish"><h2>🏆 Итоги города</h2><div>{ranking.map((player, index) => {
+    const score = game.score_breakdown?.[player.id];
+    return <p key={player.id}>
+      <b>{index + 1}. {player.name}</b>
+      <span>{scoreOf(game, player)} очков</span>
+      {score && <small>проекты {score.projects} · объекты {score.assets} · роль {score.role} · деньги {score.money} · влияние {score.influence} · скандалы {score.scandals}</small>}
+    </p>;
+  })}</div><button className="primary" onClick={onExit}>Вернуться к комнатам</button></section>;
 }

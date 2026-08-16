@@ -1,4 +1,4 @@
-export type Difficulty = "easy" | "medium" | "hard";
+export type Difficulty = "easy" | "medium" | "hard" | "expert";
 export type RoomStatus = "waiting" | "playing" | "finished";
 
 export interface RoomSummary {
@@ -24,13 +24,12 @@ export interface RoomSeat {
 export interface OwnedAsset {
   uid: string;
   card_id: string;
-  automated: boolean;
-  scaled: boolean;
   blocked: boolean;
 }
 
 export interface HeldCard { uid: string; card_id: string }
-export interface MarketAsset { uid: string; card_id: string; expires_at_turn: number }
+// `price` is the viewer's own price, computed by the engine (discounts are per-player).
+export interface MarketAsset { uid: string; card_id: string; expires_at_turn: number; price?: number }
 
 export interface PlayerState {
   id: string;
@@ -49,7 +48,7 @@ export interface PlayerState {
   assets: OwnedAsset[];
   hand?: HeldCard[];
   hand_count?: number;
-  projects: number;
+  projects: string[];
   capacity: number;
   debt: number;
   role_shields: number;
@@ -57,6 +56,9 @@ export interface PlayerState {
   zoning_district: string | null;
   district_levels: Record<string, number>;
   turns: number;
+  automation_owned: boolean;
+  automation_uid: string | null;
+  automation_disabled: boolean;
 }
 
 export interface DomainEvent {
@@ -64,6 +66,18 @@ export interface DomainEvent {
   type: string;
   actor_id: string | null;
   data: Record<string, unknown>;
+}
+
+// Itemised live score, computed by the engine. The client must never re-derive the formula:
+// money and influence convert at a rate now, and two implementations would drift apart.
+export interface ScoreBreakdown {
+  money: number;
+  influence: number;
+  assets: number;
+  projects: number;
+  role: number;
+  scandals: number;
+  total: number;
 }
 
 export interface GameState {
@@ -78,6 +92,7 @@ export interface GameState {
   round_number: number;
   starting_player_index?: number;
   current_player_index: number;
+  turn_order?: string[];
   turns_taken_in_round?: number;
   turn_serial?: number;
   actions_left: number;
@@ -85,11 +100,16 @@ export interface GameState {
   event_id: string;
   players: PlayerState[];
   market: MarketAsset[];
-  action_market: string[];
+  project_board: string[];
   turn_flags: Record<string, unknown>;
+  antitrust_active?: boolean;
   event_log: DomainEvent[];
   market_deck_count: number;
   action_deck_count: number;
+  project_deck_count: number;
+  score_breakdown: Record<string, ScoreBreakdown>;
+  // Round income for every possible home of the viewer's automation token, keyed by asset uid.
+  automation_preview: Record<string, number>;
   final_scores?: Record<string, number>;
 }
 
@@ -120,6 +140,19 @@ export interface AssetMeta {
   effects?: Record<string, unknown>;
 }
 export interface ActionMeta { id: string; title: string; tone: string; text: string; kind: string; value: number; targeted?: boolean }
+export interface ProjectRequirement { type: string; count?: number; district?: string; tag?: string; role?: string }
+export interface ProjectMeta {
+  id: string;
+  title: string;
+  text: string;
+  cost_influence: number;
+  cost_money: number;
+  points: number;
+  requirement: ProjectRequirement;
+  perk: Record<string, number>;
+  // Repeatable initiatives are never in the deck and never leave the table.
+  repeatable?: boolean;
+}
 export interface EventMeta {
   id: string;
   title: string;
@@ -130,12 +163,24 @@ export interface EventMeta {
   globalIncome?: number;
   globalMarketDiscount?: number;
 }
+// Rates owned by the engine (`city_engine/constants.py`) and shipped with the catalog, so no
+// client hardcodes the conversion.
+export interface ScoringMeta {
+  money_per_point: number;
+  influence_per_point: number;
+  project_board_size: number;
+  market_reroll_cost: number;
+  automation_cost: number;
+}
+
 export interface CityMeta {
   schema_version?: number;
   content_version: string;
+  scoring?: ScoringMeta;
   districts: DistrictMeta[];
   roles: RoleMeta[];
   assets: AssetMeta[];
   action_cards: ActionMeta[];
+  projects: ProjectMeta[];
   events: EventMeta[];
 }

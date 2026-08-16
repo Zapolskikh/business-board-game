@@ -129,7 +129,8 @@ def test_room_projection_hides_password_rng_decks_and_other_hands() -> None:
     assert "seed" not in created["data"]
     opponent = next(player for player in view["game"]["players"] if player["id"] == "seat-2")
     assert "hand" not in opponent
-    assert opponent["hand_count"] == 0
+    # Only the size leaks, never the cards — and it has to match what the opponent really holds.
+    assert opponent["hand_count"] == len(room.game.player_by_id("seat-2").hand)
 
 
 def test_room_projection_hides_opponents_free_card_identity() -> None:

@@ -8,11 +8,33 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from city_engine.constants import CONTENT_VERSION, DISTRICT_IDS, ROLE_IDS
+from city_engine.constants import (
+    AUTOMATION_COST,
+    CONTENT_VERSION,
+    DISTRICT_IDS,
+    INFLUENCE_PER_POINT,
+    MARKET_REROLL_COST,
+    MONEY_PER_POINT,
+    PROJECT_BOARD_SIZE,
+    REPEATABLE_PROJECT_IDS,
+    ROLE_IDS,
+)
 from city_engine.errors import StateValidationError
 
 CATALOG_PATH = Path(__file__).with_name("content") / "catalog.json"
 RARITIES = {"common", "uncommon", "rare", "epic", "legendary"}
+# Every project condition is a count of things already visible on the table — never a formula.
+PROJECT_REQUIREMENTS = {
+    "none",
+    "assets",
+    "automation",
+    "role",
+    "max_scandals",
+    "district_objects",
+    "district_depth",
+    "distinct_districts",
+    "tag_objects",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +83,23 @@ class ActionCardDefinition:
 
 
 @dataclass(frozen=True, slots=True)
+class ProjectDefinition:
+    """A unique city project: taken from a shared board, so one player's gain is another's loss."""
+
+    id: str
+    title: str
+    text: str
+    cost_influence: int
+    cost_money: int
+    points: int
+    requirement: dict[str, Any] = field(default_factory=dict)
+    perk: dict[str, int] = field(default_factory=dict)
+    # Repeatable initiatives never enter the deck and never leave: they are the floor that keeps
+    # the last rounds from having no scoring outlet at all, priced worse than a real project.
+    repeatable: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class EventDefinition:
     id: str
     title: str
@@ -80,7 +119,18 @@ class ContentCatalog:
     roles: dict[str, RoleDefinition]
     assets: dict[str, AssetDefinition]
     action_cards: dict[str, ActionCardDefinition]
+    projects: dict[str, ProjectDefinition]
     events: dict[str, EventDefinition]
+    # Round from which each rarity may appear on the market. Epic and legendary arrive late on
+    # purpose: bought early they are unaffordable, and bought out early the late market is empty.
+    rarity_min_round: dict[str, int]
+
+    def deck_project_ids(self) -> list[str]:
+        """Unique projects only: repeatable initiatives are always available and never drawn."""
+        return [project.id for project in self.projects.values() if not project.repeatable]
+
+    def repeatable_project_ids(self) -> list[str]:
+        return [project.id for project in self.projects.values() if project.repeatable]
 
     def validate(self) -> None:
         if self.schema_version != 1:
@@ -95,6 +145,29 @@ class ContentCatalog:
             raise StateValidationError("catalog roles do not match engine role ids/order")
         if len(self.assets) < 6 or len(self.action_cards) < 3 or not self.events:
             raise StateValidationError("catalog does not contain enough cards/events to start a game")
+        if len(self.deck_project_ids()) < PROJECT_BOARD_SIZE:
+            raise StateValidationError(f"catalog needs at least {PROJECT_BOARD_SIZE} projects to fill the board")
+        if tuple(sorted(self.repeatable_project_ids())) != tuple(sorted(REPEATABLE_PROJECT_IDS)):
+            raise StateValidationError(
+                "repeatable projects in the catalog must match REPEATABLE_PROJECT_IDS, "
+                "which state validation uses to exempt them from the uniqueness rule"
+            )
+        for project in self.projects.values():
+            if project.cost_influence < 0 or project.cost_money < 0 or project.points < 1:
+                raise StateValidationError(f"project {project.id} has invalid numeric values")
+            requirement = str(project.requirement.get("type", ""))
+            if requirement not in PROJECT_REQUIREMENTS:
+                raise StateValidationError(f"project {project.id} has unknown requirement {requirement!r}")
+            if requirement == "district_objects" and project.requirement.get("district") not in self.districts:
+                raise StateValidationError(f"project {project.id} references an unknown district")
+            if requirement == "tag_objects":
+                tag = project.requirement.get("tag")
+                if not any(tag in asset.tags for asset in self.assets.values()):
+                    raise StateValidationError(f"project {project.id} requires tag {tag!r} that no asset carries")
+            if any(value < 1 for value in project.perk.values()):
+                raise StateValidationError(f"project {project.id} has a non-positive perk value")
+        if set(self.rarity_min_round) != RARITIES:
+            raise StateValidationError("rarity_min_round must list every rarity exactly once")
         for asset in self.assets.values():
             if asset.district not in self.districts:
                 raise StateValidationError(f"asset {asset.id} references unknown district {asset.district}")
@@ -107,9 +180,21 @@ class ContentCatalog:
                 raise StateValidationError(f"role {role.id} references an unknown district")
 
     def public_meta(self) -> dict[str, Any]:
-        """JSON-safe catalog sent to React; no runtime state or deck order."""
+        """JSON-safe catalog sent to React; no runtime state or deck order.
+
+        The scoring rates ride along so clients state the conversion rather than hardcode it:
+        both the React panel and the text client print "N$ = 1 очко" from this block.
+        """
         with CATALOG_PATH.open(encoding="utf-8") as handle:
-            return json.load(handle)
+            raw = json.load(handle)
+        raw["scoring"] = {
+            "money_per_point": MONEY_PER_POINT,
+            "influence_per_point": INFLUENCE_PER_POINT,
+            "project_board_size": PROJECT_BOARD_SIZE,
+            "market_reroll_cost": MARKET_REROLL_COST,
+            "automation_cost": AUTOMATION_COST,
+        }
+        return raw
 
 
 def _unique_by_id(items: list[dict[str, Any]], label: str) -> dict[str, dict[str, Any]]:
@@ -131,6 +216,7 @@ def load_catalog(path: Path = CATALOG_PATH) -> ContentCatalog:
     role_rows = _unique_by_id(raw["roles"], "role")
     asset_rows = _unique_by_id(raw["assets"], "asset")
     action_rows = _unique_by_id(raw["action_cards"], "action card")
+    project_rows = _unique_by_id(raw["projects"], "project")
     event_rows = _unique_by_id(raw["events"], "event")
 
     catalog = ContentCatalog(
@@ -176,6 +262,21 @@ def load_catalog(path: Path = CATALOG_PATH) -> ContentCatalog:
             )
             for key, row in action_rows.items()
         },
+        projects={
+            key: ProjectDefinition(
+                id=row["id"],
+                title=row["title"],
+                text=row["text"],
+                cost_influence=int(row["cost_influence"]),
+                cost_money=int(row["cost_money"]),
+                points=int(row["points"]),
+                requirement=dict(row.get("requirement") or {"type": "none"}),
+                perk={str(key): int(value) for key, value in (row.get("perk") or {}).items()},
+                repeatable=bool(row.get("repeatable", False)),
+            )
+            for key, row in project_rows.items()
+        },
+        rarity_min_round={str(key): int(value) for key, value in raw["rarity_min_round"].items()},
         events={
             key: EventDefinition(
                 id=row["id"],

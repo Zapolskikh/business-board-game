@@ -19,6 +19,10 @@ coverage.xml
 # Simulation output
 backend/out/
 
+# Agent-play sessions, catalog cache and command journals (contain room passwords)
+.agent_play/
+arena/
+
 # Vercel
 .vercel/
 

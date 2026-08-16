@@ -17,6 +17,7 @@ from city_engine.constants import (
     MIN_PLAYERS,
     MIN_ROLE_PRICE,
     MIN_ROUNDS,
+    REPEATABLE_PROJECT_IDS,
     ROLE_IDS,
     RULES_VERSION,
     SCHEMA_VERSION,
@@ -31,28 +32,25 @@ def empty_district_levels() -> dict[str, int]:
 
 @dataclass(slots=True)
 class OwnedAsset:
+    """An object in a portfolio. Automation is no longer a property of the object.
+
+    Per-object upgrades were a ritual: three or four identical purchases per player, and they
+    welded value into objects that then could never be replaced. Automation is now a single
+    player-level token (see ``PlayerState.automation_uid``).
+    """
+
     uid: str
     card_id: str
-    automated: bool = False
-    scaled: bool = False
     blocked: bool = False
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "uid": self.uid,
-            "card_id": self.card_id,
-            "automated": self.automated,
-            "scaled": self.scaled,
-            "blocked": self.blocked,
-        }
+        return {"uid": self.uid, "card_id": self.card_id, "blocked": self.blocked}
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> OwnedAsset:
         return cls(
             uid=str(data["uid"]),
             card_id=str(data["card_id"]),
-            automated=bool(data.get("automated", False)),
-            scaled=bool(data.get("scaled", False)),
             blocked=bool(data.get("blocked", False)),
         )
 
@@ -105,7 +103,7 @@ class PlayerState:
     jail_turns: int = 0
     assets: list[OwnedAsset] = field(default_factory=list)
     hand: list[HeldCard] = field(default_factory=list)
-    projects: int = 0
+    projects: list[str] = field(default_factory=list)
     capacity: int = 3
     scandal_gained_this_round: int = 0
     debt: int = 0
@@ -115,6 +113,12 @@ class PlayerState:
     district_levels: dict[str, int] = field(default_factory=empty_district_levels)
     turns: int = 0
     banked_actions: int = 0
+    # One automation token per player: bought once, moved between own objects for free once per
+    # turn. It doubles the hosting object's own effects and exempts it from maintenance, so the
+    # best place for it shifts as the portfolio changes instead of being sunk into one card.
+    automation_owned: bool = False
+    automation_uid: str | None = None
+    automation_disabled: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -133,7 +137,7 @@ class PlayerState:
             "jail_turns": self.jail_turns,
             "assets": [asset.to_dict() for asset in self.assets],
             "hand": [card.to_dict() for card in self.hand],
-            "projects": self.projects,
+            "projects": list(self.projects),
             "capacity": self.capacity,
             "scandal_gained_this_round": self.scandal_gained_this_round,
             "debt": self.debt,
@@ -143,6 +147,9 @@ class PlayerState:
             "district_levels": dict(self.district_levels),
             "turns": self.turns,
             "banked_actions": self.banked_actions,
+            "automation_owned": self.automation_owned,
+            "automation_uid": self.automation_uid,
+            "automation_disabled": self.automation_disabled,
         }
 
     @classmethod
@@ -163,7 +170,7 @@ class PlayerState:
             jail_turns=int(data.get("jail_turns", 0)),
             assets=[OwnedAsset.from_dict(item) for item in data.get("assets", [])],
             hand=[HeldCard.from_dict(item) for item in data.get("hand", [])],
-            projects=int(data.get("projects", 0)),
+            projects=[str(item) for item in data.get("projects", [])],
             capacity=int(data.get("capacity", 3)),
             scandal_gained_this_round=int(data.get("scandal_gained_this_round", 0)),
             debt=int(data.get("debt", 0)),
@@ -174,6 +181,9 @@ class PlayerState:
             or empty_district_levels(),
             turns=int(data.get("turns", 0)),
             banked_actions=int(data.get("banked_actions", 0)),
+            automation_owned=bool(data.get("automation_owned", False)),
+            automation_uid=data.get("automation_uid"),
+            automation_disabled=bool(data.get("automation_disabled", False)),
         )
 
 
@@ -212,6 +222,9 @@ class GameState:
     round_number: int = 1
     starting_player_index: int = 0
     current_player_index: int = 0
+    # Who plays when, recomputed every round from the standings: the trailing player opens the
+    # round and gets first pick of the market. Empty only in legacy snapshots.
+    turn_order: list[str] = field(default_factory=list)
     turns_taken_in_round: int = 0
     turn_serial: int = 0
     actions_left: int = 3
@@ -220,7 +233,8 @@ class GameState:
     market_deck: list[str] = field(default_factory=list)
     market: list[MarketAsset] = field(default_factory=list)
     action_deck: list[str] = field(default_factory=list)
-    action_market: list[str] = field(default_factory=list)
+    project_board: list[str] = field(default_factory=list)
+    project_deck: list[str] = field(default_factory=list)
     turn_flags: dict[str, Any] = field(default_factory=dict)
     antitrust_active: bool = False
     final_scores: dict[str, int] = field(default_factory=dict)
@@ -247,7 +261,9 @@ class GameState:
         cloned.market_deck = list(self.market_deck)
         cloned.market = deepcopy(self.market)
         cloned.action_deck = list(self.action_deck)
-        cloned.action_market = list(self.action_market)
+        cloned.project_board = list(self.project_board)
+        cloned.project_deck = list(self.project_deck)
+        cloned.turn_order = list(self.turn_order)
         cloned.turn_flags = deepcopy(self.turn_flags)
         cloned.final_scores = dict(self.final_scores)
         cloned.processed_command_ids = list(self.processed_command_ids)
@@ -291,6 +307,18 @@ class GameState:
             raise StateValidationError("role_price is outside supported bounds")
         if self.final_scores and set(self.final_scores) != set(ids):
             raise StateValidationError("final scores must contain every player exactly once")
+        if self.turn_order and sorted(self.turn_order) != sorted(ids):
+            raise StateValidationError("turn order must contain every player exactly once")
+        if self.turn_order and self.turn_order[self.turns_taken_in_round] != ids[self.current_player_index]:
+            raise StateValidationError("current player must match the turn order position")
+        # Repeatable initiatives are deliberately exempt: they never enter the deck and may be
+        # taken again by anybody, so only the unique projects have to be globally unique.
+        project_ids = [*self.project_board, *self.project_deck]
+        for player in self.players:
+            project_ids.extend(player.projects)
+        deck_ids = [item for item in project_ids if item not in REPEATABLE_PROJECT_IDS]
+        if len(deck_ids) != len(set(deck_ids)):
+            raise StateValidationError("every unique city project may exist only once")
 
         all_uids: list[str] = [item.uid for item in self.market]
         held_roles = [player.role for player in self.players if player.role is not None]
@@ -312,6 +340,11 @@ class GameState:
                 raise StateValidationError(f"invalid district level for {player.id}")
             if min(player.money, player.influence, player.scandals, player.roofs) < 0:
                 raise StateValidationError(f"negative public resource for {player.id}")
+            if player.automation_uid is not None:
+                if not player.automation_owned:
+                    raise StateValidationError(f"player {player.id} placed an automation token they do not own")
+                if player.automation_uid not in {asset.uid for asset in player.assets}:
+                    raise StateValidationError(f"automation token of {player.id} sits on an object they do not own")
             all_uids.extend(asset.uid for asset in player.assets)
             all_uids.extend(card.uid for card in player.hand)
         if len(all_uids) != len(set(all_uids)):
@@ -329,6 +362,7 @@ class GameState:
             "role_price": self.role_price,
             "round_number": self.round_number,
             "starting_player_index": self.starting_player_index,
+            "turn_order": list(self.turn_order),
             "current_player_index": self.current_player_index,
             "turns_taken_in_round": self.turns_taken_in_round,
             "turn_serial": self.turn_serial,
@@ -339,7 +373,8 @@ class GameState:
             "market_deck": list(self.market_deck),
             "market": [item.to_dict() for item in self.market],
             "action_deck": list(self.action_deck),
-            "action_market": list(self.action_market),
+            "project_board": list(self.project_board),
+            "project_deck": list(self.project_deck),
             "turn_flags": deepcopy(self.turn_flags),
             "antitrust_active": self.antitrust_active,
             "final_scores": dict(self.final_scores),
@@ -362,6 +397,7 @@ class GameState:
             role_price=int(data.get("role_price", 3)),
             round_number=int(data.get("round_number", 1)),
             starting_player_index=int(data.get("starting_player_index", 0)),
+            turn_order=[str(item) for item in data.get("turn_order", [])],
             current_player_index=int(data.get("current_player_index", 0)),
             turns_taken_in_round=int(data.get("turns_taken_in_round", 0)),
             turn_serial=int(data.get("turn_serial", 0)),
@@ -372,7 +408,8 @@ class GameState:
             market_deck=[str(item) for item in data.get("market_deck", [])],
             market=[MarketAsset.from_dict(item) for item in data.get("market", [])],
             action_deck=[str(item) for item in data.get("action_deck", [])],
-            action_market=[str(item) for item in data.get("action_market", [])],
+            project_board=[str(item) for item in data.get("project_board", [])],
+            project_deck=[str(item) for item in data.get("project_deck", [])],
             turn_flags=dict(data.get("turn_flags") or {}),
             antitrust_active=bool(data.get("antitrust_active", False)),
             final_scores={str(key): int(value) for key, value in (data.get("final_scores") or {}).items()},

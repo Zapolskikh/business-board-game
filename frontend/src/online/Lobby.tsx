@@ -80,6 +80,7 @@ function BotConfigurator({ seat, roles, disabled, onApply }: {
         <option value="easy">Олег · easy</option>
         <option value="medium">Codex · medium</option>
         <option value="hard">Claude · hard</option>
+        <option value="expert">Claude Reborn · expert</option>
       </select>
     </label>
     <label>Роль

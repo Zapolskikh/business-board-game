@@ -73,7 +73,8 @@ def test_role_takeover_costs_triple_and_roof_blocks_it() -> None:
 
     result = engine.apply(state, command(state, "claim_role", {"role_id": "capitalist"}))
 
-    assert result.state.current_player.influence == 20 - state.role_price * 3
+    # A blocked takeover refunds the influence: paying full price for nothing was a silent tax.
+    assert result.state.current_player.influence == 20
     assert result.state.current_player.role is None
     assert result.state.player_by_id(defender.id).role == "capitalist"
     assert result.state.player_by_id(defender.id).roofs == 0
@@ -106,13 +107,15 @@ def test_buying_asset_moves_the_exact_market_card_to_player() -> None:
 def test_round_starter_is_prepared_once() -> None:
     engine = CityEngine()
     state = game()
-    starter_id = state.players[state.starting_player_index].id
 
     first = engine.apply(state, command(state, "end_turn")).state
     second = engine.apply(first, command(first, "end_turn")).state
 
+    # Turn order is recomputed from the standings, so round two opens with whoever is behind —
+    # not with the seat that happened to open round one.
     assert second.round_number == 2
-    assert second.current_player.id == starter_id
+    assert second.current_player.id == second.turn_order[0]
+    assert second.current_player.id == second.players[second.starting_player_index].id
     assert second.current_player.turns == 2
 
 

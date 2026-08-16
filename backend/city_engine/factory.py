@@ -12,6 +12,8 @@ from city_engine.constants import (
     MIN_PLAYERS,
     MIN_ROLE_PRICE,
     MIN_ROUNDS,
+    NEUTRAL_EVENT_ID,
+    PROJECT_BOARD_SIZE,
     ROLE_IDS,
 )
 from city_engine.content import ContentCatalog, load_catalog
@@ -42,6 +44,7 @@ def create_game(
     seed: int,
     asset_ids: list[str],
     action_card_ids: list[str],
+    project_ids: list[str],
     event_ids: list[str],
     settings: GameSettings | None = None,
     asset_unlock_rounds: dict[str, int] | None = None,
@@ -61,8 +64,10 @@ def create_game(
         raise StateValidationError("at least 6 unique asset ids are required")
     if len(action_card_ids) < 3 or len(set(action_card_ids)) != len(action_card_ids):
         raise StateValidationError("at least 3 unique action card ids are required")
-    if not event_ids:
-        raise StateValidationError("at least one event id is required")
+    if len(project_ids) < PROJECT_BOARD_SIZE or len(set(project_ids)) != len(project_ids):
+        raise StateValidationError(f"at least {PROJECT_BOARD_SIZE} unique project ids are required")
+    if NEUTRAL_EVENT_ID not in event_ids:
+        raise StateValidationError(f"event ids must contain the neutral {NEUTRAL_EVENT_ID!r}")
 
     for player in players:
         if player.difficulty not in BOT_DIFFICULTIES:
@@ -74,10 +79,11 @@ def create_game(
     rng = GameRNG(rng_state)
     asset_deck = list(asset_ids)
     action_deck = list(action_card_ids)
-    events = list(event_ids)
+    project_deck = list(project_ids)
     rng.shuffle(asset_deck)
     rng.shuffle(action_deck)
-    rng.shuffle(events)
+    # Which four projects open the game is the main source of variety between matches.
+    rng.shuffle(project_deck)
     starting_player = rng.randbelow(len(players))
 
     unlocks = asset_unlock_rounds or {}
@@ -113,11 +119,17 @@ def create_game(
         role_price=settings.role_price,
         starting_player_index=starting_player,
         current_player_index=starting_player,
+        # Round one has no standings yet, so the drawn seat opens and the rest follow clockwise.
+        turn_order=[players[(starting_player + offset) % len(players)].id for offset in range(len(players))],
         market_deck=asset_deck,
         market=initial_market,
-        action_deck=action_deck[3:],
-        action_market=action_deck[:3],
-        event_id=events[0],
+        action_deck=action_deck,
+        project_board=project_deck[:PROJECT_BOARD_SIZE],
+        project_deck=project_deck[PROJECT_BOARD_SIZE:],
+        # Events are switched off while the base mechanics are being tuned: a single event was
+        # drawn once and then never changed for the whole match, which added variance between
+        # games and none inside one. The machinery stays, pinned to the neutral year.
+        event_id=NEUTRAL_EVENT_ID,
     )
     state.append_event(
         "game_created",
@@ -145,10 +157,8 @@ def create_game_from_catalog(
         seed=seed,
         asset_ids=list(catalog.assets),
         action_card_ids=list(catalog.action_cards),
+        project_ids=catalog.deck_project_ids(),
         event_ids=list(catalog.events),
         settings=settings,
-        asset_unlock_rounds={
-            asset.id: {"common": 1, "uncommon": 2, "rare": 3, "epic": 4, "legendary": 5}[asset.rarity]
-            for asset in catalog.assets.values()
-        },
+        asset_unlock_rounds={asset.id: catalog.rarity_min_round[asset.rarity] for asset in catalog.assets.values()},
     )

@@ -121,7 +121,7 @@ def _summarize_game(state: GameState) -> dict[str, Any]:
                 "money": player.money,
                 "influence": player.influence,
                 "scandals": player.scandals,
-                "projects": player.projects,
+                "projects": len(player.projects),
                 "capacity": player.capacity,
                 "assets": [asset.card_id for asset in player.assets],
                 "districts": Counter(engine.owned_definition(asset).district for asset in player.assets),

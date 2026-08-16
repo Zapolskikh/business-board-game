@@ -2,6 +2,13 @@ from __future__ import annotations
 
 import pytest
 
+from city_engine.constants import (
+    INFLUENCE_PER_POINT,
+    MARKET_REROLL_COST,
+    MONEY_PER_POINT,
+    NEUTRAL_EVENT_ID,
+    PROJECT_BOARD_SIZE,
+)
 from city_engine.content import load_catalog
 from city_engine.errors import StateValidationError
 from city_engine.factory import GameSettings, PlayerSetup, create_game, create_game_from_catalog
@@ -11,6 +18,7 @@ from city_engine.serialization import dumps_state, loads_state, state_hash
 
 ASSETS = [f"asset-{index}" for index in range(12)]
 CARDS = [f"card-{index}" for index in range(8)]
+PROJECTS = [f"project-{index}" for index in range(6)]
 EVENTS = ["boom", "stable_year", "cheap_credit"]
 PLAYERS = [
     PlayerSetup(id="p1", name="Alice"),
@@ -25,6 +33,7 @@ def new_game(seed: int = 42) -> GameState:
         seed=seed,
         asset_ids=ASSETS,
         action_card_ids=CARDS,
+        project_ids=PROJECTS,
         event_ids=EVENTS,
         settings=GameSettings(max_rounds=15, role_price=3),
     )
@@ -65,6 +74,7 @@ def test_state_rejects_duplicate_player_ids() -> None:
             seed=1,
             asset_ids=ASSETS,
             action_card_ids=CARDS,
+            project_ids=PROJECTS,
             event_ids=EVENTS,
         )
 
@@ -86,5 +96,18 @@ def test_backend_catalog_is_complete_and_can_create_a_game() -> None:
     assert len(catalog.roles) == 6
     assert len(catalog.assets) == 71
     assert len(catalog.action_cards) == 34
+    assert len(catalog.deck_project_ids()) == 40
+    assert len(catalog.repeatable_project_ids()) == 2
     assert len(state.market) == 6
-    assert state.event_id in catalog.events
+    assert len(state.project_board) == PROJECT_BOARD_SIZE
+    assert state.event_id == NEUTRAL_EVENT_ID  # events are off while the base mechanics are tuned
+
+
+def test_public_meta_ships_the_scoring_rates() -> None:
+    """Clients print "N$ = 1 очко" from here; hardcoding it on either side would drift."""
+    scoring = load_catalog().public_meta()["scoring"]
+
+    assert scoring["money_per_point"] == MONEY_PER_POINT
+    assert scoring["influence_per_point"] == INFLUENCE_PER_POINT
+    assert scoring["market_reroll_cost"] == MARKET_REROLL_COST
+    assert scoring["project_board_size"] == PROJECT_BOARD_SIZE

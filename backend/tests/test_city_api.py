@@ -82,6 +82,39 @@ def test_room_rest_flow_and_polling() -> None:
         app.dependency_overrides.clear()
 
 
+def test_state_carries_the_viewers_own_market_prices() -> None:
+    service = CityRoomService(InMemoryRoomRepository())
+    app.dependency_overrides[get_room_service] = lambda: service
+    client = TestClient(app)
+    try:
+        room_id = client.post(
+            "/api/city/rooms",
+            json={"name": "Prices", "password": "secret", "capacity": 2},
+        ).json()["id"]
+        client.post(
+            f"/api/city/rooms/{room_id}/join",
+            json={"password": "secret", "seat_index": 0, "player_name": "Oleg"},
+        ).raise_for_status()
+        client.post(
+            f"/api/city/rooms/{room_id}/seats",
+            json={"password": "secret", "seat_index": 1, "kind": "bot", "difficulty": "easy"},
+        ).raise_for_status()
+        client.post(f"/api/city/rooms/{room_id}/start", json={"password": "secret", "seed": 7}).raise_for_status()
+
+        room = service.get_room(room_id)
+        assert room.game is not None
+        expected = service.engine.market_prices(room.game, room.game.player_by_id("seat-1"))
+        state = client.get(
+            f"/api/city/rooms/{room_id}/state",
+            params={"viewer_id": "seat-1"},
+            headers={"X-Room-Password": "secret"},
+        ).json()
+        # The client must never recompute discounts: every market slot ships its own price.
+        assert {item["uid"]: item["price"] for item in state["game"]["market"]} == expected
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_oversized_request_is_rejected_before_json_parsing() -> None:
     client = TestClient(app)
     response = client.post(

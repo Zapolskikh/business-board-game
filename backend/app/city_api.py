@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from city_engine.commands import Command
 from city_engine.content import load_catalog
+from city_rooms.models import RoomState
 from city_rooms.repository import InMemoryRoomRepository
 from city_rooms.service import CityRoomService
 from city_rooms.upstash import UpstashRoomRepository
@@ -37,7 +38,7 @@ class SeatRequest(BaseModel):
     password: str = Field(min_length=4, max_length=128)
     seat_index: int = Field(ge=0, le=5)
     kind: Literal["bot", "empty"]
-    difficulty: Literal["easy", "medium", "hard"] = "medium"
+    difficulty: Literal["easy", "medium", "hard", "expert"] = "medium"
     preferred_role: str | None = None
 
 
@@ -73,6 +74,17 @@ def get_room_service() -> CityRoomService:
     use_upstash = store == "upstash" or (store == "auto" and has_upstash)
     repository = UpstashRoomRepository.from_env() if use_upstash else InMemoryRoomRepository()
     return CityRoomService(repository)
+
+
+def _market_prices(service: CityRoomService, room: RoomState, viewer_id: str | None) -> dict[str, int] | None:
+    """Prices the viewer would actually pay, resolved server-side (see room_view)."""
+    if room.game is None or viewer_id is None:
+        return None
+    try:
+        player = room.game.player_by_id(viewer_id)
+    except KeyError:
+        return None
+    return service.engine.market_prices(room.game, player)
 
 
 @router.get("/meta")
@@ -176,7 +188,7 @@ def get_room_state(
     legal_actions = (
         service.engine.legal_actions(room.game, viewer_id) if room.game is not None and viewer_id is not None else []
     )
-    return {"changed": True, **room_view(room, viewer_id, legal_actions)}
+    return {"changed": True, **room_view(room, viewer_id, legal_actions, _market_prices(service, room, viewer_id))}
 
 
 @router.post("/rooms/{room_id}/commands")
@@ -188,4 +200,4 @@ def apply_command(
     data = request.model_dump(exclude={"password"})
     room = service.apply_command(room_id, password=request.password, command=Command.from_dict(data))
     legal_actions = service.engine.legal_actions(room.game, request.actor_id) if room.game is not None else []
-    return room_view(room, request.actor_id, legal_actions)
+    return room_view(room, request.actor_id, legal_actions, _market_prices(service, room, request.actor_id))

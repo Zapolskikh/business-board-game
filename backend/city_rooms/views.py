@@ -3,15 +3,35 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from functools import lru_cache
 from typing import Any
 
+from city_engine.engine import CityEngine
 from city_rooms.models import RoomState
+
+
+@lru_cache(maxsize=1)
+def _scoring_engine() -> CityEngine:
+    """Stateless scorer for projections; the catalog behind it is cached too."""
+    return CityEngine()
+
+
+def _automation_preview(room: RoomState, viewer_id: str | None) -> dict[str, int]:
+    """Round income for every possible home of the viewer's automation token."""
+    if room.game is None or viewer_id is None:
+        return {}
+    try:
+        player = room.game.player_by_id(viewer_id)
+    except KeyError:
+        return {}
+    return _scoring_engine().automation_preview(room.game, player)
 
 
 def room_view(
     room: RoomState,
     viewer_id: str | None = None,
     legal_actions: list[dict[str, Any]] | None = None,
+    market_prices: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     result: dict[str, Any] = {
         **room.public_summary(),
@@ -28,6 +48,13 @@ def room_view(
     game = deepcopy(room.game.to_dict())
     game["market_deck_count"] = len(game.pop("market_deck"))
     game["action_deck_count"] = len(game.pop("action_deck"))
+    game["project_deck_count"] = len(game.pop("project_deck"))
+    # Live score itemised by the engine. The client used to re-implement the formula; with money
+    # and influence now converting at a rate, one authoritative breakdown is the only sane option.
+    engine = _scoring_engine()
+    game["score_breakdown"] = {player.id: engine.score_breakdown(player) for player in room.game.players}
+    # Moving the token is free, so the payoff of each option must be on screen, not in the head.
+    game["automation_preview"] = _automation_preview(room, viewer_id)
     game.pop("rng", None)
     game.pop("processed_command_ids", None)
     game.pop("command_log", None)
@@ -39,5 +66,10 @@ def room_view(
     for player in game["players"]:
         if player["id"] != viewer_id:
             player["hand_count"] = len(player.pop("hand"))
+    # The viewer's own price for every market slot: discounts are per-player, so the client
+    # must not recompute them (two implementations of asset_price already drifted apart once).
+    for item in game["market"]:
+        if market_prices and item["uid"] in market_prices:
+            item["price"] = market_prices[item["uid"]]
     result["game"] = game
     return result

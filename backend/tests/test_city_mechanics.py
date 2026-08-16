@@ -3,10 +3,12 @@ from __future__ import annotations
 import pytest
 
 from city_engine.commands import Command
+from city_engine.constants import MAX_REPEATABLE_PROJECTS, PROJECT_BOARD_SIZE
 from city_engine.content import load_catalog
 from city_engine.engine import CityEngine
+from city_engine.errors import IllegalActionError
 from city_engine.factory import PlayerSetup, create_game_from_catalog
-from city_engine.models import HeldCard, OwnedAsset
+from city_engine.models import HeldCard, MarketAsset, OwnedAsset
 
 
 def make_state(seed: int = 42):
@@ -37,13 +39,12 @@ def give_asset(state, player, card_id: str) -> OwnedAsset:
 
 def give_card(state, player, card_id: str) -> HeldCard:
     state.action_deck = [item for item in state.action_deck if item != card_id]
-    state.action_market = [item for item in state.action_market if item != card_id]
     held = HeldCard(uid=f"held:{player.id}:{card_id}", card_id=card_id)
     player.hand.append(held)
     return held
 
 
-def test_improve_sell_and_develop_district() -> None:
+def test_automate_sell_and_develop_district() -> None:
     engine = CityEngine()
     state = make_state()
     player = state.current_player
@@ -51,15 +52,11 @@ def test_improve_sell_and_develop_district() -> None:
     give_asset(state, player, "media")
     player.money = 30
 
-    state = run(
-        engine,
-        state,
-        "improve_asset",
-        {"asset_uid": first.uid, "kind": "scale"},
-    )
+    state = run(engine, state, "buy_automation", {"asset_uid": first.uid})
     player = state.current_player
-    assert player.money == 26
-    assert player.assets[0].scaled
+    assert player.money == 24
+    assert player.automation_owned
+    assert player.automation_uid == first.uid
 
     state = run(engine, state, "develop_district", {"district": "residential"})
     player = state.current_player
@@ -69,23 +66,103 @@ def test_improve_sell_and_develop_district() -> None:
     state = run(engine, state, "sell_asset", {"asset_uid": first.uid})
     player = state.current_player
     assert first.uid not in {asset.uid for asset in player.assets}
-    assert player.money == 28  # 24 after development + half price 2 + scaled 2.
+    assert player.money == 24  # 22 after development + half price 2.
+    # Selling the host frees the token instead of destroying it.
+    assert player.automation_owned
+    assert player.automation_uid is None
 
 
-def test_buy_action_card_removes_it_without_refill() -> None:
+def test_buying_cards_draws_two_blind_for_one_action() -> None:
     engine = CityEngine()
     state = make_state()
     player = state.current_player
     player.money = 20
     player.influence = 10
-    card_id = state.action_market[0]
+    expected = state.action_deck[:2]
 
-    next_state = run(engine, state, "buy_action_card", {"card_id": card_id})
+    next_state = run(engine, state, "buy_action_card")
     next_player = next_state.current_player
-    assert card_id not in next_state.action_market
-    assert len(next_state.action_market) == 2
-    assert next_player.hand[0].card_id == card_id
+
+    # Two cards, because a single blind card never beat a project for the same action.
+    assert [card.card_id for card in next_player.hand] == expected
     assert (next_player.money, next_player.influence) == (17, 9)
+    assert next_state.actions_left == state.actions_left - 1
+
+
+def test_a_card_cannot_be_bought_without_actions_left() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.money = 20
+    player.influence = 10
+    state.actions_left = 0
+    state.investment_actions = 0
+
+    legal = engine.legal_actions(state, player.id)
+    assert not any(action["type"] == "buy_action_card" for action in legal)
+    with pytest.raises(IllegalActionError):
+        run(engine, state, "buy_action_card")
+
+
+def test_discarding_a_card_returns_two_units() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    held = give_card(state, player, "grant")
+
+    state = run(engine, state, "convert_action_card", {"card_uid": held.uid, "into": "influence"})
+
+    # A single unit made the discard a pure loss on a card that cost 3$ and 1◆.
+    assert state.current_player.influence == 4
+    assert not state.current_player.hand
+
+
+def test_roof_price_grows_with_the_round_and_mafia_pays_less() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.money = 30
+
+    assert engine.roof_price(state, player) == 3
+    state.round_number = 3
+    assert engine.roof_price(state, player) == 4
+    state.round_number = 7
+    assert engine.roof_price(state, player) == 6
+    player.role = "mafia"
+    assert engine.roof_price(state, player) == 5
+
+    next_state = run(engine, state, "buy_roof")
+    assert next_state.current_player.money == 25
+    assert next_state.current_player.roofs == 1
+
+
+def test_district_development_pays_at_least_one_per_level() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    # Base incomes 2 and 1: flooring the whole product used to pay +0 for the first level.
+    give_asset(state, player, "delivery")
+    give_asset(state, player, "media")
+    baseline = engine._round_income(state, player)
+
+    player.district_levels["residential"] = 1
+    assert engine._round_income(state, player) == baseline + 2  # 2 → 3 and 1 → 2
+    player.district_levels["residential"] = 2
+    assert engine._round_income(state, player) == baseline + 4  # 3 → 4 and 2 → 3
+
+
+def test_asset_purchase_event_reports_the_grey_scandal_in_deltas() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.money = 20
+    # A grey object charges a scandal on purchase, and add_scandal writes no event of its own.
+    state.market.append(MarketAsset(uid="asset:grey-test", card_id="market", expires_at_turn=99))
+
+    price = engine.asset_price(state, player, "market")
+    state = run(engine, state, "buy_asset", {"market_uid": "asset:grey-test"})
+    bought = next(event for event in reversed(state.event_log) if event.type == "asset_bought")
+    assert bought.data["deltas"][player.id] == {"money": -price, "influence": 1, "scandals": 1, "roofs": 0}
 
 
 def test_targeted_card_auto_blocked_by_roof() -> None:
@@ -156,9 +233,10 @@ def test_sixth_scandal_jails_the_actor_and_burns_the_rest_of_the_turn() -> None:
     assert state.current_player.id == target.id
     assert any(event.type == "player_jailed" for event in state.event_log)
 
-    # The jail turn itself grants a single action.
-    state = run(engine, state, "end_turn")
-    assert state.current_player.id == actor.id
+    # The jail turn itself grants a single action. Turn order is by standings now, so the jailed
+    # player is not necessarily next: skip turns until their turn comes round again.
+    while state.current_player.id != actor.id:
+        state = run(engine, state, "end_turn")
     assert state.actions_left == 1
 
 
@@ -298,6 +376,140 @@ def test_military_sanction_confiscates_asset_at_four_scandals() -> None:
     assert state.player_by_id(target.id).scandals == 3
 
 
+def test_sanction_blocked_by_roof_does_not_clean_the_target() -> None:
+    engine = CityEngine()
+    state = make_state()
+    military = state.current_player
+    target = next(player for player in state.players if player.id != military.id)
+    military.role = "military"
+    target.scandals = 3
+    target.roofs = 1
+    target.money = 20
+
+    state = run(engine, state, "use_role_power", {"power": "military_sanction", "target_id": target.id})
+
+    hit = state.player_by_id(target.id)
+    # The roof absorbs the whole sanction: money intact, and the record is NOT cleared as a bonus.
+    assert (hit.roofs, hit.money, hit.scandals) == (0, 20, 3)
+    assert any(event.type == "targeted_effect_blocked" for event in state.event_log)
+
+
+def test_sanction_that_lands_still_clears_one_scandal() -> None:
+    engine = CityEngine()
+    state = make_state()
+    military = state.current_player
+    target = next(player for player in state.players if player.id != military.id)
+    military.role = "military"
+    target.scandals = 3
+    target.roofs = 0
+    target.money = 20
+
+    state = run(engine, state, "use_role_power", {"power": "military_sanction", "target_id": target.id})
+
+    hit = state.player_by_id(target.id)
+    assert hit.scandals == 2
+    assert hit.money == 20 - (3 + state.round_number)
+
+
+def test_confiscation_and_upgrade_loss_are_logged() -> None:
+    engine = CityEngine()
+    state = make_state()
+    military = state.current_player
+    target = next(player for player in state.players if player.id != military.id)
+    military.role = "military"
+    target.scandals = 4
+    give_asset(state, target, "delivery")
+    valuable = give_asset(state, target, "urban_ecosystem")
+
+    state = run(engine, state, "use_role_power", {"power": "military_sanction", "target_id": target.id})
+
+    taken = next(event for event in state.event_log if event.type == "asset_confiscated")
+    assert taken.data["asset_id"] == valuable.card_id
+    assert taken.data["victim_id"] == target.id
+    assert taken.data["resolution"] == "seized"
+
+
+def test_freeze_card_reports_which_object_it_blocked() -> None:
+    engine = CityEngine()
+    state = make_state()
+    attacker = state.current_player
+    target = next(player for player in state.players if player.id != attacker.id)
+    target.roofs = 0
+    owned = give_asset(state, target, "delivery")
+    held = give_card(state, attacker, "asset_freeze")  # kind=freeze, blocks the best object
+
+    state = run(engine, state, "play_action_card", {"card_uid": held.uid, "target_id": target.id})
+
+    blocked = next(event for event in state.event_log if event.type == "asset_state_changed")
+    assert (blocked.data["asset_uid"], blocked.data["change"]) == (owned.uid, "blocked")
+
+
+def test_antitrust_is_announced_and_itemised_in_the_settlement() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    for card_id in ("delivery", "media", "housing", "pharmacy_chain"):
+        give_asset(state, player, card_id)
+    player.capacity = 6
+    held = give_card(state, player, "antitrust_probe")
+
+    state = run(engine, state, "play_action_card", {"card_uid": held.uid})
+    announced = next(event for event in state.event_log if event.type == "antitrust_activated")
+    assert player.id in announced.data["affected_player_ids"]
+
+    money_before = state.current_player.money
+    for _ in state.players:
+        state = run(engine, state, "end_turn")
+
+    sources = settled_sources(state)[player.id]
+    assert sources["antitrust"] < 0
+    # operations stays gross, so the breakdown still sums to the actual wallet change.
+    assert sum(sources.values()) == state.player_by_id(player.id).money - money_before
+
+
+def test_settlement_reports_where_influence_came_from() -> None:
+    engine = CityEngine()
+    state = make_state()
+    politician = state.current_player
+    politician.role = "politician"
+    give_asset(state, politician, "delivery")
+    give_asset(state, politician, "housing")
+    influence_before = politician.influence
+
+    for _ in state.players:
+        state = run(engine, state, "end_turn")
+
+    settled = next(event for event in state.event_log if event.type == "round_settled")
+    breakdown = settled.data["influence_sources"][politician.id]
+    assert breakdown == {"passive": 2, "news": 0, "rating": 0}
+    assert sum(breakdown.values()) == state.player_by_id(politician.id).influence - influence_before
+
+
+def test_roof_insurance_is_not_offered_without_a_roof() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    give_asset(state, player, "cash")
+    player.influence = 10
+    player.roofs = 0
+
+    greys = [action for action in engine.legal_actions(state, player.id) if action["type"] == "grey_operation"]
+    assert greys and not any(action["payload"]["protect_failure"] for action in greys)
+
+    player.roofs = 1
+    greys = [action for action in engine.legal_actions(state, player.id) if action["type"] == "grey_operation"]
+    assert any(action["payload"]["protect_failure"] for action in greys)
+
+
+@pytest.mark.parametrize(
+    "card_id",
+    [asset.id for asset in load_catalog().assets.values() if "grey" in asset.tags],
+)
+def test_grey_assets_warn_about_the_purchase_scandal(card_id: str) -> None:
+    # The scandal comes from the `grey` tag, so the card text is the only place a player can read it.
+    assert "скандал" in load_catalog().assets[card_id].text.lower()
+
+
 def test_grey_operation_uses_serialized_rng_for_success_and_failure() -> None:
     engine = CityEngine()
     success = make_state()
@@ -363,7 +575,8 @@ def test_every_action_card_has_a_working_engine_path(card_id: str) -> None:
         if card.kind in {"freeze", "remove_upgrade"}:
             owned = give_asset(state, target, "delivery")
             if card.kind == "remove_upgrade":
-                owned.scaled = True
+                target.automation_owned = True
+                target.automation_uid = owned.uid
     elif card.kind in {"district_cash", "zoning", "develop"}:
         payload["district"] = "residential"
         give_asset(state, player, "delivery")
@@ -371,11 +584,304 @@ def test_every_action_card_has_a_working_engine_path(card_id: str) -> None:
             give_asset(state, player, "media")
     elif card.kind == "copy_role":
         payload["role_id"] = "capitalist"
-    elif card.kind == "upgrade_discount":
-        give_asset(state, player, "delivery")
+    elif card.kind == "project":
+        # The unconditional project is always takeable, so the card path never depends on a build.
+        state.project_board = ["art_museum", *state.project_board[:-1]]
+        state.project_deck = [item for item in state.project_deck if item not in state.project_board]
+        payload["project_id"] = "art_museum"
+    elif card.kind == "automation":
+        payload["asset_uid"] = give_asset(state, player, "delivery").uid
     elif card.kind == "unblock":
         give_asset(state, player, "delivery").blocked = True
 
     next_state = run(engine, state, "play_action_card", payload)
     assert held.uid not in {item.uid for item in next_state.current_player.hand}
     assert next_state.turn_flags["card_played"] is True
+
+
+def put_on_board(state, project_id: str) -> None:
+    state.project_board = [project_id, *[item for item in state.project_board if item != project_id]][
+        :PROJECT_BOARD_SIZE
+    ]
+    state.project_deck = [item for item in state.project_deck if item not in state.project_board]
+
+
+def test_money_and_influence_are_fuel_not_score() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.money = 47
+    player.influence = 11
+    player.scandals = 2
+
+    breakdown = engine.score_breakdown(player)
+    # 47$ → 4 points, 11◆ → 3: hoarding a round's income is worth less than a single object.
+    assert breakdown["money"] == 4
+    assert breakdown["influence"] == 3
+    assert breakdown["scandals"] == -2
+    assert breakdown["total"] == engine.score(player)
+
+    player.projects.append("art_museum")
+    assert engine.score_breakdown(player)["projects"] == engine.project("art_museum").points
+
+
+def test_taking_a_project_pays_points_and_denies_it_to_everybody_else() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    put_on_board(state, "art_museum")
+    project = engine.project("art_museum")
+    player.money = 30
+    player.influence = 20
+
+    state = run(engine, state, "city_project", {"project_id": "art_museum"})
+    player = state.current_player
+
+    assert player.projects == ["art_museum"]
+    assert player.money == 30 - project.cost_money
+    assert player.influence == 20 - project.cost_influence
+    assert "art_museum" not in state.project_board
+    assert len(state.project_board) == PROJECT_BOARD_SIZE  # refilled from the deck at once
+    assert not any(
+        action["payload"].get("project_id") == "art_museum"
+        for action in engine.legal_actions(state, player.id)
+        if action["type"] == "city_project"
+    )
+
+
+def test_project_condition_is_enforced() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    put_on_board(state, "metro_line")  # requires objects in three different districts
+    player.money = 30
+    player.influence = 20
+
+    with pytest.raises(IllegalActionError):
+        run(engine, state, "city_project", {"project_id": "metro_line"})
+
+    for card_id in ("delivery", "cowork", "warehouse"):
+        give_asset(state, player, card_id)
+    state = run(engine, state, "city_project", {"project_id": "metro_line"})
+    assert state.current_player.projects == ["metro_line"]
+
+
+def test_project_perk_pays_every_round() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    before_income = engine._round_income(state, player)
+    before_influence = engine.passive_influence(player)
+
+    player.projects.append("metro_line")  # perk: +2$ per round
+    player.projects.append("courthouse")  # perk: +2◆ per round
+
+    assert engine._round_income(state, player) == before_income + 2
+    assert engine.passive_influence(player) == before_influence + 2
+
+
+def test_project_board_rotates_so_it_cannot_jam() -> None:
+    engine = CityEngine()
+    state = make_state()
+    stale = state.project_board[0]
+
+    while state.round_number == 1:
+        state = run(engine, state, "end_turn")
+
+    assert stale not in state.project_board
+    assert state.project_deck[-1] == stale  # to the bottom of the deck, not out of the game
+    assert len(state.project_board) == PROJECT_BOARD_SIZE
+
+
+def test_the_trailing_player_opens_the_next_round() -> None:
+    engine = CityEngine()
+    state = make_state()
+    leader = state.current_player
+    trailing = next(player for player in state.players if player.id != leader.id)
+    leader.money = 200
+
+    while state.round_number == 1:
+        state = run(engine, state, "end_turn")
+
+    assert state.turn_order[0] == trailing.id
+    assert state.current_player.id == trailing.id
+    assert state.players[state.starting_player_index].id == trailing.id
+
+
+def test_automation_doubles_everything_the_object_earns() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    # `battery` prints "+2$ if you own a residential object"; two industrial objects also switch
+    # on the flat district synergy. The token multiplies the whole bonus, not just the printed one.
+    battery = give_asset(state, player, "battery")
+    give_asset(state, player, "warehouse")
+    give_asset(state, player, "delivery")
+    player.automation_owned = True
+
+    plain = engine.object_synergy_income(state, player, battery)
+    player.automation_uid = battery.uid
+    automated = engine.object_synergy_income(state, player, battery)
+
+    assert plain == 1 + 2  # district synergy 1 + own cross-district bonus 2
+    assert automated == 2 * plain
+
+
+def test_automation_token_moves_free_once_per_turn() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    first = give_asset(state, player, "battery")
+    second = give_asset(state, player, "delivery")
+    player.money = 20
+
+    state = run(engine, state, "buy_automation", {"asset_uid": first.uid})
+    actions_after_purchase = state.actions_left
+    state = run(engine, state, "move_automation", {"asset_uid": second.uid})
+    player = state.current_player
+
+    assert player.automation_uid == second.uid
+    assert state.actions_left == actions_after_purchase  # moving is free
+    with pytest.raises(IllegalActionError):
+        run(engine, state, "move_automation", {"asset_uid": first.uid})
+
+
+def test_automation_preview_shows_the_income_of_every_home() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    battery = give_asset(state, player, "battery")
+    delivery = give_asset(state, player, "delivery")
+    player.automation_owned = True
+    player.automation_uid = delivery.uid
+
+    preview = engine.automation_preview(state, player)
+
+    assert set(preview) == {battery.uid, delivery.uid}
+    # The cross-district card is the better host, and the client shows that without any arithmetic.
+    assert preview[battery.uid] > preview[delivery.uid]
+    assert player.automation_uid == delivery.uid  # preview must not move the token
+
+
+def test_demolition_order_only_disables_the_token_until_settlement() -> None:
+    engine = CityEngine()
+    state = make_state()
+    attacker = state.current_player
+    target = next(player for player in state.players if player.id != attacker.id)
+    owned = give_asset(state, target, "battery")
+    target.automation_owned = True
+    target.automation_uid = owned.uid
+    held = give_card(state, attacker, "antitrust")
+
+    state = run(engine, state, "play_action_card", {"card_uid": held.uid, "target_id": target.id})
+    hit = state.player_by_id(target.id)
+
+    # A single card must not destroy the engine for good: the token is owned, just not working.
+    assert hit.automation_owned
+    assert hit.automation_uid == owned.uid
+    assert hit.automation_disabled
+    assert not engine.is_automated(hit, hit.assets[0])
+
+    while state.round_number == 1:
+        state = run(engine, state, "end_turn")
+    assert not state.player_by_id(target.id).automation_disabled
+
+
+def test_replace_asset_swaps_in_one_action_and_carries_the_token() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    cheap = give_asset(state, player, "delivery")  # cost 4 → refund 2
+    # A replacement is only offered with no free slot, so fill the portfolio first.
+    give_asset(state, player, "media")
+    give_asset(state, player, "warehouse")
+    player.automation_owned = True
+    player.automation_uid = cheap.uid
+    player.money = 30
+    state.market.append(MarketAsset(uid="asset:replacement", card_id="robotics", expires_at_turn=99))
+    price = engine.asset_price(state, player, "robotics")
+    actions_before = state.actions_left
+
+    state = run(engine, state, "replace_asset", {"asset_uid": cheap.uid, "market_uid": "asset:replacement"})
+    player = state.current_player
+
+    assert [asset.card_id for asset in player.assets] == ["media", "warehouse", "robotics"]
+    assert player.money == 30 - price + 2  # only the difference is paid
+    assert state.actions_left == actions_before - 1  # one action, not two
+    assert player.automation_uid == "asset:replacement"  # rebuilding does not cost you the engine
+
+
+def test_journalist_keeps_the_role_one_scandal_longer() -> None:
+    engine = CityEngine()
+    state = make_state()
+    reporter = state.current_player
+    reporter.role = "journalist"
+    other = next(player for player in state.players if player.id != reporter.id)
+    other.role = "mafia"
+
+    # The journalist earns influence for their own scandals, so the ordinary limit of five put
+    # their best line permanently one point from collapse.
+    engine.add_scandal(reporter, 5)
+    assert (reporter.scandals, reporter.role) == (5, "journalist")
+    engine.add_scandal(reporter, 1)
+    assert (reporter.scandals, reporter.role, reporter.jail_turns) == (6, None, 0)
+
+    engine.add_scandal(other, 5)
+    assert (other.scandals, other.role) == (5, None)
+
+
+def test_roof_blocks_a_journalist_scandal_like_any_other_attack() -> None:
+    engine = CityEngine()
+    state = make_state()
+    reporter = state.current_player
+    reporter.role = "journalist"
+    reporter.influence = 10
+    target = next(player for player in state.players if player.id != reporter.id)
+    target.roofs = 1
+
+    state = run(engine, state, "use_role_power", {"power": "journalist_publish", "target_id": target.id})
+    hit = state.player_by_id(target.id)
+
+    # Every other targeted effect checks the roof; these two used to punch straight through.
+    assert hit.scandals == 0
+    assert hit.roofs == 0
+    assert any(event.type == "targeted_effect_blocked" for event in state.event_log)
+
+
+def test_initiatives_are_capped_per_game() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.money = 200
+    player.influence = 200
+
+    for _ in range(MAX_REPEATABLE_PROJECTS):
+        state = run(engine, state, "city_project", {"project_id": "city_initiative"})
+        state.actions_left = 3
+        player = state.current_player
+
+    assert player.projects == ["city_initiative"] * MAX_REPEATABLE_PROJECTS
+    # Unlimited initiatives took 38% of all project points in the arena match.
+    with pytest.raises(IllegalActionError):
+        run(engine, state, "city_project", {"project_id": "municipal_programme"})
+
+
+def test_market_reroll_costs_money_but_no_action() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.money = 10
+    state.actions_left = 0
+    state.investment_actions = 0
+    before = [item.card_id for item in state.market]
+
+    state = run(engine, state, "reroll_market")
+    player = state.current_player
+
+    assert player.money == 8
+    assert state.actions_left == 0
+    assert len(state.market) == len(before)
+    assert [item.card_id for item in state.market] != before
+    # One reroll per turn, so it cannot be used to fish the whole deck in a single turn.
+    with pytest.raises(IllegalActionError):
+        run(engine, state, "reroll_market")

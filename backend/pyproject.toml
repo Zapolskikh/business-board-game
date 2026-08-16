@@ -20,7 +20,7 @@ dev = ["pytest>=8.0,<9.0", "httpx>=0.27,<1.0", "ruff>=0.4,<1.0"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["app*", "city_bots*", "city_engine*", "city_rooms*", "simulation*"]
+include = ["agent_play*", "app*", "city_bots*", "city_engine*", "city_rooms*", "simulation*"]
 
 [tool.setuptools.package-data]
 city_engine = ["content/*.json"]

@@ -31,18 +31,24 @@ class PolicyProfile:
     risk_penalty: float
     role_focus: float
     defence: float
+    # How hard the bot plays the project board instead of its own tableau. The older profiles
+    # were written when money was points and objects were the whole game; they still play that
+    # way, which is exactly why they are the easier opponents now.
+    planning: float = 0.0
 
 
 PROFILES = {
     "easy": PolicyProfile(horizon=3, aggression=0.12, risk_penalty=1.5, role_focus=1.4, defence=0.7),
     "medium": PolicyProfile(horizon=8, aggression=0.25, risk_penalty=2.5, role_focus=2.0, defence=1.2),
     "hard": PolicyProfile(horizon=6, aggression=0.45, risk_penalty=2.0, role_focus=1.7, defence=1.5),
+    "expert": PolicyProfile(horizon=7, aggression=0.30, risk_penalty=1.8, role_focus=1.0, defence=1.0, planning=1.0),
 }
 
 BOT_POLICY_NAMES = {
     "easy": "Олег",
     "medium": "Codex",
     "hard": "Claude",
+    "expert": "Claude Reborn",
 }
 
 BOT_POLICY_ALIASES = {
@@ -53,6 +59,10 @@ BOT_POLICY_ALIASES = {
     "кодекс": "medium",
     "claude": "hard",
     "клод": "hard",
+    "reborn": "expert",
+    "claude-reborn": "expert",
+    "claude reborn": "expert",
+    "клод-реборн": "expert",
 }
 
 
@@ -131,6 +141,8 @@ def _action_utility(
     opponents_after = sum(engine.score(other) for other in after_state.players if other.id != player.id)
     utility = after - before + (opponents_before - opponents_after) * profile.aggression
     utility += _strategic_action_bonus(engine, state, player, action, profile)
+    if profile.planning:
+        utility += _project_planning_bonus(engine, state, player, after_player) * profile.planning
     return utility
 
 
@@ -199,6 +211,42 @@ def _role_utility(engine: CityEngine, state: GameState, player: PlayerState, rol
     return engine.district_count(player, "industrial") * 4 + enemy_scandals * 2.5 + (4 if last else 0)
 
 
+def _affordable_projects(engine: CityEngine, state: GameState, player: PlayerState) -> list[Any]:
+    """Board projects whose condition the player already meets — the real scoring targets."""
+    return [
+        engine.project(project_id)
+        for project_id in state.project_board
+        if engine.project_requirement_met(player, engine.project(project_id))
+    ]
+
+
+def _project_planning_bonus(
+    engine: CityEngine,
+    state: GameState,
+    player: PlayerState,
+    after: PlayerState,
+) -> float:
+    """How much closer a move puts the player to taking projects off the board.
+
+    Projects are two thirds of the final score, and their conditions are read off the tableau, so
+    a bot that only maximises income plays the previous version of the game. This scores three
+    things the plain utility misses: newly unlocked conditions, influence when a project is
+    already unlocked but unaffordable, and money that has nowhere else to go.
+    """
+    before_ready = {project.id for project in _affordable_projects(engine, state, player)}
+    after_ready = {project.id for project in _affordable_projects(engine, state, after)}
+    unlocked = sum(engine.project(pid).points for pid in after_ready - before_ready)
+
+    # Influence is only worth hoarding while a reachable project still costs more than you hold.
+    missing = min(
+        (max(0, engine.project(pid).cost_influence - after.influence) for pid in after_ready),
+        default=0,
+    )
+    gained_influence = max(0, after.influence - player.influence)
+    influence_value = min(gained_influence, missing) * 1.4
+    return unlocked * 1.2 + influence_value
+
+
 def _strategic_action_bonus(
     engine: CityEngine,
     state: GameState,
@@ -233,7 +281,9 @@ def _strategic_action_bonus(
             if item.get("role") == preferred
         )
     elif action_type == "buy_action_card":
-        bonus += _card_value(engine, str(payload["card_id"]), player)
+        # A blind draw, so value it at the average card rather than a chosen one.
+        deck = state.action_deck or list(engine.catalog.action_cards)
+        bonus += sum(_card_value(engine, card_id, player) for card_id in deck) / len(deck)
     elif action_type == "play_action_card":
         held = next(card for card in player.hand if card.uid == payload["card_uid"])
         card = engine.action_card(held.card_id)
@@ -251,7 +301,30 @@ def _strategic_action_bonus(
     elif action_type == "buy_roof" and player.role == preferred:
         bonus += 3 * profile.defence
     elif action_type == "city_project":
-        bonus += 2 if state.max_rounds - state.round_number <= 3 else -1
+        # Projects are unique now: taking one denies it to everybody else, so a contested board
+        # is worth more than the points alone.
+        project = engine.project(str(payload["project_id"]))
+        bonus += project.points * 0.4 + len(state.players) * 0.5
+        if profile.planning and project.repeatable:
+            # An initiative is the way out of a dead hand, not a plan: prefer the board while
+            # anything on it is reachable.
+            bonus -= 3.0 if _affordable_projects(engine, state, player) else 0.0
+    elif action_type == "basic_action" and profile.planning:
+        if payload.get("kind") == "work":
+            # Money past what the board can absorb is 0.1 points a dollar.
+            bonus -= 1.5 if player.money > 25 else 0.0
+        else:
+            bonus += 1.0 if _affordable_projects(engine, state, player) else 0.0
+    elif action_type == "reroll_market":
+        affordable = sum(1 for item in state.market if player.money >= engine.asset_price(state, player, item.card_id))
+        bonus += 2.0 if affordable == 0 and len(player.assets) < player.capacity else -1.5
+    elif action_type == "replace_asset":
+        # Swapping a cheap early object for a stronger one is the whole point of the mechanic,
+        # but it must not become a treadmill: only a real jump in value is worth the action.
+        market = next(item for item in state.market if item.uid == payload["market_uid"])
+        owned = next(item for item in player.assets if item.uid == payload["asset_uid"])
+        gain = engine.asset_value_of(market.card_id) - engine.asset_value(owned)
+        bonus += gain * 1.5 - 1.0
     return bonus
 
 
