@@ -1,7 +1,9 @@
 """Version and rules constants persisted with every game snapshot."""
 
 SCHEMA_VERSION = 1
-RULES_VERSION = "city-1.2.0-rc.1"
+# rc.2: the project-board reroll is priced in influence, not money. Snapshots taken under rc.1
+# would be scored against a rule their players never agreed to, so state validation rejects them.
+RULES_VERSION = "city-1.2.0-rc.2"
 CONTENT_VERSION = "city-content-2026-08-16b"
 
 DISTRICT_IDS = (
@@ -63,7 +65,14 @@ MARKET_REROLL_COST = 2
 # One automation token per player, bought once and then moved between own objects for free.
 AUTOMATION_COST = 6
 # Refreshing the oldest project on the board: the expired card goes to the bottom of the deck.
-PROJECT_REROLL_COST = 3
+# Priced in influence for the same reason crisis PR is. At 3$ it was measured free: a four-expert
+# table paid 18 rotations a game out of pocket, which together with the automatic one replaced
+# 3.4 of the 4 board slots every round after round ten. Projects are a third of the final score
+# and the only thing in the game worth planning around, so a board that is re-dealt every round
+# deletes the planning layer exactly when it starts to matter. Money cannot price this — players
+# finish on 207$ and a 10$ fee is still under one point — but influence is the currency projects
+# actually compete for, and the players who churned hardest were the ones holding 2◆ and 300$.
+PROJECT_REROLL_INFLUENCE = 2
 # An action card is a blind draw that costs an action, so it competes with the basic actions.
 ACTION_CARD_COST = 3
 # What discarding a card returns, so a bad draw is not a dead 3$.

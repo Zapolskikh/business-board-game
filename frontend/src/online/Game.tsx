@@ -5,7 +5,9 @@ import {
   actionLabel,
   activeBonuses,
   assetEffectLines,
+  automationCost,
   capacityLabel,
+  crisisPrInfluence,
   describeEventSegments,
   difficultyLabels,
   districtCount,
@@ -17,6 +19,7 @@ import {
   powerLabels,
   projectPerkText,
   projectRequirementText,
+  projectRerollInfluence,
   rarityLabels,
   roofCost,
   scoreOf,
@@ -57,14 +60,14 @@ const rolePowers: Record<string, string[]> = {
 };
 
 const powerDescriptions: Record<string, string> = {
-  capitalist_financing: "Один раз за ход: потратить 3◆ и получить 1 инвестиционное действие для покупки объекта, слота, замены объекта или жетона автоматизации.",
-  politician_tax: "Один раз за ход: потратить 4◆ и получить по 1$ за каждый объект всех игроков в выбранном районе.",
-  politician_cleanup: "Один раз за ход: потратить 2◆ и снять 1 свой скандал.",
-  journalist_inflate: "Один раз за ход: вы и выбранный соперник получаете по 1 скандалу. Внимание: на 5 скандалах теряется роль, на 6 — тюрьма (пропуск хода).",
-  journalist_publish: "Один раз за ход: потратить 3◆ и дать выбранному сопернику 1 скандал.",
+  capitalist_financing: "Действие не расходуется, один раз за ход: потратить 3◆ и получить 1 инвестиционное действие для покупки объекта, слота, замены объекта или жетона автоматизации.",
+  politician_tax: "Действие не расходуется, один раз за ход: потратить 4◆ и получить по 1$ за каждый объект всех игроков в выбранном районе.",
+  politician_cleanup: "Действие не расходуется, один раз за ход: потратить 2◆ и снять 1 свой скандал.",
+  journalist_inflate: "Действие не расходуется, один раз за ход: вы и выбранный соперник получаете по 1 скандалу. У Журналиста порог сдвинут: роль теряется на 6 скандалах, тюрьма на 7 — у всех остальных на 5 и 6.",
+  journalist_publish: "Действие не расходуется, один раз за ход: потратить 3◆ и дать выбранному сопернику 1 скандал.",
   mafia_racket: "Один раз за ход и за 1 действие: нужен активный объект Серого сектора. Базово отбирает до 2$, сумма растёт от раунда, ваших объектов и лидерства цели; её Крыша отменяет рэкет.",
   mafia_sweep: "Один раз за ход и за 1 действие: потратить 1 Крышу, после чего каждый игрок теряет по 1 Крыше.",
-  mafia_cleanup: "Один раз за ход: снять до 2 скандалов, потратив 1 Крышу либо 3$ при наличии административного объекта.",
+  mafia_cleanup: "Действие не расходуется, один раз за ход: снять до 2 скандалов, потратив 1 Крышу либо 3$ при наличии административного объекта.",
   military_sanction: "Один раз за ход и за 1 действие: цель должна иметь минимум 2 скандала. Снимает ей скандал и взыскивает деньги либо объект; Крыша принимает удар.",
   fraudster_cleanup: "За 1 действие снять 1 свой скандал.",
   fraudster_crypto_scam: "Один раз за ход и за 1 действие: нужна активная Городская криптобиржа. Украсть у каждого соперника выбранную сумму и получить столько же скандалов (Аферист — на 1 меньше со снижением). Внимание: на 5 скандалах теряется роль, на 6 — тюрьма (пропуск хода), поэтому большая сумма может вас посадить.",
@@ -175,7 +178,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
   const viewed = game.players.find(player => player.id === viewedPlayerId) ?? me;
   const viewingOther = viewed.id !== me.id;
   const legal = room.legal_actions ?? [];
-  const labelContext = { game, player: me, assets, cards, roles, districts, projects };
+  const labelContext = { game, meta, player: me, assets, cards, roles, districts, projects };
 
   const matching = (type: string, predicate?: (action: LegalAction) => boolean) =>
     legal.filter(action => action.type === type && (!predicate || predicate(action)));
@@ -281,12 +284,18 @@ function PlayerStrip({ game, viewedId, playerId, roles, onView }: {
     const color = playerColors[(seat.get(player.id) ?? 0) % playerColors.length];
     const position = order.indexOf(player.id);
     const done = position >= 0 && position < (game.turns_taken_in_round ?? 0);
+    // The counter used to read "n/6", which is the arrest threshold — it silently hid the cliff
+    // that actually matters: the role is stripped one scandal earlier, and the journalist has
+    // both thresholds shifted up by one.
+    const roleLimit = player.role === "journalist" ? 6 : 5;
+    const atRisk = player.role !== null && player.scandals >= roleLimit - 1;
     return <button
       className={`city-player scandal-${Math.min(6, player.scandals)} ${player.id === current.id ? "active" : ""} ${player.id === viewedId ? "viewed" : ""} ${player.id === playerId ? "mine" : ""} ${done ? "turn-done" : ""}`}
       style={{ "--player": color } as CSSProperties} onClick={() => onView(player.id)} title={`Показать бизнес игрока «${player.name}». Порядок хода в раунде: ${position + 1}. Раунд начинает последний в рейтинге.`} key={player.id}
     >
       <b><span className="player-name">{position >= 0 && <span className="turn-position" title="Очередь хода в этом раунде">{position + 1}</span>}<span className="player-avatar" style={{ borderColor: role?.color ?? "#3d4757" }}>{role?.icon ?? "👤"}</span><span style={{ color }}>{player.name}</span>{player.is_bot && <span className={`bot-badge diff-${player.difficulty}`}>{difficultyLabels[player.difficulty] ?? player.difficulty}</span>}</span><em>🎲 {player.turns} · {scoreOf(game, player)} оч.</em></b>
-      <span>💰 {player.money}　◆ {player.influence}　⚠ {player.scandals}/6　🛡 {player.roofs}</span>
+      <span>💰 {player.money}　◆ {player.influence}　<span className={atRisk ? "scandal-at-risk" : undefined} title={`Скандалы: ${player.scandals}. На ${roleLimit} роль теряется, на ${roleLimit + 1} — арест и сброс до 3⚠. Без роли 1 скандал снимается в начале хода.`}>⚠ {player.scandals}/{roleLimit}</span>　🛡 {player.roofs}</span>
+      {atRisk && <small className="scandal-status">ещё 1 скандал — и роль потеряна</small>}
       <small>{role?.title ?? "без роли"} · объектов {player.assets.length}/{player.capacity} · проектов {player.projects.length}{preferred ? ` · цель ${preferred.icon} ${preferred.title}` : ""}</small>
       {player.jail_turns > 0 && <small className="scandal-status">ТЮРЬМА: ходов {player.jail_turns}</small>}
       {player.id === viewedId && player.id !== playerId && <small className="viewing-badge">👁 просмотр бизнеса</small>}
@@ -309,7 +318,7 @@ function ProjectBoard({ game, meta, me, projects, actions, reroll, busy, onActio
   const initiatives = meta.projects.filter(project => project.repeatable);
   return <section className="city-projects">
     <h2>🏗️ Городские проекты <small>главный источник очков · в колоде ещё {game.project_deck_count} · один проект уходит под низ колоды каждый раунд</small>
-      <button className="market-reroll" disabled={busy || !reroll} onClick={() => reroll && void onAction(reroll)} title="Отправить самый давний проект под низ колоды и добрать новый. Действие не расходуется, один раз за ход.">🔄 Обновить доску</button>
+      <button className="market-reroll" disabled={busy || !reroll} onClick={() => reroll && void onAction(reroll)} title={`Отправить самый давний проект под низ колоды и добрать новый за ${projectRerollInfluence(meta)}◆. Доска общая: карта уходит у всех, в том числе у того, кто уже собрал под неё условие. Действие не расходуется, один раз за ход.`}>🔄 Обновить доску · {projectRerollInfluence(meta)}◆</button>
     </h2>
     <p className="dim card-rule">Проект уникален: кто взял — тот и забрал очки, остальным он больше недоступен. Взятие стоит 1 обычное действие, влияние и деньги; условие проверяется по вашим объектам.</p>
     <div className="project-grid">{game.project_board.map((projectId, index) => {
@@ -367,7 +376,7 @@ function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selected
 }) {
   return <section className="city-map">
     <h2>Районы и рынок <small className="market-remaining">уникальных объектов в колоде: {game.market_deck_count}</small>
-      <button className="market-reroll" disabled={busy || !reroll} onClick={() => reroll && void onAction(reroll)} title={`Обновить сразу все шесть позиций рынка за ${marketRerollCost(meta)}$. Действие не расходуется, один реролл за ход.`}>🔄 Обновить рынок · {marketRerollCost(meta)}$</button>
+      <button className="market-reroll" disabled={busy || !reroll} onClick={() => reroll && void onAction(reroll)} title={`Обновить сразу все шесть позиций рынка за ${marketRerollCost(meta)}$. Рынок общий: текущие предложения исчезают у всех игроков. Действие не расходуется, один реролл за ход.`}>🔄 Обновить рынок · {marketRerollCost(meta)}$</button>
     </h2>
     <div className="district-grid">{meta.districts.map(district => {
       const count = districtCount(viewed, district.id, assets);
@@ -415,7 +424,7 @@ function CardDesk({ game, me, cards, legal, buyCard, busy, onAction, onOffer, la
     <h3 className="group-title">🃏 Карты <span className="group-hint">3$ + 1◆ и 1 действие · в колоде {game.action_deck_count}</span></h3>
     {/* A face-up market bought without an action made the influence card strictly better than
         the campaign action. The draw is blind and costs an action; the discard cushions it. */}
-    <p className="dim card-rule">За одно действие вы тянете <b>две</b> случайные карты. Розыгрыш бесплатный, одна карта за ход. Рука {me.hand?.length ?? 0}/3.</p>
+    <p className="dim card-rule">За одно действие вы тянете <b>две</b> случайные карты. Розыгрыш бесплатный — одна карта за ход; сброс тоже бесплатный и тоже один за ход. Рука {me.hand?.length ?? 0}/3.</p>
     <div className="action-market"><button className="action-card market-action tone-deal" disabled={busy || !buyCard} onClick={() => buyCard && void onAction(buyCard)} title="Потратить 1 обычное действие, 3$ и 1◆ и вытянуть две случайные карты из колоды (в руке максимум 3)."><strong>Вытянуть 2 карты<em>3$ + 1◆ + действие</em></strong><small>Случайные из колоды ({game.action_deck_count} осталось)</small></button></div>
     <div className="hand-grid">{me.hand?.map(held => {
       const card = cards.get(held.card_id);
@@ -424,7 +433,7 @@ function CardDesk({ game, me, cards, legal, buyCard, busy, onAction, onOffer, la
       const influence = convertFor(held.uid, "influence");
       return <article className={`hand-card tone-${card?.tone}`} key={held.uid}>
         <button className="action-card" disabled={busy || variants.length === 0} onClick={() => onOffer(`«${card?.title}» — выберите вариант`, variants)} title={`Разыграть бесплатно; разрешена одна карта за ход. ${card?.text ?? ""}`}><strong>{card?.title}<em>{variants.length > 1 ? "выбрать" : "сыграть"}</em></strong><small>{card?.text}</small></button>
-        <div><button disabled={busy || !money} onClick={() => money && void onAction(money)} title="Удалить карту из руки и сразу получить 2$; действие не расходуется.">Продать +2$</button><button disabled={busy || !influence} onClick={() => influence && void onAction(influence)} title="Удалить карту из руки и сразу получить 2◆; действие не расходуется.">Сбросить +2◆</button></div>
+        <div><button disabled={busy || !money} onClick={() => money && void onAction(money)} title="Удалить карту из руки и сразу получить 2$. Действие не расходуется, но сбросить можно только одну карту за ход.">Продать +2$</button><button disabled={busy || !influence} onClick={() => influence && void onAction(influence)} title="Удалить карту из руки и сразу получить 2◆. Действие не расходуется, но сбросить можно только одну карту за ход.">Сбросить +2◆</button></div>
         {variants.length > 1 && <small className="variant-preview">{variants.slice(0, 2).map(action => actionLabel(action, labelContext)).join(" · ")}</small>}
       </article>;
     })}{!me.hand?.length && <p className="empty-hand">В руке нет карт</p>}</div>
@@ -458,6 +467,7 @@ function BusinessBoard({ viewed, me, game, meta, assets, legal, viewingOther, bu
         key={owned.uid} owned={owned} index={index} owner={viewed} asset={assetMeta} districtInfo={districtInfo}
         effectLines={effectLines} viewingOther={viewingOther} busy={busy} automated={automated}
         incomeHere={game.automation_preview?.[owned.uid]} incomeNow={currentIncome}
+        baseline={viewingOther ? undefined : game.automation_baseline ?? undefined} tokenPrice={automationCost(meta)}
         automate={actionFor("buy_automation", owned.uid) ?? actionFor("move_automation", owned.uid)}
         replacements={replacementsFor(owned.uid)} sell={actionFor("sell_asset", owned.uid)}
         onAction={onAction} onOffer={onOffer}
@@ -467,7 +477,7 @@ function BusinessBoard({ viewed, me, game, meta, assets, legal, viewingOther, bu
   </section>;
 }
 
-function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines, viewingOther, busy, automated, incomeHere, incomeNow, automate, replacements, sell, onAction, onOffer }: {
+function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines, viewingOther, busy, automated, incomeHere, incomeNow, baseline, tokenPrice, automate, replacements, sell, onAction, onOffer }: {
   owned: OwnedAsset;
   index: number;
   owner: PlayerState;
@@ -479,6 +489,8 @@ function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines,
   automated: boolean;
   incomeHere?: number;
   incomeNow?: number;
+  baseline?: number;
+  tokenPrice: number;
   automate?: LegalAction;
   replacements: LegalAction[];
   sell?: LegalAction;
@@ -488,11 +500,23 @@ function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines,
   if (!asset) return null;
   const managed = index < owner.capacity;
   const sellValue = Math.floor(asset.cost / 2);
-  // Moving the token is free, so the payoff of every option is printed on the card itself.
-  const delta = incomeHere !== undefined && incomeNow !== undefined ? incomeHere - incomeNow : undefined;
+  // Every automation figure is a *difference*, never a total: the raw "30$/раунд" that used to sit
+  // on the button is the whole round income with the token here, which reads as a price tag.
+  // `buying` compares against no token at all, a move compares against where the token stands now.
+  const buying = automate?.type === "buy_automation";
+  const reference = buying ? baseline : incomeNow;
+  const delta = incomeHere !== undefined && reference !== undefined ? incomeHere - reference : undefined;
+  const signed = (value: number) => `${value >= 0 ? "+" : "−"}${Math.abs(value)}$`;
+  // What the token is worth where it already stands — otherwise "I placed it, and now what?".
+  const worthNow = automated && !owner.automation_disabled && incomeNow !== undefined && baseline !== undefined
+    ? incomeNow - baseline
+    : undefined;
   const status = owned.blocked ? "🔒 заблокирован"
-    : automated ? (owner.automation_disabled ? "⚙ жетон не работает до выплаты" : "⚙ жетон автоматизации")
-    : "работает";
+    : automated
+      ? owner.automation_disabled
+        ? "⚙ жетон не работает до выплаты"
+        : `⚙ жетон${worthNow !== undefined ? `: ${signed(worthNow)}/раунд` : " автоматизации"}`
+      : "работает";
   return <article className={`owned-asset rarity-${asset.rarity} ${owned.blocked ? "blocked" : ""} ${!managed ? "unmanaged" : ""} ${automated ? "automated" : ""}`}>
     <header>
       <span className="rarity-badge">{rarityLabels[asset.rarity]}</span>
@@ -507,9 +531,17 @@ function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines,
       ? <ul className="asset-effects">{effectLines.map((line, i) => <li key={i} className={line.active ? "effect-active" : "effect-idle"}>{line.text}{line.boosted && <span className="effect-boost">⚙×2</span>}</li>)}</ul>
       : asset.text && <small className="asset-summary">{asset.text}</small>}
     {!viewingOther && <div className="owned-actions">
-      {!automated && <button disabled={busy || !automate} onClick={() => automate && void onAction(automate)} title="Жетон автоматизации удваивает собственные бонусы объекта (кросс-районные, ролевые, влияние) и снимает с него содержание. Районная и ролевая синергия не удваиваются. Перенос бесплатный, один раз за ход.">
-        <strong>⚙ Жетон сюда{incomeHere !== undefined ? ` · ${incomeHere}$/раунд` : ""}</strong>
-        <small>{delta !== undefined ? `${delta >= 0 ? "+" : "−"}${Math.abs(delta)}$ к доходу` : "автоматизация"}</small>
+      {!automated && <button
+        className={delta !== undefined && delta <= 0 ? "automation-pointless" : ""}
+        disabled={busy || !automate}
+        onClick={() => automate && void onAction(automate)}
+        title={`${buying ? `Купить жетон автоматизации за ${tokenPrice}$ и сразу поставить его сюда. Расходует обычное либо инвестиционное действие. ` : "Перенести жетон на этот объект. Перенос бесплатный и не расходует действие, один раз за ход. "}Жетон удваивает собственные бонусы объекта (кросс-районные, ролевые, влияние) и снимает с него содержание; районная и ролевая синергия не удваиваются.${incomeHere !== undefined ? ` Доход раунда с жетоном здесь: ${incomeHere}$ (сейчас ${reference ?? "—"}$).` : ""}`}
+      >
+        <strong>⚙ {buying ? `Купить жетон · ${tokenPrice}$` : "Перенести жетон сюда"}</strong>
+        <small>{delta === undefined ? "автоматизация"
+          : delta > 0 ? `${signed(delta)}/раунд к доходу`
+          : delta === 0 ? "ничего не изменит"
+          : `${signed(delta)}/раунд — станет хуже`}</small>
       </button>}
       <button disabled={busy || replacements.length === 0} onClick={() => onOffer(`Заменить «${asset.title}» — выберите объект с рынка`, replacements)} title={`Обменять объект на любой с рынка за одно действие: возврат ${sellValue}$ зачитывается в цену, доплачивается только разница. Жетон автоматизации переезжает на новый объект.`}>
         <strong>♻ Заменить · возврат {sellValue}$</strong><small>{replacements.length ? `${replacements.length} вариантов на рынке` : "нет доступных"}</small>
@@ -565,7 +597,7 @@ function DecisionPanel({ game, me, meta, roles, districts, legal, selectedDistri
       <StaticAction action={find("basic_action", item => item.payload.kind === "work")} label="💵 Городской заказ: +2$" tooltip={`Потратить 1 обычное действие и сразу получить 2$. Деньги — топливо: в конце партии ${moneyPerPoint(meta)}$ дают лишь 1 очко, поэтому копить их невыгодно.`} busy={busy} onAction={onAction} />
       <StaticAction action={find("basic_action", item => item.payload.kind === "campaign")} label="📣 Кампания: 2$ → 2◆" tooltip="Потратить 1 обычное действие и 2$, чтобы сразу получить 2◆ влияния. Влияние нужно для проектов и ролей." busy={busy} onAction={onAction} />
       <StaticAction action={find("reroll_market")} label={`🔄 Обновить рынок: ${marketRerollCost(meta)}$`} tooltip="Полностью сменить шесть позиций рынка объектов. Действие не расходуется, один раз за ход." busy={busy} onAction={onAction} />
-      <StaticAction action={find("reroll_projects")} label="🔄 Обновить доску проектов: 3$" tooltip="Отправить самый давний проект под низ колоды и добрать новый. Действие не расходуется, один раз за ход." busy={busy} onAction={onAction} />
+      <StaticAction action={find("reroll_projects")} label={`🔄 Обновить доску проектов: ${projectRerollInfluence(meta)}◆`} tooltip={`Отправить самый давний проект под низ колоды и добрать новый за ${projectRerollInfluence(meta)}◆. Доска общая: карта уходит у всех. Действие не расходуется, один раз за ход.`} busy={busy} onAction={onAction} />
       <StaticAction action={find("buy_capacity")} label={`📦 ${capacityLabel(me)}`} tooltip="Купить постоянный дополнительный слот бизнеса. Можно потратить обычное либо инвестиционное действие; максимум 6 слотов." busy={busy} onAction={onAction} />
       <StaticAction action={districtAction} label={`⭐ Развить «${districts.get(selectedDistrict)?.title}»`} tooltip="Нужно минимум 2 своих объекта в выбранном районе. Потратить 1 действие и 2$: +25% к базовому доходу всех ваших объектов района с округлением вверх (то есть минимум +1$ каждому) и +1◆. Максимум 2 уровня; уровень личный и соперникам ничего не даёт." busy={busy} onAction={onAction} />
     </div>
@@ -588,7 +620,7 @@ function DecisionPanel({ game, me, meta, roles, districts, legal, selectedDistri
       return <button className="described-action" disabled={busy || variants.length === 0} onClick={() => onOffer(label, variants)} title={`Требуется «${info.asset}». Эффект при успехе: ${effect}. Базовый шанс успеха ${info.chance}%; у Афериста он может быть выше. ${info.failure} Страховка при провале тратит 1 Крышу и отменяет денежный либо объектный штраф, но скандалы всё равно начисляются и действие расходуется.`} key={assetId}><strong>{label}</strong><small>{variants.length ? `${effect} · шанс от ${info.chance}%` : greyRequirement(assetId)}</small></button>;
     })}</div>
 
-    <div className="action-group g-defence"><h3 className="group-title">🛡️ Защита и репутация</h3><StaticAction action={find("crisis_pr")} label="🧯 Антикризисный PR: 3◆ → −1⚠" tooltip="Потратить 1 обычное действие и 3◆, чтобы снять 1 свой скандал. Цена в влиянии, а не в деньгах: деньги слишком дёшевы в очках, чтобы скандал что-то значил." busy={busy} onAction={onAction} /><StaticAction action={find("buy_roof")} label={`🛡️ Купить Крышу (${roofCost(me, game)}$)`} tooltip={`Потратить 1 обычное действие и ${roofCost(me, game)}$. Цена растёт на 1$ каждые два раунда. Крыша гасит направленный на вас эффект другого игрока: карту, рэкет, санкцию, взлом, попытку отобрать роль. Последствия ваших собственных решений она не отменяет, но может застраховать провал вашей серой операции. Лимит 1, у Мафиози 2.`} busy={busy} onAction={onAction} /></div>
+    <div className="action-group g-defence"><h3 className="group-title">🛡️ Защита и репутация</h3><StaticAction action={find("crisis_pr")} label={`🧯 Антикризисный PR: ${crisisPrInfluence(meta)}◆ → −1⚠`} tooltip={`Потратить 1 обычное действие и ${crisisPrInfluence(meta)}◆, чтобы снять 1 свой скандал. Цена в влиянии, а не в деньгах: деньги слишком дёшевы в очках, чтобы скандал что-то значил.`} busy={busy} onAction={onAction} /><StaticAction action={find("buy_roof")} label={`🛡️ Купить Крышу (${roofCost(me, game)}$)`} tooltip={`Потратить 1 обычное действие и ${roofCost(me, game)}$. Цена растёт на 1$ каждые два раунда. Крыша гасит направленный на вас эффект другого игрока: карту, рэкет, санкцию, взлом, попытку отобрать роль. Последствия ваших собственных решений она не отменяет, но может застраховать провал вашей серой операции. Лимит 1, у Мафиози 2.`} busy={busy} onAction={onAction} /></div>
     <button className="end-turn" disabled={busy || !endTurn} onClick={() => endTurn && void onAction(endTurn)} title="Завершить текущий ход. Неиспользованные обычные действия пропадут, кроме разрешённого переносимого действия; затем сервер выполнит ходы ботов.">✅ Завершить ход</button>
   </aside>;
 }

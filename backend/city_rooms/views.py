@@ -7,6 +7,7 @@ from functools import lru_cache
 from typing import Any
 
 from city_engine.engine import CityEngine
+from city_engine.models import PlayerState
 from city_rooms.models import RoomState
 
 
@@ -16,15 +17,29 @@ def _scoring_engine() -> CityEngine:
     return CityEngine()
 
 
+def _viewer(room: RoomState, viewer_id: str | None) -> PlayerState | None:
+    if room.game is None or viewer_id is None:
+        return None
+    try:
+        return room.game.player_by_id(viewer_id)
+    except KeyError:
+        return None
+
+
 def _automation_preview(room: RoomState, viewer_id: str | None) -> dict[str, int]:
     """Round income for every possible home of the viewer's automation token."""
-    if room.game is None or viewer_id is None:
-        return {}
-    try:
-        player = room.game.player_by_id(viewer_id)
-    except KeyError:
+    player = _viewer(room, viewer_id)
+    if player is None or room.game is None:
         return {}
     return _scoring_engine().automation_preview(room.game, player)
+
+
+def _automation_baseline(room: RoomState, viewer_id: str | None) -> int | None:
+    """Round income without the token, so the client can show its contribution and not a total."""
+    player = _viewer(room, viewer_id)
+    if player is None or room.game is None:
+        return None
+    return _scoring_engine().automation_baseline(room.game, player)
 
 
 def room_view(
@@ -55,6 +70,7 @@ def room_view(
     game["score_breakdown"] = {player.id: engine.score_breakdown(player) for player in room.game.players}
     # Moving the token is free, so the payoff of each option must be on screen, not in the head.
     game["automation_preview"] = _automation_preview(room, viewer_id)
+    game["automation_baseline"] = _automation_baseline(room, viewer_id)
     game.pop("rng", None)
     game.pop("processed_command_ids", None)
     game.pop("command_log", None)

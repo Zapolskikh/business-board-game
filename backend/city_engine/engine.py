@@ -26,7 +26,7 @@ from city_engine.constants import (
     MAX_REPEATABLE_PROJECTS,
     MONEY_PER_POINT,
     PROJECT_BOARD_SIZE,
-    PROJECT_REROLL_COST,
+    PROJECT_REROLL_INFLUENCE,
     ROLE_IDS,
 )
 from city_engine.content import (
@@ -209,19 +209,20 @@ class CityEngine:
         # Rerolling costs money only, so it stays available with no actions left.
         if player.money >= MARKET_REROLL_COST:
             candidates.append(Command(type="reroll_market", actor_id=actor_id))
-        if player.money >= PROJECT_REROLL_COST and state.project_deck:
+        if player.influence >= PROJECT_REROLL_INFLUENCE and state.project_deck:
             candidates.append(Command(type="reroll_projects", actor_id=actor_id))
         if can_act and player.money >= ACTION_CARD_COST and player.influence >= 1 and len(player.hand) < 3:
             candidates.append(Command(type="buy_action_card", actor_id=actor_id))
         for held in player.hand:
-            candidates.extend(
-                Command(
-                    type="convert_action_card",
-                    actor_id=actor_id,
-                    payload={"card_uid": held.uid, "into": into},
+            if not self._flag(state, "card_converted"):
+                candidates.extend(
+                    Command(
+                        type="convert_action_card",
+                        actor_id=actor_id,
+                        payload={"card_uid": held.uid, "into": into},
+                    )
+                    for into in ("money", "influence")
                 )
-                for into in ("money", "influence")
-            )
             card = self.action_card(held.card_id)
             if card.targeted:
                 candidates.extend(
@@ -466,6 +467,34 @@ class CityEngine:
             return sum(tag in self.owned_definition(asset).tags for asset in player.assets) >= needed
         raise InvalidCommandError(f"unknown project requirement: {kind}")
 
+    def project_requirement_progress(self, player: PlayerState, project: ProjectDefinition) -> float:
+        """How far along a condition is, from 0.0 to 1.0 — the partial credit ``met`` cannot give.
+
+        A bot scoring only the moment a condition flips to met can never climb a three-step one:
+        the first two objects are worth exactly zero, so multi-step projects only ever complete by
+        accident. Conditions that cannot be approached gradually (a role, the automation token,
+        a scandal ceiling) stay binary, which is honest — there is no half of owning a token.
+        """
+        requirement = project.requirement
+        kind = str(requirement.get("type", "none"))
+        needed = max(1, int(requirement.get("count", 1)))
+        if kind in {"none", "automation", "role", "max_scandals"}:
+            return 1.0 if self.project_requirement_met(player, project) else 0.0
+        if kind == "assets":
+            have = len(player.assets)
+        elif kind == "district_objects":
+            have = self.district_count(player, str(requirement["district"]))
+        elif kind == "district_depth":
+            have = max(self.district_count(player, district) for district in DISTRICT_IDS)
+        elif kind == "distinct_districts":
+            have = sum(self.district_count(player, district) > 0 for district in DISTRICT_IDS)
+        elif kind == "tag_objects":
+            tag = str(requirement["tag"])
+            have = sum(tag in self.owned_definition(asset).tags for asset in player.assets)
+        else:
+            raise InvalidCommandError(f"unknown project requirement: {kind}")
+        return min(1.0, have / needed)
+
     def asset_value(self, owned: OwnedAsset) -> int:
         return self.asset_value_of(owned.card_id)
 
@@ -495,9 +524,10 @@ class CityEngine:
 
         Moving the token is free and repeatable, which only reads as a decision if the payoff of
         each option is on screen. Computed server-side for the same reason market prices are.
+
+        Also computed before the token is bought: 6$ with no visible payoff is not a decision
+        either, so the client can price the purchase against the same numbers as a move.
         """
-        if not player.automation_owned:
-            return {}
         original = player.automation_uid
         preview: dict[str, int] = {}
         for asset in player.assets:
@@ -505,6 +535,18 @@ class CityEngine:
             preview[asset.uid] = self._round_income(state, player)
         player.automation_uid = original
         return preview
+
+    def automation_baseline(self, state: GameState, player: PlayerState) -> int:
+        """Round income with the token parked, so the client can state what it is actually worth.
+
+        Without it every figure on screen is an absolute and the player has to subtract two
+        numbers to answer "what does this token give me", which is the only question they have.
+        """
+        original = player.automation_uid
+        player.automation_uid = None
+        baseline = self._round_income(state, player)
+        player.automation_uid = original
+        return baseline
 
     @staticmethod
     def _flag(state: GameState, key: str) -> bool:
@@ -655,23 +697,26 @@ class CityEngine:
             state.project_board.append(state.project_deck.pop(0))
 
     def _reroll_projects(self, state: GameState, command: Command) -> None:
-        """Push the oldest project to the bottom of the deck for money, without an action.
+        """Push the oldest project to the bottom of the deck for influence, without an action.
 
         Rotation already recycles a project instead of removing it, so this cannot drain the deck:
-        it only buys you a different offer when nothing on the board fits your portfolio.
+        it only buys you a different offer when nothing on the board fits your portfolio. The
+        price is influence because the board is shared — the card you rotate away is one every
+        other player can see and may already qualify for, and money was too cheap to make that a
+        real decision (see ``PROJECT_REROLL_INFLUENCE``).
         """
         player = state.current_player
         if self._flag(state, "projects_rerolled"):
             raise IllegalActionError("the project board has already been rerolled this turn")
-        if player.money < PROJECT_REROLL_COST:
-            raise IllegalActionError("not enough money to reroll the project board")
+        if player.influence < PROJECT_REROLL_INFLUENCE:
+            raise IllegalActionError("not enough influence to reroll the project board")
         if not state.project_deck:
             raise IllegalActionError("the project deck is empty")
         self._mark_flag(state, "projects_rerolled")
-        player.money -= PROJECT_REROLL_COST
-        self._rotate_project_board(state, cost=PROJECT_REROLL_COST, actor_id=player.id)
+        player.influence -= PROJECT_REROLL_INFLUENCE
+        self._rotate_project_board(state, cost_influence=PROJECT_REROLL_INFLUENCE, actor_id=player.id)
 
-    def _rotate_project_board(self, state: GameState, *, cost: int = 0, actor_id: str | None = None) -> None:
+    def _rotate_project_board(self, state: GameState, *, cost_influence: int = 0, actor_id: str | None = None) -> None:
         """One project leaves the board every round: the longest-standing one goes to the bottom.
 
         Without this the board silently jams: four projects nobody can satisfy sit there for the
@@ -688,7 +733,7 @@ class CityEngine:
             actor_id,
             expired_project_id=expired,
             project_board=list(state.project_board),
-            cost=cost,
+            cost_influence=cost_influence,
         )
 
     def _buy_capacity(self, state: GameState, command: Command) -> None:
@@ -816,7 +861,7 @@ class CityEngine:
                 )
         raw_scandals = int(purchase.get("scandals", 1 if "grey" in asset.tags else 0))
         reduction = self.effect_total(player, "greyScandalReduction") if "grey" in asset.tags else 0
-        self.add_scandal(player, max(0, raw_scandals - reduction))
+        self.add_scandal(state, player, max(0, raw_scandals - reduction))
         self._refill_market(state, 1)
 
     def _reroll_market(self, state: GameState, command: Command) -> None:
@@ -1033,7 +1078,18 @@ class CityEngine:
         )
 
     def _convert_action_card(self, state: GameState, command: Command) -> None:
+        """Discard one card for a consolation unit — once a turn, like playing one.
+
+        A purchase draws two cards and a discard costs no action, so shredding both in the same
+        turn turned the blind draw into the best influence pump in the game: 3$ and one action
+        for +4◆, against +2◆ for the campaign that is supposed to be the influence action. Bots
+        found it and bought cards they never intended to read. Capping it at one a turn — the
+        same rule the card play already follows — leaves the discard as the cushion for a bad
+        draw it was meant to be, without touching what a card is worth.
+        """
         player = state.current_player
+        if self._flag(state, "card_converted"):
+            raise IllegalActionError("only one action card may be discarded per turn")
         card_uid = self._payload_string(command, "card_uid")
         into = self._payload_string(command, "into")
         if into not in {"money", "influence"}:
@@ -1041,6 +1097,7 @@ class CityEngine:
         held = next((card for card in player.hand if card.uid == card_uid), None)
         if held is None:
             raise IllegalActionError("action card is not in the player's hand")
+        self._mark_flag(state, "card_converted")
         player.hand.remove(held)
         # Softens a blind draw: returning a single unit made the discard a pure loss on a card
         # that cost 3$ and 1◆, so nobody ever used it on purpose.
@@ -1247,7 +1304,7 @@ class CityEngine:
         if card.kind == "steal":
             attacker.money += 2
         elif card.kind == "double_scandal":
-            self.add_scandal(attacker, 1)
+            self.add_scandal(state, attacker, 1)
         elif card.kind == "blackmail":
             attacker.influence += 1
         elif card.kind == "expose" and self.ranking(state)[0].id == target.id:
@@ -1263,13 +1320,13 @@ class CityEngine:
         kind = card.kind
         before = self._resource_snapshot(state)
         if kind == "scandal":
-            self.add_scandal(target, card.value)
+            self.add_scandal(state, target, card.value)
         elif kind == "fine":
             if target.money >= card.value:
                 target.money -= card.value
             else:
                 target.money = 0
-                self.add_scandal(target, 1)
+                self.add_scandal(state, target, 1)
         elif kind == "steal":
             target.money = max(0, target.money - card.value)
         elif kind == "role_pressure":
@@ -1279,7 +1336,7 @@ class CityEngine:
                 target.influence = 0
                 target.role = None
         elif kind == "double_scandal":
-            self.add_scandal(target, card.value)
+            self.add_scandal(state, target, card.value)
         elif kind == "blackmail":
             target.influence = max(0, target.influence - card.value)
         elif kind == "freeze":
@@ -1287,7 +1344,7 @@ class CityEngine:
             frozen.blocked = True
             self._log_asset_state_change(state, target, frozen, change="blocked", source=card.id)
         elif kind == "expose":
-            self.add_scandal(target, 1)
+            self.add_scandal(state, target, 1)
         elif kind == "remove_upgrade":
             # The token is not destroyed — a single card must not switch off the whole engine for
             # good. It stops working until the round is settled, like a blocked object.
@@ -1353,13 +1410,13 @@ class CityEngine:
                 player.influence -= 3
             else:
                 # The self-scandal is your own choice, so a roof never cancels it.
-                self.add_scandal(player, 1)
+                self.add_scandal(state, player, 1)
             # Every other targeted effect checks the roof; these two used to punch straight through.
             if target.roofs > 0:
                 target.roofs -= 1
                 state.append_event("targeted_effect_blocked", target.id, power=power, by="roof")
             else:
-                self.add_scandal(target, 1)
+                self.add_scandal(state, target, 1)
         elif power == "mafia_racket":
             self._mafia_racket(state, command)
         elif power == "mafia_sweep":
@@ -1433,7 +1490,7 @@ class CityEngine:
         player.money += money
         player.influence += influence
         if self.district_count(player, "government") < 1:
-            self.add_scandal(player, 1)
+            self.add_scandal(state, player, 1)
 
     def _mafia_cleanup(self, state: GameState, command: Command) -> None:
         player = state.current_player
@@ -1565,7 +1622,7 @@ class CityEngine:
             gained += taken
         player.money += gained
         reduction = self.effect_total(player, "greyScandalReduction")
-        self.add_scandal(player, max(0, amount - reduction))
+        self.add_scandal(state, player, max(0, amount - reduction))
 
     def _fraudster_forge(self, state: GameState, command: Command) -> None:
         player = state.current_player
@@ -1578,7 +1635,7 @@ class CityEngine:
             raise IllegalActionError("forgery requires 5 influence")
         self._spend_action(state)
         player.influence -= 5
-        self.add_scandal(player, 2)
+        self.add_scandal(state, player, 2)
         player.pending_role = role_id
 
     def _grey_operation(self, state: GameState, command: Command) -> None:
@@ -1609,6 +1666,7 @@ class CityEngine:
             self._resolve_grey_success(state, player, target, asset_id, comeback)
             operation_scandals = 2 if asset_id == "datacenter" else 1
             self.add_scandal(
+                state,
                 player,
                 max(0, operation_scandals - self.effect_total(player, "greyScandalReduction")),
             )
@@ -1702,6 +1760,7 @@ class CityEngine:
                     self._log_asset_state_change(state, player, asset, change=change, source="datacenter_failure")
         failure_scandals = 1 if self.has_role(player, "fraudster") else 3 if asset_id in {"crypto", "datacenter"} else 2
         self.add_scandal(
+            state,
             player,
             max(0, failure_scandals - self.effect_total(player, "greyScandalReduction")),
         )
@@ -1715,30 +1774,52 @@ class CityEngine:
         """
         return JOURNALIST_SCANDAL_LIMIT if self.has_role(player, "journalist") else 5
 
-    def add_scandal(self, player: PlayerState, amount: int) -> None:
+    def add_scandal(self, state: GameState, player: PlayerState, amount: int) -> None:
+        """Charge scandals and announce every consequence that is not a plain counter change.
+
+        Losing a role, being jailed and spending a scandal shield used to happen in silence: the
+        only trace was the scandal counter moving, so a player found out their role was gone by
+        diffing their own state. A roof already reports itself through ``targeted_effect_blocked``
+        and the shield has to do the same, or the two defences read completely differently.
+        """
         if amount <= 0:
             player.scandals = max(0, player.scandals + amount)
             return
         if player.scandal_shields > 0:
             player.scandal_shields -= 1
+            state.append_event(
+                "scandal_shield_spent",
+                player.id,
+                absorbed=amount,
+                scandal_shields=player.scandal_shields,
+            )
             return
         limit = self.scandal_limit(player)
         next_value = player.scandals + amount
         player.scandal_gained_this_round += amount
-        if next_value >= limit + 1:
+        if next_value < limit:
+            player.scandals = next_value
+            return
+
+        lost_role = player.role
+        jailed = next_value >= limit + 1
+        player.role = None
+        player.copied_role = None
+        player.pending_role = None
+        if jailed:
             player.scandals = 3
-            player.role = None
-            player.copied_role = None
-            player.pending_role = None
             player.roofs = max(0, player.roofs - 1)
             player.jail_turns = 1
-        elif next_value >= limit:
-            player.scandals = limit
-            player.role = None
-            player.copied_role = None
-            player.pending_role = None
         else:
-            player.scandals = next_value
+            player.scandals = limit
+        state.append_event(
+            "scandal_limit_reached",
+            player.id,
+            role_id=lost_role,
+            jailed=jailed,
+            limit=limit,
+            scandals=player.scandals,
+        )
 
     def _enforce_jail_interrupt(self, state: GameState, command: Command) -> None:
         """A sixth scandal jails the actor at once: the rest of their turn is forfeited.

@@ -9,13 +9,16 @@ from pathlib import Path
 from typing import Any
 
 from city_engine.constants import (
+    ACTION_CARD_COST,
     AUTOMATION_COST,
     CONTENT_VERSION,
+    CRISIS_PR_INFLUENCE,
     DISTRICT_IDS,
     INFLUENCE_PER_POINT,
     MARKET_REROLL_COST,
     MONEY_PER_POINT,
     PROJECT_BOARD_SIZE,
+    PROJECT_REROLL_INFLUENCE,
     REPEATABLE_PROJECT_IDS,
     ROLE_IDS,
 )
@@ -193,6 +196,9 @@ class ContentCatalog:
             "project_board_size": PROJECT_BOARD_SIZE,
             "market_reroll_cost": MARKET_REROLL_COST,
             "automation_cost": AUTOMATION_COST,
+            "project_reroll_influence": PROJECT_REROLL_INFLUENCE,
+            "crisis_pr_influence": CRISIS_PR_INFLUENCE,
+            "action_card_cost": ACTION_CARD_COST,
         }
         return raw
 

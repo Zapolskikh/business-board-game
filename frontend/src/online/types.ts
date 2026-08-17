@@ -110,6 +110,8 @@ export interface GameState {
   score_breakdown: Record<string, ScoreBreakdown>;
   // Round income for every possible home of the viewer's automation token, keyed by asset uid.
   automation_preview: Record<string, number>;
+  // Round income with the token parked: every preview above minus this is what the token adds.
+  automation_baseline?: number | null;
   final_scores?: Record<string, number>;
 }
 
@@ -171,6 +173,9 @@ export interface ScoringMeta {
   project_board_size: number;
   market_reroll_cost: number;
   automation_cost: number;
+  project_reroll_influence: number;
+  crisis_pr_influence: number;
+  action_card_cost: number;
 }
 
 export interface CityMeta {

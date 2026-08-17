@@ -87,6 +87,18 @@ export function automationCost(meta: CityMeta): number {
   return meta.scoring?.automation_cost ?? 6;
 }
 
+export function projectRerollInfluence(meta: CityMeta): number {
+  return meta.scoring?.project_reroll_influence ?? 2;
+}
+
+export function crisisPrInfluence(meta: CityMeta): number {
+  return meta.scoring?.crisis_pr_influence ?? 3;
+}
+
+export function actionCardCost(meta: CityMeta): number {
+  return meta.scoring?.action_card_cost ?? 3;
+}
+
 /** Human-readable project condition, built from the structured requirement. */
 export function projectRequirementText(project: ProjectMeta, meta: CityMeta): string {
   const requirement = project.requirement ?? { type: "none" };
@@ -149,6 +161,7 @@ export function actionIdentity(action: LegalAction): string {
 
 interface LabelContext {
   game: GameState;
+  meta: CityMeta;
   player: PlayerState;
   assets: Map<string, AssetMeta>;
   cards: Map<string, ActionMeta>;
@@ -158,7 +171,7 @@ interface LabelContext {
 }
 
 export function actionLabel(action: LegalAction, context: LabelContext): string {
-  const { game, player, assets, cards, roles, districts, projects } = context;
+  const { game, meta, player, assets, cards, roles, districts, projects } = context;
   const payload = action.payload;
   const target = game.players.find(item => item.id === stringValue(payload.target_id));
   const district = districts.get(stringValue(payload.district));
@@ -166,7 +179,8 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
   const project = projects.get(stringValue(payload.project_id));
   if (action.type === "basic_action") return payload.kind === "work" ? "Городской заказ: +2$" : "Кампания: 2$ → 2◆";
   if (action.type === "end_turn") return "Завершить ход";
-  if (action.type === "reroll_market") return "Обновить рынок объектов (2$)";
+  if (action.type === "reroll_market") return `Обновить рынок объектов (${marketRerollCost(meta)}$)`;
+  if (action.type === "reroll_projects") return `Обновить доску проектов (${projectRerollInfluence(meta)}◆)`;
   if (action.type === "city_project") {
     return project
       ? `«${project.title}» · ${project.cost_influence}◆+${project.cost_money}$ → ${project.points} очков`
@@ -174,7 +188,8 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
   }
   if (action.type === "buy_capacity") return capacityLabel(player);
   if (action.type === "buy_roof") return `Купить Крышу (${roofCost(player, game)}$)`;
-  if (action.type === "crisis_pr") return "Антикризисный PR: 4$ → −1⚠";
+  // The engine charges influence, not money: CRISIS_PR_INFLUENCE, not the old 4$ price.
+  if (action.type === "crisis_pr") return `Антикризисный PR: ${crisisPrInfluence(meta)}◆ → −1⚠`;
   if (action.type === "claim_role") return `${role?.icon ?? "🏷️"} ${role?.title ?? payload.role_id}`;
   if (action.type === "buy_asset") {
     const marketItem = game.market.find(item => item.uid === payload.market_uid);
@@ -188,8 +203,13 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
     const owned = player.assets.find(item => item.uid === payload.asset_uid);
     const title = assets.get(owned?.card_id ?? "")?.title ?? "объект";
     const income = game.automation_preview?.[stringValue(payload.asset_uid)];
-    const verb = action.type === "buy_automation" ? "Купить жетон автоматизации" : "Перенести жетон";
-    return `${verb} → «${title}»${income !== undefined ? ` · доход ${income}$/раунд` : ""}`;
+    const verb = action.type === "buy_automation"
+      ? `Купить жетон автоматизации (${automationCost(meta)}$)`
+      : "Перенести жетон";
+    const baseline = game.automation_baseline;
+    const gain = income !== undefined && baseline !== undefined && baseline !== null ? income - baseline : undefined;
+    const payoff = gain !== undefined ? ` · ${gain >= 0 ? "+" : "−"}${Math.abs(gain)}$/раунд` : "";
+    return `${verb} → «${title}»${payoff}`;
   }
   if (action.type === "replace_asset") {
     const owned = player.assets.find(item => item.uid === payload.asset_uid);
@@ -250,6 +270,8 @@ const eventVerbs: Record<string, string> = {
   market_rotated: "Рынок объектов обновился",
   grey_operation: "проводит серую операцию",
   role_power_used: "использует способность роли",
+  scandal_limit_reached: "доходит до предела скандалов",
+  scandal_shield_spent: "гасит скандал щитом",
   player_jailed: "арестован",
   game_finished: "Партия завершена",
 };
@@ -458,6 +480,24 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       return lead(txt(` эффект «${card ?? cardId}» на `), playerSeg(game, targetId), ...deltas);
     case "targeted_effect_blocked":
       return lead(txt(" отражает атаку Крышей"));
+    // Both of these used to be invisible: the only trace was the scandal counter, so a player
+    // discovered a lost role by noticing their passive income had stopped.
+    case "scandal_shield_spent":
+      return lead(
+        txt(" гасит "),
+        num(`${numberValue(data.absorbed) || 1}⚠`, "good"),
+        txt(` Щитом от скандала (осталось щитов: ${numberValue(data.scandal_shields)})`),
+      );
+    case "scandal_limit_reached": {
+      const limit = numberValue(data.limit) || 5;
+      const roleTitle = meta.roles.find(item => item.id === stringValue(data.role_id))?.title;
+      const tail: LogSegment[] = [txt(` набирает ${limit}⚠ — `)];
+      tail.push(roleTitle ? txt(`роль «${roleTitle}» потеряна`) : txt("роли уже не было"));
+      if (data.jailed) {
+        tail.push(txt(", арест: следующий ход укорочен, скандалы сброшены до "), num("3⚠", "neutral"), txt(", Крыша снята"));
+      }
+      return lead(...tail);
+    }
     case "asset_confiscated": {
       const resolutions: Record<string, string> = {
         seized: "объект переходит в его бизнес",
@@ -495,7 +535,9 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       return lead(...tail);
     }
     case "player_jailed":
-      return lead(txt(" арестован: 6 скандалов, ход прерван, скандалы сброшены до "), num("3⚠", "neutral"));
+      // The arrest itself is reported by scandal_limit_reached, which knows the real limit —
+      // it is 6 for everybody but the journalist, who survives one scandal longer.
+      return lead(txt(" арестован прямо в свой ход: оставшиеся действия сгорают"));
     case "market_rotated":
       return [txt("🔄 Рынок объектов обновился")];
     case "grey_operation_resolved": {

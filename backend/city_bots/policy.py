@@ -131,7 +131,13 @@ def _action_utility(
     action_type = str(action["type"])
     payload = dict(action.get("payload") or {})
     if action_type == "end_turn":
-        return -100.0 if state.actions_left > 0 or state.investment_actions > 0 else 0.0
+        # Passing used to score -100 while an action remained, which does not mean "prefer to act"
+        # — it means "never pass". A bot whose every legal move was negative took the least bad
+        # one, so 4.4% of all decisions actively hurt the player, rising to a third of the moves
+        # in rounds 14-15: epics traded down to commons, and the free rerolls used as a place to
+        # dump a turn. A small penalty keeps any useful action ahead of passing without paying
+        # real points for the privilege of moving.
+        return -0.5 if state.actions_left > 0 or state.investment_actions > 0 else 0.0
     if action_type == "grey_operation":
         return _grey_operation_utility(engine, state, player, payload, profile)
     if action_type == "use_role_power" and payload.get("power") == "fraudster_forge":
@@ -241,21 +247,36 @@ def _project_planning_bonus(
 
     Projects are two thirds of the final score, and their conditions are read off the tableau, so
     a bot that only maximises income plays the previous version of the game. This scores three
-    things the plain utility misses: newly unlocked conditions, influence when a project is
-    already unlocked but unaffordable, and money that has nowhere else to go.
+    things the plain utility misses: progress toward conditions, influence banked for a project
+    the player is visibly building toward, and money that has nowhere else to go.
     """
     before_ready = {project.id for project in _affordable_projects(engine, state, player)}
     after_ready = {project.id for project in _affordable_projects(engine, state, after)}
     unlocked = sum(engine.project(pid).points for pid in after_ready - before_ready)
 
-    # Influence is only worth hoarding while a reachable project still costs more than you hold.
+    # Partial credit, without which the second of three required objects is worth nothing and a
+    # multi-step condition can only ever be completed by accident. Completing still dominates:
+    # the last step scores both here and in `unlocked`, because only a met condition can be cashed.
+    board = [engine.project(project_id) for project_id in state.project_board]
+    advance = 0.0
+    for project in board:
+        gained = engine.project_requirement_progress(after, project) - engine.project_requirement_progress(
+            player, project
+        )
+        if gained > 0:
+            advance += project.points * gained
+
+    # Influence is worth banking for anything the player is already halfway into, not only for a
+    # condition that is met right now — waiting for that is how a bot reaches round twelve
+    # holding 300$ and 2◆, and then cannot pay for the project it spent the game unlocking.
+    reachable = [project for project in board if engine.project_requirement_progress(after, project) >= 0.5]
     missing = min(
-        (max(0, engine.project(pid).cost_influence - after.influence) for pid in after_ready),
+        (max(0, project.cost_influence - after.influence) for project in reachable),
         default=0,
     )
     gained_influence = max(0, after.influence - player.influence)
     influence_value = min(gained_influence, missing) * 1.4
-    return unlocked * 1.2 + influence_value
+    return unlocked * 1.2 + advance * 0.9 + influence_value
 
 
 def _strategic_action_bonus(

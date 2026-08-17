@@ -140,6 +140,11 @@ h1, h2, h3, p { margin-top: 0; }
 .diff-easy { color: #b27cff; }.diff-medium { color: #4dd58a; }.diff-hard { color: #ff6b6b; }
 .viewing-badge { color: var(--player) !important; font-weight: 700; }
 .scandal-status { color: #ff9b52 !important; }
+/* One scandal away from losing the role — the cliff used to be invisible until it happened. */
+.scandal-at-risk { color: #ff9b52; font-weight: 700; }
+/* A move that changes nothing still looked like a decision worth making. */
+.automation-pointless { opacity: 0.55; }
+.automation-pointless small { color: var(--city-dim); }
 .scandal-3 { border-color: #db6d28; }.scandal-4 { border-color: #f85149; }.scandal-5, .scandal-6 { border-color: #ff2d2d; box-shadow: 0 0 10px rgba(248,81,73,.35); }
 
 .district-grid { display: grid; grid-template-columns: repeat(2, minmax(260px, 1fr)); gap: 7px; }

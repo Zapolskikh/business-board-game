@@ -117,6 +117,52 @@ def test_discarding_a_card_returns_two_units() -> None:
     assert not state.current_player.hand
 
 
+def test_only_one_card_may_be_discarded_per_turn() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    first = give_card(state, player, "grant")
+    second = give_card(state, player, "bailout")
+
+    state = run(engine, state, "convert_action_card", {"card_uid": first.uid, "into": "influence"})
+
+    # A purchase draws two cards and the discard costs no action, so shredding both in one turn
+    # made the blind draw a better influence pump than the campaign action it competes with.
+    legal = engine.legal_actions(state, state.current_player.id)
+    assert not any(action["type"] == "convert_action_card" for action in legal)
+    with pytest.raises(IllegalActionError):
+        run(engine, state, "convert_action_card", {"card_uid": second.uid, "into": "influence"})
+
+
+def test_project_requirement_progress_gives_partial_credit() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    project = engine.project("government_complex")  # government objects >= 3
+
+    assert engine.project_requirement_progress(player, project) == 0
+    give_asset(state, player, "contract")
+    assert engine.project_requirement_progress(player, project) == pytest.approx(1 / 3)
+    give_asset(state, player, "archive")
+    assert engine.project_requirement_progress(player, project) == pytest.approx(2 / 3)
+    give_asset(state, player, "passport_office")
+    # Without partial credit the first two objects scored zero, so a bot could only ever complete
+    # a three-step condition by accident.
+    assert engine.project_requirement_progress(player, project) == 1.0
+    assert engine.project_requirement_met(player, project)
+
+
+def test_binary_conditions_stay_binary() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+
+    automation = engine.project("exhibition")  # needs the automation token
+    assert engine.project_requirement_progress(player, automation) == 0.0
+    player.automation_owned = True
+    assert engine.project_requirement_progress(player, automation) == 1.0
+
+
 def test_roof_price_grows_with_the_round_and_mafia_pays_less() -> None:
     engine = CityEngine()
     state = make_state()
@@ -156,7 +202,7 @@ def test_asset_purchase_event_reports_the_grey_scandal_in_deltas() -> None:
     state = make_state()
     player = state.current_player
     player.money = 20
-    # A grey object charges a scandal on purchase, and add_scandal writes no event of its own.
+    # A grey object charges a scandal on purchase; below the limit that writes no event of its own.
     state.market.append(MarketAsset(uid="asset:grey-test", card_id="market", expires_at_turn=99))
 
     price = engine.asset_price(state, player, "market")
@@ -821,13 +867,58 @@ def test_journalist_keeps_the_role_one_scandal_longer() -> None:
 
     # The journalist earns influence for their own scandals, so the ordinary limit of five put
     # their best line permanently one point from collapse.
-    engine.add_scandal(reporter, 5)
+    engine.add_scandal(state, reporter, 5)
     assert (reporter.scandals, reporter.role) == (5, "journalist")
-    engine.add_scandal(reporter, 1)
+    engine.add_scandal(state, reporter, 1)
     assert (reporter.scandals, reporter.role, reporter.jail_turns) == (6, None, 0)
 
-    engine.add_scandal(other, 5)
+    engine.add_scandal(state, other, 5)
     assert (other.scandals, other.role) == (5, None)
+
+
+def test_reaching_the_scandal_limit_announces_the_lost_role() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.role = "politician"
+    player.scandals = 4
+
+    engine.add_scandal(state, player, 1)
+
+    # Losing a role used to be readable only by diffing your own state between two turns.
+    event = state.event_log[-1]
+    assert event.type == "scandal_limit_reached"
+    assert (event.actor_id, event.data["role_id"], event.data["jailed"]) == (player.id, "politician", False)
+    assert player.role is None
+
+
+def test_being_jailed_by_somebody_else_is_announced() -> None:
+    engine = CityEngine()
+    state = make_state()
+    victim = next(player for player in state.players if player.id != state.current_player.id)
+    victim.role = "mafia"
+    victim.scandals = 5
+
+    engine.add_scandal(state, victim, 1)
+
+    event = state.event_log[-1]
+    assert event.type == "scandal_limit_reached"
+    assert (event.data["jailed"], event.data["role_id"]) == (True, "mafia")
+    assert (victim.scandals, victim.jail_turns) == (3, 1)
+
+
+def test_a_spent_scandal_shield_reports_itself_like_a_roof() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.scandal_shields = 1
+
+    engine.add_scandal(state, player, 2)
+
+    event = state.event_log[-1]
+    assert event.type == "scandal_shield_spent"
+    assert (event.data["absorbed"], event.data["scandal_shields"]) == (2, 0)
+    assert player.scandals == 0
 
 
 def test_roof_blocks_a_journalist_scandal_like_any_other_attack() -> None:
@@ -885,3 +976,36 @@ def test_market_reroll_costs_money_but_no_action() -> None:
     # One reroll per turn, so it cannot be used to fish the whole deck in a single turn.
     with pytest.raises(IllegalActionError):
         run(engine, state, "reroll_market")
+
+
+def test_project_reroll_is_paid_in_influence_not_money() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.money = 100
+    player.influence = 2
+    state.actions_left = 0
+    state.investment_actions = 0
+    expired = state.project_board[0]
+
+    state = run(engine, state, "reroll_projects")
+    player = state.current_player
+
+    # Money is not scarce — a table finishes on 200$+ — so a money price made churning the shared
+    # board free and it was re-dealt almost completely every round after round ten.
+    assert (player.influence, player.money) == (0, 100)
+    assert state.actions_left == 0
+    assert expired not in state.project_board
+    assert expired == state.project_deck[-1]  # recycled, not removed from the game
+
+
+def test_project_reroll_is_illegal_without_the_influence() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.money = 100
+    player.influence = 1
+
+    assert not any(action["type"] == "reroll_projects" for action in engine.legal_actions(state, player.id))
+    with pytest.raises(IllegalActionError):
+        run(engine, state, "reroll_projects")

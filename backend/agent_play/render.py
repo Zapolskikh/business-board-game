@@ -24,6 +24,23 @@ POWER_LABELS = {
     "fraudster_forge": "подделка документов",
 }
 
+# Which offers do not consume one of the three turn actions. The engine spends an action inside
+# each handler, so this is the only place a reader can learn it — and a whole match was misplayed
+# on the assumption that a role power costs a turn action the way a basic action does.
+FREE_ACTION_TYPES = frozenset(
+    {"reroll_market", "reroll_projects", "play_action_card", "convert_action_card", "move_automation"}
+)
+FREE_POWERS = frozenset(
+    {
+        "capitalist_financing",
+        "politician_tax",
+        "politician_cleanup",
+        "journalist_inflate",
+        "journalist_publish",
+        "mafia_cleanup",
+    }
+)
+
 GREY_LABELS = {
     "cash": "отмывание",
     "market": "контрабанда",
@@ -137,8 +154,15 @@ def _payload_hint(action: dict[str, Any], game: dict[str, Any], me: dict[str, An
             verb = "вместо " if action["type"] == "replace_asset" else ""
             bits.append(f"{verb}«{catalog.asset_title(owned['card_id'])}»")
         if action["type"] in {"move_automation", "buy_automation"}:
+            # A total reads as a price tag; the decision is the difference against where the
+            # token stands now — or against no token at all when it is still being bought.
             income = (game.get("automation_preview") or {}).get(asset_uid)
-            if income is not None:
+            baseline = game.get("automation_baseline")
+            current = (game.get("automation_preview") or {}).get(me.get("automation_uid"))
+            reference = baseline if action["type"] == "buy_automation" else current
+            if income is not None and reference is not None:
+                bits.append(f"{income - reference:+d}$/раунд (итого {income}$)")
+            elif income is not None:
                 bits.append(f"доход станет {income}$/раунд")
     card_uid = payload.get("card_uid")
     if card_uid:
@@ -156,6 +180,8 @@ def _payload_hint(action: dict[str, Any], game: dict[str, Any], me: dict[str, An
         )
     if payload.get("power"):
         bits.append(POWER_LABELS.get(str(payload["power"]), str(payload["power"])))
+        if str(payload["power"]) in FREE_POWERS:
+            bits.append("действие не расходуется")
     if payload.get("asset_id") and action["type"] == "grey_operation":
         bits.append(GREY_LABELS.get(str(payload["asset_id"]), str(payload["asset_id"])))
     if payload.get("target_id"):
@@ -186,6 +212,8 @@ def describe_action(
 ) -> str:
     payload = " ".join(f"{key}={value}" for key, value in sorted(action["payload"].items()))
     hint = _payload_hint(action, game, me, catalog)
+    if action["type"] in FREE_ACTION_TYPES:
+        hint = f"{hint} · действие не расходуется" if hint else "действие не расходуется"
     line = f"[{index:>2}] {action['type']}"
     if payload:
         line = f"{line} {payload}"
@@ -210,6 +238,7 @@ FOLD_HINTS = {
     "grey_operation": "серая операция",
     "develop_district": "развить район",
     "buy_automation": "купить жетон автоматизации и поставить на объект",
+    "buy_capacity": "купить дополнительный слот бизнеса",
 }
 
 
@@ -334,6 +363,16 @@ def describe_event(event: dict[str, Any], game: dict[str, Any], catalog: Catalog
             suffix = f" ({', '.join(parts)})" if parts else ""
             totals.append(f"{player_name(game, player_id)} {paid:+d}$" + (f" {gained:+d}◆" if gained else "") + suffix)
         return f"{head} раунд {data.get('round_number')}: " + "; ".join(totals)
+    if kind == "scandal_limit_reached":
+        # The whole point of the event is that the player notices it, so it does not go through
+        # the generic key=value tail.
+        role_id = data.get("role_id")
+        lost = f"роль {catalog.role_title(str(role_id))} потеряна" if role_id else "роли уже не было"
+        jail = ", арест: следующий ход укорочен, скандалы сброшены до 3⚠, Крыша снята" if data.get("jailed") else ""
+        return f"{head} набрал {data.get('limit')}⚠ — {lost}{jail}"
+    if kind == "scandal_shield_spent":
+        absorbed = data.get("absorbed", 1)
+        return f"{head} погасил {absorbed}⚠ Щитом от скандала (щитов осталось {data.get('scandal_shields')})"
     if kind == "game_finished":
         scores = data.get("scores") or {}
         table = ", ".join(f"{player_name(game, key)} {value}" for key, value in scores.items())
@@ -532,6 +571,8 @@ def render_state(
     slot = CAPACITY_COSTS.get(int(me["capacity"]))
     reroll = catalog.scoring.get("market_reroll_cost", 2)
     automation = catalog.scoring.get("automation_cost", 6)
+    project_reroll = catalog.scoring.get("project_reroll_influence", 2)
+    card_cost = catalog.scoring.get("action_card_cost", 3)
     token = (
         "жетон автоматизации: куплен"
         if me.get("automation_owned")
@@ -539,7 +580,8 @@ def render_state(
     )
     lines.append(
         f"    цены сейчас: Крыша {roof_price(game, me)}$ · {token} · "
-        f"две карты 3$+1◆ и действие · реролл рынка {reroll}$ и доски проектов 3$ — без действия · "
+        f"две карты {card_cost}$+1◆ и действие · "
+        f"реролл рынка {reroll}$ и доски проектов {project_reroll}◆ — без действия, доски общие · "
         + (f"слот {int(me['capacity']) + 1} за {slot}$" if slot else "слоты максимум")
     )
     breakdown = dict(game.get("score_breakdown", {}).get(player_id, {}))
