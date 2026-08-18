@@ -42,6 +42,40 @@ def _automation_baseline(room: RoomState, viewer_id: str | None) -> int | None:
     return _scoring_engine().automation_baseline(room.game, player)
 
 
+def _round_forecast(room: RoomState, viewer_id: str | None) -> dict[str, dict[str, int]] | None:
+    """The viewer's itemised round payout, from the same code that pays it out."""
+    player = _viewer(room, viewer_id)
+    if player is None or room.game is None:
+        return None
+    return _scoring_engine().round_forecast(room.game, player)
+
+
+def room_journal(room: RoomState) -> dict[str, Any]:
+    """The full replayable record of a finished game.
+
+    ``room_view`` strips the seed and the command journal because they are hidden information
+    while the game runs. Once it is over there is nothing left to hide, and this is the only
+    projection ``city_engine.replay.replay_game`` can rebuild a match from — which is what makes
+    a saved game analysable ("what if I had taken the project instead") rather than just readable.
+    """
+    if room.game is None:
+        raise ValueError("the room has no game to export")
+    if room.game.status != "finished":
+        raise ValueError("the journal is only exported after the game is finished")
+    game = room.game.to_dict()
+    engine = _scoring_engine()
+    return {
+        "room_id": room.id,
+        "room_name": room.name,
+        "exported_revision": room.revision,
+        "rules_version": game["rules_version"],
+        "content_version": game["content_version"],
+        "seats": [seat.to_dict() for seat in room.seats],
+        "score_breakdown": {player.id: engine.score_breakdown(player) for player in room.game.players},
+        "game": game,
+    }
+
+
 def room_view(
     room: RoomState,
     viewer_id: str | None = None,
@@ -71,6 +105,8 @@ def room_view(
     # Moving the token is free, so the payoff of each option must be on screen, not in the head.
     game["automation_preview"] = _automation_preview(room, viewer_id)
     game["automation_baseline"] = _automation_baseline(room, viewer_id)
+    # A permanent project perk paying +1◆ a round was indistinguishable from one paying nothing.
+    game["round_forecast"] = _round_forecast(room, viewer_id)
     game.pop("rng", None)
     game.pop("processed_command_ids", None)
     game.pop("command_log", None)

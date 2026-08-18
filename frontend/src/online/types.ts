@@ -80,6 +80,14 @@ export interface ScoreBreakdown {
   total: number;
 }
 
+// What settling the round right now would pay the viewer, itemised by the engine. Both rows carry
+// a `total`; every other key sums to it. A permanent project perk paying +1◆ a round used to be
+// indistinguishable from one paying nothing, because nothing on screen added the passives up.
+export interface RoundForecast {
+  money: { objects: number; projects: number; maintenance: number; antitrust: number; mafia_tribute: number; journalist: number; debt: number; total: number };
+  influence: { objects: number; administrative: number; projects: number; news: number; rating: number; total: number };
+}
+
 export interface GameState {
   schema_version?: number;
   rules_version?: string;
@@ -112,6 +120,7 @@ export interface GameState {
   automation_preview: Record<string, number>;
   // Round income with the token parked: every preview above minus this is what the token adds.
   automation_baseline?: number | null;
+  round_forecast?: RoundForecast | null;
   final_scores?: Record<string, number>;
 }
 
@@ -173,9 +182,16 @@ export interface ScoringMeta {
   project_board_size: number;
   market_reroll_cost: number;
   automation_cost: number;
-  project_reroll_influence: number;
+  project_reroll_money: number;
   crisis_pr_influence: number;
   action_card_cost: number;
+  // One entry per campaign tier: the same action buys more influence at a worsening rate.
+  campaign_tiers: { spend: number; gain: number }[];
+  // Laundering scales on both sides: cost = base + ⌊раунд/2⌋, gain = base + ⌊раунд/3⌋.
+  laundering_base_cost: number;
+  laundering_base_gain: number;
+  hack_influence_steal: number;
+  compromat_influence: number;
 }
 
 export interface CityMeta {

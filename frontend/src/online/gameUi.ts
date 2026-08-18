@@ -9,6 +9,7 @@ import type {
   PlayerState,
   ProjectMeta,
   RoleMeta,
+  RoomView,
 } from "./types";
 
 export const rarityLabels: Record<string, string> = {
@@ -46,6 +47,7 @@ export const greyOperationLabels: Record<string, string> = {
   market: "Контрабанда",
   crypto: "Памп и дамп",
   datacenter: "Взлом",
+  influence_broker: "Слив компромата",
 };
 
 const capacityCosts: Record<number, number> = { 3: 6, 4: 10, 5: 15 };
@@ -80,15 +82,35 @@ export function influencePerPoint(meta: CityMeta): number {
 }
 
 export function marketRerollCost(meta: CityMeta): number {
-  return meta.scoring?.market_reroll_cost ?? 2;
+  return meta.scoring?.market_reroll_cost ?? 4;
 }
 
 export function automationCost(meta: CityMeta): number {
   return meta.scoring?.automation_cost ?? 6;
 }
 
-export function projectRerollInfluence(meta: CityMeta): number {
-  return meta.scoring?.project_reroll_influence ?? 2;
+export function projectRerollMoney(meta: CityMeta): number {
+  return meta.scoring?.project_reroll_money ?? 10;
+}
+
+export function campaignTiers(meta: CityMeta): { spend: number; gain: number }[] {
+  return meta.scoring?.campaign_tiers ?? [{ spend: 2, gain: 2 }];
+}
+
+// Matches the engine's `laundering_cost`/`laundering_gain`: both sides grow with the round, so the
+// grey channel stays ahead of the best campaign tier instead of being dominated by it.
+export function launderingCost(meta: CityMeta, round: number): number {
+  return (meta.scoring?.laundering_base_cost ?? 4) + Math.floor(round / 2);
+}
+
+export function launderingGain(meta: CityMeta, round: number): number {
+  return (meta.scoring?.laundering_base_gain ?? 2) + Math.floor(round / 3);
+}
+
+/** The tier of a campaign action, resolved from the payload the engine offered. */
+export function campaignTier(meta: CityMeta, spend: unknown): { spend: number; gain: number } | undefined {
+  const wanted = numberValue(spend);
+  return campaignTiers(meta).find(tier => tier.spend === wanted);
 }
 
 export function crisisPrInfluence(meta: CityMeta): number {
@@ -177,10 +199,14 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
   const district = districts.get(stringValue(payload.district));
   const role = roles.get(stringValue(payload.role_id));
   const project = projects.get(stringValue(payload.project_id));
-  if (action.type === "basic_action") return payload.kind === "work" ? "Городской заказ: +2$" : "Кампания: 2$ → 2◆";
+  if (action.type === "basic_action") {
+    if (payload.kind === "work") return "Городской заказ: +2$";
+    const tier = campaignTier(meta, payload.spend);
+    return tier ? `Кампания: ${tier.spend}$ → ${tier.gain}◆` : "Кампания";
+  }
   if (action.type === "end_turn") return "Завершить ход";
   if (action.type === "reroll_market") return `Обновить рынок объектов (${marketRerollCost(meta)}$)`;
-  if (action.type === "reroll_projects") return `Обновить доску проектов (${projectRerollInfluence(meta)}◆)`;
+  if (action.type === "reroll_projects") return `Обновить доску проектов (${projectRerollMoney(meta)}$)`;
   if (action.type === "city_project") {
     return project
       ? `«${project.title}» · ${project.cost_influence}◆+${project.cost_money}$ → ${project.points} очков`
@@ -197,7 +223,8 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
   }
   if (action.type === "sell_asset") {
     const owned = player.assets.find(item => item.uid === payload.asset_uid);
-    return `Продать «${assets.get(owned?.card_id ?? "")?.title ?? "объект"}»`;
+    const asset = assets.get(owned?.card_id ?? "");
+    return `Продать «${asset?.title ?? "объект"}» за ${Math.floor((asset?.cost ?? 0) / 2)}$`;
   }
   if (action.type === "buy_automation" || action.type === "move_automation") {
     const owned = player.assets.find(item => item.uid === payload.asset_uid);
@@ -210,12 +237,6 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
     const gain = income !== undefined && baseline !== undefined && baseline !== null ? income - baseline : undefined;
     const payoff = gain !== undefined ? ` · ${gain >= 0 ? "+" : "−"}${Math.abs(gain)}$/раунд` : "";
     return `${verb} → «${title}»${payoff}`;
-  }
-  if (action.type === "replace_asset") {
-    const owned = player.assets.find(item => item.uid === payload.asset_uid);
-    const marketItem = game.market.find(item => item.uid === payload.market_uid);
-    const incoming = assets.get(marketItem?.card_id ?? "");
-    return `Заменить «${assets.get(owned?.card_id ?? "")?.title ?? "объект"}» на «${incoming?.title ?? "объект"}»`;
   }
   if (action.type === "develop_district") return `Развить район «${district?.title ?? payload.district}»`;
   if (action.type === "buy_action_card") return `Купить «${cards.get(stringValue(payload.card_id))?.title ?? payload.card_id}»`;
@@ -253,6 +274,7 @@ const eventVerbs: Record<string, string> = {
   turn_order_set: "Порядок хода определён",
   market_rerolled: "обновляет рынок объектов",
   role_takeover_blocked: "не смог перехватить роль",
+  role_stripped: "сливает компромат и снимает роль",
   roof_bought: "покупает Крышу",
   crisis_pr: "проводит антикризисный PR",
   capacity_bought: "расширяет бизнес",
@@ -391,7 +413,11 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
     case "basic_action":
       return data.kind === "work"
         ? lead(txt(" берёт городской заказ ("), num("+2$", "good"), txt(`, стало ${numberValue(data.money)}$)`))
-        : lead(txt(" проводит кампанию ("), num("2$→2◆", "good"), txt(`, стало ${numberValue(data.influence)}◆)`));
+        : lead(
+            txt(" проводит кампанию ("),
+            num(`${numberValue(data.spend)}$→${numberValue(data.gain)}◆`, "good"),
+            txt(`, стало ${numberValue(data.influence)}◆)`),
+          );
     case "city_project_taken": {
       const project = meta.projects.find(item => item.id === stringValue(data.project_id));
       return lead(
@@ -431,17 +457,14 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
     case "asset_bought":
       // Deltas expose the grey-tag scandal and the purchase bonuses, which have no events of their own.
       return lead(txt(` покупает «${asset ?? assetId}» за `), num(`${numberValue(data.cost)}$`, "bad"), ...deltas);
-    case "asset_sold":
-      return lead(txt(` продаёт «${asset ?? "объект"}» за `), num(`${numberValue(data.value)}$`, "good"));
-    case "asset_replaced": {
-      const sold = meta.assets.find(item => item.id === stringValue(data.sold_asset_id))?.title;
-      return lead(
-        txt(` меняет «${sold ?? "объект"}» на «${asset ?? assetId}» (`),
-        num(`${numberValue(data.price)}$`, "bad"),
-        txt(" − возврат "),
-        num(`${numberValue(data.refund)}$`, "good"),
-        txt(")"),
-      );
+    case "asset_sold": {
+      const tail: LogSegment[] = [
+        txt(` продаёт «${asset ?? "объект"}» за `),
+        num(`${numberValue(data.value)}$`, "good"),
+      ];
+      // The token is freed by the sale; without this line it silently vanished from the board.
+      if (data.automation_freed) tail.push(txt(" · жетон автоматизации снят"));
+      return lead(...tail);
     }
     case "automation_bought":
       return lead(txt(" покупает жетон автоматизации ("), signed(-numberValue(data.cost), "$"), txt(")"));
@@ -479,7 +502,14 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
     case "targeted_card_resolved":
       return lead(txt(` эффект «${card ?? cardId}» на `), playerSeg(game, targetId), ...deltas);
     case "targeted_effect_blocked":
-      return lead(txt(" отражает атаку Крышей"));
+      // The actor of this event is the defender, and the injunction defends as well as the roof.
+      return lead(txt(data.by === "role_shield" ? " отражает атаку судебным запретом" : " отражает атаку Крышей"));
+    case "role_stripped":
+      return lead(
+        txt(" сливает компромат на "),
+        playerSeg(game, stringValue(data.target_id)),
+        txt(` — роль «${role ?? roleId}» потеряна, место освободилось`),
+      );
     // Both of these used to be invisible: the only trace was the scandal counter, so a player
     // discovered a lost role by noticing their passive income had stopped.
     case "scandal_shield_spent":
@@ -569,6 +599,70 @@ export function describeEvent(event: DomainEvent, game: GameState, meta: CityMet
   return describeEventSegments(event, game, meta)
     .map(segment => segment.text)
     .join("");
+}
+
+// One row per source in the round forecast. `total` is rendered separately, and a zero row is kept
+// on screen greyed out: "объекты +0◆" is the answer to "why is my influence not growing".
+const forecastLabels: Record<string, string> = {
+  objects: "🏢 Объекты",
+  projects: "🏗️ Проекты",
+  administrative: "🏛️ Административный ресурс",
+  maintenance: "🔧 Содержание",
+  antitrust: "⚖️ Антимонопольное",
+  mafia_tribute: "🕵️ Дань",
+  journalist: "📰 Публикации",
+  debt: "🏦 Кредит",
+  news: "📰 Новости",
+  rating: "⭐ Рейтинг",
+};
+
+export interface ForecastRow { key: string; label: string; value: number }
+
+export function forecastRows(row: Record<string, number> | undefined): ForecastRow[] {
+  if (!row) return [];
+  return Object.entries(row)
+    .filter(([key]) => key !== "total" && key in forecastLabels)
+    .map(([key, value]) => ({ key, label: forecastLabels[key], value }));
+}
+
+/** Full match record as Markdown: the chronicle plus the standings, ready to read or to share. */
+export function buildGameLogMarkdown(room: RoomView, meta: CityMeta, version: string): string {
+  const game = room.game;
+  if (!game) return "";
+  const ranked = [...game.players].sort((a, b) => scoreOf(game, b) - scoreOf(game, a));
+  const lines = [
+    `# Город влияния — журнал партии «${room.name}»`,
+    "",
+    `- Версия сборки: v${version}`,
+    `- Правила: ${game.rules_version ?? "—"} · контент: ${game.content_version ?? "—"}`,
+    `- Раунд: ${game.round_number}/${game.max_rounds} · состояние: ${game.status}`,
+    `- Записей в хронике: ${game.event_log.length}`,
+    "",
+    "## Итоги",
+    "",
+    "| # | Игрок | Очки | Проекты | Объекты | Роль | Деньги | Влияние | Скандалы |",
+    "|---|---|---:|---:|---:|---:|---:|---:|---:|",
+  ];
+  ranked.forEach((player, index) => {
+    const score = game.score_breakdown?.[player.id];
+    const role = meta.roles.find(item => item.id === player.role)?.title ?? "без роли";
+    lines.push(
+      `| ${index + 1} | ${player.name}${player.is_bot ? ` (бот ${difficultyLabels[player.difficulty] ?? player.difficulty})` : ""} · ${role} `
+      + `| ${scoreOf(game, player)} | ${score?.projects ?? 0} | ${score?.assets ?? 0} | ${score?.role ?? 0} `
+      + `| ${score?.money ?? 0} (${player.money}$) | ${score?.influence ?? 0} (${player.influence}◆) | ${score?.scandals ?? 0} |`,
+    );
+  });
+  lines.push("", "## Портфели", "");
+  for (const player of ranked) {
+    const owned = player.assets.map(item => meta.assets.find(asset => asset.id === item.card_id)?.title ?? item.card_id);
+    const projects = player.projects.map(id => meta.projects.find(item => item.id === id)?.title ?? id);
+    lines.push(`### ${player.name}`, "", `- Объекты: ${owned.join(", ") || "нет"}`, `- Проекты: ${projects.join(", ") || "нет"}`, "");
+  }
+  lines.push("## Хроника", "");
+  // Oldest first: the chronicle on screen is newest-first for reading, but a log to analyse has to
+  // run in the direction the game actually went.
+  game.event_log.forEach(event => lines.push(`${event.seq}. ${describeEvent(event, game, meta)}`));
+  return lines.join("\n");
 }
 
 // A single bonus line for an object card. `active` → condition met for the owner right now

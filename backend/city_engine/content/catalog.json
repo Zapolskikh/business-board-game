@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "content_version": "city-content-2026-08-16b",
+  "content_version": "city-content-2026-08-18a",
   "districts": [
     {
       "id": "residential",
@@ -534,14 +534,13 @@
       "cost": 8,
       "income": 2,
       "influence": 2,
-      "text": "+1◆ за раунд, если есть объект Административного квартала.",
+      "text": "+1◆ за раунд.",
       "tags": [
         "data"
       ],
       "effects": {
         "influenceBonus": {
-          "value": 1,
-          "district": "government"
+          "value": 1
         }
       }
     },
@@ -753,7 +752,7 @@
       "cost": 4,
       "income": 2,
       "influence": 0,
-      "text": "При покупке +2$ и +1 скандал; открывает отмывание.",
+      "text": "При покупке +2$ и +1 скандал; открывает отмывание денег в влияние.",
       "tags": [
         "grey"
       ],
@@ -791,7 +790,7 @@
       "cost": 7,
       "income": 3,
       "influence": 0,
-      "text": "При покупке +2 скандала; +2$ при наличии Технокластера; открывает взлом.",
+      "text": "При покупке +2 скандала; +2$ при наличии Технокластера; открывает взлом ради влияния.",
       "tags": [
         "grey",
         "tech"
@@ -1015,15 +1014,14 @@
       "cost": 8,
       "income": 1,
       "influence": 2,
-      "text": "+1◆ за раунд при наличии Административного объекта.",
+      "text": "+1◆ за раунд.",
       "tags": [
         "finance",
         "politics"
       ],
       "effects": {
         "influenceBonus": {
-          "value": 1,
-          "district": "government"
+          "value": 1
         }
       }
     },
@@ -1131,15 +1129,14 @@
       "cost": 8,
       "income": 2,
       "influence": 1,
-      "text": "+1◆ за раунд при наличии объекта Спального района.",
+      "text": "+1◆ за раунд.",
       "tags": [
         "production",
         "politics"
       ],
       "effects": {
         "influenceBonus": {
-          "value": 1,
-          "district": "residential"
+          "value": 1
         }
       }
     },
@@ -1149,14 +1146,17 @@
       "district": "industrial",
       "rarity": "rare",
       "cost": 10,
-      "income": 3,
+      "income": 2,
       "influence": 1,
-      "text": "+2$ пока вы Силовик и +2$ пока вы Мафиози.",
+      "text": "+1◆ за раунд; +2$ пока вы Силовик и +2$ пока вы Мафиози.",
       "tags": [
         "production",
         "security"
       ],
       "effects": {
+        "influenceBonus": {
+          "value": 1
+        },
         "roleBonuses": [
           {
             "role": "military",
@@ -1327,15 +1327,14 @@
       "cost": 8,
       "income": 1,
       "influence": 2,
-      "text": "+1◆ за раунд при наличии объекта Технокластера.",
+      "text": "+1◆ за раунд.",
       "tags": [
         "data",
         "government"
       ],
       "effects": {
         "influenceBonus": {
-          "value": 1,
-          "district": "tech"
+          "value": 1
         }
       }
     },
@@ -1440,15 +1439,14 @@
       "cost": 9,
       "income": 1,
       "influence": 2,
-      "text": "+1◆ за раунд при наличии Административного объекта; усиленный источник влияния, при покупке +1 скандал.",
+      "text": "+1◆ за раунд; при покупке +1 скандал; открывает слив компромата.",
       "tags": [
         "grey",
         "government"
       ],
       "effects": {
         "influenceBonus": {
-          "value": 1,
-          "district": "government"
+          "value": 1
         }
       }
     },
@@ -1458,14 +1456,17 @@
       "district": "shadows",
       "rarity": "rare",
       "cost": 9,
-      "income": 2,
+      "income": 1,
       "influence": 1,
-      "text": "При покупке +1 скандал; +2$ пока вы Мафиози и +2$ пока вы Силовик.",
+      "text": "+1◆ за раунд; при покупке +1 скандал; +2$ пока вы Мафиози и +2$ пока вы Силовик.",
       "tags": [
         "grey",
         "security"
       ],
       "effects": {
+        "influenceBonus": {
+          "value": 1
+        },
         "roleBonuses": [
           {
             "role": "mafia",
@@ -1927,7 +1928,7 @@
       "title": "Дворец правосудия",
       "text": "Суд строят те, у кого есть вес в администрации.",
       "cost_influence": 5,
-      "cost_money": 2,
+      "cost_money": 5,
       "points": 7,
       "requirement": {
         "type": "district_objects",
@@ -2021,7 +2022,7 @@
     {
       "id": "security_hub",
       "title": "Центр городской безопасности",
-      "text": "Штаб охраны порядка; нужен объект с охраной.",
+      "text": "Штаб охраны порядка; нужен объект с охраной; поднимает предел Крыш.",
       "cost_influence": 4,
       "cost_money": 4,
       "points": 6,
@@ -2031,7 +2032,8 @@
         "count": 1
       },
       "perk": {
-        "turnRoof": 1
+        "turnRoof": 1,
+        "roofCapacity": 1
       }
     },
     {
@@ -2168,7 +2170,7 @@
       "title": "Городской дата-центр",
       "text": "Два объекта с данными складываются в вычислительный центр.",
       "cost_influence": 5,
-      "cost_money": 5,
+      "cost_money": 8,
       "points": 7,
       "requirement": {
         "type": "tag_objects",
@@ -2214,7 +2216,7 @@
     {
       "id": "defence_order",
       "title": "Оборонный заказ",
-      "text": "Два охранных объекта — и город доверяет вам подряд.",
+      "text": "Два охранных объекта — и город доверяет вам подряд; поднимает предел Крыш.",
       "cost_influence": 4,
       "cost_money": 5,
       "points": 6,
@@ -2224,7 +2226,8 @@
         "count": 2
       },
       "perk": {
-        "turnRoof": 1
+        "turnRoof": 1,
+        "roofCapacity": 1
       }
     },
     {
@@ -2312,7 +2315,7 @@
       "title": "Правительственный комплекс",
       "text": "Три административных здания в одном квартале.",
       "cost_influence": 5,
-      "cost_money": 4,
+      "cost_money": 7,
       "points": 7,
       "requirement": {
         "type": "district_objects",

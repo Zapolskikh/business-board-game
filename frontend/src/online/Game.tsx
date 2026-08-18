@@ -6,20 +6,25 @@ import {
   activeBonuses,
   assetEffectLines,
   automationCost,
+  buildGameLogMarkdown,
+  campaignTiers,
   capacityLabel,
   crisisPrInfluence,
   describeEventSegments,
   difficultyLabels,
   districtCount,
+  forecastRows,
   greyOperationLabels,
   influencePerPoint,
+  launderingCost,
+  launderingGain,
   marketPrice,
   marketRerollCost,
   moneyPerPoint,
   powerLabels,
   projectPerkText,
   projectRequirementText,
-  projectRerollInfluence,
+  projectRerollMoney,
   rarityLabels,
   roofCost,
   scoreOf,
@@ -74,12 +79,14 @@ const powerDescriptions: Record<string, string> = {
   fraudster_forge: "Один раз за ход: 1 действие, 5◆ и +2 скандала — гарантированно получить выбранную роль со следующего хода. Внимание: если два скандала доведут вас до 5 — роль потеряется, до 6 — тюрьма.",
 };
 
-const greyOperationInfo: Record<string, { asset: string; effect: (round: number) => string; chance: number; failure: string }> = {
+const greyOperationInfo: Record<string, { asset: string; effect: (round: number, meta: CityMeta) => string; chance: number; failure: string }> = {
   cash: {
     asset: "Сеть наличных обменников",
-    effect: round => `2◆ → ${5 + round}$`,
+    // Both sides scale with the round: a flat gain against a growing stake made the operation
+    // strictly worse than the top campaign tier, and then nobody ever ran it.
+    effect: (round, meta) => `${launderingCost(meta, round)}$ → ${launderingGain(meta, round)}◆`,
     chance: 85,
-    failure: "При успехе: +1 скандал. При провале: −3$ и −3◆. Скандалы: Аферист +1, остальные +2. На 5 скандалах теряется роль, на 6 — тюрьма.",
+    failure: "Единственный неограниченный способ превратить лишние деньги во влияние, и с ростом раунда курс становится лучше, чем у кампании. При успехе: +1 скандал. При провале ставка теряется, влияния нет. Скандалы при провале: Аферист +1, остальные +2. На 5 скандалах теряется роль, на 6 — тюрьма.",
   },
   market: {
     asset: "Ночной рынок",
@@ -95,9 +102,15 @@ const greyOperationInfo: Record<string, { asset: string; effect: (round: number)
   },
   datacenter: {
     asset: "Нелегальный дата-центр",
-    effect: () => "заблокировать самый доходный объект выбранного соперника на раунд",
+    effect: (_round, meta) => `украсть у цели до ${meta.scoring?.hack_influence_steal ?? 4}◆`,
     chance: 55,
-    failure: "Крыша цели тратится и полностью отменяет блокировку. При успехе: +2 скандала. При провале дата-центр блокируется, а стоящий на нём жетон автоматизации выключается до выплаты раунда. Скандалы при провале: Аферист +1, остальные +3. На 5 скандалах теряется роль, на 6 — тюрьма.",
+    failure: "Крыша цели тратится и полностью отменяет кражу. При успехе: +2 скандала. При провале: −2◆. Скандалы при провале: Аферист +1, остальные +3. На 5 скандалах теряется роль, на 6 — тюрьма.",
+  },
+  influence_broker: {
+    asset: "Торговец компроматом",
+    effect: (_round, meta) => `${meta.scoring?.compromat_influence ?? 3}◆ → снять роль с цели`,
+    chance: 70,
+    failure: "Цель теряет роль: −3 очка, весь её пассив и место освобождается по свободной цене, а не по цене переворота. Судебный запрет или Крыша цели полностью гасят слив. Только раз в раунд. При успехе: +2 скандала. При провале: −2◆ и скандалы (Аферист +1, остальные +3). На 5 скандалах теряется роль, на 6 — тюрьма.",
   },
 };
 
@@ -202,7 +215,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
     </header>
 
     {error && <p className="game-error">{error}</p>}
-    {game.status === "finished" && <FinishPanel game={game} ranking={ranking} onExit={onExit} />}
+    {game.status === "finished" && <FinishPanel room={room} game={game} meta={meta} ranking={ranking} roomId={roomId} password={password} playerId={playerId} onExit={onExit} />}
 
     <main className="city-layout" data-mobile-tab={mobileTab}>
       <div className="city-main-col">
@@ -214,7 +227,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
           buyActions={buyActions} reroll={matching("reroll_market")[0]} busy={busy} onAction={send}
         />
         {!viewingOther && <CardDesk game={game} me={me} cards={cards} legal={legal} buyCard={buyCardAction} busy={busy} onAction={send} onOffer={offer} labelContext={labelContext} />}
-        <BusinessBoard viewed={viewed} me={me} game={game} meta={meta} assets={assets} legal={legal} viewingOther={viewingOther} busy={busy} onAction={send} onOffer={offer} />
+        <BusinessBoard viewed={viewed} me={me} game={game} meta={meta} assets={assets} legal={legal} viewingOther={viewingOther} busy={busy} onAction={send} />
       </div>
 
       <div className="city-side">
@@ -222,7 +235,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
           game={game} me={me} meta={meta} roles={roles} districts={districts} legal={legal}
           selectedDistrict={selectedDistrict} busy={busy} onAction={send} onOffer={offer}
         />
-        <Chronicle game={game} meta={meta} />
+        <Chronicle room={room} game={game} meta={meta} />
       </div>
 
       <section className="mobile-game-menu">
@@ -318,7 +331,7 @@ function ProjectBoard({ game, meta, me, projects, actions, reroll, busy, onActio
   const initiatives = meta.projects.filter(project => project.repeatable);
   return <section className="city-projects">
     <h2>🏗️ Городские проекты <small>главный источник очков · в колоде ещё {game.project_deck_count} · один проект уходит под низ колоды каждый раунд</small>
-      <button className="market-reroll" disabled={busy || !reroll} onClick={() => reroll && void onAction(reroll)} title={`Отправить самый давний проект под низ колоды и добрать новый за ${projectRerollInfluence(meta)}◆. Доска общая: карта уходит у всех, в том числе у того, кто уже собрал под неё условие. Действие не расходуется, один раз за ход.`}>🔄 Обновить доску · {projectRerollInfluence(meta)}◆</button>
+      <button className="market-reroll" disabled={busy || !reroll} onClick={() => reroll && void onAction(reroll)} title={`Отправить самый давний проект под низ колоды и добрать новый за ${projectRerollMoney(meta)}$. Цена в деньгах, а не в влиянии: влияние — это то, чем сами проекты и покупаются. Доска общая: карта уходит у всех, в том числе у того, кто уже собрал под неё условие. Действие не расходуется, один раз за ход.`}>🔄 Обновить доску · {projectRerollMoney(meta)}$</button>
     </h2>
     <p className="dim card-rule">Проект уникален: кто взял — тот и забрал очки, остальным он больше недоступен. Взятие стоит 1 обычное действие, влияние и деньги; условие проверяется по вашим объектам.</p>
     <div className="project-grid">{game.project_board.map((projectId, index) => {
@@ -440,7 +453,7 @@ function CardDesk({ game, me, cards, legal, buyCard, busy, onAction, onOffer, la
   </section>;
 }
 
-function BusinessBoard({ viewed, me, game, meta, assets, legal, viewingOther, busy, onAction, onOffer }: {
+function BusinessBoard({ viewed, me, game, meta, assets, legal, viewingOther, busy, onAction }: {
   viewed: PlayerState;
   me: PlayerState;
   game: GameState;
@@ -450,10 +463,8 @@ function BusinessBoard({ viewed, me, game, meta, assets, legal, viewingOther, bu
   viewingOther: boolean;
   busy: boolean;
   onAction: (action: LegalAction) => Promise<void>;
-  onOffer: (title: string, actions: LegalAction[]) => void;
 }) {
   const actionFor = (type: string, uid: string) => legal.find(action => action.type === type && action.payload.asset_uid === uid);
-  const replacementsFor = (uid: string) => legal.filter(action => action.type === "replace_asset" && action.payload.asset_uid === uid);
   const currentIncome = viewed.automation_uid ? game.automation_preview?.[viewed.automation_uid] : undefined;
   return <section className="business-board">
     <h2>{viewingOther ? `Бизнес: ${viewed.name}` : "Ваш бизнес"} <small>слоты {viewed.assets.length}/{viewed.capacity}</small></h2>
@@ -469,15 +480,15 @@ function BusinessBoard({ viewed, me, game, meta, assets, legal, viewingOther, bu
         incomeHere={game.automation_preview?.[owned.uid]} incomeNow={currentIncome}
         baseline={viewingOther ? undefined : game.automation_baseline ?? undefined} tokenPrice={automationCost(meta)}
         automate={actionFor("buy_automation", owned.uid) ?? actionFor("move_automation", owned.uid)}
-        replacements={replacementsFor(owned.uid)} sell={actionFor("sell_asset", owned.uid)}
-        onAction={onAction} onOffer={onOffer}
+        sell={actionFor("sell_asset", owned.uid)}
+        onAction={onAction}
       />;
     })}{!viewed.assets.length && <p className="empty-business">У игрока пока нет объектов.</p>}</div>
-    {!viewingOther && me.assets.length >= me.capacity && <p className="capacity-warning">Все слоты заняты: расширьте бизнес или замените объект на более сильный.</p>}
+    {!viewingOther && me.assets.length >= me.capacity && <p className="capacity-warning">Все слоты заняты. Продажа бесплатна и не тратит действие — продайте слабый объект и купите на рынке сильный: весь обмен стоит ровно одно действие покупки.</p>}
   </section>;
 }
 
-function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines, viewingOther, busy, automated, incomeHere, incomeNow, baseline, tokenPrice, automate, replacements, sell, onAction, onOffer }: {
+function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines, viewingOther, busy, automated, incomeHere, incomeNow, baseline, tokenPrice, automate, sell, onAction }: {
   owned: OwnedAsset;
   index: number;
   owner: PlayerState;
@@ -492,10 +503,8 @@ function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines,
   baseline?: number;
   tokenPrice: number;
   automate?: LegalAction;
-  replacements: LegalAction[];
   sell?: LegalAction;
   onAction: (action: LegalAction) => Promise<void>;
-  onOffer: (title: string, actions: LegalAction[]) => void;
 }) {
   if (!asset) return null;
   const managed = index < owner.capacity;
@@ -543,10 +552,11 @@ function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines,
           : delta === 0 ? "ничего не изменит"
           : `${signed(delta)}/раунд — станет хуже`}</small>
       </button>}
-      <button disabled={busy || replacements.length === 0} onClick={() => onOffer(`Заменить «${asset.title}» — выберите объект с рынка`, replacements)} title={`Обменять объект на любой с рынка за одно действие: возврат ${sellValue}$ зачитывается в цену, доплачивается только разница. Жетон автоматизации переезжает на новый объект.`}>
-        <strong>♻ Заменить · возврат {sellValue}$</strong><small>{replacements.length ? `${replacements.length} вариантов на рынке` : "нет доступных"}</small>
+      {/* The sale is free, so "sell then buy" costs exactly the one action a purchase costs — which
+          is what the separate replacement command used to cost, without its choice matrix. */}
+      <button className="danger" disabled={busy || !sell} onClick={() => sell && void onAction(sell)} title={`Продать объект за ${sellValue}$. Продажа бесплатна и не расходует действие: слот освобождается сразу, а покупка нового объекта стоит одно действие. Жетон автоматизации, если он стоит здесь, снимается — перенесите его бесплатно на другой объект.`}>
+        <strong>Продать · +{sellValue}$</strong><small>без действия, слот освободится</small>
       </button>
-      <button className="danger" disabled={busy || !sell} onClick={() => sell && void onAction(sell)} title={`Продать объект за ${sellValue}$. Продажа расходует 1 обычное действие и освобождает слот.`}>Продать · {sellValue}$</button>
     </div>}
   </article>;
 }
@@ -582,8 +592,13 @@ function DecisionPanel({ game, me, meta, roles, districts, legal, selectedDistri
     const hasAsset = me.assets.some(asset => asset.card_id === assetId && !asset.blocked);
     if (!hasAsset) return `🔒 Нужен активный объект «${info.asset}»`;
     if (game.actions_left < 1) return "🔒 Нужно 1 обычное действие";
-    if (assetId === "cash" && me.influence < 2) return "🔒 Нужно 2◆";
-    if (assetId === "datacenter" && !game.players.some(player => player.id !== me.id && player.assets.length > 0)) return "🔒 У соперников нет объектов для взлома";
+    if (assetId === "cash" && me.money < launderingCost(meta, game.round_number)) return `🔒 Нужно ${launderingCost(meta, game.round_number)}$`;
+    if (assetId === "influence_broker") {
+      const cost = meta.scoring?.compromat_influence ?? 3;
+      if (me.influence < cost) return `🔒 Нужно ${cost}◆`;
+      if (!game.players.some(player => player.id !== me.id && player.role)) return "🔒 Ни у кого из соперников нет роли";
+      return "🔒 Уже использовано в этом раунде";
+    }
     return "Недоступно в текущий ход";
   };
   return <aside className="city-actions">
@@ -592,12 +607,23 @@ function DecisionPanel({ game, me, meta, roles, districts, legal, selectedDistri
     {!busy && legal.length === 0 && game.status === "playing" && <p className="bot-action-note">Ожидаем ход игрока <b>{current.name}</b>.</p>}
 
     <ScorePanel game={game} me={me} meta={meta} />
+    <IncomePanel game={game} />
 
     <div className="action-group g-city"><h3 className="group-title">🏙️ Город <span className="group-hint">доход и развитие</span></h3>
       <StaticAction action={find("basic_action", item => item.payload.kind === "work")} label="💵 Городской заказ: +2$" tooltip={`Потратить 1 обычное действие и сразу получить 2$. Деньги — топливо: в конце партии ${moneyPerPoint(meta)}$ дают лишь 1 очко, поэтому копить их невыгодно.`} busy={busy} onAction={onAction} />
-      <StaticAction action={find("basic_action", item => item.payload.kind === "campaign")} label="📣 Кампания: 2$ → 2◆" tooltip="Потратить 1 обычное действие и 2$, чтобы сразу получить 2◆ влияния. Влияние нужно для проектов и ролей." busy={busy} onAction={onAction} />
+      {/* One action, three rates: the action — not the money — was the real price of influence, so a
+          single 2$→2◆ tier capped everybody at 2◆ per action no matter how rich they were. */}
+      <div className="campaign-tiers">{campaignTiers(meta).map(tier => {
+        const action = find("basic_action", item => item.payload.kind === "campaign" && item.payload.spend === tier.spend);
+        return <button
+          key={tier.spend}
+          disabled={busy || !action}
+          onClick={() => action && void onAction(action)}
+          title={`Потратить 1 обычное действие и ${tier.spend}$, чтобы получить ${tier.gain}◆. Курс ухудшается с ростом ступени (${(tier.spend / tier.gain).toFixed(2)}$ за 1◆), зато одно действие приносит больше влияния. Влияние нужно для проектов и ролей.`}
+        >📣 {tier.spend}$ → {tier.gain}◆</button>;
+      })}</div>
       <StaticAction action={find("reroll_market")} label={`🔄 Обновить рынок: ${marketRerollCost(meta)}$`} tooltip="Полностью сменить шесть позиций рынка объектов. Действие не расходуется, один раз за ход." busy={busy} onAction={onAction} />
-      <StaticAction action={find("reroll_projects")} label={`🔄 Обновить доску проектов: ${projectRerollInfluence(meta)}◆`} tooltip={`Отправить самый давний проект под низ колоды и добрать новый за ${projectRerollInfluence(meta)}◆. Доска общая: карта уходит у всех. Действие не расходуется, один раз за ход.`} busy={busy} onAction={onAction} />
+      <StaticAction action={find("reroll_projects")} label={`🔄 Обновить доску проектов: ${projectRerollMoney(meta)}$`} tooltip={`Отправить самый давний проект под низ колоды и добрать новый за ${projectRerollMoney(meta)}$. Доска общая: карта уходит у всех. Действие не расходуется, один раз за ход.`} busy={busy} onAction={onAction} />
       <StaticAction action={find("buy_capacity")} label={`📦 ${capacityLabel(me)}`} tooltip="Купить постоянный дополнительный слот бизнеса. Можно потратить обычное либо инвестиционное действие; максимум 6 слотов." busy={busy} onAction={onAction} />
       <StaticAction action={districtAction} label={`⭐ Развить «${districts.get(selectedDistrict)?.title}»`} tooltip="Нужно минимум 2 своих объекта в выбранном районе. Потратить 1 действие и 2$: +25% к базовому доходу всех ваших объектов района с округлением вверх (то есть минимум +1$ каждому) и +1◆. Максимум 2 уровня; уровень личный и соперникам ничего не даёт." busy={busy} onAction={onAction} />
     </div>
@@ -616,7 +642,7 @@ function DecisionPanel({ game, me, meta, roles, districts, legal, selectedDistri
     <div className="action-group g-grey"><h3 className="group-title">🌒 Серые операции <span className="group-hint">через специальные объекты</span></h3><p className="dim card-rule">Каждая операция требует свой активный объект и 1 обычное действие. При выборе можно застраховать провал Крышей.</p>{Object.entries(greyOperationLabels).map(([assetId, label]) => {
       const variants = all("grey_operation", action => action.payload.asset_id === assetId);
       const info = greyOperationInfo[assetId];
-      const effect = info.effect(game.round_number);
+      const effect = info.effect(game.round_number, meta);
       return <button className="described-action" disabled={busy || variants.length === 0} onClick={() => onOffer(label, variants)} title={`Требуется «${info.asset}». Эффект при успехе: ${effect}. Базовый шанс успеха ${info.chance}%; у Афериста он может быть выше. ${info.failure} Страховка при провале тратит 1 Крышу и отменяет денежный либо объектный штраф, но скандалы всё равно начисляются и действие расходуется.`} key={assetId}><strong>{label}</strong><small>{variants.length ? `${effect} · шанс от ${info.chance}%` : greyRequirement(assetId)}</small></button>;
     })}</div>
 
@@ -646,16 +672,107 @@ function ScorePanel({ game, me, meta }: { game: GameState; me: PlayerState; meta
   </div>;
 }
 
+// Money accrues passively every round while influence has to be bought with actions, so "is this
+// perk doing anything?" was unanswerable: nothing on screen added the passives up. The engine ships
+// the same breakdown it pays out with (`round_forecast`), so this panel can never drift from it.
+function IncomePanel({ game }: { game: GameState }) {
+  const forecast = game.round_forecast;
+  if (!forecast) return null;
+  const column = (
+    title: string,
+    glyph: string,
+    row: Record<string, number>,
+    hint: string,
+  ) => <div className="income-column">
+    <h4>{title}<b className={row.total > 0 ? "income-total on" : "income-total"}>{row.total > 0 ? "+" : ""}{row.total}{glyph}</b></h4>
+    <ul>{forecastRows(row).map(item => <li key={item.key} className={item.value === 0 ? "score-zero" : undefined}>
+      <span>{item.label}</span><b>{item.value > 0 ? `+${item.value}` : item.value}{glyph}</b>
+    </li>)}</ul>
+    <small className="dim">{hint}</small>
+  </div>;
+  return <div className="income-panel">
+    <h3 className="group-title">📈 Доход за раунд <span className="group-hint">начисляется в конце раунда</span></h3>
+    <div className="income-columns">
+      {column("Деньги", "$", forecast.money, "Постоянные бонусы проектов входят в строку «Проекты».")}
+      {column("Влияние", "◆", forecast.influence, "Влияние почти не растёт само: его дают объекты с +◆, проекты и роль Политика.")}
+    </div>
+  </div>;
+}
+
 function StaticAction({ action, label, tooltip, busy, onAction }: { action?: LegalAction; label: string; tooltip: string; busy: boolean; onAction: (action: LegalAction) => Promise<void> }) {
   return <button disabled={busy || !action} onClick={() => action && void onAction(action)} title={tooltip}>{label}</button>;
 }
 
-function Chronicle({ game, meta }: { game: GameState; meta: CityMeta }) {
-  return <aside className="city-log"><h2>📜 Хроника <small>события партии</small></h2><div className="log-scroll">{[...game.event_log].reverse().slice(0, 80).map(event => <p className={`log-entry ${event.actor_id ? "log-player" : "log-system"}`} key={event.seq}><b>#{event.seq}</b>{" "}{describeEventSegments(event, game, meta).map((segment, index) => {
-    if (segment.kind === "player") return <span className="log-name" style={{ color: segment.color }} key={index}>{segment.text}</span>;
-    if (segment.kind === "num") return <span className={`log-num log-num-${segment.tone}`} key={index}>{segment.text}</span>;
-    return <span key={index}>{segment.text}</span>;
-  })}</p>)}</div></aside>;
+/** Copy/download the whole match. Rooms expire, so an unexported game is gone for good. */
+function useGameLogExport(room: RoomView, meta: CityMeta) {
+  const [status, setStatus] = useState("");
+  const text = useCallback(() => buildGameLogMarkdown(room, meta, __GAME_VERSION__), [room, meta]);
+  const save = useCallback((body: string, extension: string) => {
+    const blob = new Blob([body], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    link.download = `city-of-influence-${room.name.replace(/[^\w\-]+/g, "_")}-${stamp}.${extension}`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [room.name]);
+  const copy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(text());
+      setStatus("Журнал скопирован в буфер");
+    } catch {
+      setStatus("Скопировать не удалось — скачайте файл");
+    }
+  }, [text]);
+  const download = useCallback(() => {
+    save(text(), "md");
+    setStatus("Журнал сохранён (.md)");
+  }, [save, text]);
+  return { status, copy, download, save, setStatus };
+}
+
+function LogExportButtons({ room, meta, roomId, password, playerId, replayable }: {
+  room: RoomView;
+  meta: CityMeta;
+  roomId: string;
+  password: string;
+  playerId: string;
+  replayable: boolean;
+}) {
+  const { status, copy, download, save, setStatus } = useGameLogExport(room, meta);
+  const downloadJournal = async () => {
+    try {
+      const journal = await cityApi.journal(roomId, password, playerId);
+      save(JSON.stringify(journal, null, 2), "json");
+      setStatus("Полный журнал сохранён (.json) — партию можно переиграть");
+    } catch (reason) {
+      setStatus(reason instanceof Error ? reason.message : "Журнал недоступен");
+    }
+  };
+  return <div className="log-export">
+    <button onClick={() => void copy()} title="Скопировать читаемый журнал партии в буфер обмена: итоги, портфели и вся хроника от начала к концу.">📋 Копировать журнал</button>
+    <button onClick={download} title="Скачать читаемый журнал партии в формате Markdown.">💾 Скачать .md</button>
+    {/* The seed plus the command log is what makes a match replayable, not just readable. */}
+    {replayable && <button onClick={() => void downloadJournal()} title="Скачать полный журнал: сид, все команды и финальный снапшот. По нему партию можно точно воспроизвести и разобрать. Доступно только после завершения партии.">🧾 Скачать .json для разбора</button>}
+    {status && <small className="log-export-status">{status}</small>}
+  </div>;
+}
+
+function Chronicle({ room, game, meta }: { room: RoomView; game: GameState; meta: CityMeta }) {
+  const { status, copy, download } = useGameLogExport(room, meta);
+  return <aside className="city-log"><h2>📜 Хроника <small>события партии</small></h2>
+    {/* Also mid-game: a room lost to an expiry or a restart takes the whole match with it. */}
+    <div className="log-export">
+      <button onClick={() => void copy()} title="Скопировать журнал партии на текущий момент.">📋 Копировать</button>
+      <button onClick={download} title="Скачать журнал партии на текущий момент в формате Markdown.">💾 .md</button>
+      {status && <small className="log-export-status">{status}</small>}
+    </div>
+    <div className="log-scroll">{[...game.event_log].reverse().slice(0, 80).map(event => <p className={`log-entry ${event.actor_id ? "log-player" : "log-system"}`} key={event.seq}><b>#{event.seq}</b>{" "}{describeEventSegments(event, game, meta).map((segment, index) => {
+      if (segment.kind === "player") return <span className="log-name" style={{ color: segment.color }} key={index}>{segment.text}</span>;
+      if (segment.kind === "num") return <span className={`log-num log-num-${segment.tone}`} key={index}>{segment.text}</span>;
+      return <span key={index}>{segment.text}</span>;
+    })}</p>)}</div></aside>;
 }
 
 function RulesModal({ html, onClose }: { html: string; onClose: () => void }) {
@@ -687,7 +804,16 @@ function ChoiceModal({ choice, game, labelContext, busy, onClose, onAction }: {
   })}</div></section></div>;
 }
 
-function FinishPanel({ game, ranking, onExit }: { game: GameState; ranking: PlayerState[]; onExit: () => void }) {
+function FinishPanel({ room, game, meta, ranking, roomId, password, playerId, onExit }: {
+  room: RoomView;
+  game: GameState;
+  meta: CityMeta;
+  ranking: PlayerState[];
+  roomId: string;
+  password: string;
+  playerId: string;
+  onExit: () => void;
+}) {
   return <section className="city-finish"><h2>🏆 Итоги города</h2><div>{ranking.map((player, index) => {
     const score = game.score_breakdown?.[player.id];
     return <p key={player.id}>
@@ -695,5 +821,9 @@ function FinishPanel({ game, ranking, onExit }: { game: GameState; ranking: Play
       <span>{scoreOf(game, player)} очков</span>
       {score && <small>проекты {score.projects} · объекты {score.assets} · роль {score.role} · деньги {score.money} · влияние {score.influence} · скандалы {score.scandals}</small>}
     </p>;
-  })}</div><button className="primary" onClick={onExit}>Вернуться к комнатам</button></section>;
+  })}</div>
+    <h3>Журнал партии</h3>
+    <p className="dim">Записей: {game.event_log.length}. Комната со временем удаляется, поэтому сохраните партию, если хотите её потом разобрать.</p>
+    <LogExportButtons room={room} meta={meta} roomId={roomId} password={password} playerId={playerId} replayable />
+    <button className="primary" onClick={onExit}>Вернуться к комнатам</button></section>;
 }

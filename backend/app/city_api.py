@@ -11,11 +11,12 @@ from pydantic import BaseModel, Field
 
 from city_engine.commands import Command
 from city_engine.content import load_catalog
+from city_rooms.errors import RoomValidationError
 from city_rooms.models import RoomState
 from city_rooms.repository import InMemoryRoomRepository
 from city_rooms.service import CityRoomService
 from city_rooms.upstash import UpstashRoomRepository
-from city_rooms.views import room_view
+from city_rooms.views import room_journal, room_view
 
 router = APIRouter(prefix="/api/city", tags=["city"])
 
@@ -189,6 +190,26 @@ def get_room_state(
         service.engine.legal_actions(room.game, viewer_id) if room.game is not None and viewer_id is not None else []
     )
     return {"changed": True, **room_view(room, viewer_id, legal_actions, _market_prices(service, room, viewer_id))}
+
+
+@router.get("/rooms/{room_id}/journal")
+def get_room_journal(
+    room_id: str,
+    viewer_id: str | None = Query(default=None),
+    room_password: str = Header(alias="X-Room-Password"),
+    service: CityRoomService = Depends(get_room_service),
+) -> dict[str, Any]:
+    """Replayable record of a finished match: seed, command journal and the final snapshot.
+
+    Rooms expire, so a match that is not exported is gone; this is what makes a game analysable
+    after the fact instead of only readable in the chronicle while the room still exists.
+    """
+    room = service.get_room(room_id)
+    service.authorize_viewer(room, room_password, viewer_id)
+    try:
+        return room_journal(room)
+    except ValueError as exc:
+        raise RoomValidationError(str(exc)) from exc
 
 
 @router.post("/rooms/{room_id}/commands")

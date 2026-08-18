@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { cityApi } from "./api";
+import { difficultyLabels } from "./gameUi";
 import type { CityMeta, Difficulty, RoleMeta, RoomSeat, RoomView } from "./types";
 
 interface Props {
@@ -53,7 +54,7 @@ export function Lobby({ roomId, meta, initialPassword = "", playerId, onBack, on
     <section className="seat-grid">{room.seats.map(seat => <article className={`panel seat ${seat.kind}`} key={seat.index}>
       <h3>Место {seat.index + 1}</h3>
       <strong>{seat.kind === "empty" ? "Свободно" : seat.name}</strong>
-      {seat.kind === "bot" && <small>{seat.difficulty} · {seat.preferred_role ? `цель: ${meta.roles.find(role => role.id === seat.preferred_role)?.title}` : "любая роль"}</small>}
+      {seat.kind === "bot" && <small>{difficultyLabels[seat.difficulty] ?? seat.difficulty} · {seat.preferred_role ? `цель: ${meta.roles.find(role => role.id === seat.preferred_role)?.title}` : "любая роль"}</small>}
       {(seat.kind === "empty" || seat.kind === "human") && <button className="primary" disabled={busy || !password || (seat.kind === "empty" && room.status !== "waiting")} onClick={() => join(seat.index)}>{seat.kind === "human" ? "Сесть на это место" : "Занять"}</button>}
       {room.status === "waiting" && seat.kind !== "human" && <BotConfigurator seat={seat} roles={meta.roles} disabled={busy || !password} onApply={(difficulty, role) => bot(seat.index, difficulty, role)} />}
       {room.status === "waiting" && seat.kind !== "empty" && <button className="danger" disabled={busy} onClick={() => clear(seat.index)}>Освободить</button>}
@@ -62,33 +63,25 @@ export function Lobby({ roomId, meta, initialPassword = "", playerId, onBack, on
   </main>;
 }
 
+// Only Reborn is offered: the other three policies were written when money was points and objects
+// were the whole game, so after the influence pass they play a version of the rules that no longer
+// exists — they never sell an object and never buy influence. The engine still accepts them.
 function BotConfigurator({ seat, roles, disabled, onApply }: {
   seat: RoomSeat;
   roles: RoleMeta[];
   disabled: boolean;
   onApply: (difficulty: Difficulty, role: string | null) => void;
 }) {
-  const [difficulty, setDifficulty] = useState<Difficulty>(seat.difficulty ?? "medium");
   const [role, setRole] = useState(seat.preferred_role ?? "");
-  useEffect(() => {
-    setDifficulty(seat.difficulty ?? "medium");
-    setRole(seat.preferred_role ?? "");
-  }, [seat.difficulty, seat.preferred_role]);
+  useEffect(() => { setRole(seat.preferred_role ?? ""); }, [seat.preferred_role]);
   return <div className="bot-controls">
-    <label>Модель
-      <select value={difficulty} onChange={event => setDifficulty(event.target.value as Difficulty)}>
-        <option value="easy">Олег · easy</option>
-        <option value="medium">Codex · medium</option>
-        <option value="hard">Claude · hard</option>
-        <option value="expert">Claude Reborn · expert</option>
-      </select>
-    </label>
+    <p className="bot-model">Модель: <b>Claude Reborn</b></p>
     <label>Роль
       <select value={role} onChange={event => setRole(event.target.value)}>
         <option value="">Любая</option>
         {roles.map(item => <option value={item.id} key={item.id}>{item.icon} {item.title}</option>)}
       </select>
     </label>
-    <button disabled={disabled} onClick={() => onApply(difficulty, role || null)}>{seat.kind === "bot" ? "Применить" : "Посадить бота"}</button>
+    <button disabled={disabled} onClick={() => onApply("expert", role || null)}>{seat.kind === "bot" ? "Применить" : "Посадить бота"}</button>
   </div>;
 }

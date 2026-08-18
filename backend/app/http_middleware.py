@@ -67,6 +67,9 @@ def _rule_for(request: Request) -> tuple[str, RateRule] | None:
         return "create-room", RateRule(12)
     if request.method == "GET" and request.url.path.endswith("/state"):
         return "private-state", RateRule(300)
+    # A journal export is one large response per finished game; nothing polls it.
+    if request.method == "GET" and request.url.path.endswith("/journal"):
+        return "journal-export", RateRule(20)
     if request.method == "POST" and request.url.path.endswith("/commands"):
         return "game-command", RateRule(120)
     if request.method == "DELETE":

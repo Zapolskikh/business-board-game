@@ -11,14 +11,19 @@ from typing import Any
 from city_engine.constants import (
     ACTION_CARD_COST,
     AUTOMATION_COST,
+    CAMPAIGN_TIERS,
+    COMPROMAT_INFLUENCE,
     CONTENT_VERSION,
     CRISIS_PR_INFLUENCE,
     DISTRICT_IDS,
+    HACK_INFLUENCE_STEAL,
     INFLUENCE_PER_POINT,
+    LAUNDERING_BASE_COST,
+    LAUNDERING_BASE_GAIN,
     MARKET_REROLL_COST,
     MONEY_PER_POINT,
     PROJECT_BOARD_SIZE,
-    PROJECT_REROLL_INFLUENCE,
+    PROJECT_REROLL_MONEY,
     REPEATABLE_PROJECT_IDS,
     ROLE_IDS,
 )
@@ -196,9 +201,17 @@ class ContentCatalog:
             "project_board_size": PROJECT_BOARD_SIZE,
             "market_reroll_cost": MARKET_REROLL_COST,
             "automation_cost": AUTOMATION_COST,
-            "project_reroll_influence": PROJECT_REROLL_INFLUENCE,
+            "project_reroll_money": PROJECT_REROLL_MONEY,
             "crisis_pr_influence": CRISIS_PR_INFLUENCE,
             "action_card_cost": ACTION_CARD_COST,
+            # Campaign tiers travel as pairs so the client renders one button per tier without
+            # knowing the rates; a dict would arrive with string keys through JSON.
+            "campaign_tiers": [{"spend": spend, "gain": gain} for spend, gain in sorted(CAMPAIGN_TIERS.items())],
+            # Both sides of laundering scale with the round, so the client is given the formula.
+            "laundering_base_cost": LAUNDERING_BASE_COST,
+            "laundering_base_gain": LAUNDERING_BASE_GAIN,
+            "hack_influence_steal": HACK_INFLUENCE_STEAL,
+            "compromat_influence": COMPROMAT_INFLUENCE,
         }
         return raw
 

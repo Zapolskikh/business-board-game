@@ -12,7 +12,11 @@ from math import floor
 from typing import Any
 
 from city_engine.commands import Command
-from city_engine.constants import MARKET_REROLL_COST
+from city_engine.constants import (
+    COMPROMAT_INFLUENCE,
+    HACK_INFLUENCE_STEAL,
+    MARKET_REROLL_COST,
+)
 from city_engine.engine import CityEngine
 from city_engine.models import GameState, PlayerState
 
@@ -36,17 +40,45 @@ class PolicyProfile:
     # were written when money was points and objects were the whole game; they still play that
     # way, which is exactly why they are the easier opponents now.
     planning: float = 0.0
+    # Money the bot is happy to hold; everything above reads as capital it failed to deploy. One
+    # slot plus one object is what a turn can actually absorb, so a bigger buffer is just hoarding.
+    cash_comfort: int = 30
+    # What an idle dollar above that buffer costs, in points. See ``_position_value``.
+    cash_drag: float = 0.09
+    # What a point of influence is worth when it completes a project this turn versus when it is
+    # banked toward one still being built. See ``_project_planning_bonus``.
+    cashable_influence: float = 1.4
+    building_influence: float = 1.4
+    # What a point of recurring influence is worth against a dollar of recurring income. The older
+    # profiles keep 1.0 — the ratio they were tuned against. See ``_position_value``.
+    influence_weight: float = 1.0
 
+
+# What one influence is worth in dollars when both are about to be spent, not hoarded: a project
+# turns 1◆ into roughly 1.5 points, while a dollar buys 0.5 in an object and 0.1 once the slots
+# are full. Used wherever a decision trades one currency for the other.
+INFLUENCE_IN_MONEY = 3.0
 
 PROFILES = {
     "easy": PolicyProfile(horizon=3, aggression=0.12, risk_penalty=1.5, role_focus=1.4, defence=0.7),
     "medium": PolicyProfile(horizon=8, aggression=0.25, risk_penalty=2.5, role_focus=2.0, defence=1.2),
     "hard": PolicyProfile(horizon=6, aggression=0.45, risk_penalty=2.0, role_focus=1.7, defence=1.5),
-    "expert": PolicyProfile(horizon=7, aggression=0.30, risk_penalty=1.8, role_focus=1.0, defence=1.0, planning=1.0),
+    # Only ``influence_weight`` moved in the influence pass, and it moved because it was wrong, not
+    # because it was worth tuning. Everything more aggressive was measured and rejected: forcing
+    # money out of the wallet (cash_comfort 18 / cash_drag 0.20) bought +1.1 projects a game and
+    # still lost 2.3 points and 8 points of win share over 40 games, because a dollar left in the
+    # wallet is worth 0.1 points and the project board simply has nowhere to put the influence.
+    # See the note in ``_position_value``.
+    "expert": PolicyProfile(
+        horizon=7,
+        aggression=0.30,
+        risk_penalty=1.8,
+        role_focus=1.0,
+        defence=1.0,
+        planning=1.0,
+        influence_weight=INFLUENCE_IN_MONEY,
+    ),
 }
-
-# Money a planning bot is happy to hold; everything above reads as capital it failed to deploy.
-CASH_COMFORT = 30
 
 BOT_POLICY_NAMES = {
     "easy": "Олег",
@@ -152,7 +184,7 @@ def _action_utility(
     utility = after - before + (opponents_before - opponents_after) * profile.aggression
     utility += _strategic_action_bonus(engine, state, player, action, profile)
     if profile.planning:
-        utility += _project_planning_bonus(engine, state, player, after_player) * profile.planning
+        utility += _project_planning_bonus(engine, state, player, after_player, profile) * profile.planning
     return utility
 
 
@@ -164,7 +196,11 @@ def _position_value(
 ) -> float:
     rounds_left = max(1, state.max_rounds - state.round_number + 1)
     horizon = min(profile.horizon, rounds_left)
-    recurring = engine._round_income(state, player) + engine.passive_influence(player)
+    # A point of influence a round is not a dollar a round. Counting them equally made every object
+    # that pays influence look like a weak income card: across 48 measured player-games not one bot
+    # ever owned the compromat trader or the illegal datacentre, so two of the five grey operations
+    # were unreachable rather than mispriced.
+    recurring = engine._round_income(state, player) + engine.passive_influence(player) * profile.influence_weight
     scandal_risk = player.scandals**2 * profile.risk_penalty
     defence = (player.roofs + player.role_shields + player.scandal_shields) * profile.defence
     role_value = _role_position_value(engine, state, player, player.role, profile)
@@ -172,8 +208,16 @@ def _position_value(
     # Money counts toward the score at 10$ = 1 point, so simply holding it looks profitable and
     # every sink — a slot, an object, a project — reads as a net loss. A bot finished a measured
     # match sitting on 296$ and three slots, converting two dollars at a time through campaign.
+    #
     # Above a working balance the drag almost cancels that 0.1/$, leaving spending clearly better.
-    cash_drag = max(0, player.money - CASH_COMFORT) * 0.09 * profile.planning
+    #
+    # Raising it further was tried and rejected. At 0.20 the bot's closing balance fell from 177$ to
+    # 138$ and it took a full extra project a game, and it still lost: −2.3 points and 42% of wins
+    # against the untuned profile over 40 games. The bot is not the problem — with only four project
+    # slots on a shared board, the influence that money buys has nowhere to go, so the surplus
+    # scores more sitting in the wallet at 0.1 points a dollar than it does converted. That is a
+    # statement about the scoring rate and the width of the board, not about the policy.
+    cash_drag = max(0, player.money - profile.cash_comfort) * profile.cash_drag * profile.planning
     return (
         engine.score(player) + recurring * horizon * 0.55 + defence + role_value + hand_value - scandal_risk - cash_drag
     )
@@ -242,6 +286,7 @@ def _project_planning_bonus(
     state: GameState,
     player: PlayerState,
     after: PlayerState,
+    profile: PolicyProfile,
 ) -> float:
     """How much closer a move puts the player to taking projects off the board.
 
@@ -269,13 +314,36 @@ def _project_planning_bonus(
     # Influence is worth banking for anything the player is already halfway into, not only for a
     # condition that is met right now — waiting for that is how a bot reaches round twelve
     # holding 300$ and 2◆, and then cannot pay for the project it spent the game unlocking.
+    #
+    # Two shortfalls, not one. The old code took the minimum over everything half-built, so the
+    # moment a single project became affordable the whole term collapsed to zero and banking for
+    # the next one scored nothing: the bot could only ever hold enough influence for one project,
+    # took at most one a turn, and sat on the rest as cash. Measured: 31.6% of turns ended with a
+    # satisfied project it could not pay for, and in 29.5% of those it was holding 20$ or more.
+    gained_influence = max(0, after.influence - player.influence)
+    cashable_shortfall = min(
+        (
+            short
+            for short in (
+                max(0, engine.project(project_id).cost_influence - after.influence)
+                for project_id in state.project_board
+                if engine.project_requirement_met(after, engine.project(project_id))
+            )
+            if short > 0
+        ),
+        default=0,
+    )
     reachable = [project for project in board if engine.project_requirement_progress(after, project) >= 0.5]
-    missing = min(
+    building_shortfall = min(
         (max(0, project.cost_influence - after.influence) for project in reachable),
         default=0,
     )
-    gained_influence = max(0, after.influence - player.influence)
-    influence_value = min(gained_influence, missing) * 1.4
+    # A project whose condition is already met converts influence into points this turn, so it is
+    # worth more per point of influence than one still being built toward.
+    influence_value = max(
+        min(gained_influence, cashable_shortfall) * profile.cashable_influence,
+        min(gained_influence, building_shortfall) * profile.building_influence,
+    )
     return unlocked * 1.2 + advance * 0.9 + influence_value
 
 
@@ -371,17 +439,47 @@ def _strategic_action_bonus(
         )
         spare = player.money >= MARKET_REROLL_COST + 5
         bonus += 2.0 if spare and not upgrade_on_offer else -2.0
-    elif action_type == "replace_asset":
-        # Swapping a cheap early object for a stronger one is the whole point of the mechanic,
-        # but it must not become a treadmill: only a real jump in value is worth the action.
-        market = next(item for item in state.market if item.uid == payload["market_uid"])
-        owned = next(item for item in player.assets if item.uid == payload["asset_uid"])
-        gain = engine.asset_value_of(market.card_id) - engine.asset_value(owned)
-        bonus += gain * 1.5 - 1.0
-        if gain < 0 and profile.planning:
-            # Downgrading an epic to a common for a little income costs real points.
-            bonus -= 4.0
+    elif action_type == "sell_asset":
+        bonus += _sell_asset_bonus(engine, state, player, str(payload["asset_uid"]), profile)
     return bonus
+
+
+def _sell_asset_bonus(
+    engine: CityEngine,
+    state: GameState,
+    player: PlayerState,
+    asset_uid: str,
+    profile: PolicyProfile,
+) -> float:
+    """Selling is free now, and the whole point of it is the purchase that follows.
+
+    A one-step utility can only ever see the loss: the refund equals the points the object was
+    worth, so every sale scores negative and the bot would never rebuild its tableau. The
+    dedicated one-action swap used to hide this — it was 9.7% of all measured bot actions. This
+    values the sale by the best object the freed slot can immediately hold instead.
+    """
+    owned = next((item for item in player.assets if item.uid == asset_uid), None)
+    if owned is None:
+        return 0.0
+    refund = engine.asset_refund(owned)
+    outgoing = engine.asset_value(owned)
+    # Only a full tableau needs the slot: with a slot free, buying keeps both objects.
+    if len(player.assets) < player.capacity:
+        return -3.0
+    budget = player.money + refund
+    upgrade = max(
+        (
+            engine.asset_value_of(item.card_id) - outgoing
+            for item in state.market
+            if budget >= engine.asset_price(state, player, item.card_id)
+        ),
+        default=None,
+    )
+    if upgrade is None or upgrade <= 0:
+        # Nothing on the market beats what is being sold, so this is a pure downgrade.
+        return -4.0
+    # The purchase still costs the action the swap used to, and only a real jump is worth it.
+    return upgrade * 1.5 - 1.0 + (1.0 if profile.planning else 0.0)
 
 
 def _grey_operation_utility(
@@ -391,27 +489,53 @@ def _grey_operation_utility(
     payload: dict[str, Any],
     profile: PolicyProfile,
 ) -> float:
+    """Grey operations are priced in expected units, so influence has to be converted to them.
+
+    Two of the five now trade in influence rather than cash, and a dollar and a point of influence
+    are nowhere near interchangeable: influence buys projects at roughly 1.5 points each, a dollar
+    buys 0.5 at best and 0.1 once the slots are full. ``INFLUENCE_IN_MONEY`` is that ratio, so a
+    3◆ laundering run is not compared against a 6$ one as if they were the same size.
+    """
     asset_id = str(payload["asset_id"])
     place = next(index for index, item in enumerate(engine.ranking(state), start=1) if item.id == player.id)
     fraud_bonus = [0, 0.05, 0.1, 0.2][min(3, place - 1)] if engine.has_role(player, "fraudster") else 0
     tech_bonus = min(0.1, engine.district_count(player, "tech") * 0.05) if engine.has_role(player, "fraudster") else 0
-    chance = min(
-        0.9,
-        {"cash": 0.85, "market": 0.75, "crypto": 0.6, "datacenter": 0.55}[asset_id] + fraud_bonus + tech_bonus,
-    )
+    chance = min(0.9, engine.GREY_BASE_CHANCE[asset_id] + fraud_bonus + tech_bonus)
     if asset_id == "cash":
-        success_value, failure_cost = 5 + state.round_number - 2, 6
+        # Money into influence: worth the difference between what each buys, not the raw amounts.
+        stake = engine.laundering_cost(state)
+        success_value = engine.laundering_gain(state) * INFLUENCE_IN_MONEY - stake
+        failure_cost = stake
     elif asset_id == "market":
         target = state.player_by_id(str(payload["target_id"]))
         success_value, failure_cost = min(3 + floor(state.round_number / 2), target.money), 1
     elif asset_id == "crypto":
         success_value, failure_cost = 6 + state.round_number, 9
+    elif asset_id == "datacenter":
+        target = state.player_by_id(str(payload["target_id"]))
+        stolen = min(HACK_INFLUENCE_STEAL, target.influence)
+        # Taken from a rival, so the aggression profile values the denial on top of the gain.
+        success_value = stolen * INFLUENCE_IN_MONEY * (1 + profile.aggression)
+        failure_cost = 2 * INFLUENCE_IN_MONEY
     else:
         target = state.player_by_id(str(payload["target_id"]))
-        success_value = (
-            max((engine.owned_definition(asset).income for asset in target.assets), default=0) * profile.aggression
-        )
-        failure_cost = 5
+        if target.role is None or player.compromat_round == state.round_number:
+            return -100.0
+        # Stripping a role costs the target 3 points and the passive behind it; a face-up roof or
+        # injunction makes the attempt a knowingly wasted action, exactly like a blocked takeover.
+        defended = target.roofs > 0 or target.role_shields > 0
+        denial = (3 + _role_utility(engine, state, target, target.role) * 0.3) * (1 + profile.aggression)
+        # The seat also reopens at the free price instead of the threefold takeover, and that is the
+        # attacker's own reason to pull the trigger. Counting only the denial made a leak pure
+        # altruism in a four-player game — the cost is yours and the benefit is split three ways —
+        # so the bot correctly never ran one across 24 measured games.
+        held = _role_utility(engine, state, player, player.role) if player.role else 0.0
+        wanted = _role_utility(engine, state, player, target.role)
+        if target.role == player.preferred_role:
+            wanted += 5 * profile.role_focus
+        seat = (state.role_price * 2) * INFLUENCE_IN_MONEY * 0.5 if wanted > held else 0.0
+        success_value = (0.0 if defended else denial + seat) - COMPROMAT_INFLUENCE * INFLUENCE_IN_MONEY
+        failure_cost = 2 * INFLUENCE_IN_MONEY
     scandal_cost = (1 if engine.has_role(player, "fraudster") else 2) * profile.risk_penalty
     protection_cost = 1.5 if payload.get("protect_failure") and player.roofs > 0 else 0
     return chance * success_value - (1 - chance) * failure_cost - scandal_cost - protection_cost

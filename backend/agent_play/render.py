@@ -28,7 +28,16 @@ POWER_LABELS = {
 # each handler, so this is the only place a reader can learn it — and a whole match was misplayed
 # on the assumption that a role power costs a turn action the way a basic action does.
 FREE_ACTION_TYPES = frozenset(
-    {"reroll_market", "reroll_projects", "play_action_card", "convert_action_card", "move_automation"}
+    {
+        "reroll_market",
+        "reroll_projects",
+        "play_action_card",
+        "convert_action_card",
+        "move_automation",
+        # Selling is free: the only reason to sell is the purchase that follows, and charging an
+        # action for the sale made a swap cost two actions where a purchase costs one.
+        "sell_asset",
+    }
 )
 FREE_POWERS = frozenset(
     {
@@ -42,10 +51,11 @@ FREE_POWERS = frozenset(
 )
 
 GREY_LABELS = {
-    "cash": "отмывание",
-    "market": "контрабанда",
-    "crypto": "памп и дамп",
-    "datacenter": "взлом",
+    "cash": "отмывание: за деньги получить влияние",
+    "market": "контрабанда: украсть деньги у цели",
+    "crypto": "памп и дамп: деньги и удар по лидеру",
+    "datacenter": "взлом: украсть влияние у цели",
+    "influence_broker": "слив компромата: снять роль с цели (раз в раунд, Крыша гасит)",
 }
 
 CAPACITY_COSTS = {3: 6, 4: 10, 5: 15}
@@ -59,7 +69,8 @@ class Catalog:
     cards: dict[str, dict[str, Any]]
     projects: dict[str, dict[str, Any]]
     events: dict[str, dict[str, Any]]
-    scoring: dict[str, int]
+    # Not all of `scoring` is a number: the campaign tiers travel as a list of {spend, gain} pairs.
+    scoring: dict[str, Any]
 
     @classmethod
     def from_meta(cls, meta: dict[str, Any]) -> Catalog:
@@ -73,7 +84,7 @@ class Catalog:
             cards=index(meta.get("action_cards", [])),
             projects=index(meta.get("projects", [])),
             events=index(meta.get("events", [])),
-            scoring={str(key): int(value) for key, value in (meta.get("scoring") or {}).items()},
+            scoring=dict(meta.get("scoring") or {}),
         )
 
     def project_title(self, project_id: str) -> str:
@@ -151,8 +162,7 @@ def _payload_hint(action: dict[str, Any], game: dict[str, Any], me: dict[str, An
     if asset_uid:
         owned = next((entry for entry in me["assets"] if entry["uid"] == asset_uid), None)
         if owned:
-            verb = "вместо " if action["type"] == "replace_asset" else ""
-            bits.append(f"{verb}«{catalog.asset_title(owned['card_id'])}»")
+            bits.append(f"«{catalog.asset_title(owned['card_id'])}»")
         if action["type"] in {"move_automation", "buy_automation"}:
             # A total reads as a price tag; the decision is the difference against where the
             # token stands now — or against no token at all when it is still being bought.
@@ -204,6 +214,17 @@ def _payload_hint(action: dict[str, Any], game: dict[str, Any], me: dict[str, An
         bits.append("снять 1 скандал")
     if action["type"] == "buy_action_card":
         bits.append("две случайные карты из колоды")
+    if action["type"] == "basic_action":
+        # The tier is the decision: the same action buys 2◆, 3◆ or 4◆ at a worsening rate.
+        tiers = {int(row["spend"]): int(row["gain"]) for row in catalog.scoring.get("campaign_tiers") or []}
+        spend = payload.get("spend")
+        # No "→" in a hint: the transcript uses "→ " to mark the commands it played.
+        if payload.get("kind") == "campaign" and spend is not None and int(spend) in tiers:
+            bits.append(f"{int(spend)}$ за {tiers[int(spend)]}◆")
+        elif payload.get("kind") == "work":
+            bits.append("+2$")
+    if action["type"] == "sell_asset":
+        bits.append("слот освобождается, жетон автоматизации снимается")
     return " ".join(bits)
 
 
@@ -220,13 +241,11 @@ def describe_action(
     return f"{line}   · {hint}" if hint else line
 
 
-# A family printed one line per variant is what made the action list 43% of the whole board dump:
-# `replace_asset` alone is up to 6 owned × 6 market entries. Folded families are still playable —
-# `resolve_action` addresses them by type plus payload filters.
+# A family printed one line per variant is what made the action list 43% of the whole board dump.
+# Folded families are still playable — `resolve_action` addresses them by type plus payload filters.
 FOLD_AFTER = 6
 FOLD_HINTS = {
-    "replace_asset": "заменить свой объект на объект с рынка",
-    "sell_asset": "продать свой объект",
+    "sell_asset": "продать свой объект за половину цены (без действия)",
     "move_automation": "перенести жетон автоматизации (бесплатно, раз в ход)",
     "buy_asset": "купить объект с рынка",
     "convert_action_card": "сбросить карту в 1$ или 1◆",
@@ -569,19 +588,23 @@ def render_state(
     lines.extend(_owned_line(owned, me, game, catalog) for owned in me["assets"])
     lines.append(f"    районы: {districts or 'пусто'}")
     slot = CAPACITY_COSTS.get(int(me["capacity"]))
-    reroll = catalog.scoring.get("market_reroll_cost", 2)
+    reroll = catalog.scoring.get("market_reroll_cost", 4)
     automation = catalog.scoring.get("automation_cost", 6)
-    project_reroll = catalog.scoring.get("project_reroll_influence", 2)
+    project_reroll = catalog.scoring.get("project_reroll_money", 10)
     card_cost = catalog.scoring.get("action_card_cost", 3)
     token = (
         "жетон автоматизации: куплен"
         if me.get("automation_owned")
         else f"жетон автоматизации {automation}$ (один на партию, переносится бесплатно раз в ход)"
     )
+    tiers = " / ".join(
+        f"{int(row['spend'])}$→{int(row['gain'])}◆" for row in catalog.scoring.get("campaign_tiers") or []
+    )
     lines.append(
         f"    цены сейчас: Крыша {roof_price(game, me)}$ · {token} · "
         f"две карты {card_cost}$+1◆ и действие · "
-        f"реролл рынка {reroll}$ и доски проектов {project_reroll}◆ — без действия, доски общие · "
+        f"реролл рынка {reroll}$ и доски проектов {project_reroll}$ — без действия, доски общие · "
+        + (f"кампания {tiers} за одно действие · " if tiers else "")
         + (f"слот {int(me['capacity']) + 1} за {slot}$" if slot else "слоты максимум")
     )
     breakdown = dict(game.get("score_breakdown", {}).get(player_id, {}))

@@ -3,10 +3,18 @@ from __future__ import annotations
 import pytest
 
 from city_engine.commands import Command
-from city_engine.constants import MAX_REPEATABLE_PROJECTS, PROJECT_BOARD_SIZE
+from city_engine.constants import (
+    CAMPAIGN_TIERS,
+    COMPROMAT_INFLUENCE,
+    HACK_INFLUENCE_STEAL,
+    MARKET_REROLL_COST,
+    MAX_REPEATABLE_PROJECTS,
+    PROJECT_BOARD_SIZE,
+    PROJECT_REROLL_MONEY,
+)
 from city_engine.content import load_catalog
 from city_engine.engine import CityEngine
-from city_engine.errors import IllegalActionError
+from city_engine.errors import IllegalActionError, InvalidCommandError
 from city_engine.factory import PlayerSetup, create_game_from_catalog
 from city_engine.models import HeldCard, MarketAsset, OwnedAsset
 
@@ -527,7 +535,9 @@ def test_settlement_reports_where_influence_came_from() -> None:
 
     settled = next(event for event in state.event_log if event.type == "round_settled")
     breakdown = settled.data["influence_sources"][politician.id]
-    assert breakdown == {"passive": 2, "news": 0, "rating": 0}
+    # Itemised by source: a project perk paying +1◆ a round used to be indistinguishable from one
+    # paying nothing, because the whole passive arrived as a single unlabelled number.
+    assert breakdown == {"objects": 0, "administrative": 2, "projects": 0, "news": 0, "rating": 0}
     assert sum(breakdown.values()) == state.player_by_id(politician.id).influence - influence_before
 
 
@@ -561,22 +571,90 @@ def test_grey_operation_uses_serialized_rng_for_success_and_failure() -> None:
     success = make_state()
     actor = success.current_player
     give_asset(success, actor, "cash")
-    actor.influence = 10
+    actor.money = 20
+    stake = engine.laundering_cost(success)
     success.rng.state = 0  # next random ~= .236, below the .85 laundering chance.
     success = run(engine, success, "grey_operation", {"asset_id": "cash"})
-    assert success.current_player.money == 16
-    assert success.current_player.influence == 8
+    # Laundering runs the other way now: money in, influence out. See LAUNDERING_BASE_GAIN.
+    assert success.current_player.money == 20 - stake
+    assert success.current_player.influence == 2 + engine.laundering_gain(success)
     assert success.current_player.scandals == 1
 
     failure = make_state()
     actor = failure.current_player
     give_asset(failure, actor, "cash")
-    actor.influence = 10
+    actor.money = 20
     failure.rng.state = 100_000  # next random ~= .991, above the .85 chance.
     failure = run(engine, failure, "grey_operation", {"asset_id": "cash"})
-    assert failure.current_player.money == 7
-    assert failure.current_player.influence == 7
+    # The launderer keeps the stake and delivers nothing.
+    assert failure.current_player.money == 20 - stake
+    assert failure.current_player.influence == 2
     assert failure.current_player.scandals == 2
+
+
+def test_hacking_takes_influence_instead_of_blocking_an_object() -> None:
+    engine = CityEngine()
+    state = make_state()
+    actor = state.current_player
+    give_asset(state, actor, "datacenter")
+    actor.scandals = 0
+    target = next(other for other in state.players if other.id != actor.id)
+    target.influence = 10
+    target.roofs = 0
+    give_asset(state, target, "robotics")
+    state.rng.state = 0  # below the .55 hack chance
+
+    state = run(engine, state, "grey_operation", {"asset_id": "datacenter", "target_id": target.id})
+
+    hit = state.player_by_id(target.id)
+    assert hit.influence == 10 - HACK_INFLUENCE_STEAL
+    assert state.current_player.influence == 2 + HACK_INFLUENCE_STEAL
+    # The block mechanic left this operation entirely: it was worth ~4$ against a 264$ wallet.
+    assert not any(asset.blocked for asset in hit.assets)
+
+
+def test_compromat_leak_strips_a_role_once_per_round() -> None:
+    engine = CityEngine()
+    state = make_state()
+    actor = state.current_player
+    give_asset(state, actor, "influence_broker")
+    actor.influence = 10
+    actor.scandals = 0
+    target = next(other for other in state.players if other.id != actor.id)
+    target.role = "capitalist"
+    target.roofs = 0
+    state.actions_left = 3
+    state.rng.state = 0  # below the .70 leak chance
+
+    state = run(engine, state, "grey_operation", {"asset_id": "influence_broker", "target_id": target.id})
+
+    assert state.player_by_id(target.id).role is None
+    assert state.current_player.influence == 10 - COMPROMAT_INFLUENCE
+    assert state.current_player.scandals == 2
+    # Once per round, not per turn: a per-turn cadence would hold the whole role board hostage.
+    state.player_by_id(target.id).role = "politician"
+    with pytest.raises(IllegalActionError):
+        run(engine, state, "grey_operation", {"asset_id": "influence_broker", "target_id": target.id})
+
+
+def test_compromat_leak_is_absorbed_by_a_roof() -> None:
+    engine = CityEngine()
+    state = make_state()
+    actor = state.current_player
+    give_asset(state, actor, "influence_broker")
+    actor.influence = 10
+    target = next(other for other in state.players if other.id != actor.id)
+    target.role = "capitalist"
+    target.roofs = 1
+    state.rng.state = 0
+
+    state = run(engine, state, "grey_operation", {"asset_id": "influence_broker", "target_id": target.id})
+
+    hit = state.player_by_id(target.id)
+    assert hit.role == "capitalist"
+    assert hit.roofs == 0
+    # The attacker still paid: the influence and the scandals are the price of the attempt.
+    assert state.current_player.influence == 10 - COMPROMAT_INFLUENCE
 
 
 def test_fraudster_forgery_is_deterministic() -> None:
@@ -833,14 +911,15 @@ def test_demolition_order_only_disables_the_token_until_settlement() -> None:
     assert not state.player_by_id(target.id).automation_disabled
 
 
-def test_replace_asset_swaps_in_one_action_and_carries_the_token() -> None:
+def test_selling_costs_no_action_so_a_swap_costs_only_the_purchase() -> None:
+    """Sell-then-buy replaces the dedicated one-action swap and must cost the same one action."""
     engine = CityEngine()
     state = make_state()
     player = state.current_player
     cheap = give_asset(state, player, "delivery")  # cost 4 → refund 2
-    # A replacement is only offered with no free slot, so fill the portfolio first.
     give_asset(state, player, "media")
     give_asset(state, player, "warehouse")
+    player.capacity = 3  # full slots: the case the swap command used to exist for
     player.automation_owned = True
     player.automation_uid = cheap.uid
     player.money = 30
@@ -848,13 +927,80 @@ def test_replace_asset_swaps_in_one_action_and_carries_the_token() -> None:
     price = engine.asset_price(state, player, "robotics")
     actions_before = state.actions_left
 
-    state = run(engine, state, "replace_asset", {"asset_uid": cheap.uid, "market_uid": "asset:replacement"})
+    state = run(engine, state, "sell_asset", {"asset_uid": cheap.uid})
     player = state.current_player
+    assert player.money == 32
+    assert state.actions_left == actions_before  # the sale itself is free
+    assert player.automation_uid is None  # the token is freed, and the event says so
 
+    state = run(engine, state, "buy_asset", {"market_uid": "asset:replacement"})
+    player = state.current_player
     assert [asset.card_id for asset in player.assets] == ["media", "warehouse", "robotics"]
-    assert player.money == 30 - price + 2  # only the difference is paid
-    assert state.actions_left == actions_before - 1  # one action, not two
-    assert player.automation_uid == "asset:replacement"  # rebuilding does not cost you the engine
+    assert player.money == 32 - price
+    assert state.actions_left == actions_before - 1  # one action for the whole swap, as before
+
+    sold = next(event for event in state.event_log if event.type == "asset_sold")
+    assert sold.data["automation_freed"] is True
+
+
+def test_selling_is_offered_with_an_empty_action_counter() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    owned = give_asset(state, player, "delivery")
+    state.actions_left = 0
+    state.investment_actions = 0
+
+    sales = [action for action in engine.legal_actions(state, player.id) if action["type"] == "sell_asset"]
+    assert [action["payload"]["asset_uid"] for action in sales] == [owned.uid]
+
+
+def test_replace_asset_no_longer_exists() -> None:
+    """The swap was a whole command plus an owned × market choice matrix; a free sale replaces it."""
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    give_asset(state, player, "delivery")
+    give_asset(state, player, "media")
+    give_asset(state, player, "warehouse")
+    player.capacity = 3  # full slots: the only situation the swap was ever offered in
+    player.money = 30
+    state.market.append(MarketAsset(uid="asset:replacement", card_id="robotics", expires_at_turn=99))
+
+    assert not any(action["type"] == "replace_asset" for action in engine.legal_actions(state, player.id))
+    with pytest.raises(InvalidCommandError):
+        run(engine, state, "replace_asset", {"asset_uid": player.assets[0].uid, "market_uid": "asset:replacement"})
+
+
+def test_campaign_tiers_trade_money_for_influence_at_worsening_rates() -> None:
+    engine = CityEngine()
+    for spend, gain in CAMPAIGN_TIERS.items():
+        state = make_state()
+        player = state.current_player
+        player.money = 20
+        player.influence = 0
+        state = run(engine, state, "basic_action", {"kind": "campaign", "spend": spend})
+        player = state.current_player
+        assert (player.money, player.influence) == (20 - spend, gain)
+
+    # The action, not the money, was the price of influence: the tiers raise the ceiling per action
+    # from 2◆ to 4◆ while making every extra point dearer.
+    rates = [spend / gain for spend, gain in sorted(CAMPAIGN_TIERS.items())]
+    assert rates == sorted(rates) and rates[0] < rates[-1]
+
+    # Laundering is the unbounded channel, so from the mid-game on it has to beat the best tier —
+    # otherwise it is dominated by the basic action and nobody ever runs it (measured: zero uses).
+    state = make_state()
+    best_tier = max(rates)
+    for round_number in (6, 10, 15):
+        state.round_number = round_number
+        grey_rate = engine.laundering_cost(state) / engine.laundering_gain(state)
+        assert grey_rate < best_tier, f"laundering is dominated in round {round_number}"
+
+    state = make_state()
+    state.current_player.money = 20
+    with pytest.raises(InvalidCommandError):
+        run(engine, state, "basic_action", {"kind": "campaign", "spend": 4})
 
 
 def test_journalist_keeps_the_role_one_scandal_longer() -> None:
@@ -969,7 +1115,7 @@ def test_market_reroll_costs_money_but_no_action() -> None:
     state = run(engine, state, "reroll_market")
     player = state.current_player
 
-    assert player.money == 8
+    assert player.money == 10 - MARKET_REROLL_COST
     assert state.actions_left == 0
     assert len(state.market) == len(before)
     assert [item.card_id for item in state.market] != before
@@ -978,7 +1124,7 @@ def test_market_reroll_costs_money_but_no_action() -> None:
         run(engine, state, "reroll_market")
 
 
-def test_project_reroll_is_paid_in_influence_not_money() -> None:
+def test_project_reroll_is_paid_in_money_not_influence() -> None:
     engine = CityEngine()
     state = make_state()
     player = state.current_player
@@ -991,20 +1137,22 @@ def test_project_reroll_is_paid_in_influence_not_money() -> None:
     state = run(engine, state, "reroll_projects")
     player = state.current_player
 
-    # Money is not scarce — a table finishes on 200$+ — so a money price made churning the shared
-    # board free and it was re-dealt almost completely every round after round ten.
-    assert (player.influence, player.money) == (0, 100)
+    # Influence is the currency the projects themselves are bought with, so charging it for the
+    # reroll taxed the exact resource the board wants spent. Money is the surplus — but the price
+    # has to be an order of magnitude above the market reroll, or the shared board churns for free.
+    assert (player.influence, player.money) == (2, 100 - PROJECT_REROLL_MONEY)
+    assert PROJECT_REROLL_MONEY > MARKET_REROLL_COST * 2
     assert state.actions_left == 0
     assert expired not in state.project_board
     assert expired == state.project_deck[-1]  # recycled, not removed from the game
 
 
-def test_project_reroll_is_illegal_without_the_influence() -> None:
+def test_project_reroll_is_illegal_without_the_money() -> None:
     engine = CityEngine()
     state = make_state()
     player = state.current_player
-    player.money = 100
-    player.influence = 1
+    player.money = PROJECT_REROLL_MONEY - 1
+    player.influence = 20
 
     assert not any(action["type"] == "reroll_projects" for action in engine.legal_actions(state, player.id))
     with pytest.raises(IllegalActionError):

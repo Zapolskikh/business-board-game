@@ -21,6 +21,7 @@ backend/out/
 
 # Agent-play sessions, catalog cache and command journals (contain room passwords)
 .agent_play/
+.agent_play*/
 arena/
 
 # Vercel

@@ -42,12 +42,16 @@ def test_production_simulation_reports_engine_games() -> None:
     )
     result = run_batch(config)
     assert result["games"] == 2
+    # `operations` was one opaque number; it is split into the lines a player can act on, and
+    # `maintenance` in particular used to be invisible in both the chronicle and the report.
     assert set(result["avg_winner_income_sources"]) == {
         "antitrust",
         "debt",
         "journalist",
         "mafia_tribute",
-        "operations",
+        "maintenance",
+        "objects",
+        "projects",
     }
     assert round(sum(result["seat_win_pct"].values()), 2) == 100.0
     assert sum(result["seat_wins"].values()) == 2

@@ -45,6 +45,12 @@ export const cityApi = {
       headers: { "X-Room-Password": password },
     });
   },
+  // Replayable record of a finished match: the seed and the command journal, which `/state` hides
+  // while the game is running. Rooms expire, so an unexported game is gone for good.
+  journal: (id: string, password: string, viewerId: string) =>
+    request<unknown>(`/api/city/rooms/${id}/journal?${new URLSearchParams({ viewer_id: viewerId })}`, {
+      headers: { "X-Room-Password": password },
+    }),
   command: (id: string, password: string, actorId: string, gameRevision: number, action: LegalAction) =>
     request<RoomView>(`/api/city/rooms/${id}/commands`, json({
       password,

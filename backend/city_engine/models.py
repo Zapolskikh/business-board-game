@@ -119,6 +119,9 @@ class PlayerState:
     automation_owned: bool = False
     automation_uid: str | None = None
     automation_disabled: bool = False
+    # Round in which this player last attempted a compromat leak. ``turn_flags`` cannot hold it:
+    # they are cleared on every turn boundary, and the leak is limited per round, not per turn.
+    compromat_round: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -150,6 +153,7 @@ class PlayerState:
             "automation_owned": self.automation_owned,
             "automation_uid": self.automation_uid,
             "automation_disabled": self.automation_disabled,
+            "compromat_round": self.compromat_round,
         }
 
     @classmethod
@@ -184,6 +188,7 @@ class PlayerState:
             automation_owned=bool(data.get("automation_owned", False)),
             automation_uid=data.get("automation_uid"),
             automation_disabled=bool(data.get("automation_disabled", False)),
+            compromat_round=int(data.get("compromat_round", 0)),
         )
 
 

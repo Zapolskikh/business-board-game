@@ -1,10 +1,12 @@
 """Version and rules constants persisted with every game snapshot."""
 
 SCHEMA_VERSION = 1
-# rc.2: the project-board reroll is priced in influence, not money. Snapshots taken under rc.1
-# would be scored against a rule their players never agreed to, so state validation rejects them.
-RULES_VERSION = "city-1.2.0-rc.2"
-CONTENT_VERSION = "city-content-2026-08-16b"
+# 1.3.0-rc.1: the influence economy pass. Campaign converts money in tiers, selling an object is
+# free, object replacement is gone, both rerolls are priced in money, and two grey operations now
+# trade in influence instead of cash. Snapshots taken under 1.2.x would be scored against rules
+# their players never agreed to, so state validation rejects them.
+RULES_VERSION = "city-1.3.0-rc.1"
+CONTENT_VERSION = "city-content-2026-08-18a"
 
 DISTRICT_IDS = (
     "residential",
@@ -61,18 +63,25 @@ MAINTENANCE_PER_ASSET = 1
 # would put their optimal play one point from collapse. Jail still follows one step later.
 JOURNALIST_SCANDAL_LIMIT = 6
 # Refreshing the whole asset market costs money but no action: a sink that buys tempo, not points.
-MARKET_REROLL_COST = 2
+# At 2$ it was measured free — four expert bots spent 3.6$ each on it across a whole game while
+# finishing on 264$. 4$ is still cheap enough to use as a tool and dear enough to notice.
+MARKET_REROLL_COST = 4
+# Money into influence, one action, three tiers. The action — not the money — was the real price
+# of influence: campaign was the only scalable source and it was capped at 2◆ per action, so a
+# player holding 264$ and 2◆ had no way to convert. Rates worsen as the tier grows (1.0 / 1.67 /
+# 2.25 $ per ◆), so the cheap trade stays the default and the expensive one is for a full wallet.
+CAMPAIGN_TIERS = {2: 2, 5: 3, 9: 4}
 # One automation token per player, bought once and then moved between own objects for free.
 AUTOMATION_COST = 6
 # Refreshing the oldest project on the board: the expired card goes to the bottom of the deck.
-# Priced in influence for the same reason crisis PR is. At 3$ it was measured free: a four-expert
-# table paid 18 rotations a game out of pocket, which together with the automatic one replaced
-# 3.4 of the 4 board slots every round after round ten. Projects are a third of the final score
-# and the only thing in the game worth planning around, so a board that is re-dealt every round
-# deletes the planning layer exactly when it starts to matter. Money cannot price this — players
-# finish on 207$ and a 10$ fee is still under one point — but influence is the currency projects
-# actually compete for, and the players who churned hardest were the ones holding 2◆ and 300$.
-PROJECT_REROLL_INFLUENCE = 2
+# Priced in money, but an order of magnitude above the market reroll. Influence was the wrong
+# currency: it is the one the projects themselves are bought with, so the reroll was a tax on the
+# exact resource the board wants you to spend, and 39.6% of measured turns already ended with a
+# satisfied project the player could not afford. Money has the opposite problem — at 3$ a
+# four-expert table paid 18 rotations a game and re-dealt 3.4 of the 4 slots every round, which
+# deletes the planning layer. 10$ once a turn is the price at which a rotation is a decision
+# about a dead board rather than a default end-of-turn click.
+PROJECT_REROLL_MONEY = 10
 # An action card is a blind draw that costs an action, so it competes with the basic actions.
 ACTION_CARD_COST = 3
 # What discarding a card returns, so a bad draw is not a dead 3$.
@@ -80,3 +89,26 @@ CARD_DISCARD_VALUE = 2
 # Scandal cleanup is priced in influence: at 10$ = 1 point money made it effectively free and the
 # whole attack layer stopped mattering.
 CRISIS_PR_INFLUENCE = 3
+
+# --- grey operations -------------------------------------------------------------------------
+# Laundering used to pay 2◆ for 5+round dollars: it spent the scarce resource to make the one
+# already in surplus, which is why it was taken 15 times in 24 measured games. Reversed, it is the
+# only unbounded money→influence channel in the game, and it charges scandals for the privilege.
+#
+# Both sides scale with the round, and that is the whole point. A flat 3◆ against a stake that grew
+# with the round was measured strictly worse than the top campaign tier by round six — 11$ for 3◆
+# against 9$ for 4◆, plus a scandal — and four expert bots used it zero times in 24 games. The gain
+# has to outpace the stake, or the grey channel is dominated by the basic action it is meant to
+# beat. It stays honest because a scandal is a point and the object costs a slot.
+LAUNDERING_BASE_GAIN = 2
+LAUNDERING_BASE_COST = 4
+# Hacking used to block the target's best object for one round — worth about 4$ against a player
+# holding 264$, so it was used zero times in 24 games. It now takes influence instead, which is
+# the only resource anybody is short of, and the block mechanic leaves the operation entirely.
+HACK_INFLUENCE_STEAL = 4
+# Leaking compromat strips a role: -3 points, the whole passive behind it, and the seat opens at
+# the free price instead of the threefold takeover. Priced in influence so it competes with the
+# projects, and limited to once a round because a per-turn cadence would let one player hold the
+# whole role board hostage. A roof or a court injunction absorbs it like any other attack.
+COMPROMAT_INFLUENCE = 3
+COMPROMAT_CHANCE = 0.7

@@ -210,3 +210,94 @@ def test_rest_room_can_reach_a_persisted_final_state() -> None:
         assert set(finished.game.final_scores) == {"seat-1", "seat-2"}
     finally:
         app.dependency_overrides.clear()
+
+
+def _start_two_seat_room(client: TestClient, *, name: str, max_rounds: int = 15) -> str:
+    room_id = client.post(
+        "/api/city/rooms",
+        json={"name": name, "password": "secret", "capacity": 2, "max_rounds": max_rounds},
+    ).json()["id"]
+    client.post(
+        f"/api/city/rooms/{room_id}/join",
+        json={"password": "secret", "seat_index": 0, "player_name": "Oleg"},
+    ).raise_for_status()
+    client.post(
+        f"/api/city/rooms/{room_id}/seats",
+        json={"password": "secret", "seat_index": 1, "kind": "bot", "difficulty": "easy"},
+    ).raise_for_status()
+    client.post(f"/api/city/rooms/{room_id}/start", json={"password": "secret", "seed": 7}).raise_for_status()
+    return room_id
+
+
+def test_state_carries_the_viewers_itemised_round_forecast() -> None:
+    service = CityRoomService(InMemoryRoomRepository())
+    app.dependency_overrides[get_room_service] = lambda: service
+    client = TestClient(app)
+    try:
+        room_id = _start_two_seat_room(client, name="Forecast")
+        room = service.get_room(room_id)
+        assert room.game is not None
+        # A project perk paying +1◆ a round was indistinguishable from one paying nothing.
+        room.game.player_by_id("seat-1").projects.append("courthouse")
+        # Every unique project may exist only once, so it has to leave the board and the deck.
+        room.game.project_board = [item for item in room.game.project_board if item != "courthouse"]
+        room.game.project_deck = [item for item in room.game.project_deck if item != "courthouse"]
+        # `get` hands out a deep copy, so the mutation has to go back through the repository.
+        expected_revision = room.revision
+        room.revision += 1
+        service.repository.save(room, expected_revision)
+
+        forecast = client.get(
+            f"/api/city/rooms/{room_id}/state",
+            params={"viewer_id": "seat-1"},
+            headers={"X-Room-Password": "secret"},
+        ).json()["game"]["round_forecast"]
+
+        assert forecast["influence"]["projects"] == 2
+        assert forecast["influence"]["total"] == sum(
+            value for key, value in forecast["influence"].items() if key != "total"
+        )
+        assert forecast["money"]["total"] == sum(value for key, value in forecast["money"].items() if key != "total")
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_journal_is_exported_only_after_the_game_is_finished() -> None:
+    service = CityRoomService(InMemoryRoomRepository())
+    app.dependency_overrides[get_room_service] = lambda: service
+    client = TestClient(app)
+    try:
+        room_id = _start_two_seat_room(client, name="Journal", max_rounds=5)
+        params = {"viewer_id": "seat-1"}
+        headers = {"X-Room-Password": "secret"}
+
+        running = client.get(f"/api/city/rooms/{room_id}/journal", params=params, headers=headers)
+        assert running.status_code == 422  # the seed is hidden information while the game runs
+        assert client.get(f"/api/city/rooms/{room_id}/journal", params=params).status_code == 422
+
+        for index in range(20):
+            state = client.get(f"/api/city/rooms/{room_id}/state", params=params, headers=headers).json()
+            if state["status"] == "finished":
+                break
+            client.post(
+                f"/api/city/rooms/{room_id}/commands",
+                json={
+                    "password": "secret",
+                    "actor_id": "seat-1",
+                    "type": "end_turn",
+                    "payload": {},
+                    "command_id": f"pass-{index}",
+                    "expected_revision": state["game"]["revision"],
+                },
+            ).raise_for_status()
+
+        journal = client.get(f"/api/city/rooms/{room_id}/journal", params=params, headers=headers)
+        assert journal.status_code == 200
+        body = journal.json()
+        # Seed plus command log is what makes replay_game able to rebuild the match.
+        created = next(event for event in body["game"]["event_log"] if event["type"] == "game_created")
+        assert created["data"]["seed"] == 7
+        assert body["game"]["command_log"]
+        assert set(body["score_breakdown"]) == {"seat-1", "seat-2"}
+    finally:
+        app.dependency_overrides.clear()

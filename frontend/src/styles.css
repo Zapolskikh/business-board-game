@@ -124,6 +124,29 @@ h1, h2, h3, p { margin-top: 0; }
 .score-panel li.score-zero { color: var(--city-dim); }
 .score-panel li.score-zero b { color: var(--city-dim); }
 
+/* Money accrues passively while influence has to be bought with actions, so the two columns sit
+   side by side: the whole question a player has is "why is the right one not growing". */
+.income-panel { padding: 7px 9px; background: var(--city-panel); border: 1px solid var(--city-border); border-radius: 7px; }
+.income-columns { display: grid; margin-top: 4px; grid-template-columns: 1fr 1fr; gap: 8px; }
+.income-column h4 { display: flex; margin: 0 0 3px; align-items: baseline; justify-content: space-between; gap: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
+.income-column ul { display: flex; margin: 0; padding: 0; flex-direction: column; gap: 1px; list-style: none; }
+.income-column li { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; font-size: 11px; }
+.income-column li b { color: #e3b341; }
+.income-column li.score-zero, .income-column li.score-zero b { color: var(--city-dim); }
+.income-column small { display: block; margin-top: 3px; font-size: 9px; line-height: 1.35; }
+.income-total { flex: 0 0 auto; color: var(--city-dim); font-size: 13px; }
+.income-total.on { color: #3fb950; }
+
+/* One button per campaign tier: the tier is the decision, not whether to campaign. */
+.campaign-tiers { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 4px; }
+
+/* Rooms expire, so an unexported match is gone for good — the buttons live in the chronicle too. */
+.log-export { display: flex; margin-bottom: 6px; flex-wrap: wrap; align-items: center; gap: 5px; }
+.log-export button { padding: 4px 7px; font-size: 10px; }
+.log-export-status { flex: 1 1 100%; color: #3fb950; font-size: 10px; }
+.bot-model { margin: 0 0 4px; color: var(--city-dim); font-size: 11px; }
+.bot-model b { color: var(--text); }
+
 .city-players { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 5px; }
 .city-player { display: flex; min-width: 0; padding: 7px 9px; flex-direction: column; color: var(--text); text-align: left; background: var(--city-panel); border: 1px solid var(--city-border); border-radius: 7px; font-size: 12px; }
 .city-player:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0,0,0,.34); }
