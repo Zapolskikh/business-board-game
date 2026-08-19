@@ -5,6 +5,7 @@ import pytest
 from city_engine.commands import Command
 from city_engine.constants import (
     CAMPAIGN_TIERS,
+    CASH_TO_INFLUENCE_MONEY,
     COMPROMAT_INFLUENCE,
     HACK_INFLUENCE_STEAL,
     MARKET_REROLL_COST,
@@ -723,6 +724,50 @@ def test_every_action_card_has_a_working_engine_path(card_id: str) -> None:
     assert next_state.turn_flags["card_played"] is True
 
 
+def test_the_relief_card_pays_in_slots_because_money_cannot_buy_the_scarce_half() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    held = give_card(state, player, "bailout")
+    capacity = player.capacity
+
+    state = run(engine, state, "play_action_card", {"card_uid": held.uid})
+
+    # It used to pay 3$ to anybody not in last place: a third of a point, less than discarding the
+    # card for 2◆. A slot is the half of an object purchase that money cannot replace.
+    assert state.current_player.capacity == capacity + 1
+
+
+def test_the_tax_manoeuvre_runs_money_into_influence_not_the_reverse() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.money = 20
+    player.influence = 1
+    held = give_card(state, player, "tax_manoeuvre")
+
+    state = run(engine, state, "play_action_card", {"card_uid": held.uid})
+    player = state.current_player
+
+    # 2◆ → 8$ traded the scarce resource for the plentiful one, which made the card strictly worse
+    # than throwing it away for 2◆. Reversed, it is the top campaign tier without the action.
+    assert (player.money, player.influence) == (20 - CASH_TO_INFLUENCE_MONEY, 5)
+
+
+def test_money_printed_on_cards_grows_with_the_round() -> None:
+    engine = CityEngine()
+    state = make_state()
+    state.current_player.money = 0
+    held = give_card(state, state.current_player, "grant")
+    state.round_number = 12
+
+    state = run(engine, state, "play_action_card", {"card_uid": held.uid})
+
+    # 7$ is 0.7 points by the rate the game scores at, and every other money figure — the roof, the
+    # racket, laundering — already scales with the round. These did not, so they aged into dump fodder.
+    assert state.current_player.money == 7 + 12
+
+
 def put_on_board(state, project_id: str) -> None:
     state.project_board = [project_id, *[item for item in state.project_board if item != project_id]][
         :PROJECT_BOARD_SIZE
@@ -1124,27 +1169,45 @@ def test_market_reroll_costs_money_but_no_action() -> None:
         run(engine, state, "reroll_market")
 
 
-def test_project_reroll_is_paid_in_money_not_influence() -> None:
+def test_project_reroll_redeals_the_whole_board_for_money_and_an_action() -> None:
     engine = CityEngine()
     state = make_state()
     player = state.current_player
     player.money = 100
     player.influence = 2
-    state.actions_left = 0
+    state.actions_left = 2
     state.investment_actions = 0
-    expired = state.project_board[0]
+    before = list(state.project_board)
+    deck_size = len(state.project_deck)
 
     state = run(engine, state, "reroll_projects")
     player = state.current_player
 
     # Influence is the currency the projects themselves are bought with, so charging it for the
-    # reroll taxed the exact resource the board wants spent. Money is the surplus — but the price
-    # has to be an order of magnitude above the market reroll, or the shared board churns for free.
+    # re-deal taxed the exact resource the board wants spent. Money is the surplus — but the price
+    # has to be an order of magnitude above the market reroll, or the shared board churns for free,
+    # and it costs an action because moving four cards is a decision, not an end-of-turn click.
     assert (player.influence, player.money) == (2, 100 - PROJECT_REROLL_MONEY)
     assert PROJECT_REROLL_MONEY > MARKET_REROLL_COST * 2
-    assert state.actions_left == 0
-    assert expired not in state.project_board
-    assert expired == state.project_deck[-1]  # recycled, not removed from the game
+    assert state.actions_left == 1
+    # The whole board is re-dealt, not rotated by one: four cards go back, four come out.
+    assert len(state.project_board) == PROJECT_BOARD_SIZE
+    assert len(state.project_deck) == deck_size
+    assert set(before) <= set(state.project_board) | set(state.project_deck)
+    assert set(state.project_board) != set(before)
+
+
+def test_project_reroll_needs_an_action() -> None:
+    engine = CityEngine()
+    state = make_state()
+    state.current_player.money = 100
+    state.actions_left = 0
+    state.investment_actions = 0
+
+    legal = engine.legal_actions(state, state.current_player.id)
+    assert not any(action["type"] == "reroll_projects" for action in legal)
+    with pytest.raises(IllegalActionError):
+        run(engine, state, "reroll_projects")
 
 
 def test_project_reroll_is_illegal_without_the_money() -> None:

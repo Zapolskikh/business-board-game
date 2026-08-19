@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from functools import lru_cache
+from math import floor
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,7 @@ from city_engine.constants import (
     ACTION_CARD_COST,
     AUTOMATION_COST,
     CAMPAIGN_TIERS,
+    CARD_DISCARD_VALUE,
     COMPROMAT_INFLUENCE,
     CONTENT_VERSION,
     CRISIS_PR_INFLUENCE,
@@ -31,6 +33,20 @@ from city_engine.errors import StateValidationError
 
 CATALOG_PATH = Path(__file__).with_name("content") / "catalog.json"
 RARITIES = {"common", "uncommon", "rare", "epic", "legendary"}
+
+
+def asset_points(cost: int) -> int:
+    """Final-scoring points an object is worth, and what selling it pays back: half its price.
+
+    Lives here rather than in the engine because the number has to reach the card: an object turns
+    money into points at 2$ each, five times better than the 10$ a hoarded point costs, which makes
+    "sell the weak one, buy the dear one" the strongest late money sink in the game. Both clients
+    used to derive `floor(cost / 2)` themselves, so the rate was on screen nowhere and duplicated
+    in three places.
+    """
+    return floor(cost / 2)
+
+
 # Every project condition is a count of things already visible on the table — never a formula.
 PROJECT_REQUIREMENTS = {
     "none",
@@ -195,6 +211,9 @@ class ContentCatalog:
         """
         with CATALOG_PATH.open(encoding="utf-8") as handle:
             raw = json.load(handle)
+        # Computed, not stored: the scoring rule owns it, so the catalog cannot drift from the score.
+        for asset in raw["assets"]:
+            asset["points"] = asset_points(int(asset["cost"]))
         raw["scoring"] = {
             "money_per_point": MONEY_PER_POINT,
             "influence_per_point": INFLUENCE_PER_POINT,
@@ -204,6 +223,9 @@ class ContentCatalog:
             "project_reroll_money": PROJECT_REROLL_MONEY,
             "crisis_pr_influence": CRISIS_PR_INFLUENCE,
             "action_card_cost": ACTION_CARD_COST,
+            # What a discarded card pays back. The client had "+1" written into a label while the
+            # engine paid 2, so the cheapest influence line in the game was mislabelled on screen.
+            "card_discard_value": CARD_DISCARD_VALUE,
             # Campaign tiers travel as pairs so the client renders one button per tier without
             # knowing the rates; a dict would arrive with string keys through JSON.
             "campaign_tiers": [{"spend": spend, "gain": gain} for spend, gain in sorted(CAMPAIGN_TIERS.items())],

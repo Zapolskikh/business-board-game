@@ -5,6 +5,8 @@ import {
   actionLabel,
   activeBonuses,
   assetEffectLines,
+  assetHints,
+  assetPoints,
   automationCost,
   buildGameLogMarkdown,
   campaignTiers,
@@ -14,10 +16,10 @@ import {
   difficultyLabels,
   districtCount,
   forecastRows,
+  greyOperationInfo,
   greyOperationLabels,
   influencePerPoint,
   launderingCost,
-  launderingGain,
   marketPrice,
   marketRerollCost,
   moneyPerPoint,
@@ -30,6 +32,7 @@ import {
   scoreOf,
   stringValue,
 } from "./gameUi";
+import type { AssetHint } from "./gameUi";
 import { buildRulesHtml } from "./rulesDocument";
 import type {
   ActionMeta,
@@ -77,41 +80,6 @@ const powerDescriptions: Record<string, string> = {
   fraudster_cleanup: "За 1 действие снять 1 свой скандал.",
   fraudster_crypto_scam: "Один раз за ход и за 1 действие: нужна активная Городская криптобиржа. Украсть у каждого соперника выбранную сумму и получить столько же скандалов (Аферист — на 1 меньше со снижением). Внимание: на 5 скандалах теряется роль, на 6 — тюрьма (пропуск хода), поэтому большая сумма может вас посадить.",
   fraudster_forge: "Один раз за ход: 1 действие, 5◆ и +2 скандала — гарантированно получить выбранную роль со следующего хода. Внимание: если два скандала доведут вас до 5 — роль потеряется, до 6 — тюрьма.",
-};
-
-const greyOperationInfo: Record<string, { asset: string; effect: (round: number, meta: CityMeta) => string; chance: number; failure: string }> = {
-  cash: {
-    asset: "Сеть наличных обменников",
-    // Both sides scale with the round: a flat gain against a growing stake made the operation
-    // strictly worse than the top campaign tier, and then nobody ever ran it.
-    effect: (round, meta) => `${launderingCost(meta, round)}$ → ${launderingGain(meta, round)}◆`,
-    chance: 85,
-    failure: "Единственный неограниченный способ превратить лишние деньги во влияние, и с ростом раунда курс становится лучше, чем у кампании. При успехе: +1 скандал. При провале ставка теряется, влияния нет. Скандалы при провале: Аферист +1, остальные +2. На 5 скандалах теряется роль, на 6 — тюрьма.",
-  },
-  market: {
-    asset: "Ночной рынок",
-    effect: round => `украсть у цели до ${3 + Math.floor(round / 2)}$`,
-    chance: 75,
-    failure: "Крыша цели тратится и полностью отменяет кражу. При успехе: +1 скандал. При провале теряется Крыша, если она есть. Скандалы: Аферист +1, остальные +2. На 5 скандалах теряется роль, на 6 — тюрьма.",
-  },
-  crypto: {
-    asset: "Городская криптобиржа",
-    effect: round => `получить ${6 + round}$ и лишить лидера до ${2 + Math.floor(round / 2)}$`,
-    chance: 60,
-    failure: "Свой доход вы получаете всегда, но Крыша лидера тратится и отменяет списание с него. При успехе: +2 скандала. При провале: −5$, а жетон автоматизации на криптобирже выключается до выплаты раунда. Скандалы при провале: Аферист +1, остальные +3. На 5 скандалах теряется роль, на 6 — тюрьма.",
-  },
-  datacenter: {
-    asset: "Нелегальный дата-центр",
-    effect: (_round, meta) => `украсть у цели до ${meta.scoring?.hack_influence_steal ?? 4}◆`,
-    chance: 55,
-    failure: "Крыша цели тратится и полностью отменяет кражу. При успехе: +2 скандала. При провале: −2◆. Скандалы при провале: Аферист +1, остальные +3. На 5 скандалах теряется роль, на 6 — тюрьма.",
-  },
-  influence_broker: {
-    asset: "Торговец компроматом",
-    effect: (_round, meta) => `${meta.scoring?.compromat_influence ?? 3}◆ → снять роль с цели`,
-    chance: 70,
-    failure: "Цель теряет роль: −3 очка, весь её пассив и место освобождается по свободной цене, а не по цене переворота. Судебный запрет или Крыша цели полностью гасят слив. Только раз в раунд. При успехе: +2 скандала. При провале: −2◆ и скандалы (Аферист +1, остальные +3). На 5 скандалах теряется роль, на 6 — тюрьма.",
-  },
 };
 
 export function Game({ roomId, password, playerId, meta, onExit }: Props) {
@@ -331,7 +299,7 @@ function ProjectBoard({ game, meta, me, projects, actions, reroll, busy, onActio
   const initiatives = meta.projects.filter(project => project.repeatable);
   return <section className="city-projects">
     <h2>🏗️ Городские проекты <small>главный источник очков · в колоде ещё {game.project_deck_count} · один проект уходит под низ колоды каждый раунд</small>
-      <button className="market-reroll" disabled={busy || !reroll} onClick={() => reroll && void onAction(reroll)} title={`Отправить самый давний проект под низ колоды и добрать новый за ${projectRerollMoney(meta)}$. Цена в деньгах, а не в влиянии: влияние — это то, чем сами проекты и покупаются. Доска общая: карта уходит у всех, в том числе у того, кто уже собрал под неё условие. Действие не расходуется, один раз за ход.`}>🔄 Обновить доску · {projectRerollMoney(meta)}$</button>
+      <button className="market-reroll" disabled={busy || !reroll} onClick={() => reroll && void onAction(reroll)} title={`Все четыре проекта уходят обратно в колоду, колода перемешивается и раздаётся заново. Цена: ${projectRerollMoney(meta)}$ и 1 обычное действие, один раз за ход. Цена в деньгах, а не в влиянии: влияние — это то, чем сами проекты и покупаются. Доска общая: она меняется у всех, в том числе у того, кто уже собрал условие под лежащий на ней проект.`}>🔄 Пересобрать доску · {projectRerollMoney(meta)}$ + ⚡</button>
     </h2>
     <p className="dim card-rule">Проект уникален: кто взял — тот и забрал очки, остальным он больше недоступен. Взятие стоит 1 обычное действие, влияние и деньги; условие проверяется по вашим объектам.</p>
     <div className="project-grid">{game.project_board.map((projectId, index) => {
@@ -405,19 +373,41 @@ function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selected
           const remaining = Math.max(0, item.expires_at_turn - (game.turn_serial ?? 0));
           const price = marketPrice(asset, item);
           const effectLines = assetEffectLines(asset, me, game, meta, assets, { includeSynergy: true });
-          return <button className={`market-card rarity-${asset.rarity}`} disabled={busy || viewingOther || !buy} onClick={event => { event.stopPropagation(); if (buy) void onAction(buy); }} title={`Купить за ${price}$. Занимает свободный слот и расходует обычное либо инвестиционное действие.${asset.influence > 0 ? ` Даёт ${asset.influence}◆ разово в момент покупки.` : ""} ${asset.text}`} key={item.uid}>
-            <span className="rarity-badge">{rarityLabels[asset.rarity] ?? asset.rarity}</span><b>{asset.title}</b>
-            {asset.tags.length > 0 && <span className="asset-tags">{asset.tags.map(tag => <i key={tag}>{tag}</i>)}</span>}
-            <span className="asset-stats">{price}$ · доход <b className={asset.income > 0 ? "stat-income on" : "stat-income"}>{asset.income}$</b>/раунд{asset.influence > 0 && <> · <b className="stat-inf on">+{asset.influence}◆</b> разово</>}</span>
-            {effectLines.length > 0
-              ? <ul className="asset-effects">{effectLines.map((line, index) => <li key={index} className={line.active ? "effect-active" : "effect-idle"}>{line.text}{line.boosted && <span className="effect-boost">⚙×2</span>}</li>)}</ul>
-              : asset.text && <small className="asset-summary">{asset.text}</small>}
-            <small className="market-expiry">⏳ ещё {remaining} ходов</small>
+          // Not owned yet, so nothing it unlocks is `ready` — the panel is advertising, not status.
+          const hints = assetHints(asset, me, game, meta, assets, { market: true });
+          const points = assetPoints(asset);
+          return <button className={`market-card rarity-${asset.rarity} ${hints.special ? "special" : ""}`} disabled={busy || viewingOther || !buy} onClick={event => { event.stopPropagation(); if (buy) void onAction(buy); }} title={`Купить за ${price}$. Занимает свободный слот и расходует обычное либо инвестиционное действие. В финальном счёте объект стоит ${points} очков — это ${moneyPerPoint(meta) / 2}$ за очко против ${moneyPerPoint(meta)}$ за очко у денег в кошельке, поэтому объекты и есть главный сток денег.${asset.influence > 0 ? ` Даёт ${asset.influence}◆ разово в момент покупки.` : ""} ${asset.text}${hints.special ? ` Специальный объект: без него серая операция «${greyOperationLabels[asset.id]}» недоступна вообще.` : ""}`} key={item.uid}>
+            <span className="card-main">
+              <span className="rarity-badge">{rarityLabels[asset.rarity] ?? asset.rarity}</span><b>{asset.title}</b>
+              {asset.tags.length > 0 && <span className="asset-tags">{asset.tags.map(tag => <i key={tag}>{tag}</i>)}</span>}
+              {/* Points first: it is the number the whole late game turns on and it used to be nowhere. */}
+              <span className="asset-stats"><b className="stat-points on">{points} очк</b> · {price}$ · доход <b className={asset.income > 0 ? "stat-income on" : "stat-income"}>{asset.income}$</b>/раунд{asset.influence > 0 && <> · <b className="stat-inf on">+{asset.influence}◆</b> разово</>}</span>
+              {effectLines.length > 0
+                ? <ul className="asset-effects">{effectLines.map((line, index) => <li key={index} className={line.active ? "effect-active" : "effect-idle"}>{line.text}{line.boosted && <span className="effect-boost">⚙×2</span>}</li>)}</ul>
+                : asset.text && <small className="asset-summary">{asset.text}</small>}
+              <small className="market-expiry">⏳ ещё {remaining} ходов</small>
+            </span>
+            <AssetHintPanel hints={hints} />
           </button>;
         }) : <span className="empty-district">На рынке пока нет объектов района</span>}</div>
       </article>;
     })}</div>
   </section>;
+}
+
+// The right-hand column of an object card. Two thirds of the width sat empty while the only place
+// that named an object's operation was a locked button in the action panel — read after the money
+// was already spent on something else. `special` is the loud part: five objects in the catalog are
+// the sole key to their grey operation, and nothing on the card used to say so.
+function AssetHintPanel({ hints }: { hints: { special: boolean; hints: AssetHint[] } }) {
+  if (hints.hints.length === 0) return null;
+  return <span className="asset-hints">
+    {hints.special && <span className="hint-badge">🌒 Специальный объект</span>}
+    {hints.hints.map(hint => <span className={`asset-hint hint-${hint.kind} ${hint.ready ? "ready" : ""}`} title={hint.tooltip} key={`${hint.kind}:${hint.title}`}>
+      <b>{hint.icon} {hint.title}{hint.ready && <i className="hint-ready">доступно</i>}</b>
+      <i>{hint.detail}</i>
+    </span>)}
+  </span>;
 }
 
 function CardDesk({ game, me, cards, legal, buyCard, busy, onAction, onOffer, labelContext }: {
@@ -437,7 +427,9 @@ function CardDesk({ game, me, cards, legal, buyCard, busy, onAction, onOffer, la
     <h3 className="group-title">🃏 Карты <span className="group-hint">3$ + 1◆ и 1 действие · в колоде {game.action_deck_count}</span></h3>
     {/* A face-up market bought without an action made the influence card strictly better than
         the campaign action. The draw is blind and costs an action; the discard cushions it. */}
-    <p className="dim card-rule">За одно действие вы тянете <b>две</b> случайные карты. Розыгрыш бесплатный — одна карта за ход; сброс тоже бесплатный и тоже один за ход. Рука {me.hand?.length ?? 0}/3.</p>
+    {/* `card-rule-market` describes the purchase button above it, and the portrait layout hides both
+        on the tab that shows only the hand. */}
+    <p className="dim card-rule card-rule-market">За одно действие вы тянете <b>две</b> случайные карты. Розыгрыш бесплатный — одна карта за ход; сброс тоже бесплатный и тоже один за ход. Рука {me.hand?.length ?? 0}/3.</p>
     <div className="action-market"><button className="action-card market-action tone-deal" disabled={busy || !buyCard} onClick={() => buyCard && void onAction(buyCard)} title="Потратить 1 обычное действие, 3$ и 1◆ и вытянуть две случайные карты из колоды (в руке максимум 3)."><strong>Вытянуть 2 карты<em>3$ + 1◆ + действие</em></strong><small>Случайные из колоды ({game.action_deck_count} осталось)</small></button></div>
     <div className="hand-grid">{me.hand?.map(held => {
       const card = cards.get(held.card_id);
@@ -474,9 +466,13 @@ function BusinessBoard({ viewed, me, game, meta, assets, legal, viewingOther, bu
       const districtInfo = meta.districts.find(d => d.id === assetMeta?.district);
       const automated = viewed.automation_uid === owned.uid;
       const effectLines = assetMeta ? assetEffectLines(assetMeta, viewed, game, meta, assets, { automated: automated && !viewed.automation_disabled, includeSynergy: true }) : [];
+      // A blocked object opens nothing: every gate in the engine checks `not asset.blocked`.
+      const hints = assetMeta
+        ? assetHints(assetMeta, viewed, game, meta, assets, { active: !owned.blocked })
+        : { special: false, hints: [] };
       return <OwnedAssetCard
         key={owned.uid} owned={owned} index={index} owner={viewed} asset={assetMeta} districtInfo={districtInfo}
-        effectLines={effectLines} viewingOther={viewingOther} busy={busy} automated={automated}
+        effectLines={effectLines} hints={hints} viewingOther={viewingOther} busy={busy} automated={automated}
         incomeHere={game.automation_preview?.[owned.uid]} incomeNow={currentIncome}
         baseline={viewingOther ? undefined : game.automation_baseline ?? undefined} tokenPrice={automationCost(meta)}
         automate={actionFor("buy_automation", owned.uid) ?? actionFor("move_automation", owned.uid)}
@@ -488,13 +484,14 @@ function BusinessBoard({ viewed, me, game, meta, assets, legal, viewingOther, bu
   </section>;
 }
 
-function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines, viewingOther, busy, automated, incomeHere, incomeNow, baseline, tokenPrice, automate, sell, onAction }: {
+function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines, hints, viewingOther, busy, automated, incomeHere, incomeNow, baseline, tokenPrice, automate, sell, onAction }: {
   owned: OwnedAsset;
   index: number;
   owner: PlayerState;
   asset?: AssetMeta;
   districtInfo?: { title: string; icon: string; color: string };
   effectLines: { text: string; active: boolean; boosted: boolean }[];
+  hints: { special: boolean; hints: AssetHint[] };
   viewingOther: boolean;
   busy: boolean;
   automated: boolean;
@@ -508,7 +505,8 @@ function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines,
 }) {
   if (!asset) return null;
   const managed = index < owner.capacity;
-  const sellValue = Math.floor(asset.cost / 2);
+  // One number, two meanings: the refund in money equals the points the object is carrying.
+  const sellValue = assetPoints(asset);
   // Every automation figure is a *difference*, never a total: the raw "30$/раунд" that used to sit
   // on the button is the whole round income with the token here, which reads as a price tag.
   // `buying` compares against no token at all, a move compares against where the token stands now.
@@ -526,7 +524,7 @@ function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines,
         ? "⚙ жетон не работает до выплаты"
         : `⚙ жетон${worthNow !== undefined ? `: ${signed(worthNow)}/раунд` : " автоматизации"}`
       : "работает";
-  return <article className={`owned-asset rarity-${asset.rarity} ${owned.blocked ? "blocked" : ""} ${!managed ? "unmanaged" : ""} ${automated ? "automated" : ""}`}>
+  return <article className={`owned-asset rarity-${asset.rarity} ${owned.blocked ? "blocked" : ""} ${!managed ? "unmanaged" : ""} ${automated ? "automated" : ""} ${hints.special ? "special" : ""}`}>
     <header>
       <span className="rarity-badge">{rarityLabels[asset.rarity]}</span>
       {districtInfo && <span className="asset-district" style={{ color: districtInfo.color }}>{districtInfo.icon} {districtInfo.title}</span>}
@@ -535,10 +533,11 @@ function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines,
     <h3>{asset.title}</h3>
     {asset.tags.length > 0 && <span className="asset-tags">{asset.tags.map(tag => <i key={tag}>{tag}</i>)}</span>}
     {/* No ◆ here: the influence on a card is a one-off purchase bonus, already collected. */}
-    <p className="asset-stats"><b className="stat-income on">{asset.income}$</b> доход/раунд</p>
+    <p className="asset-stats"><b className="stat-points on">{sellValue} очк</b> · <b className="stat-income on">{asset.income}$</b> доход/раунд</p>
     {effectLines.length > 0
       ? <ul className="asset-effects">{effectLines.map((line, i) => <li key={i} className={line.active ? "effect-active" : "effect-idle"}>{line.text}{line.boosted && <span className="effect-boost">⚙×2</span>}</li>)}</ul>
       : asset.text && <small className="asset-summary">{asset.text}</small>}
+    <AssetHintPanel hints={hints} />
     {!viewingOther && <div className="owned-actions">
       {!automated && <button
         className={delta !== undefined && delta <= 0 ? "automation-pointless" : ""}
@@ -554,8 +553,8 @@ function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines,
       </button>}
       {/* The sale is free, so "sell then buy" costs exactly the one action a purchase costs — which
           is what the separate replacement command used to cost, without its choice matrix. */}
-      <button className="danger" disabled={busy || !sell} onClick={() => sell && void onAction(sell)} title={`Продать объект за ${sellValue}$. Продажа бесплатна и не расходует действие: слот освобождается сразу, а покупка нового объекта стоит одно действие. Жетон автоматизации, если он стоит здесь, снимается — перенесите его бесплатно на другой объект.`}>
-        <strong>Продать · +{sellValue}$</strong><small>без действия, слот освободится</small>
+      <button className="danger" disabled={busy || !sell} onClick={() => sell && void onAction(sell)} title={`Продать объект за ${sellValue}$ и потерять его ${sellValue} очков в финальном счёте — возврат и очки это одно и то же число. Смысл продажи только в том, что покупается вместо: объект дороже даст больше очков. Продажа бесплатна и не расходует действие, слот освобождается сразу. Жетон автоматизации, если он стоит здесь, снимается — перенесите его бесплатно на другой объект.`}>
+        <strong>Продать · +{sellValue}$</strong><small>−{sellValue} очков, без действия</small>
       </button>
     </div>}
   </article>;
@@ -623,7 +622,7 @@ function DecisionPanel({ game, me, meta, roles, districts, legal, selectedDistri
         >📣 {tier.spend}$ → {tier.gain}◆</button>;
       })}</div>
       <StaticAction action={find("reroll_market")} label={`🔄 Обновить рынок: ${marketRerollCost(meta)}$`} tooltip="Полностью сменить шесть позиций рынка объектов. Действие не расходуется, один раз за ход." busy={busy} onAction={onAction} />
-      <StaticAction action={find("reroll_projects")} label={`🔄 Обновить доску проектов: ${projectRerollMoney(meta)}$`} tooltip={`Отправить самый давний проект под низ колоды и добрать новый за ${projectRerollMoney(meta)}$. Доска общая: карта уходит у всех. Действие не расходуется, один раз за ход.`} busy={busy} onAction={onAction} />
+      <StaticAction action={find("reroll_projects")} label={`🔄 Пересобрать доску проектов: ${projectRerollMoney(meta)}$ + действие`} tooltip={`Все четыре проекта возвращаются в колоду, колода перемешивается и раздаётся заново. Цена: ${projectRerollMoney(meta)}$ и 1 обычное действие, один раз за ход. Доска общая: она меняется у всех.`} busy={busy} onAction={onAction} />
       <StaticAction action={find("buy_capacity")} label={`📦 ${capacityLabel(me)}`} tooltip="Купить постоянный дополнительный слот бизнеса. Можно потратить обычное либо инвестиционное действие; максимум 6 слотов." busy={busy} onAction={onAction} />
       <StaticAction action={districtAction} label={`⭐ Развить «${districts.get(selectedDistrict)?.title}»`} tooltip="Нужно минимум 2 своих объекта в выбранном районе. Потратить 1 действие и 2$: +25% к базовому доходу всех ваших объектов района с округлением вверх (то есть минимум +1$ каждому) и +1◆. Максимум 2 уровня; уровень личный и соперникам ничего не даёт." busy={busy} onAction={onAction} />
     </div>

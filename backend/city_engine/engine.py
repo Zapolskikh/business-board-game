@@ -17,6 +17,7 @@ from city_engine.constants import (
     CAMPAIGN_TIERS,
     CAPACITY_COSTS,
     CARD_DISCARD_VALUE,
+    CASH_TO_INFLUENCE_MONEY,
     COMPROMAT_CHANCE,
     COMPROMAT_INFLUENCE,
     CRISIS_PR_INFLUENCE,
@@ -40,6 +41,7 @@ from city_engine.content import (
     AssetDefinition,
     ContentCatalog,
     ProjectDefinition,
+    asset_points,
     load_catalog,
 )
 from city_engine.errors import CityEngineError, IllegalActionError, InvalidCommandError, StaleRevisionError
@@ -196,10 +198,12 @@ class CityEngine:
                 for district in DISTRICT_IDS
                 if self.district_count(player, district) >= 2 and player.district_levels[district] < 2
             )
-        # Rerolling costs money only, so it stays available with no actions left.
+        # The market reroll costs money only, so it stays available with no actions left.
         if player.money >= MARKET_REROLL_COST:
             candidates.append(Command(type="reroll_market", actor_id=actor_id))
-        if player.money >= PROJECT_REROLL_MONEY and state.project_deck:
+        # The project re-deal spends an action now, so unlike the market reroll it disappears once
+        # the turn is out of actions.
+        if can_act and player.money >= PROJECT_REROLL_MONEY and state.project_deck:
             candidates.append(Command(type="reroll_projects", actor_id=actor_id))
         if can_act and player.money >= ACTION_CARD_COST and player.influence >= 1 and len(player.hand) < 3:
             candidates.append(Command(type="buy_action_card", actor_id=actor_id))
@@ -489,18 +493,18 @@ class CityEngine:
         return self.asset_value_of(owned.card_id)
 
     def asset_value_of(self, card_id: str) -> int:
-        """Points an object is worth: half its price.
+        """Points an object is worth: half its price, via ``content.asset_points``.
 
         A flat rarity ladder was tried here and measured worse — it cut what a dollar buys in
         points, so objects stopped soaking up income and the bots ended games sitting on 500$.
         Objects are the main money sink and have to stay one; the late replacement arbitrage is
         a separate problem and needs a fix that does not also break the sink.
         """
-        return floor(self.asset(card_id).cost / 2)
+        return asset_points(self.asset(card_id).cost)
 
     def asset_refund(self, owned: OwnedAsset) -> int:
-        """What selling or replacing an object pays back, in money."""
-        return floor(self.owned_definition(owned).cost / 2)
+        """What selling or replacing an object pays back, in money — the same half price."""
+        return asset_points(self.owned_definition(owned).cost)
 
     def is_automated(self, player: PlayerState, owned: OwnedAsset) -> bool:
         """Whether the player's single automation token is currently working on this object."""
@@ -580,6 +584,17 @@ class CityEngine:
 
     def roof_limit(self, player: PlayerState) -> int:
         return (2 if self.has_role(player, "mafia") else 1) + self.effect_total(player, "roofCapacity")
+
+    @staticmethod
+    def _round_scaled(state: GameState, base: int) -> int:
+        """A money amount printed on a card, grown by the round it is played in.
+
+        Every other money figure in the game already scales — the roof price, laundering, the racket,
+        the pump and dump — because a dollar buys ten times less by the endgame. The card texts that
+        did not scale were worth a tenth of a point in round twelve, i.e. less than discarding the
+        card for influence, which is exactly how they were used across two measured matches.
+        """
+        return base + state.round_number
 
     def roof_price(self, state: GameState, player: PlayerState) -> int:
         """Roof cost grows with the round: a flat 3$ blanked late attacks worth ten times that."""
@@ -717,12 +732,13 @@ class CityEngine:
             state.project_board.append(state.project_deck.pop(0))
 
     def _reroll_projects(self, state: GameState, command: Command) -> None:
-        """Push the oldest project to the bottom of the deck for money, without an action.
+        """Shuffle the whole board back into the deck and deal four fresh projects.
 
-        Rotation already recycles a project instead of removing it, so this cannot drain the deck:
-        it only buys you a different offer when nothing on the board fits your portfolio. The
-        price is money and it is deliberately steep — see ``PROJECT_REROLL_MONEY`` for why neither
-        a cheap money price nor an influence price worked.
+        It used to move exactly one card — the oldest — for the same money and no action, which is
+        the round rotation you get for free anyway: as a way out of a board that fits nobody it was
+        a lottery ticket on a single blind draw. A full re-deal is a real decision, so it costs a
+        real action on top of the money; that price is also what stops a player sitting on 300$ from
+        re-dealing every turn and turning the board into a slot machine.
         """
         player = state.current_player
         if self._flag(state, "projects_rerolled"):
@@ -731,9 +747,22 @@ class CityEngine:
             raise IllegalActionError("not enough money to reroll the project board")
         if not state.project_deck:
             raise IllegalActionError("the project deck is empty")
+        self._spend_action(state)
         self._mark_flag(state, "projects_rerolled")
         player.money -= PROJECT_REROLL_MONEY
-        self._rotate_project_board(state, cost_money=PROJECT_REROLL_MONEY, actor_id=player.id)
+        returned = list(state.project_board)
+        # Back into the deck, never out of the game: every project stays reachable for everybody.
+        state.project_deck.extend(returned)
+        state.project_board = []
+        GameRNG(state.rng).shuffle(state.project_deck)
+        self._refill_project_board(state)
+        state.append_event(
+            "project_board_redealt",
+            player.id,
+            cost_money=PROJECT_REROLL_MONEY,
+            returned_project_ids=returned,
+            project_board=list(state.project_board),
+        )
 
     def _rotate_project_board(self, state: GameState, *, cost_money: int = 0, actor_id: str | None = None) -> None:
         """One project leaves the board every round: the longest-standing one goes to the bottom.
@@ -1158,8 +1187,10 @@ class CityEngine:
             raise IllegalActionError("roof limit reached")
         if card.kind == "influence" and player.money < 2:
             raise IllegalActionError("media campaign requires 2 money")
-        if card.kind == "influence_to_cash" and player.influence < 2:
-            raise IllegalActionError("tax manoeuvre requires 2 influence")
+        if card.kind == "cash_to_influence" and player.money < CASH_TO_INFLUENCE_MONEY:
+            raise IllegalActionError(f"this card requires {CASH_TO_INFLUENCE_MONEY} money")
+        if card.kind == "capacity" and player.capacity >= MAX_CAPACITY:
+            raise IllegalActionError("the business is already at the slot limit")
         if card.kind in {"district_cash", "zoning", "develop"}:
             district = self._payload_string(command, "district")
             if district not in DISTRICT_IDS:
@@ -1202,14 +1233,15 @@ class CityEngine:
         elif kind == "roof":
             player.roofs = min(self.roof_limit(player), player.roofs + 1)
         elif kind == "grant":
-            player.money += card.value
+            player.money += self._round_scaled(state, card.value)
             player.influence += int(any("ai" in self.owned_definition(asset).tags for asset in player.assets))
         elif kind == "bridge_loan":
             player.money += card.value
             player.debt += 4
         elif kind == "district_cash":
             district = str(command.payload["district"])
-            player.money += min(10, self.district_count(player, district) * card.value)
+            cap = self._round_scaled(state, 10)
+            player.money += min(cap, self.district_count(player, district) * card.value)
         elif kind == "influence":
             player.money -= 2
             player.influence += card.value
@@ -1232,12 +1264,15 @@ class CityEngine:
             state.actions_left += card.value
         elif kind == "investment_action":
             state.investment_actions += card.value
-        elif kind == "comeback":
-            is_last = self.ranking(state)[-1].id == player.id
-            player.money += state.round_number * card.value if is_last else 3
-        elif kind == "influence_to_cash":
-            player.influence -= 2
-            player.money += card.value
+        elif kind == "capacity":
+            # A slot, not money: the object it will hold turns 2$ into a point, so with the wallet
+            # in surplus and six slots the cap, the slot is the scarce half of the purchase.
+            player.capacity = min(MAX_CAPACITY, player.capacity + card.value)
+        elif kind == "cash_to_influence":
+            # The old direction traded the scarce resource for the plentiful one, which made the
+            # card strictly worse than discarding it for influence.
+            player.money -= CASH_TO_INFLUENCE_MONEY
+            player.influence += card.value
         elif kind == "project":
             # The card pays the influence, not the condition: the project still has to be earned.
             project_id = str(command.payload["project_id"])
@@ -1292,7 +1327,7 @@ class CityEngine:
         card: ActionCardDefinition,
     ) -> None:
         if card.kind == "steal":
-            attacker.money += 2
+            attacker.money += self._round_scaled(state, 2)
         elif card.kind == "double_scandal":
             self.add_scandal(state, attacker, 1)
         elif card.kind == "blackmail":
@@ -1312,13 +1347,17 @@ class CityEngine:
         if kind == "scandal":
             self.add_scandal(state, target, card.value)
         elif kind == "fine":
-            if target.money >= card.value:
-                target.money -= card.value
+            # Money effects scale with the round, like the roof price and the grey operations: a flat
+            # 4$ was a tenth of a point by round twelve, so the card was worth less than discarding
+            # it. Scaling keeps the card identity and fixes the whole money-denominated class.
+            amount = self._round_scaled(state, card.value)
+            if target.money >= amount:
+                target.money -= amount
             else:
                 target.money = 0
                 self.add_scandal(state, target, 1)
         elif kind == "steal":
-            target.money = max(0, target.money - card.value)
+            target.money = max(0, target.money - self._round_scaled(state, card.value))
         elif kind == "role_pressure":
             if target.influence >= card.value:
                 target.influence -= card.value
@@ -1343,7 +1382,7 @@ class CityEngine:
             if automated is not None:
                 self._log_asset_state_change(state, target, automated, change="automation_disabled", source=card.id)
         elif kind == "mixed_fine":
-            target.money = max(0, target.money - 2)
+            target.money = max(0, target.money - self._round_scaled(state, 2))
             target.influence = max(0, target.influence - 1)
         else:
             raise InvalidCommandError(f"unsupported targeted card kind: {kind}")

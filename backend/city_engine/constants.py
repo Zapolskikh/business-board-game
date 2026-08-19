@@ -1,12 +1,17 @@
 """Version and rules constants persisted with every game snapshot."""
 
 SCHEMA_VERSION = 1
+# 1.3.0-rc.2: the project board is re-dealt in full instead of rotating one card, and that now costs
+# an action on top of the money; money printed on action cards grows with the round.
+#
 # 1.3.0-rc.1: the influence economy pass. Campaign converts money in tiers, selling an object is
 # free, object replacement is gone, both rerolls are priced in money, and two grey operations now
 # trade in influence instead of cash. Snapshots taken under 1.2.x would be scored against rules
 # their players never agreed to, so state validation rejects them.
-RULES_VERSION = "city-1.3.0-rc.1"
-CONTENT_VERSION = "city-content-2026-08-18a"
+RULES_VERSION = "city-1.3.0-rc.2"
+# 2026-08-19a: «Антикризисная помощь» gives a business slot, «Налоговый манёвр» runs money into
+# influence instead of the reverse, and the money cards say that their figures scale.
+CONTENT_VERSION = "city-content-2026-08-19a"
 
 DISTRICT_IDS = (
     "residential",
@@ -86,6 +91,10 @@ PROJECT_REROLL_MONEY = 10
 ACTION_CARD_COST = 3
 # What discarding a card returns, so a bad draw is not a dead 3$.
 CARD_DISCARD_VALUE = 2
+# What the tax manoeuvre pays to run money into influence. It has to beat the discard — a card that
+# gives 2◆ for 8$ is strictly worse than the same card thrown away for 2◆ — and it buys the top
+# campaign tier without spending the action, which is the point of playing a card at all.
+CASH_TO_INFLUENCE_MONEY = 8
 # Scandal cleanup is priced in influence: at 10$ = 1 point money made it effectively free and the
 # whole attack layer stopped mattering.
 CRISIS_PR_INFLUENCE = 3

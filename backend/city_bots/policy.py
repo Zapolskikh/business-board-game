@@ -564,6 +564,10 @@ def _card_value(engine: CityEngine, card_id: str, player: PlayerState) -> float:
         return 5
     if card.kind in {"extra_action", "investment_action"}:
         return card.value * 4
+    if card.kind == "capacity":
+        # A free slot is worth the object that will fill it, and by the time cards are flowing the
+        # bot has the money — the slot is the half of the purchase it cannot buy any other way.
+        return 8
     if card.kind in {"project", "role_shield", "scandal_shield"}:
         return 6
     return max(1, card.value)

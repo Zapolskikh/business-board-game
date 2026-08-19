@@ -149,6 +149,10 @@ export interface AssetMeta {
   text: string;
   tags: string[];
   effects?: Record<string, unknown>;
+  // Final-scoring points, computed by the engine (`content.asset_points`) and also what a sale pays
+  // back in money. Shipped rather than derived: money buys points at 2$ each through an object and
+  // at 10$ each held, and that rate is the whole late game.
+  points?: number;
 }
 export interface ActionMeta { id: string; title: string; tone: string; text: string; kind: string; value: number; targeted?: boolean }
 export interface ProjectRequirement { type: string; count?: number; district?: string; tag?: string; role?: string }
@@ -185,6 +189,8 @@ export interface ScoringMeta {
   project_reroll_money: number;
   crisis_pr_influence: number;
   action_card_cost: number;
+  // What discarding a card pays back, in money or in influence.
+  card_discard_value?: number;
   // One entry per campaign tier: the same action buys more influence at a worsening rate.
   campaign_tiers: { spend: number; gain: number }[];
   // Laundering scales on both sides: cost = base + ⌊раунд/2⌋, gain = base + ⌊раунд/3⌋.

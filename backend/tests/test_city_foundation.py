@@ -10,9 +10,10 @@ from city_engine.constants import (
     PROJECT_BOARD_SIZE,
 )
 from city_engine.content import load_catalog
+from city_engine.engine import CityEngine
 from city_engine.errors import StateValidationError
 from city_engine.factory import GameSettings, PlayerSetup, create_game, create_game_from_catalog
-from city_engine.models import GameState
+from city_engine.models import GameState, OwnedAsset
 from city_engine.rng import GameRNG, RNGState
 from city_engine.serialization import dumps_state, loads_state, state_hash
 
@@ -111,3 +112,16 @@ def test_public_meta_ships_the_scoring_rates() -> None:
     assert scoring["influence_per_point"] == INFLUENCE_PER_POINT
     assert scoring["market_reroll_cost"] == MARKET_REROLL_COST
     assert scoring["project_board_size"] == PROJECT_BOARD_SIZE
+
+
+def test_public_meta_ships_the_points_every_object_scores() -> None:
+    """The card shows this number, so it has to be the one the engine scores and refunds with."""
+    engine = CityEngine()
+    rows = load_catalog().public_meta()["assets"]
+
+    assert rows, "the catalog must ship objects"
+    for row in rows:
+        assert row["points"] == engine.asset_value_of(row["id"])
+        # A sale pays back exactly the points it removes: the reason selling only makes sense as
+        # half of a swap, and the reason the button has to say both numbers.
+        assert row["points"] == engine.asset_refund(OwnedAsset(uid=f"asset:{row['id']}", card_id=row["id"]))

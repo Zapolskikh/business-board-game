@@ -50,7 +50,62 @@ export const greyOperationLabels: Record<string, string> = {
   influence_broker: "Слив компромата",
 };
 
+// Lives next to the labels rather than in the screen that draws the operation panel, because the
+// object cards have to say the same thing: buying one of these five objects is the *only* way into
+// its operation, and until now the market card kept that to itself — the panel announced the
+// requirement only after you had already spent your money on something else.
+export const greyOperationInfo: Record<string, { asset: string; effect: (round: number, meta: CityMeta) => string; chance: number; failure: string }> = {
+  cash: {
+    asset: "Сеть наличных обменников",
+    // Both sides scale with the round: a flat gain against a growing stake made the operation
+    // strictly worse than the top campaign tier, and then nobody ever ran it.
+    effect: (round, meta) => `${launderingCost(meta, round)}$ → ${launderingGain(meta, round)}◆`,
+    chance: 85,
+    failure: "Единственный неограниченный способ превратить лишние деньги во влияние, и с ростом раунда курс становится лучше, чем у кампании. При успехе: +1 скандал. При провале ставка теряется, влияния нет. Скандалы при провале: Аферист +1, остальные +2. На 5 скандалах теряется роль, на 6 — тюрьма.",
+  },
+  market: {
+    asset: "Ночной рынок",
+    effect: round => `украсть у цели до ${3 + Math.floor(round / 2)}$`,
+    chance: 75,
+    failure: "Крыша цели тратится и полностью отменяет кражу. При успехе: +1 скандал. При провале теряется Крыша, если она есть. Скандалы: Аферист +1, остальные +2. На 5 скандалах теряется роль, на 6 — тюрьма.",
+  },
+  crypto: {
+    asset: "Городская криптобиржа",
+    effect: round => `получить ${6 + round}$ и лишить лидера до ${2 + Math.floor(round / 2)}$`,
+    chance: 60,
+    failure: "Свой доход вы получаете всегда, но Крыша лидера тратится и отменяет списание с него. При успехе: +2 скандала. При провале: −5$, а жетон автоматизации на криптобирже выключается до выплаты раунда. Скандалы при провале: Аферист +1, остальные +3. На 5 скандалах теряется роль, на 6 — тюрьма.",
+  },
+  datacenter: {
+    asset: "Нелегальный дата-центр",
+    effect: (_round, meta) => `украсть у цели до ${meta.scoring?.hack_influence_steal ?? 4}◆`,
+    chance: 55,
+    failure: "Крыша цели тратится и полностью отменяет кражу. При успехе: +2 скандала. При провале: −2◆. Скандалы при провале: Аферист +1, остальные +3. На 5 скандалах теряется роль, на 6 — тюрьма.",
+  },
+  influence_broker: {
+    asset: "Торговец компроматом",
+    effect: (_round, meta) => `${meta.scoring?.compromat_influence ?? 3}◆ → снять роль с цели`,
+    chance: 70,
+    failure: "Цель теряет роль: −3 очка, весь её пассив и место освобождается по свободной цене, а не по цене переворота. Судебный запрет или Крыша цели полностью гасят слив. Только раз в раунд. При успехе: +2 скандала. При провале: −2◆ и скандалы (Аферист +1, остальные +3). На 5 скандалах теряется роль, на 6 — тюрьма.",
+  },
+};
+
+// Role powers that are gated on owning something, and on what exactly the engine checks. The scam
+// checks a card id (`engine.py:1597`); the racket and the paid cleanup check a district
+// (`engine.py:1459`, `engine.py:1497`), so there every object of that district is the key.
+const assetGatedPowers: { power: string; role: string; asset?: string; district?: string; detail: string }[] = [
+  { power: "fraudster_crypto_scam", role: "fraudster", asset: "crypto", detail: "отобрать сумму у всех соперников" },
+  { power: "mafia_racket", role: "mafia", district: "shadows", detail: "дань с выбранного соперника" },
+  { power: "mafia_cleanup", role: "mafia", district: "government", detail: "снять до 2 скандалов за 3$" },
+];
+
 const capacityCosts: Record<number, number> = { 3: 6, 4: 10, 5: 15 };
+
+// Points an object adds to the final score, and what selling it refunds in money — one number for
+// both, because the engine uses one rule (`content.asset_points`). The fallback keeps an older
+// `/meta` payload rendering instead of printing zeroes everywhere.
+export function assetPoints(asset: AssetMeta): number {
+  return asset.points ?? Math.floor(asset.cost / 2);
+}
 
 export function stringValue(value: unknown): string {
   return value === undefined || value === null ? "" : String(value);
@@ -119,6 +174,10 @@ export function crisisPrInfluence(meta: CityMeta): number {
 
 export function actionCardCost(meta: CityMeta): number {
   return meta.scoring?.action_card_cost ?? 3;
+}
+
+export function cardDiscardValue(meta: CityMeta): number {
+  return meta.scoring?.card_discard_value ?? 2;
 }
 
 /** Human-readable project condition, built from the structured requirement. */
@@ -206,7 +265,7 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
   }
   if (action.type === "end_turn") return "Завершить ход";
   if (action.type === "reroll_market") return `Обновить рынок объектов (${marketRerollCost(meta)}$)`;
-  if (action.type === "reroll_projects") return `Обновить доску проектов (${projectRerollMoney(meta)}$)`;
+  if (action.type === "reroll_projects") return `Пересобрать доску проектов (${projectRerollMoney(meta)}$ + действие)`;
   if (action.type === "city_project") {
     return project
       ? `«${project.title}» · ${project.cost_influence}◆+${project.cost_money}$ → ${project.points} очков`
@@ -224,7 +283,8 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
   if (action.type === "sell_asset") {
     const owned = player.assets.find(item => item.uid === payload.asset_uid);
     const asset = assets.get(owned?.card_id ?? "");
-    return `Продать «${asset?.title ?? "объект"}» за ${Math.floor((asset?.cost ?? 0) / 2)}$`;
+    const points = asset ? assetPoints(asset) : 0;
+    return `Продать «${asset?.title ?? "объект"}» за ${points}$ (−${points} очков)`;
   }
   if (action.type === "buy_automation" || action.type === "move_automation") {
     const owned = player.assets.find(item => item.uid === payload.asset_uid);
@@ -240,7 +300,10 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
   }
   if (action.type === "develop_district") return `Развить район «${district?.title ?? payload.district}»`;
   if (action.type === "buy_action_card") return `Купить «${cards.get(stringValue(payload.card_id))?.title ?? payload.card_id}»`;
-  if (action.type === "convert_action_card") return payload.into === "money" ? "Продать карту → +1$" : "Сбросить карту → +1◆";
+  if (action.type === "convert_action_card") {
+    const back = cardDiscardValue(meta);
+    return payload.into === "money" ? `Продать карту → +${back}$` : `Сбросить карту → +${back}◆`;
+  }
   if (action.type === "play_action_card") {
     const held = player.hand?.find(item => item.uid === payload.card_uid);
     const title = cards.get(held?.card_id ?? "")?.title ?? "Карта";
@@ -271,6 +334,7 @@ const eventVerbs: Record<string, string> = {
   basic_action: "выполняет городское действие",
   city_project_taken: "забирает городской проект",
   project_board_rotated: "Доска проектов обновилась",
+  project_board_redealt: "пересобирает доску проектов",
   turn_order_set: "Порядок хода определён",
   market_rerolled: "обновляет рынок объектов",
   role_takeover_blocked: "не смог перехватить роль",
@@ -436,6 +500,17 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       // Rotation recycles: the card goes under the deck, it does not leave the game.
       const tail = txt(`🏗️ Проект «${title}» уходит под низ колоды`);
       return event.actor_id ? lead(txt(` обновляет доску проектов («${title}» под низ колоды)`)) : [tail];
+    }
+    case "project_board_redealt": {
+      // A full re-deal, so naming one card would be misleading: the whole board changed.
+      const titles = ((data.project_board as string[]) ?? [])
+        .map(id => meta.projects.find(item => item.id === id)?.title ?? id)
+        .join(", ");
+      return lead(
+        txt(" пересобирает доску проектов ("),
+        signed(-numberValue(data.cost_money), "$"),
+        txt(` и действие) → ${titles}`),
+      );
     }
     case "turn_order_set": {
       const order = (data.order as string[]) ?? [];
@@ -794,6 +869,118 @@ export function assetEffectLines(
   }
 
   return lines;
+}
+
+export interface AssetHint {
+  kind: "grey" | "power" | "project" | "upgrade";
+  icon: string;
+  title: string;
+  detail: string;
+  // Whether the owner could act on it right now: the object is active in their business and the
+  // role, if the ability needs one, is theirs. A market card is a promise, so nothing is ready yet.
+  ready: boolean;
+  tooltip: string;
+}
+
+// What an object hands its owner besides income: the operations only it unlocks, and the projects on
+// the board that count it. This is an index over the catalog and the board, not a second
+// implementation of any rule — nothing here re-evaluates a condition, so it cannot drift from the
+// engine the way a local copy of `project_requirement_met` would.
+export function assetHints(
+  asset: AssetMeta,
+  owner: PlayerState,
+  game: GameState,
+  meta: CityMeta,
+  assets: Map<string, AssetMeta>,
+  options?: { active?: boolean; market?: boolean },
+): { special: boolean; hints: AssetHint[] } {
+  const active = options?.active ?? false;
+  const roleTitle = (id: string): string => meta.roles.find(item => item.id === id)?.title ?? id;
+  const districtTitle = (id?: string): string => meta.districts.find(item => item.id === id)?.title ?? id ?? "";
+  // A forged mandate counts: the engine's `has_role` accepts the copied role for every power.
+  const hasRole = (id: string): boolean => owner.role === id || owner.copied_role === id;
+  const hints: AssetHint[] = [];
+
+  const grey = greyOperationInfo[asset.id];
+  if (grey) {
+    const label = greyOperationLabels[asset.id] ?? asset.id;
+    const effect = grey.effect(game.round_number, meta);
+    hints.push({
+      kind: "grey",
+      icon: "🌒",
+      title: label,
+      detail: `${effect} · шанс от ${grey.chance}%`,
+      ready: active,
+      tooltip: `Серая операция «${label}» доступна только владельцу этого объекта — другого входа в неё нет, и роль для неё не нужна. Стоит 1 обычное действие. Эффект при успехе: ${effect}. Базовый шанс ${grey.chance}%, у Афериста выше. ${grey.failure}`,
+    });
+  }
+
+  for (const gate of assetGatedPowers) {
+    if (gate.asset ? gate.asset !== asset.id : gate.district !== asset.district) continue;
+    const label = powerLabels[gate.power] ?? gate.power;
+    const owns = hasRole(gate.role);
+    hints.push({
+      kind: "power",
+      icon: "✴",
+      title: label,
+      detail: owns ? gate.detail : `нужна роль «${roleTitle(gate.role)}»`,
+      ready: active && owns,
+      tooltip: `Способность «${label}» роли «${roleTitle(gate.role)}» работает только при ${gate.asset ? "этом объекте" : `активном объекте района «${districtTitle(gate.district)}»`}: ${gate.detail}.`,
+    });
+  }
+
+  // With every slot taken, money only becomes points through a swap, and the swap is invisible: the
+  // refund equals the points the outgoing object was worth, so the gain is purely the difference.
+  if (options?.market && owner.assets.length >= owner.capacity) {
+    const owned = owner.assets
+      .map(item => assets.get(item.card_id))
+      .filter((item): item is AssetMeta => Boolean(item));
+    const weakest = owned.reduce<AssetMeta | null>(
+      (worst, item) => (worst === null || assetPoints(item) < assetPoints(worst) ? item : worst),
+      null,
+    );
+    const gain = weakest ? assetPoints(asset) - assetPoints(weakest) : 0;
+    if (weakest && gain > 0) {
+      hints.push({
+        kind: "upgrade",
+        icon: "⇄",
+        title: `Замена «${weakest.title}»`,
+        detail: `+${gain} очков · продажа вернёт ${assetPoints(weakest)}$`,
+        ready: false,
+        tooltip: `Слоты заняты, поэтому это единственный способ доложить очков за деньги: продайте «${weakest.title}» (${assetPoints(weakest)} очков, столько же вернётся деньгами, продажа бесплатна и не тратит действие) и купите этот объект за ${asset.cost}$ — чистыми +${gain} очков за одно действие покупки.`,
+      });
+    }
+  }
+
+  for (const project of boardProjectsFor(asset, game, meta)) {
+    hints.push({
+      kind: "project",
+      icon: "🏗️",
+      title: project.title,
+      detail: `${project.points} очков · ${projectRequirementText(project, meta)}`,
+      ready: false,
+      tooltip: `Проект «${project.title}» с доски требует: ${projectRequirementText(project, meta)}. Этот объект в условие входит. Награда: ${project.points} очков и ${projectPerkText(project)}.`,
+    });
+  }
+
+  return { special: Boolean(grey), hints };
+}
+
+// Projects on the board whose condition names this object's tag or district. Conditions counting
+// districts in the abstract (`distinct_districts`, `district_depth`) are left out on purpose: every
+// object feeds them somehow, so listing those would put the same two lines on all 71 cards.
+function boardProjectsFor(asset: AssetMeta, game: GameState, meta: CityMeta): ProjectMeta[] {
+  return game.project_board
+    .map(projectId => meta.projects.find(item => item.id === projectId))
+    .filter((project): project is ProjectMeta => {
+      const requirement = project?.requirement;
+      if (!requirement) return false;
+      if (requirement.type === "tag_objects") return Boolean(requirement.tag && asset.tags.includes(requirement.tag));
+      if (requirement.type === "district_objects") return requirement.district === asset.district;
+      return false;
+    })
+    .sort((left, right) => right.points - left.points)
+    .slice(0, 3);
 }
 
 export function activeBonuses(player: PlayerState, game: GameState, meta: CityMeta, assets: Map<string, AssetMeta>): { text: string; active: boolean }[] {
