@@ -1,4 +1,4 @@
-"""Design metrics for the balance work described in DESIGN_V2.md.
+"""Design metrics for the balance work described in SIMPLIFICATION_TODO.md.
 
 Not a balance report on roles — those live in ``simulation.cli``. This answers four questions
 about the shape of the game itself:
@@ -9,7 +9,7 @@ about the shape of the game itself:
 * **Portfolio shape** — depth in one district versus spread, i.e. whether mono is still forced.
 * **Lead stability** — the round after which the eventual winner never loses first place.
 
-Run it after every balance change and compare against the table in DESIGN_V2.md::
+Run it after every balance change and compare against the expectations in SIMPLIFICATION_TODO.md::
 
     python -m simulation.design_metrics --games=40
 """

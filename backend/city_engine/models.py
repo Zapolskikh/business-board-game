@@ -59,17 +59,19 @@ class OwnedAsset:
 class MarketAsset:
     uid: str
     card_id: str
-    expires_at_turn: int
+    # The round this slot rotates out at, not a turn counter: players plan in rounds, and a
+    # per-turn deadline expired before the reader's next turn at any table above two seats.
+    expires_at_round: int
 
     def to_dict(self) -> dict[str, Any]:
-        return {"uid": self.uid, "card_id": self.card_id, "expires_at_turn": self.expires_at_turn}
+        return {"uid": self.uid, "card_id": self.card_id, "expires_at_round": self.expires_at_round}
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> MarketAsset:
         return cls(
             uid=str(data["uid"]),
             card_id=str(data["card_id"]),
-            expires_at_turn=int(data["expires_at_turn"]),
+            expires_at_round=int(data["expires_at_round"]),
         )
 
 

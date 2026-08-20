@@ -370,7 +370,7 @@ function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selected
           const asset = assets.get(item.card_id);
           if (!asset) return null;
           const buy = buyActions.get(item.uid);
-          const remaining = Math.max(0, item.expires_at_turn - (game.turn_serial ?? 0));
+          const remaining = Math.max(0, item.expires_at_round - game.round_number);
           const price = marketPrice(asset, item);
           const effectLines = assetEffectLines(asset, me, game, meta, assets, { includeSynergy: true });
           // Not owned yet, so nothing it unlocks is `ready` — the panel is advertising, not status.
@@ -385,7 +385,9 @@ function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selected
               {effectLines.length > 0
                 ? <ul className="asset-effects">{effectLines.map((line, index) => <li key={index} className={line.active ? "effect-active" : "effect-idle"}>{line.text}{line.boosted && <span className="effect-boost">⚙×2</span>}</li>)}</ul>
                 : asset.text && <small className="asset-summary">{asset.text}</small>}
-              <small className="market-expiry">⏳ ещё {remaining} ходов</small>
+              {/* Rounds, not turns: the old per-turn countdown expired before the reader's next
+                  turn, so "save up for that one" was never a playable plan. */}
+              <small className="market-expiry">⏳ {remaining > 0 ? `ещё ${remaining} р.` : "уходит в конце раунда"}</small>
             </span>
             <AssetHintPanel hints={hints} />
           </button>;

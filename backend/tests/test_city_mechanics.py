@@ -8,6 +8,7 @@ from city_engine.constants import (
     CASH_TO_INFLUENCE_MONEY,
     COMPROMAT_INFLUENCE,
     HACK_INFLUENCE_STEAL,
+    MARKET_ASSET_ROUNDS,
     MARKET_REROLL_COST,
     MAX_REPEATABLE_PROJECTS,
     PROJECT_BOARD_SIZE,
@@ -212,7 +213,7 @@ def test_asset_purchase_event_reports_the_grey_scandal_in_deltas() -> None:
     player = state.current_player
     player.money = 20
     # A grey object charges a scandal on purchase; below the limit that writes no event of its own.
-    state.market.append(MarketAsset(uid="asset:grey-test", card_id="market", expires_at_turn=99))
+    state.market.append(MarketAsset(uid="asset:grey-test", card_id="market", expires_at_round=99))
 
     price = engine.asset_price(state, player, "market")
     state = run(engine, state, "buy_asset", {"market_uid": "asset:grey-test"})
@@ -968,7 +969,7 @@ def test_selling_costs_no_action_so_a_swap_costs_only_the_purchase() -> None:
     player.automation_owned = True
     player.automation_uid = cheap.uid
     player.money = 30
-    state.market.append(MarketAsset(uid="asset:replacement", card_id="robotics", expires_at_turn=99))
+    state.market.append(MarketAsset(uid="asset:replacement", card_id="robotics", expires_at_round=99))
     price = engine.asset_price(state, player, "robotics")
     actions_before = state.actions_left
 
@@ -1010,7 +1011,7 @@ def test_replace_asset_no_longer_exists() -> None:
     give_asset(state, player, "warehouse")
     player.capacity = 3  # full slots: the only situation the swap was ever offered in
     player.money = 30
-    state.market.append(MarketAsset(uid="asset:replacement", card_id="robotics", expires_at_turn=99))
+    state.market.append(MarketAsset(uid="asset:replacement", card_id="robotics", expires_at_round=99))
 
     assert not any(action["type"] == "replace_asset" for action in engine.legal_actions(state, player.id))
     with pytest.raises(InvalidCommandError):
@@ -1146,6 +1147,30 @@ def test_initiatives_are_capped_per_game() -> None:
     # Unlimited initiatives took 38% of all project points in the arena match.
     with pytest.raises(IllegalActionError):
         run(engine, state, "city_project", {"project_id": "municipal_programme"})
+
+
+def test_the_market_holds_still_for_a_whole_round() -> None:
+    """Slots expire in rounds, so the board cannot change between two of a player's own turns."""
+    engine = CityEngine()
+    state = make_state()
+    assert [item.expires_at_round for item in state.market] == [1 + MARKET_ASSET_ROUNDS] * len(state.market)
+
+    before = [item.uid for item in state.market]
+    opening_round = state.round_number
+    # Every other player takes their turn; the round has not turned over yet.
+    while state.round_number == opening_round:
+        previous = [item.uid for item in state.market]
+        state = run(engine, state, "end_turn")
+        if state.round_number == opening_round:
+            assert [item.uid for item in state.market] == previous
+    assert [item.uid for item in state.market] == before  # untouched for the whole round
+
+    while state.round_number < 1 + MARKET_ASSET_ROUNDS:
+        state = run(engine, state, "end_turn")
+    # The round the slots were dated to has arrived, so they are gone and replaced.
+    assert not {item.uid for item in state.market} & set(before)
+    assert len(state.market) == len(before)
+    assert any(event.type == "market_rotated" for event in state.event_log)
 
 
 def test_market_reroll_costs_money_but_no_action() -> None:

@@ -148,6 +148,10 @@ export function projectRerollMoney(meta: CityMeta): number {
   return meta.scoring?.project_reroll_money ?? 10;
 }
 
+export function marketAssetRounds(meta: CityMeta): number {
+  return meta.scoring?.market_asset_rounds ?? 2;
+}
+
 export function campaignTiers(meta: CityMeta): { spend: number; gain: number }[] {
   return meta.scoring?.campaign_tiers ?? [{ spend: 2, gain: 2 }];
 }

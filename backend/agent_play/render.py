@@ -474,14 +474,14 @@ def _owned_line(owned: dict[str, Any], me: dict[str, Any], game: dict[str, Any],
 def _market_line(item: dict[str, Any], game: dict[str, Any], catalog: Catalog) -> str:
     asset = catalog.assets.get(item["card_id"], {})
     price = item.get("price", asset.get("cost", "?"))
-    remaining = max(0, int(item["expires_at_turn"]) - int(game.get("turn_serial", 0)))
+    remaining = max(0, int(item["expires_at_round"]) - int(game.get("round_number", 0)))
     influence = int(asset.get("influence", 0))
     return (
         f"    {item['uid']:<28} {catalog.asset_title(item['card_id']):<26} "
         f"{catalog.district_title(str(asset.get('district', ''))):<18} {price}$ доход {asset.get('income', '?')}$"
         + f" [{','.join(asset.get('tags', [])) or '—'}]"
         + (f" +{influence}◆ разово" if influence else "")
-        + f" {asset.get('rarity', '')} ⏳{remaining}"
+        + f" {asset.get('rarity', '')} ⏳{remaining}р"
         # Conditions and bonuses are the whole point of the expensive cards; buying blind is worse
         # than the extra line width.
         + (f"\n{'':<38}└ {asset['text']}" if asset.get("text") else "")

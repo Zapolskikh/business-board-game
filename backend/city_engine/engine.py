@@ -28,6 +28,7 @@ from city_engine.constants import (
     LAUNDERING_BASE_COST,
     LAUNDERING_BASE_GAIN,
     MAINTENANCE_PER_ASSET,
+    MARKET_ASSET_ROUNDS,
     MARKET_REROLL_COST,
     MAX_CAPACITY,
     MAX_REPEATABLE_PROJECTS,
@@ -1944,7 +1945,8 @@ class CityEngine:
             state.turns_taken_in_round += 1
             state.current_player_index = self._seat_of(state, state.turn_order[state.turns_taken_in_round])
             state.turn_serial += 1
-            self._rotate_expired_market(state)
+            # No market pruning here on purpose: the board must hold still for a whole round, or
+            # "see it, save for it, buy it" cannot be played.
             self._prepare_current_player(state)
             return
 
@@ -2022,7 +2024,12 @@ class CityEngine:
         )
 
     def _rotate_expired_market(self, state: GameState) -> None:
-        expired = [item for item in state.market if item.expires_at_turn <= state.turn_serial]
+        """Prune the market. Called only when a round opens, so a slot cannot vanish mid-round.
+
+        It used to run on every turn pass as well, which is what made the countdown unreadable:
+        between two of your own turns three of six slots could change at a four-player table.
+        """
+        expired = [item for item in state.market if item.expires_at_round <= state.round_number]
         if not expired:
             return
         expired_uids = {item.uid for item in expired}
@@ -2044,7 +2051,7 @@ class CityEngine:
             MarketAsset(
                 uid=f"asset:{card_id}",
                 card_id=card_id,
-                expires_at_turn=state.turn_serial + len(state.players) * 2,
+                expires_at_round=state.round_number + MARKET_ASSET_ROUNDS,
             )
             for card_id in drawn
         )

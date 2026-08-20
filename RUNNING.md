@@ -41,8 +41,18 @@ npm.cmd --prefix frontend run build
 .\.venv\Scripts\python.exe -m simulation.cli --games=10 --rounds=15 --players=4 --role-price=3 --bots=oleg,codex,codex,claude --workers=2
 ```
 
+Боты: `oleg` (easy), `codex` (medium), `claude` (hard), `reborn` (expert). Порядок в `--bots`
+соответствует местам за столом. Для оценки баланса брать `reborn` — easy-боты почти не генерируют
+скандалов, поэтому всё, что работает через взаимодействие, показывает на них ноль.
+
+`--specialist=2,mafia` означает, что второй игрок строит стратегию вокруг роли Мафиози. Полная серия
+по всем ролям сразу — `python -m simulation.suite --games=300 --workers=8`.
+
+Отчёты `SIMULATION_RESULTS_*.md` — генерируемые артефакты в корне репозитория, в гите их нет.
+Прогон без `--output` перезаписывает их молча.
+
 Метрики дизайна (из чего состоят очки, какие действия жмут игроки, когда фиксируется лидер) —
-после каждой правки баланса, сверяя с таблицей в `DESIGN_V2.md`:
+после каждой правки баланса, сверяя с ожиданиями в [SIMPLIFICATION_TODO.md](SIMPLIFICATION_TODO.md):
 
 ```powershell
 .\.venv\Scripts\python.exe -m simulation.design_metrics --games=40

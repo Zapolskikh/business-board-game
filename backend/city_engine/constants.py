@@ -1,6 +1,9 @@
 """Version and rules constants persisted with every game snapshot."""
 
 SCHEMA_VERSION = 1
+# 1.4.0-rc.1: the asset market expires in rounds instead of turns and rotates only when a round
+# opens, so `MarketAsset` carries a different field and old snapshots cannot be replayed.
+#
 # 1.3.0-rc.2: the project board is re-dealt in full instead of rotating one card, and that now costs
 # an action on top of the money; money printed on action cards grows with the round.
 #
@@ -8,7 +11,7 @@ SCHEMA_VERSION = 1
 # free, object replacement is gone, both rerolls are priced in money, and two grey operations now
 # trade in influence instead of cash. Snapshots taken under 1.2.x would be scored against rules
 # their players never agreed to, so state validation rejects them.
-RULES_VERSION = "city-1.3.0-rc.2"
+RULES_VERSION = "city-1.4.0-rc.1"
 # 2026-08-19a: «Антикризисная помощь» gives a business slot, «Налоговый манёвр» runs money into
 # influence instead of the reverse, and the money cards say that their figures scale.
 CONTENT_VERSION = "city-content-2026-08-19a"
@@ -63,6 +66,17 @@ MAX_REPEATABLE_PROJECTS = 3
 # already behind and cannot replace the object. Left at 1$; the money surplus needs a sink that
 # scales with success, not with ownership.
 MAINTENANCE_PER_ASSET = 1
+# How many rounds a market slot survives before it rotates out.
+#
+# This used to be counted in turns — `turn_serial + players * 2` — and pruned on every turn pass,
+# which made the printed countdown a lie at any table size: at four players "⏳3" read as three
+# rounds and expired before the reader's next turn. Measured cost in a live game: an object planned
+# for two turns ahead vanished, and a project needing a second Administrative asset expired unused
+# because the only qualifying asset appeared and rotated away inside one round.
+#
+# Rounds are the unit players plan in, and rotation now happens only when a round opens, so the
+# board a player sees on their turn is the board they will still see when they come back to it.
+MARKET_ASSET_ROUNDS = 2
 
 # The journalist trades in scandals, so the role-loss threshold that everybody else hits at 5
 # would put their optimal play one point from collapse. Jail still follows one step later.
