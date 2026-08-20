@@ -11,10 +11,18 @@ SCHEMA_VERSION = 1
 # free, object replacement is gone, both rerolls are priced in money, and two grey operations now
 # trade in influence instead of cash. Snapshots taken under 1.2.x would be scored against rules
 # their players never agreed to, so state validation rejects them.
-RULES_VERSION = "city-1.4.0-rc.1"
-# 2026-08-19a: «Антикризисная помощь» gives a business slot, «Налоговый манёвр» runs money into
-# influence instead of the reverse, and the money cards say that their figures scale.
-CONTENT_VERSION = "city-content-2026-08-19a"
+# 1.4.0: the simplification pass. Automation, city events, forged/copied roles, the investment
+# action pool and business upkeep leave the game; the three defences merge into one Крыша; campaign
+# has one tier; every scandal cleanup costs an action; grey operations gate on a district instead of
+# one card; the asset market rotates its three oldest slots once a round; cards can buy points
+# outright. Snapshots taken under 1.3.x describe a game with different rules, so state validation
+# rejects them — old rooms will not open.
+RULES_VERSION = "city-1.4.0"
+# 2026-08-21a: 37 action cards. The automation and role-forgery cards are gone, replaced by the
+# «деньги → очки» family and «Предписание о демонтаже» (takes a development level); the two defence
+# cards now hand out the same Крыша as the third; the two projects that required automation ask for
+# tagged objects instead. The events array is gone from the catalog entirely.
+CONTENT_VERSION = "city-content-2026-08-21a"
 
 DISTRICT_IDS = (
     "residential",
