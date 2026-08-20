@@ -92,10 +92,25 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
   const [showRules, setShowRules] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileGameTab>("city");
   const [seenEvents, setSeenEvents] = useState<number | null>(null);
+  const [showLog, setShowLog] = useState(false);
+  // Watching the opponents is part of the game, so the chronicle can open itself while they play —
+  // and closes again on your own turn, because a popup over the board would be in the way.
+  const [autoLog, setAutoLog] = useState(() => window.localStorage.getItem("city.autoLog") !== "off");
 
   const selectMobileTab = useCallback((tab: MobileGameTab) => {
+    // The chronicle is a popup on every screen size; on a phone that popup is full-screen, so the
+    // tab opens it instead of switching to a column that no longer exists.
+    if (tab === "log") {
+      setShowLog(true);
+      return;
+    }
     setMobileTab(tab);
     window.scrollTo({ top: 0, behavior: "instant" });
+  }, []);
+
+  const toggleAutoLog = useCallback((enabled: boolean) => {
+    setAutoLog(enabled);
+    window.localStorage.setItem("city.autoLog", enabled ? "on" : "off");
   }, []);
 
   const assets = useMemo(() => new Map(meta.assets.map(asset => [asset.id, asset])), [meta.assets]);
@@ -130,8 +145,16 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
   const hasGame = Boolean(room?.game);
   useEffect(() => {
     if (!hasGame) return;
-    setSeenEvents(seen => (seen === null || mobileTab === "log" ? logCount : seen));
-  }, [hasGame, logCount, mobileTab]);
+    setSeenEvents(seen => (seen === null || showLog ? logCount : seen));
+  }, [hasGame, logCount, showLog]);
+
+  // Keyed on the turn serial, so closing it by hand during an opponent's turn keeps it closed.
+  const turnOwnerId = room?.game?.players[room.game.current_player_index]?.id;
+  const turnSerial = room?.game?.turn_serial;
+  useEffect(() => {
+    if (!hasGame || !autoLog) return;
+    setShowLog(Boolean(turnOwnerId) && turnOwnerId !== playerId);
+  }, [autoLog, hasGame, playerId, turnOwnerId, turnSerial]);
   const unseenEvents = seenEvents === null ? 0 : Math.max(0, logCount - seenEvents);
 
   const send = useCallback(async (action: LegalAction) => {
@@ -205,8 +228,12 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
           game={game} me={me} meta={meta} roles={roles} districts={districts} assets={assets} legal={legal}
           busy={busy} onAction={send} onOffer={offer}
         />
-        <Chronicle room={room} game={game} meta={meta} />
+        <button className="log-open" onClick={() => setShowLog(true)} title="Открыть хронику партии: все события по порядку.">
+          📜 Хроника{unseenEvents > 0 && <i className="log-badge">{Math.min(unseenEvents, 99)}</i>}
+        </button>
       </div>
+
+      {showLog && <ChronicleModal room={room} game={game} meta={meta} autoLog={autoLog} onAutoLog={toggleAutoLog} onClose={() => setShowLog(false)} />}
 
       <section className="mobile-game-menu">
         <h2>Меню</h2>
@@ -594,6 +621,8 @@ function DecisionPanel({ game, me, meta, roles, districts, assets, legal, busy, 
   const cleanupAction = cleanupRoleAction ?? find("crisis_pr");
   const cleanup = cleanupOffer(cleanupRoleAction ? cleanupPower : undefined, meta);
   const dotCount = Math.max(3, game.actions_left);
+  const greyAvailable = Object.keys(greyOperationLabels).filter(assetId => all("grey_operation", action => action.payload.asset_id === assetId).length > 0).length;
+  const freeRoles = meta.roles.filter(role => !roleHolder(role.id)).length;
   const greyRequirement = (assetId: string): string => {
     // The gate is a district, so the lock message has to name districts — the old text named one
     // card out of 71, which is exactly why three of the five operations were never run.
@@ -637,23 +666,28 @@ function DecisionPanel({ game, me, meta, roles, districts, assets, legal, busy, 
       <StaticAction action={find("buy_capacity")} label={`📦 ${capacityLabel(me)}`} tooltip="Купить постоянный дополнительный слот бизнеса. Можно потратить обычное либо инвестиционное действие; максимум 6 слотов." busy={busy} onAction={onAction} />
     </div>
 
-    <div className="action-group g-roles"><h3 className="group-title">🏷️ Роли <span className="group-hint">свободная {game.role_price}◆ · переворот {game.role_price * 3}◆</span></h3><div className="role-market">{meta.roles.map(role => {
+    {/* A player claims a role once or twice a game, so six full-width cards are six cards of
+        standing furniture. Folded once you hold one; the summary carries your role and the count. */}
+    <details className="action-group g-roles" open={!me.role}><summary className="group-title">🏷️ Роли <span className="group-hint">{me.role ? `ваша: ${roles.get(me.role)?.title}` : "у вас нет роли"} · свободно {freeRoles} из {meta.roles.length} · {game.role_price}◆ / переворот {game.role_price * 3}◆</span></summary><div className="role-market">{meta.roles.map(role => {
       const claim = find("claim_role", action => action.payload.role_id === role.id);
       const holder = roleHolder(role.id);
       return <button disabled={busy || !claim} onClick={() => claim && void onAction(claim)} style={{ borderColor: role.color }} title={`${role.passive} Способность: ${role.power} Получение роли расходует 1 обычное действие и ${roleCost(role.id)}◆.${holder ? ` Сейчас роль у ${holder.name}; его Крыша или судебный запрет могут заблокировать захват.` : ""}`} key={role.id}><span className="role-line"><span className="role-icon" style={{ borderColor: role.color }}>{role.icon}</span>{role.title} · {roleCost(role.id)}◆</span><small>{holder ? `занята: ${holder.name}` : role.passive}</small></button>;
-    })}</div>
-      {displayRoleId && <div className="role-powers" style={{ borderColor: roles.get(displayRoleId)?.color }}><strong>{roles.get(displayRoleId)?.icon} Способности: {roles.get(displayRoleId)?.title}</strong><small>{roles.get(displayRoleId)?.power}</small>{powers.map(power => {
+    })}</div></details>
+
+    {/* The powers stay outside the fold: they are used every turn, unlike claiming a role. */}
+    {displayRoleId && <div className="action-group g-roles"><div className="role-powers" style={{ borderColor: roles.get(displayRoleId)?.color }}><strong>{roles.get(displayRoleId)?.icon} Способности: {roles.get(displayRoleId)?.title}</strong><small>{roles.get(displayRoleId)?.power}</small>{powers.map(power => {
         const variants = all("use_role_power", action => action.payload.power === power);
         return <button className={power.includes("racket") || power.includes("sanction") || power.includes("scam") ? "danger" : ""} disabled={busy || variants.length === 0} onClick={() => onOffer(powerLabels[power] ?? power, variants)} title={powerDescriptions[power]} key={power}>{powerLabels[power] ?? power}{variants.length > 1 ? " → выбрать" : ""}</button>;
-      })}</div>}
-    </div>
+      })}</div></div>}
 
-    <div className="action-group g-grey"><h3 className="group-title">🌒 Серые операции <span className="group-hint">через специальные объекты</span></h3><p className="dim card-rule">Операцию открывает любой активный объект нужного района, роль не нужна. Каждая стоит 1 обычное действие; при выборе можно застраховать провал Крышей.</p>{Object.entries(greyOperationLabels).map(([assetId, label]) => {
+    {/* Five lines of which four were locked all game. Open when at least one is actually
+        available, folded to a single summary line the rest of the time. */}
+    <details className="action-group g-grey" open={greyAvailable > 0}><summary className="group-title">🌒 Серые операции <span className="group-hint">{greyAvailable > 0 ? `доступно: ${greyAvailable}` : "нужен объект Серого сектора, Технокластера или Администрации"}</span></summary><p className="dim card-rule">Операцию открывает любой активный объект нужного района, роль не нужна. Каждая стоит 1 обычное действие; при выборе можно застраховать провал Крышей.</p>{Object.entries(greyOperationLabels).map(([assetId, label]) => {
       const variants = all("grey_operation", action => action.payload.asset_id === assetId);
       const info = greyOperationInfo[assetId];
       const effect = info.effect(game.round_number, meta);
       return <button className="described-action" disabled={busy || variants.length === 0} onClick={() => onOffer(label, variants)} title={`Открывает любой активный объект районов: ${(greyOperationDistricts[assetId] ?? []).map(id => districts.get(id)?.title ?? id).join(", ")}. Эффект при успехе: ${effect}. Базовый шанс успеха ${info.chance}%; у Афериста он может быть выше. ${info.failure} Страховка при провале тратит 1 Крышу и отменяет денежный либо объектный штраф, но скандалы всё равно начисляются и действие расходуется.`} key={assetId}><strong>{label}</strong><small>{variants.length ? `${effect} · шанс от ${info.chance}%` : greyRequirement(assetId)}</small></button>;
-    })}</div>
+    })}</details>
 
     <div className="action-group g-defence"><h3 className="group-title">🛡️ Защита и репутация</h3><StaticAction action={cleanupAction} label={cleanup.label} tooltip={cleanup.tooltip} busy={busy} onAction={onAction} /><StaticAction action={find("buy_roof")} label={`🛡️ Купить Крышу (${roofCost(me, game)}$)`} tooltip={`Потратить 1 обычное действие и ${roofCost(me, game)}$. Цена растёт на 1$ каждые два раунда. Крыша — единственная защита в игре: она гасит направленный на вас эффект другого игрока (карту, рэкет, санкцию, взлом), попытку отобрать роль и любое начисление скандалов целиком. Последствия ваших собственных решений она не отменяет, но может застраховать провал вашей серой операции. Лимит 2, у Мафиози 3.`} busy={busy} onAction={onAction} /></div>
     <button className="end-turn" disabled={busy || !endTurn} onClick={() => endTurn && void onAction(endTurn)} title="Завершить текущий ход. Неиспользованные обычные действия пропадут, кроме разрешённого переносимого действия; затем сервер выполнит ходы ботов.">✅ Завершить ход</button>
@@ -769,9 +803,32 @@ function LogExportButtons({ room, meta, roomId, password, playerId, replayable }
   </div>;
 }
 
-function Chronicle({ room, game, meta }: { room: RoomView; game: GameState; meta: CityMeta }) {
+// A permanent column for something read between turns cost the board a third of its width. It is a
+// centred popup now — full-screen on a phone, like the rules — and it can open itself while the
+// opponents play, which is the only time anybody reads it.
+function ChronicleModal({ room, game, meta, autoLog, onAutoLog, onClose }: {
+  room: RoomView;
+  game: GameState;
+  meta: CityMeta;
+  autoLog: boolean;
+  onAutoLog: (enabled: boolean) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
   const { status, copy, download } = useGameLogExport(room, meta);
-  return <aside className="city-log"><h2>📜 Хроника <small>события партии</small></h2>
+  return <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+    <aside className="city-log chronicle-modal panel" role="dialog" aria-modal="true" aria-label="Хроника партии" onMouseDown={event => event.stopPropagation()}>
+    <h2>📜 Хроника <small>события партии</small>
+      <button className="chronicle-close" onClick={onClose} aria-label="Закрыть хронику">✕</button>
+    </h2>
+    <label className="chronicle-auto" title="Открывать хронику автоматически, пока ходят соперники, и закрывать её на вашем ходу.">
+      <input type="checkbox" checked={autoLog} onChange={event => onAutoLog(event.target.checked)} />
+      Открывать не в свой ход
+    </label>
     {/* Also mid-game: a room lost to an expiry or a restart takes the whole match with it. */}
     <div className="log-export">
       <button onClick={() => void copy()} title="Скопировать журнал партии на текущий момент.">📋 Копировать</button>
@@ -782,7 +839,7 @@ function Chronicle({ room, game, meta }: { room: RoomView; game: GameState; meta
       if (segment.kind === "player") return <span className="log-name" style={{ color: segment.color }} key={index}>{segment.text}</span>;
       if (segment.kind === "num") return <span className={`log-num log-num-${segment.tone}`} key={index}>{segment.text}</span>;
       return <span key={index}>{segment.text}</span>;
-    })}</p>)}</div></aside>;
+    })}</p>)}</div></aside></div>;
 }
 
 function RulesModal({ html, onClose }: { html: string; onClose: () => void }) {

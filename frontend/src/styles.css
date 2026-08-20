@@ -279,6 +279,15 @@ h1, h2, h3, p { margin-top: 0; }
 .token-label { color: var(--city-dim); font-size: 8px; text-transform: uppercase; }.token-dots { display: flex; gap: 3px; }.token-dots i { width: 9px; height: 9px; background: #26384c; border-radius: 50%; }.token-dots i.on { background: #58a6ff; box-shadow: 0 0 7px #58a6ff; }
 .action-group { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding-top: 2px; }.action-group .group-title, .action-group > p, .action-group .role-market, .action-group .role-powers { grid-column: 1 / -1; }
 .action-group > button { min-height: 35px; padding: 6px 8px; font-size: 11px; }
+/* Two groups fold (<details>): the flex `group-title` on a <summary> drops the native disclosure
+   marker, so put one back, and force a block box when closed so a grid quirk cannot leak the
+   folded content onto the screen. */
+details.action-group > summary { cursor: pointer; list-style: none; }
+details.action-group > summary::-webkit-details-marker { display: none; }
+details.action-group > summary::after { content: "▾"; margin-left: auto; color: var(--city-dim); font-size: 10px; }
+details.action-group:not([open]) { display: block; }
+details.action-group:not([open]) > summary { margin-bottom: 0; }
+details.action-group:not([open]) > summary::after { content: "▸"; }
 .g-city { --accent: #58a6ff; }.g-roles { --accent: #e3b341; }.g-grey { --accent: #d65d86; }.g-defence { --accent: #58a6ff; }
 .g-grey .described-action { display: flex; min-height: 49px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; text-align: left; }.g-grey .described-action strong { color: var(--text); font-size: 10px; }.g-grey .described-action small { color: var(--city-dim); font-size: 8.5px; line-height: 1.3; }
 .city-actions button:not(:disabled) { background: linear-gradient(180deg, color-mix(in srgb, var(--accent, #58a6ff), transparent 87%), var(--city-panel-2)); border-color: color-mix(in srgb, var(--accent, #58a6ff), #30363d 45%); }
@@ -293,6 +302,16 @@ h1, h2, h3, p { margin-top: 0; }
 .end-turn { width: 100%; color: #e8fff0; border-color: #4ebd7b !important; font-weight: 800; }
 
 .city-log h2 { display: flex; align-items: baseline; gap: 8px; }.city-log h2 small { color: var(--city-dim); font-size: 9px; font-weight: 400; text-transform: none; }
+/* The chronicle popup: centred and capped on a desktop, full-screen on a phone — the same shape
+   the rules modal uses, because it is read the same way. */
+.chronicle-modal { position: relative; width: min(560px, 94vw); max-height: 86vh; overflow: hidden auto; }
+.chronicle-modal h2 { position: relative; padding-right: 26px; }
+.chronicle-close { position: absolute; top: -2px; right: 0; padding: 0 5px; border: 0; background: none; color: var(--city-dim); font-size: 14px; cursor: pointer; }
+.chronicle-close:hover { color: #fff; }
+.chronicle-auto { display: flex; align-items: center; gap: 5px; margin: 0 0 6px; color: var(--city-dim); font-size: 10px; cursor: pointer; }
+.log-open { display: flex; width: 100%; align-items: center; justify-content: center; gap: 6px; padding: 8px; border: 1px solid var(--city-line); border-radius: 10px; background: var(--city-panel); color: var(--city-text); font-size: 11px; font-weight: 700; cursor: pointer; }
+.log-open:hover { border-color: #e3b341; }
+.log-badge { padding: 1px 5px; border-radius: 8px; background: #e3b341; color: #111; font-size: 9px; font-style: normal; font-weight: 800; }
 .log-scroll { display: flex; max-height: 300px; padding-right: 3px; flex-direction: column; gap: 4px; overflow-y: auto; scrollbar-width: thin; }
 .log-entry { margin: 0; padding: 6px 7px; color: var(--text); background: rgba(255,255,255,.025); border-left: 3px solid #51617c; border-radius: 3px; font-size: 11px; line-height: 1.4; }
 .log-entry b { margin-right: 4px; color: #7d8aa0; font-size: 9px; }
@@ -407,12 +426,14 @@ h1, h2, h3, p { margin-top: 0; }
   .city-layout[data-mobile-tab="players"] .city-cards .group-hint,
   .city-layout[data-mobile-tab="players"] .card-rule-market { display: none; }
 
-  .city-layout[data-mobile-tab="actions"] > .city-side,
-  .city-layout[data-mobile-tab="log"] > .city-side { display: block; }
-  .city-layout[data-mobile-tab="actions"] .city-log { display: none; }
-  .city-layout[data-mobile-tab="log"] .city-actions { display: none; }
-  .city-layout[data-mobile-tab="log"] .city-log { display: block; }
-  .city-layout[data-mobile-tab="log"] .log-scroll { max-height: none; }
+  .city-layout[data-mobile-tab="actions"] > .city-side { display: block; }
+  /* The chronicle tab opens the popup instead of switching columns, and on a phone the popup is
+     the whole screen — same shape as the rules modal. */
+  .chronicle-modal { width: 100vw; max-width: none; max-height: 100vh; height: 100vh; border-radius: 0; }
+  .chronicle-modal .log-scroll { max-height: none; }
+  /* The opener sits under the decision panel, which only the "Ход" tab shows. */
+  .city-layout[data-mobile-tab] .log-open { display: none; }
+  .city-layout[data-mobile-tab="actions"] .log-open { display: flex; }
 
   /* Portrait is one narrow column, so nothing inside a panel may split in two. These repeat the
      ≤600px rules on purpose: a 601–720px portrait screen (small tablet, large phone) misses that
