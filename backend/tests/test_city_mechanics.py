@@ -106,7 +106,6 @@ def test_a_card_cannot_be_bought_without_actions_left() -> None:
     player.money = 20
     player.influence = 10
     state.actions_left = 0
-    state.investment_actions = 0
 
     legal = engine.legal_actions(state, player.id)
     assert not any(action["type"] == "buy_action_card" for action in legal)
@@ -316,49 +315,20 @@ def test_journalist_earns_two_money_per_standing_rival_scandal() -> None:
     assert settled_sources(state)[journalist.id]["journalist"] == 6
 
 
-def test_mafia_levy_needs_only_presence_in_the_district() -> None:
-    engine = CityEngine()
-    state = create_game_from_catalog(
-        "mafia-levy",
-        [PlayerSetup("p1", "Mafia"), PlayerSetup("p2", "Victim"), PlayerSetup("p3", "Baron")],
-        seed=7,
-    )
-    mafia, victim, baron = state.players
-    mafia.role = "mafia"
-    # Two shadow objects for the mafia, one for the victim — and a third player owns more than both,
-    # so the old strict-majority rule would have collected nothing.
-    give_asset(state, mafia, "underground_casino")
-    give_asset(state, mafia, "cash")
-    give_asset(state, victim, "market")
-    give_asset(state, victim, "housing")
-    give_asset(state, victim, "pharmacy_chain")
-    for card_id in ("underground_casino", "cash", "market"):
-        give_asset(state, baron, card_id)
-
-    for _ in state.players:
-        state = run(engine, state, "end_turn")
-
-    sources = settled_sources(state)
-    assert sources[mafia.id]["mafia_tribute"] == 2  # 2$ for the victim's single shadow object
-    assert sources[victim.id]["mafia_tribute"] == -2
-    assert sources[baron.id]["mafia_tribute"] == 0  # the baron outnumbers the mafia, so pays nothing
-
-
-def test_capitalist_and_politician_powers() -> None:
+def test_politician_tax_charges_influence_and_pays_per_city_object() -> None:
     engine = CityEngine()
     state = make_state()
     player = state.current_player
-    player.role = "capitalist"
+    player.role = "politician"
     player.influence = 10
-    state = run(engine, state, "use_role_power", {"power": "capitalist_financing"})
-    assert state.current_player.influence == 7
-    assert state.investment_actions == 1
+    give_asset(state, player, "delivery")
+    give_asset(state, state.players[1], "media")
 
-    state.current_player.role = "politician"
-    state.current_player.scandals = 2
-    state = run(engine, state, "use_role_power", {"power": "politician_cleanup"})
-    assert state.current_player.scandals == 1
-    assert state.current_player.influence == 5
+    state = run(engine, state, "use_role_power", {"power": "politician_tax", "district": "residential"})
+    player = state.current_player
+
+    # Every residential object on the table pays, including the opponent's.
+    assert (player.influence, player.money) == (6, 12)
 
 
 def test_journalist_powers_use_scandal_rules() -> None:
@@ -657,28 +627,6 @@ def test_compromat_leak_is_absorbed_by_a_roof() -> None:
     assert hit.roofs == 0
     # The attacker still paid: the influence and the scandals are the price of the attempt.
     assert state.current_player.influence == 10 - COMPROMAT_INFLUENCE
-
-
-def test_fraudster_forgery_is_deterministic() -> None:
-    engine = CityEngine()
-    state = make_state()
-    player = state.current_player
-    player.role = "fraudster"
-    player.influence = 10
-    player.scandals = 0
-    state.actions_left = 4
-    state.rng.state = 0
-    state = run(
-        engine,
-        state,
-        "use_role_power",
-        {"power": "fraudster_forge", "role_id": "capitalist"},
-    )
-    assert state.current_player.pending_role == "capitalist"
-    # Forgery now costs a single action, 5 influence and 2 scandals.
-    assert state.current_player.influence == 5
-    assert state.current_player.scandals == 2
-    assert state.actions_left == 3
 
 
 @pytest.mark.parametrize("card_id", list(load_catalog().action_cards))
@@ -995,7 +943,6 @@ def test_selling_is_offered_with_an_empty_action_counter() -> None:
     player = state.current_player
     owned = give_asset(state, player, "delivery")
     state.actions_left = 0
-    state.investment_actions = 0
 
     sales = [action for action in engine.legal_actions(state, player.id) if action["type"] == "sell_asset"]
     assert [action["payload"]["asset_uid"] for action in sales] == [owned.uid]
@@ -1179,7 +1126,6 @@ def test_market_reroll_costs_money_but_no_action() -> None:
     player = state.current_player
     player.money = 10
     state.actions_left = 0
-    state.investment_actions = 0
     before = [item.card_id for item in state.market]
 
     state = run(engine, state, "reroll_market")
@@ -1201,7 +1147,6 @@ def test_project_reroll_redeals_the_whole_board_for_money_and_an_action() -> Non
     player.money = 100
     player.influence = 2
     state.actions_left = 2
-    state.investment_actions = 0
     before = list(state.project_board)
     deck_size = len(state.project_deck)
 
@@ -1227,7 +1172,6 @@ def test_project_reroll_needs_an_action() -> None:
     state = make_state()
     state.current_player.money = 100
     state.actions_left = 0
-    state.investment_actions = 0
 
     legal = engine.legal_actions(state, state.current_player.id)
     assert not any(action["type"] == "reroll_projects" for action in legal)

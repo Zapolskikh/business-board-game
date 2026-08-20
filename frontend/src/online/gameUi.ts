@@ -28,18 +28,15 @@ export const difficultyLabels: Record<string, string> = {
 };
 
 export const powerLabels: Record<string, string> = {
-  capitalist_financing: "Ускоренное финансирование",
   politician_tax: "Налог района",
   politician_cleanup: "Урегулировать скандал",
   journalist_inflate: "Раздуть историю",
   journalist_publish: "Опубликовать расследование",
   mafia_racket: "Рэкет",
-  mafia_sweep: "Сжечь связи",
   mafia_cleanup: "Замять дело",
   military_sanction: "Санкции",
   fraudster_cleanup: "Снять скандал",
   fraudster_crypto_scam: "Криптоскам",
-  fraudster_forge: "Подделать документы",
 };
 
 export const greyOperationLabels: Record<string, string> = {
@@ -232,7 +229,7 @@ export function marketPrice(asset: AssetMeta, item: MarketAsset): number {
 // pays the discounted price too, because the engine checks the copied role as well.
 export function roofCost(player: PlayerState, game: GameState): number {
   const base = 3 + Math.floor((game.round_number - 1) / 2);
-  return player.role === "mafia" || player.copied_role === "mafia" ? base - 1 : base;
+  return player.role === "mafia" ? base - 1 : base;
 }
 
 export function capacityLabel(player: PlayerState): string {
@@ -445,11 +442,9 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       return [txt("🎬 Партия началась")];
     case "turn_started": {
       const actions = numberValue(data.actions);
-      const invest = numberValue(data.investment_actions);
       return lead(
         txt(` начинает ход · раунд ${numberValue(data.round_number)} · `),
         num(`${actions}⚡`, "neutral"),
-        ...(invest > 0 ? [txt(" +"), num(`${invest}💼`, "neutral")] : []),
       );
     }
     case "turn_ended":
@@ -688,7 +683,6 @@ const forecastLabels: Record<string, string> = {
   administrative: "🏛️ Административный ресурс",
   maintenance: "🔧 Содержание",
   antitrust: "⚖️ Антимонопольное",
-  mafia_tribute: "🕵️ Дань",
   journalist: "📰 Публикации",
   debt: "🏦 Кредит",
   news: "📰 Новости",
@@ -776,9 +770,6 @@ export function assetEffectLines(
   const lines: AssetEffectLine[] = [];
   const districtTitle = (id: string): string => meta.districts.find(item => item.id === id)?.title ?? id;
   const roleTitle = (id: string): string => meta.roles.find(item => item.id === id)?.title ?? id;
-  // Income and influence are paid out when the round is settled, after a forged mandate has
-  // already expired (the engine clears copied_role when the turn ends), so only the main role
-  // counts for these lines — unlike purchase discounts, which resolve during the turn.
   const hasRole = (role: string): boolean => owner.role === role;
   const hasLink = (district: string): boolean =>
     districtCount(owner, district, assets) > 0
@@ -901,8 +892,7 @@ export function assetHints(
   const active = options?.active ?? false;
   const roleTitle = (id: string): string => meta.roles.find(item => item.id === id)?.title ?? id;
   const districtTitle = (id?: string): string => meta.districts.find(item => item.id === id)?.title ?? id ?? "";
-  // A forged mandate counts: the engine's `has_role` accepts the copied role for every power.
-  const hasRole = (id: string): boolean => owner.role === id || owner.copied_role === id;
+  const hasRole = (id: string): boolean => owner.role === id;
   const hints: AssetHint[] = [];
 
   const grey = greyOperationInfo[asset.id];
@@ -1013,7 +1003,6 @@ export function activeBonuses(player: PlayerState, game: GameState, meta: CityMe
   if (player.debt > 0) result.push({ text: `Мостовой кредит: −${player.debt}$ при ближайшей выплате.`, active: false });
   if (player.role_shields > 0) result.push({ text: `Судебный запрет защитит роль: ${player.role_shields}.`, active: true });
   if (player.scandal_shields > 0) result.push({ text: `Репутационный резерв отменит следующее получение скандалов.`, active: true });
-  if (player.copied_role) result.push({ text: `Временный мандат: ${meta.roles.find(item => item.id === player.copied_role)?.title ?? player.copied_role}.`, active: true });
   // A finished project can neither be blocked nor confiscated, so its perk is always on.
   for (const projectId of player.projects) {
     const project = meta.projects.find(item => item.id === projectId);

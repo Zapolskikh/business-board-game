@@ -103,6 +103,11 @@ AUTOMATION_COST = 6
 PROJECT_REROLL_MONEY = 10
 # An action card is a blind draw that costs an action, so it competes with the basic actions.
 ACTION_CARD_COST = 3
+# What a point costs when a card buys it outright: worse than an object (2$) and much better than a
+# hoarded point (10$), and it needs no slot — which is the whole point. Six slots cap the object
+# channel, so a full tableau had nowhere to put money: two measured matches ended with 248$ and 864$
+# unspent across the table, 24 and 86 points nobody made a decision about.
+POINTS_CARD_RATE = 5
 # What discarding a card returns, so a bad draw is not a dead 3$.
 CARD_DISCARD_VALUE = 2
 # What the tax manoeuvre pays to run money into influence. It has to beat the discard — a card that

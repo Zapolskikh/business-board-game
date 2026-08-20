@@ -96,7 +96,7 @@ def test_backend_catalog_is_complete_and_can_create_a_game() -> None:
     assert len(catalog.districts) == 6
     assert len(catalog.roles) == 6
     assert len(catalog.assets) == 71
-    assert len(catalog.action_cards) == 34
+    assert len(catalog.action_cards) == 37
     assert len(catalog.deck_project_ids()) == 40
     assert len(catalog.repeatable_project_ids()) == 2
     assert len(state.market) == 6

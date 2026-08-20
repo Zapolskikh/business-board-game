@@ -169,11 +169,9 @@ def _action_utility(
         # in rounds 14-15: epics traded down to commons, and the free rerolls used as a place to
         # dump a turn. A small penalty keeps any useful action ahead of passing without paying
         # real points for the privilege of moving.
-        return -0.5 if state.actions_left > 0 or state.investment_actions > 0 else 0.0
+        return -0.5 if state.actions_left > 0 else 0.0
     if action_type == "grey_operation":
         return _grey_operation_utility(engine, state, player, payload, profile)
-    if action_type == "use_role_power" and payload.get("power") == "fraudster_forge":
-        return _forgery_utility(engine, state, player, payload, profile)
 
     before = _position_value(engine, state, player, profile)
     opponents_before = sum(engine.score(other) for other in state.players if other.id != player.id)
@@ -541,28 +539,16 @@ def _grey_operation_utility(
     return chance * success_value - (1 - chance) * failure_cost - scandal_cost - protection_cost
 
 
-def _forgery_utility(
-    engine: CityEngine,
-    state: GameState,
-    player: PlayerState,
-    payload: dict[str, Any],
-    profile: PolicyProfile,
-) -> float:
-    role_id = str(payload["role_id"])
-    chance = min(0.9, 0.5 + engine.district_count(player, "tech") * 0.1)
-    success = _role_utility(engine, state, player, role_id)
-    failure = 12 + player.scandals * profile.risk_penalty
-    specialist = 5 * profile.role_focus if role_id == player.preferred_role else 0
-    return chance * (success + specialist) - (1 - chance) * failure - 5
-
-
 def _card_value(engine: CityEngine, card_id: str, player: PlayerState) -> float:
     card = engine.action_card(card_id)
     if card.kind in {"clean", "deep_clean"}:
         return min(card.value, player.scandals) * 3
     if card.kind == "roof":
         return 5
-    if card.kind in {"extra_action", "investment_action"}:
+    if card.kind == "extra_action":
+        return card.value * 4
+    if card.kind == "district_points":
+        # Scores straight away, so it is worth its face value in points rather than a guess.
         return card.value * 4
     if card.kind == "capacity":
         # A free slot is worth the object that will fill it, and by the time cards are flowing the

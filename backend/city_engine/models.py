@@ -100,12 +100,13 @@ class PlayerState:
     scandals: int = 0
     roofs: int = 0
     role: str | None = None
-    copied_role: str | None = None
-    pending_role: str | None = None
     jail_turns: int = 0
     assets: list[OwnedAsset] = field(default_factory=list)
     hand: list[HeldCard] = field(default_factory=list)
     projects: list[str] = field(default_factory=list)
+    # Points that come from neither projects nor objects — today the cards that buy score outright.
+    # Deliberately one general field: a pseudo-project would have broken every project statistic.
+    bonus_points: int = 0
     capacity: int = 3
     scandal_gained_this_round: int = 0
     debt: int = 0
@@ -137,12 +138,11 @@ class PlayerState:
             "scandals": self.scandals,
             "roofs": self.roofs,
             "role": self.role,
-            "copied_role": self.copied_role,
-            "pending_role": self.pending_role,
             "jail_turns": self.jail_turns,
             "assets": [asset.to_dict() for asset in self.assets],
             "hand": [card.to_dict() for card in self.hand],
             "projects": list(self.projects),
+            "bonus_points": self.bonus_points,
             "capacity": self.capacity,
             "scandal_gained_this_round": self.scandal_gained_this_round,
             "debt": self.debt,
@@ -171,12 +171,11 @@ class PlayerState:
             scandals=int(data.get("scandals", 0)),
             roofs=int(data.get("roofs", 0)),
             role=data.get("role"),
-            copied_role=data.get("copied_role"),
-            pending_role=data.get("pending_role"),
             jail_turns=int(data.get("jail_turns", 0)),
             assets=[OwnedAsset.from_dict(item) for item in data.get("assets", [])],
             hand=[HeldCard.from_dict(item) for item in data.get("hand", [])],
             projects=[str(item) for item in data.get("projects", [])],
+            bonus_points=int(data.get("bonus_points", 0)),
             capacity=int(data.get("capacity", 3)),
             scandal_gained_this_round=int(data.get("scandal_gained_this_round", 0)),
             debt=int(data.get("debt", 0)),
@@ -235,7 +234,6 @@ class GameState:
     turns_taken_in_round: int = 0
     turn_serial: int = 0
     actions_left: int = 3
-    investment_actions: int = 0
     event_id: str = "stable_year"
     market_deck: list[str] = field(default_factory=list)
     market: list[MarketAsset] = field(default_factory=list)
@@ -334,7 +332,7 @@ class GameState:
         for player in self.players:
             if player.difficulty not in BOT_DIFFICULTIES:
                 raise StateValidationError(f"unknown bot difficulty: {player.difficulty}")
-            for role in (player.role, player.copied_role, player.pending_role, player.preferred_role):
+            for role in (player.role, player.preferred_role):
                 if role is not None and role not in ROLE_IDS:
                     raise StateValidationError(f"unknown role: {role}")
             if player.capacity < 3 or player.capacity > MAX_CAPACITY:
@@ -374,7 +372,6 @@ class GameState:
             "turns_taken_in_round": self.turns_taken_in_round,
             "turn_serial": self.turn_serial,
             "actions_left": self.actions_left,
-            "investment_actions": self.investment_actions,
             "event_id": self.event_id,
             "players": [player.to_dict() for player in self.players],
             "market_deck": list(self.market_deck),
@@ -409,7 +406,6 @@ class GameState:
             turns_taken_in_round=int(data.get("turns_taken_in_round", 0)),
             turn_serial=int(data.get("turn_serial", 0)),
             actions_left=int(data.get("actions_left", 3)),
-            investment_actions=int(data.get("investment_actions", 0)),
             event_id=str(data.get("event_id", "stable_year")),
             players=[PlayerState.from_dict(item) for item in data["players"]],
             market_deck=[str(item) for item in data.get("market_deck", [])],

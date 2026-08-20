@@ -33,6 +33,7 @@ from city_engine.constants import (
     MAX_CAPACITY,
     MAX_REPEATABLE_PROJECTS,
     MONEY_PER_POINT,
+    POINTS_CARD_RATE,
     PROJECT_BOARD_SIZE,
     PROJECT_REROLL_MONEY,
     ROLE_IDS,
@@ -141,7 +142,6 @@ class CityEngine:
     def _candidate_commands(self, state: GameState, actor_id: str) -> list[Command]:
         player = state.current_player
         can_act = state.actions_left > 0
-        can_invest = can_act or state.investment_actions > 0
         candidates = [Command(type="end_turn", actor_id=actor_id)]
         if can_act:
             candidates.append(Command(type="basic_action", actor_id=actor_id, payload={"kind": "work"}))
@@ -167,7 +167,7 @@ class CityEngine:
                     and player.influence
                     >= (state.role_price * 3 if self.role_holder(state, role_id) else state.role_price)
                 )
-        if can_invest:
+        if can_act:
             if player.capacity < MAX_CAPACITY and player.money >= CAPACITY_COSTS.get(player.capacity, 10**9):
                 candidates.append(Command(type="buy_capacity", actor_id=actor_id))
             if not player.automation_owned and player.money >= AUTOMATION_COST:
@@ -238,15 +238,6 @@ class CityEngine:
                     )
                     for district in DISTRICT_IDS
                 )
-            elif card.kind == "copy_role":
-                candidates.extend(
-                    Command(
-                        type="play_action_card",
-                        actor_id=actor_id,
-                        payload={"card_uid": held.uid, "role_id": role_id},
-                    )
-                    for role_id in ROLE_IDS
-                )
             elif card.kind == "project":
                 candidates.extend(
                     Command(
@@ -309,14 +300,6 @@ class CityEngine:
     def _role_power_candidates(self, state: GameState, actor_id: str) -> list[Command]:
         player = state.current_player
         candidates: list[Command] = []
-        if self.has_role(player, "capitalist"):
-            candidates.append(
-                Command(
-                    type="use_role_power",
-                    actor_id=actor_id,
-                    payload={"power": "capitalist_financing"},
-                )
-            )
         if self.has_role(player, "politician"):
             candidates.append(
                 Command(
@@ -346,13 +329,6 @@ class CityEngine:
                     for power in ("journalist_inflate", "journalist_publish")
                 )
         if self.has_role(player, "mafia"):
-            candidates.append(
-                Command(
-                    type="use_role_power",
-                    actor_id=actor_id,
-                    payload={"power": "mafia_sweep"},
-                )
-            )
             candidates.extend(
                 Command(
                     type="use_role_power",
@@ -396,19 +372,17 @@ class CityEngine:
                 )
                 for amount in range(1, 7)
             )
-            candidates.extend(
-                Command(
-                    type="use_role_power",
-                    actor_id=actor_id,
-                    payload={"power": "fraudster_forge", "role_id": role_id},
-                )
-                for role_id in ROLE_IDS
-            )
         return candidates
 
     @staticmethod
     def has_role(player: PlayerState, role_id: str) -> bool:
-        return player.role == role_id or player.copied_role == role_id
+        """Roles are held, never borrowed: forging and copying are gone, so this is one comparison.
+
+        It used to also accept `copied_role`, which meant every rule in the engine had two ways to
+        be true and the client had two role fields to render — for a mechanic used three times in
+        eight measured player-games, every one of them a no-op.
+        """
+        return player.role == role_id
 
     @staticmethod
     def role_holder(state: GameState, role_id: str) -> PlayerState | None:
@@ -622,10 +596,7 @@ class CityEngine:
         card_discount = int(state.turn_flags.get("market_discount", 0))
         return max(1, asset.cost - event_discount - role_discount - logistics_discount - card_discount)
 
-    def _spend_action(self, state: GameState, *, investment_allowed: bool = False) -> None:
-        if investment_allowed and state.investment_actions > 0:
-            state.investment_actions -= 1
-            return
+    def _spend_action(self, state: GameState) -> None:
         if state.actions_left < 1:
             raise IllegalActionError("no actions left")
         state.actions_left -= 1
@@ -792,7 +763,7 @@ class CityEngine:
             raise IllegalActionError("maximum capacity reached")
         if player.money < cost:
             raise IllegalActionError("not enough money for capacity")
-        self._spend_action(state, investment_allowed=True)
+        self._spend_action(state)
         player.money -= cost
         player.capacity += 1
         state.append_event("capacity_bought", player.id, cost=cost, capacity=player.capacity)
@@ -867,7 +838,7 @@ class CityEngine:
         cost = self.asset_price(state, player, asset.id)
         if player.money < cost:
             raise IllegalActionError("not enough money for the asset")
-        self._spend_action(state, investment_allowed=True)
+        self._spend_action(state)
         before = self._resource_snapshot(state)
         player.money -= cost
         self._gain_asset(state, player, market_asset, asset)
@@ -947,7 +918,7 @@ class CityEngine:
             raise IllegalActionError("the automation token is already owned")
         if player.money < AUTOMATION_COST:
             raise IllegalActionError("not enough money for the automation token")
-        self._spend_action(state, investment_allowed=True)
+        self._spend_action(state)
         player.money -= AUTOMATION_COST
         player.automation_owned = True
         target = self._optional_payload_string(command, "asset_uid")
@@ -1190,6 +1161,8 @@ class CityEngine:
             raise IllegalActionError("media campaign requires 2 money")
         if card.kind == "cash_to_influence" and player.money < CASH_TO_INFLUENCE_MONEY:
             raise IllegalActionError(f"this card requires {CASH_TO_INFLUENCE_MONEY} money")
+        if card.kind == "buy_points" and player.money < card.value * POINTS_CARD_RATE:
+            raise IllegalActionError(f"this card requires {card.value * POINTS_CARD_RATE} money")
         if card.kind == "capacity" and player.capacity >= MAX_CAPACITY:
             raise IllegalActionError("the business is already at the slot limit")
         if card.kind in {"district_cash", "zoning", "develop"}:
@@ -1201,10 +1174,6 @@ class CityEngine:
                 raise IllegalActionError("the selected district needs an owned object")
             if card.kind == "develop" and (count < 2 or player.district_levels[district] >= 2):
                 raise IllegalActionError("the selected district cannot be developed")
-        if card.kind == "copy_role":
-            role_id = self._payload_string(command, "role_id")
-            if role_id not in ROLE_IDS or role_id == player.role:
-                raise IllegalActionError("temporary mandate requires another valid role")
         if card.kind == "market_discount" and (len(player.assets) >= player.capacity or not state.market):
             raise IllegalActionError("there is no available object purchase")
         if card.kind == "automation" and player.automation_owned:
@@ -1259,12 +1228,16 @@ class CityEngine:
             district = str(command.payload["district"])
             player.district_levels[district] += 1
             player.influence += card.value
-        elif kind == "copy_role":
-            player.copied_role = str(command.payload["role_id"])
+        elif kind == "buy_points":
+            # The one sink that does not need a slot, which is why it exists at all.
+            player.money -= card.value * POINTS_CARD_RATE
+            player.bonus_points += card.value
+        elif kind == "district_points":
+            # Rewards a wide portfolio, which is the one thing the mono-district meta never gives.
+            spread = sum(1 for district in DISTRICT_IDS if self.district_count(player, district) >= 2)
+            player.bonus_points += spread * card.value
         elif kind == "extra_action":
             state.actions_left += card.value
-        elif kind == "investment_action":
-            state.investment_actions += card.value
         elif kind == "capacity":
             # A slot, not money: the object it will hold turns 2$ into a point, so with the wallet
             # in surplus and six slots the cap, the slot is the scarce half of the purchase.
@@ -1403,14 +1376,7 @@ class CityEngine:
         player = state.current_player
         power = self._payload_string(command, "power")
         before = self._resource_snapshot(state)
-        if power == "capitalist_financing":
-            self._require_role(player, "capitalist")
-            self._once_per_turn(state, power)
-            if player.influence < 3:
-                raise IllegalActionError("accelerated financing requires 3 influence")
-            player.influence -= 3
-            state.investment_actions += 1
-        elif power == "politician_tax":
+        if power == "politician_tax":
             self._require_role(player, "politician")
             self._once_per_turn(state, power)
             district = self._payload_string(command, "district")
@@ -1449,14 +1415,6 @@ class CityEngine:
                 self.add_scandal(state, target, 1)
         elif power == "mafia_racket":
             self._mafia_racket(state, command)
-        elif power == "mafia_sweep":
-            self._require_role(player, "mafia")
-            self._once_per_turn(state, power)
-            if player.roofs < 1:
-                raise IllegalActionError("roof sweep requires a roof")
-            self._spend_action(state)
-            for target in state.players:
-                target.roofs = max(0, target.roofs - 1)
         elif power == "mafia_cleanup":
             self._mafia_cleanup(state, command)
         elif power == "military_sanction":
@@ -1469,8 +1427,6 @@ class CityEngine:
             player.scandals -= 1
         elif power == "fraudster_crypto_scam":
             self._fraudster_crypto_scam(state, command)
-        elif power == "fraudster_forge":
-            self._fraudster_forge(state, command)
         else:
             raise InvalidCommandError(f"unsupported role power: {power}")
         state.append_event(
@@ -1479,9 +1435,6 @@ class CityEngine:
             power=power,
             target_id=command.payload.get("target_id"),
             district=command.payload.get("district"),
-            # Deltas only cover money/influence/scandals/roofs, so an extra action was invisible:
-            # two agents in two matches independently concluded the capitalist power did nothing.
-            investment_actions=state.investment_actions,
             actions_left=state.actions_left,
             deltas=self._resource_deltas(state, before),
         )
@@ -1654,20 +1607,6 @@ class CityEngine:
         reduction = self.effect_total(player, "greyScandalReduction")
         self.add_scandal(state, player, max(0, amount - reduction))
 
-    def _fraudster_forge(self, state: GameState, command: Command) -> None:
-        player = state.current_player
-        self._require_role(player, "fraudster")
-        self._once_per_turn(state, "fraudster_forge")
-        role_id = self._payload_string(command, "role_id")
-        if role_id not in ROLE_IDS:
-            raise InvalidCommandError(f"unknown role: {role_id}")
-        if player.influence < 5:
-            raise IllegalActionError("forgery requires 5 influence")
-        self._spend_action(state)
-        player.influence -= 5
-        self.add_scandal(state, player, 2)
-        player.pending_role = role_id
-
     GREY_ASSET_IDS = ("cash", "market", "crypto", "datacenter", "influence_broker")
     GREY_TARGETED_IDS = ("market", "datacenter", "influence_broker")
     GREY_BASE_CHANCE = {
@@ -1809,8 +1748,6 @@ class CityEngine:
             return
         lost_role = target.role
         target.role = None
-        target.copied_role = None
-        target.pending_role = None
         # The seat opens at the free price: a stripped role is not held by anybody any more, so the
         # threefold takeover no longer applies and the leak has actually changed the board.
         state.append_event("role_stripped", player.id, target_id=target.id, role_id=lost_role)
@@ -1895,8 +1832,6 @@ class CityEngine:
         lost_role = player.role
         jailed = next_value >= limit + 1
         player.role = None
-        player.copied_role = None
-        player.pending_role = None
         if jailed:
             player.scandals = 3
             player.roofs = max(0, player.roofs - 1)
@@ -1927,7 +1862,6 @@ class CityEngine:
         if player.jail_turns < 1:
             return
         state.actions_left = 0
-        state.investment_actions = 0
         state.append_event("player_jailed", player.id, round_number=state.round_number)
         self._end_turn(state, command)
 
@@ -1937,7 +1871,6 @@ class CityEngine:
             player.banked_actions = 1
         else:
             player.banked_actions = 0
-        player.copied_role = None
         state.turn_flags = {}
         state.append_event("turn_ended", player.id, round_number=state.round_number)
 
@@ -1954,7 +1887,6 @@ class CityEngine:
         if state.round_number >= state.max_rounds:
             state.status = "finished"
             state.actions_left = 0
-            state.investment_actions = 0
             state.final_scores = {player.id: self.score(player) for player in state.players}
             state.append_event(
                 "game_finished",
@@ -2001,8 +1933,6 @@ class CityEngine:
     def _prepare_current_player(self, state: GameState) -> None:
         player = state.current_player
         jailed = player.jail_turns > 0
-        player.copied_role = player.pending_role
-        player.pending_role = None
         player.jail_turns = max(0, player.jail_turns - 1)
         player.turns += 1
         if player.role is None and player.scandals > 0:
@@ -2012,7 +1942,6 @@ class CityEngine:
         base_actions = 1 if jailed else (4 if player.role == "fraudster" else 3)
         bonus = min(1, self.effect_total(player, "extraActions"))
         state.actions_left = base_actions + (0 if jailed else bonus + player.banked_actions)
-        state.investment_actions = min(1, self.effect_total(player, "extraInvestmentActions"))
         player.banked_actions = 0
         state.turn_flags = {}
         state.append_event(
@@ -2020,7 +1949,6 @@ class CityEngine:
             player.id,
             round_number=state.round_number,
             actions=state.actions_left,
-            investment_actions=state.investment_actions,
         )
 
     def _rotate_expired_market(self, state: GameState) -> None:
@@ -2071,7 +1999,6 @@ class CityEngine:
             player.debt = 0
             player.zoning_district = None
             player.scandal_gained_this_round = 0
-            player.copied_role = None
             player.automation_disabled = False
             for asset in player.assets:
                 asset.blocked = False
@@ -2096,34 +2023,9 @@ class CityEngine:
         breakdowns = {player.id: self._income_breakdown(state, player) for player in state.players}
         incomes = {player_id: sum(item.values()) for player_id, item in breakdowns.items()}
         income_sources: dict[str, dict[str, int]] = {
-            player.id: {**breakdowns[player.id], "mafia_tribute": 0, "journalist": 0, "debt": -player.debt}
+            player.id: {**breakdowns[player.id], "journalist": 0, "debt": -player.debt}
             for player in state.players
         }
-        for mafia in [player for player in state.players if player.role == "mafia"]:
-            tribute = 0
-            for victim in state.players:
-                if victim.id == mafia.id:
-                    continue
-                levy = 0
-                for district in DISTRICT_IDS:
-                    mafia_count = self.district_count(mafia, district)
-                    # Presence is enough: the mafia levies every rival it outnumbers in a district
-                    # where it owns something, even when a third player owns more there.
-                    if mafia_count > 0 and self.district_count(victim, district) < mafia_count:
-                        levy += (
-                            sum(
-                                self.owned_definition(asset).district == district and not asset.blocked
-                                for asset in victim.assets
-                            )
-                            * 2
-                        )
-                paid = min(max(0, incomes[victim.id]), levy)
-                incomes[victim.id] -= paid
-                income_sources[victim.id]["mafia_tribute"] -= paid
-                tribute += paid
-            incomes[mafia.id] += tribute
-            income_sources[mafia.id]["mafia_tribute"] += tribute
-
         influence_sources: dict[str, dict[str, int]] = {}
         for player in state.players:
             journalist = player.role == "journalist"
@@ -2315,6 +2217,7 @@ class CityEngine:
             + player.influence // INFLUENCE_PER_POINT
             + asset_score
             + self.project_points(player)
+            + player.bonus_points
             + (3 if player.role else 0)
             - player.scandals
         )
@@ -2327,6 +2230,7 @@ class CityEngine:
             "influence": player.influence // INFLUENCE_PER_POINT,
             "assets": asset_score,
             "projects": self.project_points(player),
+            "bonus": player.bonus_points,
             "role": 3 if player.role else 0,
             "scandals": -player.scandals,
             "total": self.score(player),

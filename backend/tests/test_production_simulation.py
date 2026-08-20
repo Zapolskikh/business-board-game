@@ -48,7 +48,6 @@ def test_production_simulation_reports_engine_games() -> None:
         "antitrust",
         "debt",
         "journalist",
-        "mafia_tribute",
         "maintenance",
         "objects",
         "projects",

@@ -10,18 +10,15 @@ from dataclasses import dataclass
 from typing import Any
 
 POWER_LABELS = {
-    "capitalist_financing": "ускоренное финансирование",
     "politician_tax": "налог района",
     "politician_cleanup": "снять скандал",
     "journalist_inflate": "раздуть историю",
     "journalist_publish": "публикация",
     "mafia_racket": "рэкет",
-    "mafia_sweep": "сжечь связи",
     "mafia_cleanup": "замять дело",
     "military_sanction": "санкции",
     "fraudster_cleanup": "очистка следов",
     "fraudster_crypto_scam": "криптоскам",
-    "fraudster_forge": "подделка документов",
 }
 
 # Which offers do not consume one of the three turn actions. The engine spends an action inside
@@ -41,7 +38,6 @@ FREE_ACTION_TYPES = frozenset(
 )
 FREE_POWERS = frozenset(
     {
-        "capitalist_financing",
         "politician_tax",
         "politician_cleanup",
         "journalist_inflate",
@@ -142,7 +138,7 @@ def score_of(game: dict[str, Any], player: dict[str, Any]) -> int:
 
 def roof_price(game: dict[str, Any], player: dict[str, Any]) -> int:
     base = 3 + (int(game["round_number"]) - 1) // 2
-    return base - 1 if "mafia" in (player["role"], player["copied_role"]) else base
+    return base - 1 if player["role"] == "mafia" else base
 
 
 def _payload_hint(action: dict[str, Any], game: dict[str, Any], me: dict[str, Any], catalog: Catalog) -> str:
@@ -324,9 +320,8 @@ def render_turn_status(room: dict[str, Any], catalog: Catalog, player_id: str) -
     me = next(player for player in game["players"] if player["id"] == player_id)
     legal = room.get("legal_actions") or []
     breakdown = dict(game.get("score_breakdown", {}).get(player_id, {}))
-    invest = f" +{game['investment_actions']}💼" if game["investment_actions"] else ""
     head = (
-        f"действий {game['actions_left']}{invest} · {me['money']}$ {me['influence']}◆ "
+        f"действий {game['actions_left']} · {me['money']}$ {me['influence']}◆ "
         f"{me['scandals']}⚠ {me['roofs']}🛡 · очки {breakdown.get('total', 0)} · раунд "
         f"{game['round_number']}/{game['max_rounds']}"
     )
@@ -420,8 +415,6 @@ def describe_event(event: dict[str, Any], game: dict[str, Any], catalog: Catalog
 
 def _player_line(player: dict[str, Any], game: dict[str, Any], catalog: Catalog, mine: bool) -> str:
     role = catalog.role_title(player["role"]) if player["role"] else "без роли"
-    if player["copied_role"]:
-        role = f"{role}+{catalog.role_title(player['copied_role'])}"
     hand = player.get("hand")
     hand_text = f"рука {len(hand)}" if hand is not None else f"карт {player.get('hand_count', 0)}"
     scores = game.get("final_scores") or {}
@@ -489,12 +482,12 @@ def _market_line(item: dict[str, Any], game: dict[str, Any], catalog: Catalog) -
 
 
 ROLE_POWERS = {
-    "capitalist": ("capitalist_financing",),
+    "capitalist": (),
     "politician": ("politician_tax", "politician_cleanup"),
     "journalist": ("journalist_inflate", "journalist_publish"),
-    "mafia": ("mafia_racket", "mafia_sweep", "mafia_cleanup"),
+    "mafia": ("mafia_racket", "mafia_cleanup"),
     "military": ("military_sanction",),
-    "fraudster": ("fraudster_cleanup", "fraudster_crypto_scam", "fraudster_forge"),
+    "fraudster": ("fraudster_cleanup", "fraudster_crypto_scam"),
 }
 
 
@@ -521,7 +514,7 @@ def _role_powers_line(me: dict[str, Any], game: dict[str, Any], legal: list[dict
     The legal-action list only shows what is possible right now, so a power whose precondition
     fails simply vanished — one agent never learned its role could clean scandals at half price.
     """
-    roles = [role for role in (me["role"], me["copied_role"]) if role]
+    roles = [role for role in (me["role"],) if role]
     powers = [power for role in roles for power in ROLE_POWERS.get(role, ())]
     if not powers:
         return "способности роли: нет роли"
@@ -565,7 +558,6 @@ def render_state(
         f"ходит {current['name']}"
         + (
             f" — ЭТО Я · действий {game['actions_left']}"
-            + (f" + {game['investment_actions']} инвестиционных" if game["investment_actions"] else "")
             if current["id"] == player_id
             else " (не я)"
         ),

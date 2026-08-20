@@ -59,27 +59,24 @@ type MobileGameTab = "city" | "players" | "actions" | "log" | "menu";
 
 const playerColors = ["#58a6ff", "#3fb950", "#f0883e", "#d65db1", "#e3b341", "#9b6ee7"];
 const rolePowers: Record<string, string[]> = {
-  capitalist: ["capitalist_financing"],
+  capitalist: [],
   politician: ["politician_tax", "politician_cleanup"],
   journalist: ["journalist_inflate", "journalist_publish"],
-  mafia: ["mafia_racket", "mafia_sweep", "mafia_cleanup"],
+  mafia: ["mafia_racket", "mafia_cleanup"],
   military: ["military_sanction"],
-  fraudster: ["fraudster_cleanup", "fraudster_crypto_scam", "fraudster_forge"],
+  fraudster: ["fraudster_cleanup", "fraudster_crypto_scam"],
 };
 
 const powerDescriptions: Record<string, string> = {
-  capitalist_financing: "Действие не расходуется, один раз за ход: потратить 3◆ и получить 1 инвестиционное действие для покупки объекта, слота, замены объекта или жетона автоматизации.",
   politician_tax: "Действие не расходуется, один раз за ход: потратить 4◆ и получить по 1$ за каждый объект всех игроков в выбранном районе.",
   politician_cleanup: "Действие не расходуется, один раз за ход: потратить 2◆ и снять 1 свой скандал.",
   journalist_inflate: "Действие не расходуется, один раз за ход: вы и выбранный соперник получаете по 1 скандалу. У Журналиста порог сдвинут: роль теряется на 6 скандалах, тюрьма на 7 — у всех остальных на 5 и 6.",
   journalist_publish: "Действие не расходуется, один раз за ход: потратить 3◆ и дать выбранному сопернику 1 скандал.",
   mafia_racket: "Один раз за ход и за 1 действие: нужен активный объект Серого сектора. Базово отбирает до 2$, сумма растёт от раунда, ваших объектов и лидерства цели; её Крыша отменяет рэкет.",
-  mafia_sweep: "Один раз за ход и за 1 действие: потратить 1 Крышу, после чего каждый игрок теряет по 1 Крыше.",
   mafia_cleanup: "Действие не расходуется, один раз за ход: снять до 2 скандалов, потратив 1 Крышу либо 3$ при наличии административного объекта.",
   military_sanction: "Один раз за ход и за 1 действие: цель должна иметь минимум 2 скандала. Снимает ей скандал и взыскивает деньги либо объект; Крыша принимает удар.",
   fraudster_cleanup: "За 1 действие снять 1 свой скандал.",
   fraudster_crypto_scam: "Один раз за ход и за 1 действие: нужна активная Городская криптобиржа. Украсть у каждого соперника выбранную сумму и получить столько же скандалов (Аферист — на 1 меньше со снижением). Внимание: на 5 скандалах теряется роль, на 6 — тюрьма (пропуск хода), поэтому большая сумма может вас посадить.",
-  fraudster_forge: "Один раз за ход: 1 действие, 5◆ и +2 скандала — гарантированно получить выбранную роль со следующего хода. Внимание: если два скандала доведут вас до 5 — роль потеряется, до 6 — тюрьма.",
 };
 
 export function Game({ roomId, password, playerId, meta, onExit }: Props) {
@@ -177,7 +174,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
     <header className="city-head">
       <div className="city-head-title">
         <h1>Город влияния <small>online release</small> <span className="game-version">v{__GAME_VERSION__}</span></h1>
-        <p>{room.name} · Раунд {game.round_number}/{game.max_rounds} · Ход: <b>{current.name}</b> · Действий: <b>{game.actions_left}</b>{game.investment_actions > 0 && <> · Инвестиционных: <b className="investment-actions">{game.investment_actions}</b></>}</p>
+        <p>{room.name} · Раунд {game.round_number}/{game.max_rounds} · Ход: <b>{current.name}</b> · Действий: <b>{game.actions_left}</b></p>
       </div>
       <div className="city-head-buttons"><button onClick={() => setShowRules(true)}>📖 Правила</button><button onClick={onExit}>← Комнаты</button></div>
     </header>
@@ -581,10 +578,9 @@ function DecisionPanel({ game, me, meta, roles, districts, legal, selectedDistri
   const roleHolder = (roleId: string) => game.players.find(player => player.role === roleId);
   const roleCost = (roleId: string) => roleHolder(roleId) ? game.role_price * 3 : game.role_price;
   const districtAction = find("develop_district", action => action.payload.district === selectedDistrict);
-  const displayRoleId = me.role ?? me.copied_role;
+  const displayRoleId = me.role;
   const powers = Array.from(new Set([
     ...(rolePowers[me.role ?? ""] ?? []),
-    ...(rolePowers[me.copied_role ?? ""] ?? []),
     ...all("use_role_power").map(action => stringValue(action.payload.power)),
   ])).filter(Boolean);
   const dotCount = Math.max(3, game.actions_left);
@@ -603,7 +599,7 @@ function DecisionPanel({ game, me, meta, roles, districts, legal, selectedDistri
     return "Недоступно в текущий ход";
   };
   return <aside className="city-actions">
-    <div className="actions-head"><h2>🎛️ Решения</h2><div className={`action-tokens ${game.actions_left === 0 ? "spent" : ""}`}><span className="token-label">Действий</span><span className="token-dots">{Array.from({ length: dotCount }).map((_, index) => <i className={index < game.actions_left ? "on" : "off"} key={index} />)}</span><b>{game.actions_left}</b>{game.investment_actions > 0 && <span className="token-invest">+{game.investment_actions} 💼</span>}</div></div>
+    <div className="actions-head"><h2>🎛️ Решения</h2><div className={`action-tokens ${game.actions_left === 0 ? "spent" : ""}`}><span className="token-label">Действий</span><span className="token-dots">{Array.from({ length: dotCount }).map((_, index) => <i className={index < game.actions_left ? "on" : "off"} key={index} />)}</span><b>{game.actions_left}</b></div></div>
     {busy && <p className="bot-action-note">Сервер выполняет команду и ходы ботов…</p>}
     {!busy && legal.length === 0 && game.status === "playing" && <p className="bot-action-note">Ожидаем ход игрока <b>{current.name}</b>.</p>}
 
@@ -634,7 +630,7 @@ function DecisionPanel({ game, me, meta, roles, districts, legal, selectedDistri
       const holder = roleHolder(role.id);
       return <button disabled={busy || !claim} onClick={() => claim && void onAction(claim)} style={{ borderColor: role.color }} title={`${role.passive} Способность: ${role.power} Получение роли расходует 1 обычное действие и ${roleCost(role.id)}◆.${holder ? ` Сейчас роль у ${holder.name}; его Крыша или судебный запрет могут заблокировать захват.` : ""}`} key={role.id}><span className="role-line"><span className="role-icon" style={{ borderColor: role.color }}>{role.icon}</span>{role.title} · {roleCost(role.id)}◆</span><small>{holder ? `занята: ${holder.name}` : role.passive}</small></button>;
     })}</div>
-      {displayRoleId && <div className="role-powers" style={{ borderColor: roles.get(displayRoleId)?.color }}><strong>{roles.get(displayRoleId)?.icon} Способности: {roles.get(displayRoleId)?.title}{me.copied_role && me.role !== me.copied_role ? " + временный мандат" : ""}</strong><small>{roles.get(displayRoleId)?.power}</small>{powers.map(power => {
+      {displayRoleId && <div className="role-powers" style={{ borderColor: roles.get(displayRoleId)?.color }}><strong>{roles.get(displayRoleId)?.icon} Способности: {roles.get(displayRoleId)?.title}</strong><small>{roles.get(displayRoleId)?.power}</small>{powers.map(power => {
         const variants = all("use_role_power", action => action.payload.power === power);
         return <button className={power.includes("racket") || power.includes("sanction") || power.includes("scam") ? "danger" : ""} disabled={busy || variants.length === 0} onClick={() => onOffer(powerLabels[power] ?? power, variants)} title={powerDescriptions[power]} key={power}>{powerLabels[power] ?? power}{variants.length > 1 ? " → выбрать" : ""}</button>;
       })}</div>}
@@ -660,6 +656,7 @@ function ScorePanel({ game, me, meta }: { game: GameState; me: PlayerState; meta
   const rows: { label: string; value: number; hint: string }[] = [
     { label: "🏗️ Проекты", value: score.projects, hint: "Городские проекты — главный источник очков" },
     { label: "🏢 Объекты", value: score.assets, hint: "Половина цены объекта: дорогие карточки дают больше очков" },
+    { label: "🎖️ Прочие очки", value: score.bonus ?? 0, hint: "Очки, купленные картами: 5$ за очко, слот не нужен" },
     { label: "🏷️ Роль", value: score.role, hint: "3 очка, пока роль у вас" },
     { label: `💰 ${me.money}$`, value: score.money, hint: `Деньги — топливо: ${moneyPerPoint(meta)}$ дают 1 очко` },
     { label: `◆ ${me.influence}`, value: score.influence, hint: `Влияние: ${influencePerPoint(meta)}◆ дают 1 очко` },

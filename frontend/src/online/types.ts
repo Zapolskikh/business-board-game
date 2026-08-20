@@ -42,8 +42,6 @@ export interface PlayerState {
   scandals: number;
   roofs: number;
   role: string | null;
-  copied_role: string | null;
-  pending_role: string | null;
   jail_turns: number;
   assets: OwnedAsset[];
   hand?: HeldCard[];
@@ -75,6 +73,8 @@ export interface ScoreBreakdown {
   influence: number;
   assets: number;
   projects: number;
+  // Points from neither projects nor objects: the cards that buy score outright.
+  bonus?: number;
   role: number;
   scandals: number;
   total: number;
@@ -84,7 +84,7 @@ export interface ScoreBreakdown {
 // a `total`; every other key sums to it. A permanent project perk paying +1◆ a round used to be
 // indistinguishable from one paying nothing, because nothing on screen added the passives up.
 export interface RoundForecast {
-  money: { objects: number; projects: number; maintenance: number; antitrust: number; mafia_tribute: number; journalist: number; debt: number; total: number };
+  money: { objects: number; projects: number; maintenance: number; antitrust: number; journalist: number; debt: number; total: number };
   influence: { objects: number; administrative: number; projects: number; news: number; rating: number; total: number };
 }
 
@@ -104,7 +104,6 @@ export interface GameState {
   turns_taken_in_round?: number;
   turn_serial?: number;
   actions_left: number;
-  investment_actions: number;
   event_id: string;
   players: PlayerState[];
   market: MarketAsset[];
