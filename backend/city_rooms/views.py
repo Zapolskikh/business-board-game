@@ -102,8 +102,12 @@ def room_view(
             player["hand_count"] = len(player.pop("hand"))
     # The viewer's own price for every market slot: discounts are per-player, so the client
     # must not recompute them (two implementations of asset_price already drifted apart once).
+    # "The three oldest slots leave when the round opens" is a rule, and the three oldest are not
+    # the first three of anything the client can see, so the engine answers instead of the client.
+    leaving = set(engine.market_rotation_uids(room.game))
     for item in game["market"]:
         if market_prices and item["uid"] in market_prices:
             item["price"] = market_prices[item["uid"]]
+        item["leaving"] = item["uid"] in leaving
     result["game"] = game
     return result

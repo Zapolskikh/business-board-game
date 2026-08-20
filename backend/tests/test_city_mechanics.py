@@ -8,8 +8,8 @@ from city_engine.constants import (
     CASH_TO_INFLUENCE_MONEY,
     COMPROMAT_INFLUENCE,
     HACK_INFLUENCE_STEAL,
-    MARKET_ASSET_ROUNDS,
     MARKET_REROLL_COST,
+    MARKET_ROTATION_SIZE,
     MAX_REPEATABLE_PROJECTS,
     PROJECT_BOARD_SIZE,
     PROJECT_REROLL_MONEY,
@@ -203,7 +203,7 @@ def test_asset_purchase_event_reports_the_grey_scandal_in_deltas() -> None:
     player = state.current_player
     player.money = 20
     # A grey object charges a scandal on purchase; below the limit that writes no event of its own.
-    state.market.append(MarketAsset(uid="asset:grey-test", card_id="market", expires_at_round=99))
+    state.market.append(MarketAsset(uid="asset:grey-test", card_id="market"))
 
     price = engine.asset_price(state, player, "market")
     state = run(engine, state, "buy_asset", {"market_uid": "asset:grey-test"})
@@ -903,7 +903,7 @@ def test_selling_costs_no_action_so_a_swap_costs_only_the_purchase() -> None:
     give_asset(state, player, "warehouse")
     player.capacity = 3  # full slots: the case the swap command used to exist for
     player.money = 30
-    state.market.append(MarketAsset(uid="asset:replacement", card_id="robotics", expires_at_round=99))
+    state.market.append(MarketAsset(uid="asset:replacement", card_id="robotics"))
     price = engine.asset_price(state, player, "robotics")
     actions_before = state.actions_left
 
@@ -940,7 +940,7 @@ def test_replace_asset_no_longer_exists() -> None:
     give_asset(state, player, "warehouse")
     player.capacity = 3  # full slots: the only situation the swap was ever offered in
     player.money = 30
-    state.market.append(MarketAsset(uid="asset:replacement", card_id="robotics", expires_at_round=99))
+    state.market.append(MarketAsset(uid="asset:replacement", card_id="robotics"))
 
     assert not any(action["type"] == "replace_asset" for action in engine.legal_actions(state, player.id))
     with pytest.raises(InvalidCommandError):
@@ -1106,13 +1106,14 @@ def test_initiatives_are_capped_per_game() -> None:
         run(engine, state, "city_project", {"project_id": "municipal_programme"})
 
 
-def test_the_market_holds_still_for_a_whole_round() -> None:
-    """Slots expire in rounds, so the board cannot change between two of a player's own turns."""
+def test_the_market_holds_still_for_a_whole_round_then_rotates_three_slots() -> None:
+    """One rotation a round, of a fixed size, instead of six independent per-slot countdowns."""
     engine = CityEngine()
     state = make_state()
-    assert [item.expires_at_round for item in state.market] == [1 + MARKET_ASSET_ROUNDS] * len(state.market)
-
     before = [item.uid for item in state.market]
+    # The engine names the slots that will go, so the client never has to know the rule.
+    assert engine.market_rotation_uids(state) == before[:MARKET_ROTATION_SIZE]
+
     opening_round = state.round_number
     # Every other player takes their turn; the round has not turned over yet.
     while state.round_number == opening_round:
@@ -1120,29 +1121,33 @@ def test_the_market_holds_still_for_a_whole_round() -> None:
         state = run(engine, state, "end_turn")
         if state.round_number == opening_round:
             assert [item.uid for item in state.market] == previous
-    assert [item.uid for item in state.market] == before  # untouched for the whole round
-
-    while state.round_number < 1 + MARKET_ASSET_ROUNDS:
-        state = run(engine, state, "end_turn")
-    # The round the slots were dated to has arrived, so they are gone and replaced.
-    assert not {item.uid for item in state.market} & set(before)
     assert len(state.market) == len(before)
+
+    # The oldest three are gone; the other three are exactly the ones that were not marked.
+    survivors = [item.uid for item in state.market]
+    assert survivors[: len(before) - MARKET_ROTATION_SIZE] == before[MARKET_ROTATION_SIZE:]
+    assert not set(survivors[len(before) - MARKET_ROTATION_SIZE :]) & set(before)
     assert any(event.type == "market_rotated" for event in state.event_log)
 
 
-def test_market_reroll_costs_money_but_no_action() -> None:
+def test_market_reroll_costs_money_and_an_action() -> None:
     engine = CityEngine()
     state = make_state()
     player = state.current_player
     player.money = 10
     state.actions_left = 0
+    # No actions, no reroll: the market rotates by itself every round, so impatience costs a turn.
+    assert not any(action["type"] == "reroll_market" for action in engine.legal_actions(state, player.id))
+    with pytest.raises(IllegalActionError):
+        run(engine, state, "reroll_market")
+    state.actions_left = 2
     before = [item.card_id for item in state.market]
 
     state = run(engine, state, "reroll_market")
     player = state.current_player
 
     assert player.money == 10 - MARKET_REROLL_COST
-    assert state.actions_left == 0
+    assert state.actions_left == 1
     assert len(state.market) == len(before)
     assert [item.card_id for item in state.market] != before
     # One reroll per turn, so it cannot be used to fish the whole deck in a single turn.

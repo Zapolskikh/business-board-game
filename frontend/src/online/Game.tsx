@@ -15,6 +15,7 @@ import {
   districtCount,
   forecastRows,
   greyOperationInfo,
+  greyOperationDistricts,
   greyOperationLabels,
   influencePerPoint,
   launderingCost,
@@ -198,7 +199,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
 
       <div className="city-side">
         <DecisionPanel
-          game={game} me={me} meta={meta} roles={roles} districts={districts} legal={legal}
+          game={game} me={me} meta={meta} roles={roles} districts={districts} assets={assets} legal={legal}
           selectedDistrict={selectedDistrict} busy={busy} onAction={send} onOffer={offer}
         />
         <Chronicle room={room} game={game} meta={meta} />
@@ -368,7 +369,6 @@ function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selected
           const asset = assets.get(item.card_id);
           if (!asset) return null;
           const buy = buyActions.get(item.uid);
-          const remaining = Math.max(0, item.expires_at_round - game.round_number);
           const price = marketPrice(asset, item);
           const effectLines = assetEffectLines(asset, me, meta, assets, { includeSynergy: true });
           // Not owned yet, so nothing it unlocks is `ready` — the panel is advertising, not status.
@@ -383,9 +383,9 @@ function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selected
               {effectLines.length > 0
                 ? <ul className="asset-effects">{effectLines.map((line, index) => <li key={index} className={line.active ? "effect-active" : "effect-idle"}>{line.text}{line.boosted && <span className="effect-boost">⚙×2</span>}</li>)}</ul>
                 : asset.text && <small className="asset-summary">{asset.text}</small>}
-              {/* Rounds, not turns: the old per-turn countdown expired before the reader's next
-                  turn, so "save up for that one" was never a playable plan. */}
-              <small className="market-expiry">⏳ {remaining > 0 ? `ещё ${remaining} р.` : "уходит в конце раунда"}</small>
+              {/* One rotation a round replaces the oldest three slots, and the server says which
+                  ones: six independent countdowns were six clocks for one rule. */}
+              {item.leaving && <small className="market-expiry">⏳ уходит в конце раунда</small>}
             </span>
             <AssetHintPanel hints={hints} />
           </button>;
@@ -521,12 +521,13 @@ function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines,
   </article>;
 }
 
-function DecisionPanel({ game, me, meta, roles, districts, legal, selectedDistrict, busy, onAction, onOffer }: {
+function DecisionPanel({ game, me, meta, roles, districts, assets, legal, selectedDistrict, busy, onAction, onOffer }: {
   game: GameState;
   me: PlayerState;
   meta: CityMeta;
   roles: Map<string, { id: string; title: string; icon: string; color: string; passive: string; power: string }>;
   districts: Map<string, { title: string }>;
+  assets: Map<string, AssetMeta>;
   legal: LegalAction[];
   selectedDistrict: string;
   busy: boolean;
@@ -553,9 +554,12 @@ function DecisionPanel({ game, me, meta, roles, districts, legal, selectedDistri
   const cleanup = cleanupOffer(cleanupRoleAction ? cleanupPower : undefined, meta);
   const dotCount = Math.max(3, game.actions_left);
   const greyRequirement = (assetId: string): string => {
-    const info = greyOperationInfo[assetId];
-    const hasAsset = me.assets.some(asset => asset.card_id === assetId && !asset.blocked);
-    if (!hasAsset) return `🔒 Нужен активный объект «${info.asset}»`;
+    // The gate is a district, so the lock message has to name districts — the old text named one
+    // card out of 71, which is exactly why three of the five operations were never run.
+    const gates = greyOperationDistricts[assetId] ?? [];
+    if (!gates.some(district => districtCount(me, district, assets) > 0)) {
+      return `🔒 Нужен активный объект: ${gates.map(id => districts.get(id)?.title ?? id).join(" или ")}`;
+    }
     if (game.actions_left < 1) return "🔒 Нужно 1 обычное действие";
     if (assetId === "cash" && me.money < launderingCost(meta, game.round_number)) return `🔒 Нужно ${launderingCost(meta, game.round_number)}$`;
     if (assetId === "influence_broker") {
@@ -587,7 +591,7 @@ function DecisionPanel({ game, me, meta, roles, districts, legal, selectedDistri
           title={`Потратить 1 обычное действие и ${tier.spend}$, чтобы получить ${tier.gain}◆. Курс ухудшается с ростом ступени (${(tier.spend / tier.gain).toFixed(2)}$ за 1◆), зато одно действие приносит больше влияния. Влияние нужно для проектов и ролей.`}
         >📣 {tier.spend}$ → {tier.gain}◆</button>;
       })}</div>
-      <StaticAction action={find("reroll_market")} label={`🔄 Обновить рынок: ${marketRerollCost(meta)}$`} tooltip="Полностью сменить шесть позиций рынка объектов. Действие не расходуется, один раз за ход." busy={busy} onAction={onAction} />
+      <StaticAction action={find("reroll_market")} label={`🔄 Обновить рынок: ${marketRerollCost(meta)}$ + действие`} tooltip="Полностью сменить все шесть позиций рынка объектов, не дожидаясь ротации: 1 обычное действие и деньги, один раз за ход. Сам рынок и так обновляет три самые старые позиции в начале каждого раунда — эта кнопка для тех случаев, когда ждать нельзя." busy={busy} onAction={onAction} />
       <StaticAction action={find("reroll_projects")} label={`🔄 Пересобрать доску проектов: ${projectRerollMoney(meta)}$ + действие`} tooltip={`Все четыре проекта возвращаются в колоду, колода перемешивается и раздаётся заново. Цена: ${projectRerollMoney(meta)}$ и 1 обычное действие, один раз за ход. Доска общая: она меняется у всех.`} busy={busy} onAction={onAction} />
       <StaticAction action={find("buy_capacity")} label={`📦 ${capacityLabel(me)}`} tooltip="Купить постоянный дополнительный слот бизнеса. Можно потратить обычное либо инвестиционное действие; максимум 6 слотов." busy={busy} onAction={onAction} />
       <StaticAction action={districtAction} label={`⭐ Развить «${districts.get(selectedDistrict)?.title}»`} tooltip="Нужно минимум 2 своих объекта в выбранном районе. Потратить 1 действие и 2$: +25% к базовому доходу всех ваших объектов района с округлением вверх (то есть минимум +1$ каждому) и +1◆. Максимум 2 уровня; уровень личный и соперникам ничего не даёт." busy={busy} onAction={onAction} />
@@ -604,11 +608,11 @@ function DecisionPanel({ game, me, meta, roles, districts, legal, selectedDistri
       })}</div>}
     </div>
 
-    <div className="action-group g-grey"><h3 className="group-title">🌒 Серые операции <span className="group-hint">через специальные объекты</span></h3><p className="dim card-rule">Каждая операция требует свой активный объект и 1 обычное действие. При выборе можно застраховать провал Крышей.</p>{Object.entries(greyOperationLabels).map(([assetId, label]) => {
+    <div className="action-group g-grey"><h3 className="group-title">🌒 Серые операции <span className="group-hint">через специальные объекты</span></h3><p className="dim card-rule">Операцию открывает любой активный объект нужного района, роль не нужна. Каждая стоит 1 обычное действие; при выборе можно застраховать провал Крышей.</p>{Object.entries(greyOperationLabels).map(([assetId, label]) => {
       const variants = all("grey_operation", action => action.payload.asset_id === assetId);
       const info = greyOperationInfo[assetId];
       const effect = info.effect(game.round_number, meta);
-      return <button className="described-action" disabled={busy || variants.length === 0} onClick={() => onOffer(label, variants)} title={`Требуется «${info.asset}». Эффект при успехе: ${effect}. Базовый шанс успеха ${info.chance}%; у Афериста он может быть выше. ${info.failure} Страховка при провале тратит 1 Крышу и отменяет денежный либо объектный штраф, но скандалы всё равно начисляются и действие расходуется.`} key={assetId}><strong>{label}</strong><small>{variants.length ? `${effect} · шанс от ${info.chance}%` : greyRequirement(assetId)}</small></button>;
+      return <button className="described-action" disabled={busy || variants.length === 0} onClick={() => onOffer(label, variants)} title={`Открывает любой активный объект районов: ${(greyOperationDistricts[assetId] ?? []).map(id => districts.get(id)?.title ?? id).join(", ")}. Эффект при успехе: ${effect}. Базовый шанс успеха ${info.chance}%; у Афериста он может быть выше. ${info.failure} Страховка при провале тратит 1 Крышу и отменяет денежный либо объектный штраф, но скандалы всё равно начисляются и действие расходуется.`} key={assetId}><strong>{label}</strong><small>{variants.length ? `${effect} · шанс от ${info.chance}%` : greyRequirement(assetId)}</small></button>;
     })}</div>
 
     <div className="action-group g-defence"><h3 className="group-title">🛡️ Защита и репутация</h3><StaticAction action={cleanupAction} label={cleanup.label} tooltip={cleanup.tooltip} busy={busy} onAction={onAction} /><StaticAction action={find("buy_roof")} label={`🛡️ Купить Крышу (${roofCost(me, game)}$)`} tooltip={`Потратить 1 обычное действие и ${roofCost(me, game)}$. Цена растёт на 1$ каждые два раунда. Крыша — единственная защита в игре: она гасит направленный на вас эффект другого игрока (карту, рэкет, санкцию, взлом), попытку отобрать роль и любое начисление скандалов целиком. Последствия ваших собственных решений она не отменяет, но может застраховать провал вашей серой операции. Лимит 2, у Мафиози 3.`} busy={busy} onAction={onAction} /></div>

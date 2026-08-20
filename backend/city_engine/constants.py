@@ -59,24 +59,28 @@ REPEATABLE_PROJECT_IDS = ("city_initiative", "municipal_programme")
 # of all project points in the arena match, and one player's last sixteen actions were twelve
 # identical clicks. Three per game keeps them as a way out of a dead hand, not as a strategy.
 MAX_REPEATABLE_PROJECTS = 3
-# How many rounds a market slot survives before it rotates out.
+# How many market slots the opening of a round replaces: the oldest three of six.
 #
-# This used to be counted in turns — `turn_serial + players * 2` — and pruned on every turn pass,
-# which made the printed countdown a lie at any table size: at four players "⏳3" read as three
-# rounds and expired before the reader's next turn. Measured cost in a live game: an object planned
-# for two turns ahead vanished, and a project needing a second Administrative asset expired unused
-# because the only qualifying asset appeared and rotated away inside one round.
+# This used to be a per-slot countdown — six independent timers printed as "⏳2р" on every card —
+# and before that it was counted in turns, which made the printed number a lie at any table size.
+# One rotation a round, at a fixed size, is the same freshness with one rule instead of six clocks,
+# and the three slots leaving are marked so the choice "buy now or wait" stays answerable.
 #
-# Rounds are the unit players plan in, and rotation now happens only when a round opens, so the
-# board a player sees on their turn is the board they will still see when they come back to it.
-MARKET_ASSET_ROUNDS = 2
+# Not all six: half the market has to survive, or the see-it/save-for-it/buy-it loop breaks. Income
+# in rounds 1-5 is 3-15$ while a legendary object costs 17-18$, and the expensive rarities only
+# enter the deck from a certain round (`rarity_min_round`) — with a full rotation the round you are
+# rich has to coincide with the round the card appears, which turns the top of the catalog into a
+# lottery. Cards that rotate out go to the bottom of the deck, so nothing leaves the game.
+MARKET_ROTATION_SIZE = 3
 
 # The journalist trades in scandals, so the role-loss threshold that everybody else hits at 5
 # would put their optimal play one point from collapse. Jail still follows one step later.
 JOURNALIST_SCANDAL_LIMIT = 6
-# Refreshing the whole asset market costs money but no action: a sink that buys tempo, not points.
-# At 2$ it was measured free — four expert bots spent 3.6$ each on it across a whole game while
-# finishing on 264$. 4$ is still cheap enough to use as a tool and dear enough to notice.
+# Refreshing the whole asset market, out of turn: 1 action and this much money, once per turn.
+# At 2$ and no action it was measured free — four expert bots spent 3.6$ each across a whole game
+# while finishing on 264$. Now that the market rotates by itself every round, the button is the
+# impatient option, and the action is its real price. If endgame conversion slows down, lower this
+# number rather than giving the action back.
 MARKET_REROLL_COST = 4
 # Money into influence, one action, three tiers. The action — not the money — was the real price
 # of influence: campaign was the only scalable source and it was capped at 2◆ per action, so a

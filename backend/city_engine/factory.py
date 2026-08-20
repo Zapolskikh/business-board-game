@@ -6,7 +6,6 @@ from dataclasses import dataclass
 
 from city_engine.constants import (
     BOT_DIFFICULTIES,
-    MARKET_ASSET_ROUNDS,
     MAX_PLAYERS,
     MAX_ROLE_PRICE,
     MAX_ROUNDS,
@@ -94,10 +93,7 @@ def create_game(
     if len(initial_market_ids) < 6:
         raise StateValidationError("not enough round-one assets to create the initial market")
     asset_deck = remaining_assets
-    initial_market = [
-        MarketAsset(uid=f"asset:{card_id}", card_id=card_id, expires_at_round=1 + MARKET_ASSET_ROUNDS)
-        for card_id in initial_market_ids
-    ]
+    initial_market = [MarketAsset(uid=f"asset:{card_id}", card_id=card_id) for card_id in initial_market_ids]
     state = GameState(
         game_id=game_id,
         players=[

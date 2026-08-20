@@ -29,7 +29,7 @@ export interface OwnedAsset {
 
 export interface HeldCard { uid: string; card_id: string }
 // `price` is the viewer's own price, computed by the engine (discounts are per-player).
-export interface MarketAsset { uid: string; card_id: string; expires_at_round: number; price?: number }
+export interface MarketAsset { uid: string; card_id: string; leaving?: boolean; price?: number }
 
 export interface PlayerState {
   id: string;
@@ -165,7 +165,7 @@ export interface ScoringMeta {
   project_board_size: number;
   market_reroll_cost: number;
   project_reroll_money: number;
-  market_asset_rounds: number;
+  market_rotation_size: number;
   crisis_pr_influence: number;
   action_card_cost: number;
   // What discarding a card pays back, in money or in influence.

@@ -46,23 +46,31 @@ export const greyOperationLabels: Record<string, string> = {
   influence_broker: "Слив компромата",
 };
 
-// Lives next to the labels rather than in the screen that draws the operation panel, because the
-// object cards have to say the same thing: buying one of these five objects is the *only* way into
-// its operation, and until now the market card kept that to itself — the panel announced the
-// requirement only after you had already spent your money on something else.
+// Mirrors `CityEngine.GREY_OPERATION_DISTRICTS`: an operation is unlocked by any active object of
+// these districts, not by one card out of 71. Kept next to the labels because the object cards have
+// to say the same thing the operation panel says — the panel used to announce the requirement only
+// after you had already spent your money on something else.
+export const greyOperationDistricts: Record<string, string[]> = {
+  cash: ["shadows"],
+  market: ["shadows"],
+  crypto: ["tech", "shadows"],
+  datacenter: ["tech", "shadows"],
+  influence_broker: ["shadows", "government"],
+};
+
 export const greyOperationInfo: Record<string, { asset: string; effect: (round: number, meta: CityMeta) => string; chance: number; failure: string }> = {
   cash: {
     asset: "Сеть наличных обменников",
     // Both sides scale with the round: a flat gain against a growing stake made the operation
     // strictly worse than the top campaign tier, and then nobody ever ran it.
     effect: (round, meta) => `${launderingCost(meta, round)}$ → ${launderingGain(meta, round)}◆`,
-    chance: 85,
+    chance: 80,
     failure: "Единственный неограниченный способ превратить лишние деньги во влияние, и с ростом раунда курс становится лучше, чем у кампании. При успехе: +1 скандал. При провале ставка теряется, влияния нет. Скандалы при провале: Аферист +1, остальные +2. На 5 скандалах теряется роль, на 6 — тюрьма.",
   },
   market: {
     asset: "Ночной рынок",
     effect: round => `украсть у цели до ${3 + Math.floor(round / 2)}$`,
-    chance: 75,
+    chance: 70,
     failure: "Крыша цели тратится и полностью отменяет кражу. При успехе: +1 скандал. При провале теряется Крыша, если она есть. Скандалы: Аферист +1, остальные +2. На 5 скандалах теряется роль, на 6 — тюрьма.",
   },
   crypto: {
@@ -140,8 +148,8 @@ export function projectRerollMoney(meta: CityMeta): number {
   return meta.scoring?.project_reroll_money ?? 10;
 }
 
-export function marketAssetRounds(meta: CityMeta): number {
-  return meta.scoring?.market_asset_rounds ?? 2;
+export function marketRotationSize(meta: CityMeta): number {
+  return meta.scoring?.market_rotation_size ?? 3;
 }
 
 export function campaignTiers(meta: CityMeta): { spend: number; gain: number }[] {
@@ -297,7 +305,7 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
     return tier ? `Кампания: ${tier.spend}$ → ${tier.gain}◆` : "Кампания";
   }
   if (action.type === "end_turn") return "Завершить ход";
-  if (action.type === "reroll_market") return `Обновить рынок объектов (${marketRerollCost(meta)}$)`;
+  if (action.type === "reroll_market") return `Обновить рынок объектов (${marketRerollCost(meta)}$ + действие)`;
   if (action.type === "reroll_projects") return `Пересобрать доску проектов (${projectRerollMoney(meta)}$ + действие)`;
   if (action.type === "city_project") {
     return project
@@ -890,18 +898,36 @@ export function assetHints(
   const hasRole = (id: string): boolean => owner.role === id;
   const hints: AssetHint[] = [];
 
-  const grey = greyOperationInfo[asset.id];
-  if (grey) {
-    const label = greyOperationLabels[asset.id] ?? asset.id;
-    const effect = grey.effect(game.round_number, meta);
+  // The Серый сектор unlocks all five operations, so listing them one per line would bury the card
+  // under its own hints. One line each up to two, a single summary line beyond that.
+  const unlocked = Object.entries(greyOperationDistricts).filter(([, districts]) => districts.includes(asset.district));
+  const operationLine = (operationId: string): string => {
+    const grey = greyOperationInfo[operationId];
+    return `${greyOperationLabels[operationId] ?? operationId}: ${grey.effect(game.round_number, meta)} · шанс от ${grey.chance}%`;
+  };
+  if (unlocked.length > 2) {
     hints.push({
       kind: "grey",
       icon: "🌒",
-      title: label,
-      detail: `${effect} · шанс от ${grey.chance}%`,
+      title: `Серые операции (${unlocked.length})`,
+      detail: unlocked.map(([operationId]) => greyOperationLabels[operationId] ?? operationId).join(", "),
       ready: active,
-      tooltip: `Серая операция «${label}» доступна только владельцу этого объекта — другого входа в неё нет, и роль для неё не нужна. Стоит 1 обычное действие. Эффект при успехе: ${effect}. Базовый шанс ${grey.chance}%, у Афериста выше. ${grey.failure}`,
+      tooltip: `Любой активный объект этого района открывает ${unlocked.length} серых операций, роль для них не нужна, каждая стоит 1 обычное действие. ${unlocked.map(([operationId]) => operationLine(operationId)).join(" · ")}`,
     });
+  } else {
+    for (const [operationId, districts] of unlocked) {
+      const grey = greyOperationInfo[operationId];
+      const label = greyOperationLabels[operationId] ?? operationId;
+      const effect = grey.effect(game.round_number, meta);
+      hints.push({
+        kind: "grey",
+        icon: "🌒",
+        title: label,
+        detail: `${effect} · шанс от ${grey.chance}%`,
+        ready: active,
+        tooltip: `Серая операция «${label}» открыта любому владельцу активного объекта районов: ${districts.map(districtTitle).join(", ")}. Роль для неё не нужна. Стоит 1 обычное действие. Эффект при успехе: ${effect}. Базовый шанс ${grey.chance}%, у Афериста выше. ${grey.failure}`,
+      });
+    }
   }
 
   for (const gate of assetGatedPowers) {
@@ -952,7 +978,7 @@ export function assetHints(
     });
   }
 
-  return { special: Boolean(grey), hints };
+  return { special: unlocked.length > 0, hints };
 }
 
 // Projects on the board whose condition names this object's tag or district. Conditions counting

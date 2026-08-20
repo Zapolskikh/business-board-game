@@ -21,8 +21,8 @@ from city_engine.constants import (
     INFLUENCE_PER_POINT,
     LAUNDERING_BASE_COST,
     LAUNDERING_BASE_GAIN,
-    MARKET_ASSET_ROUNDS,
     MARKET_REROLL_COST,
+    MARKET_ROTATION_SIZE,
     MONEY_PER_POINT,
     PROJECT_BOARD_SIZE,
     PROJECT_REROLL_MONEY,
@@ -207,7 +207,7 @@ class ContentCatalog:
             "market_reroll_cost": MARKET_REROLL_COST,
             "project_reroll_money": PROJECT_REROLL_MONEY,
             # How many rounds a market slot lasts, so the client can say "rounds" and mean it.
-            "market_asset_rounds": MARKET_ASSET_ROUNDS,
+            "market_rotation_size": MARKET_ROTATION_SIZE,
             "crisis_pr_influence": CRISIS_PR_INFLUENCE,
             "action_card_cost": ACTION_CARD_COST,
             # What a discarded card pays back. The client had "+1" written into a label while the

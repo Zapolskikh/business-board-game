@@ -26,8 +26,8 @@ from city_engine.constants import (
     JOURNALIST_SCANDAL_LIMIT,
     LAUNDERING_BASE_COST,
     LAUNDERING_BASE_GAIN,
-    MARKET_ASSET_ROUNDS,
     MARKET_REROLL_COST,
+    MARKET_ROTATION_SIZE,
     MAX_CAPACITY,
     MAX_REPEATABLE_PROJECTS,
     MONEY_PER_POINT,
@@ -185,8 +185,8 @@ class CityEngine:
                 for district in DISTRICT_IDS
                 if self.district_count(player, district) >= 2 and player.district_levels[district] < 2
             )
-        # The market reroll costs money only, so it stays available with no actions left.
-        if player.money >= MARKET_REROLL_COST:
+        # The reroll spends an action now, so it disappears once the turn is out of them.
+        if can_act and player.money >= MARKET_REROLL_COST:
             candidates.append(Command(type="reroll_market", actor_id=actor_id))
         # The project re-deal spends an action now, so unlike the market reroll it disappears once
         # the turn is out of actions.
@@ -236,11 +236,10 @@ class CityEngine:
             else:
                 candidates.append(Command(type="play_action_card", actor_id=actor_id, payload={"card_uid": held.uid}))
         candidates.extend(self._role_power_candidates(state, actor_id))
-        active_asset_ids = {asset.card_id for asset in player.assets if not asset.blocked}
         # Insuring a failure spends a roof, so without one the flag silently did nothing.
         protect_options = (False, True) if player.roofs > 0 else (False,)
         for asset_id in ("cash", "crypto"):
-            if not can_act or asset_id not in active_asset_ids:
+            if not can_act or not self.grey_operation_unlocked(player, asset_id):
                 continue
             candidates.extend(
                 Command(
@@ -251,7 +250,7 @@ class CityEngine:
                 for protect in protect_options
             )
         for asset_id in ("market", "datacenter", "influence_broker"):
-            if not can_act or asset_id not in active_asset_ids:
+            if not can_act or not self.grey_operation_unlocked(player, asset_id):
                 continue
             for target in state.players:
                 if target.id == actor_id:
@@ -807,10 +806,10 @@ class CityEngine:
         self._refill_market(state, 1)
 
     def _reroll_market(self, state: GameState, command: Command) -> None:
-        """Money into market quality, once per turn, without spending an action.
+        """Money and an action into market quality, once per turn.
 
-        The market used to rotate only on a timer nobody controlled, so a plan longer than the
-        current turn was impossible and spare cash had nowhere to go. This is the unbounded sink.
+        The market rotates three slots by itself every round now, so this button is the impatient
+        option rather than the only one — and the action is what makes impatience cost something.
         """
         player = state.current_player
         if self._flag(state, "market_rerolled"):
@@ -819,6 +818,7 @@ class CityEngine:
             raise IllegalActionError("not enough money to reroll the market")
         if not state.market and not state.market_deck:
             raise IllegalActionError("there is nothing left to reroll")
+        self._spend_action(state)
         self._mark_flag(state, "market_rerolled")
         player.money -= MARKET_REROLL_COST
         replaced = len(state.market)
@@ -1467,17 +1467,41 @@ class CityEngine:
         reduction = self.effect_total(player, "greyScandalReduction")
         self.add_scandal(state, player, max(0, amount - reduction))
 
-    GREY_ASSET_IDS = ("cash", "market", "crypto", "datacenter", "influence_broker")
+    # Every operation used to demand one exact card out of 71 — which also had to hold one of the
+    # six slots. Compare the racket, which asks for *any* Серый сектор object: 11 uses in a single
+    # game against 10 for all five grey operations across two, and 8 of those were one crypto
+    # exchange. Three of the five were never run at all. The gate is now a district, so an
+    # operation is unlocked by a shelf of the catalog instead of a single card.
+    # Серый сектор opens all five, which is the point of the district: it is the grey shelf, and the
+    # racket already works that way. Технокластер opens the two technical operations and the
+    # Административный квартал opens the leak, so a clean city can still reach part of the layer.
+    GREY_OPERATION_DISTRICTS = {
+        "cash": ("shadows",),
+        "market": ("shadows",),
+        "crypto": ("tech", "shadows"),
+        "datacenter": ("tech", "shadows"),
+        "influence_broker": ("shadows", "government"),
+    }
+    GREY_ASSET_IDS = tuple(GREY_OPERATION_DISTRICTS)
     GREY_TARGETED_IDS = ("market", "datacenter", "influence_broker")
+    # Trimmed with the gate: both of these are now reachable from any Серый сектор object rather
+    # than from one card, and the two cheapest operations were the ones already being used.
     GREY_BASE_CHANCE = {
-        "cash": 0.85,
-        "market": 0.75,
+        "cash": 0.80,
+        "market": 0.70,
         "crypto": 0.60,
         "datacenter": 0.55,
         "influence_broker": COMPROMAT_CHANCE,
     }
     # A leak and a hack are two scandals; the rest are one.
     GREY_SUCCESS_SCANDALS = {"datacenter": 2, "influence_broker": 2}
+
+    def grey_operation_unlocked(self, player: PlayerState, operation_id: str) -> bool:
+        """Does the player hold an active object of a district this operation runs out of?"""
+        return any(
+            self.district_count(player, district) > 0
+            for district in self.GREY_OPERATION_DISTRICTS.get(operation_id, ())
+        )
 
     def laundering_cost(self, state: GameState) -> int:
         """What laundering money into influence costs, growing with the round like the roof does."""
@@ -1492,8 +1516,8 @@ class CityEngine:
         asset_id = self._payload_string(command, "asset_id")
         if asset_id not in self.GREY_ASSET_IDS:
             raise InvalidCommandError("unknown grey operation asset")
-        if not any(asset.card_id == asset_id and not asset.blocked for asset in player.assets):
-            raise IllegalActionError("the required grey asset is not active")
+        if not self.grey_operation_unlocked(player, asset_id):
+            raise IllegalActionError("the operation requires an active object of the right district")
         target: PlayerState | None = None
         if asset_id in self.GREY_TARGETED_IDS:
             target = self._target_player(state, player, self._payload_string(command, "target_id"))
@@ -1745,7 +1769,7 @@ class CityEngine:
         self._set_turn_order(state)
         state.turn_serial += 1
         state.antitrust_active = False
-        self._rotate_expired_market(state)
+        self._rotate_market(state)
         self._shuffle_action_deck(state)
         self._rotate_project_board(state)
         self._prepare_current_player(state)
@@ -1799,19 +1823,27 @@ class CityEngine:
             actions=state.actions_left,
         )
 
-    def _rotate_expired_market(self, state: GameState) -> None:
-        """Prune the market. Called only when a round opens, so a slot cannot vanish mid-round.
+    def market_rotation_uids(self, state: GameState) -> list[str]:
+        """Which slots the next round opening will replace: the oldest MARKET_ROTATION_SIZE.
 
-        It used to run on every turn pass as well, which is what made the countdown unreadable:
-        between two of your own turns three of six slots could change at a four-player table.
+        Age is position — `_refill_market` appends and removal keeps order — so the client cannot
+        read this off the list it receives without knowing the rule. It gets the answer instead.
         """
-        expired = [item for item in state.market if item.expires_at_round <= state.round_number]
-        if not expired:
+        return [item.uid for item in state.market[:MARKET_ROTATION_SIZE]]
+
+    def _rotate_market(self, state: GameState) -> None:
+        """Replace the oldest slots. Called only when a round opens, never mid-round.
+
+        The leaving cards go to the bottom of the deck rather than out of the game: at three a
+        round for fifteen rounds, dropping them would empty the catalog before the endgame.
+        """
+        leaving = state.market[:MARKET_ROTATION_SIZE]
+        if not leaving:
             return
-        expired_uids = {item.uid for item in expired}
-        state.market = [item for item in state.market if item.uid not in expired_uids]
-        self._refill_market(state, len(expired))
-        state.append_event("market_rotated", expired_asset_ids=[item.card_id for item in expired])
+        state.market = state.market[len(leaving) :]
+        state.market_deck.extend(item.card_id for item in leaving)
+        self._refill_market(state, len(leaving))
+        state.append_event("market_rotated", expired_asset_ids=[item.card_id for item in leaving])
 
     def _refill_market(self, state: GameState, needed: int) -> None:
         drawn: list[str] = []
@@ -1823,14 +1855,7 @@ class CityEngine:
             else:
                 remaining.append(card_id)
         state.market_deck = remaining
-        state.market.extend(
-            MarketAsset(
-                uid=f"asset:{card_id}",
-                card_id=card_id,
-                expires_at_round=state.round_number + MARKET_ASSET_ROUNDS,
-            )
-            for card_id in drawn
-        )
+        state.market.extend(MarketAsset(uid=f"asset:{card_id}", card_id=card_id) for card_id in drawn)
 
     def _shuffle_action_deck(self, state: GameState) -> None:
         """Cards are a blind draw, so the only thing to maintain is a shuffled deck."""
