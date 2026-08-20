@@ -306,6 +306,61 @@ def test_journalist_earns_two_money_per_standing_rival_scandal() -> None:
     assert settled_sources(state)[journalist.id]["journalist"] == 6
 
 
+def test_the_engine_counts_a_project_condition_for_the_player() -> None:
+    """Have/needed comes from the engine: 16 tag projects went unused because nobody counted."""
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+
+    tagged = next(
+        project
+        for project in engine.catalog.projects.values()
+        if project.requirement.get("type") == "tag_objects" and int(project.requirement.get("count", 1)) >= 2
+    )
+    standing = engine.project_requirement_standing(player, tagged)
+    assert (standing["binary"], standing["have"], standing["met"]) == (False, 0, False)
+    assert standing["needed"] == int(tagged.requirement["count"])
+
+    # A condition with no halves reports a yes/no instead of a fraction nobody could read.
+    role_gated = next(
+        project for project in engine.catalog.projects.values() if project.requirement.get("type") == "role"
+    )
+    assert engine.project_requirement_standing(player, role_gated) == {
+        "binary": True,
+        "met": False,
+        "have": 0,
+        "needed": 1,
+    }
+    player.role = "capitalist"
+    assert engine.project_requirement_standing(player, role_gated)["met"] is True
+
+
+def test_development_says_what_the_next_level_pays() -> None:
+    """The +25% rounds up per level over the district's own objects, so only the engine can say."""
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+
+    # One object is not enough to develop at all, so there is nothing to promise.
+    give_asset(state, player, "delivery")
+    assert engine.development_gain(state, player, "residential") == 0
+
+    give_asset(state, player, "media")
+    promised = engine.development_gain(state, player, "residential")
+    assert promised > 0
+
+    player.money = 10
+    before = engine._round_income(state, player)
+    state = run(engine, state, "develop_district", {"district": "residential"})
+    player = state.current_player
+    assert engine._round_income(state, player) - before == promised
+
+    # Level two is offered next, and level three does not exist.
+    assert engine.development_gain(state, player, "residential") > 0
+    player.district_levels["residential"] = 2
+    assert engine.development_gain(state, player, "residential") == 0
+
+
 def test_every_cleanup_costs_an_action_and_nothing_else_limits_it() -> None:
     """One rule, one limit: the action. The per-turn counters were an invisible second limit."""
     engine = CityEngine()

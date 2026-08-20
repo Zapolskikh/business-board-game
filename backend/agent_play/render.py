@@ -457,13 +457,21 @@ ROLE_POWERS = {
 }
 
 
-def _project_line(project_id: str, catalog: Catalog) -> str:
+def _project_line(project_id: str, catalog: Catalog, progress: dict[str, Any] | None = None) -> str:
     project = catalog.projects.get(project_id, {})
     perk = ", ".join(f"{key} {value}" for key, value in (project.get("perk") or {}).items())
+    # The server counts the condition for the viewer; an agent that has to count tags itself
+    # simply does not, which is how 16 tag projects left the board unused in two measured games.
+    standing = ""
+    if progress:
+        if progress.get("binary"):
+            standing = " (вы: да)" if progress.get("met") else " (вы: нет)"
+        else:
+            standing = f" (вы: {min(int(progress['have']), int(progress['needed']))}/{progress['needed']})"
     return (
         f"    {project_id:<22} {catalog.project_title(project_id):<30} "
         f"{project.get('cost_influence', '?')}◆+{project.get('cost_money', '?')}$ → "
-        f"{project.get('points', '?')} очков · условие: {catalog.project_requirement(project_id)}"
+        f"{project.get('points', '?')} очков · условие: {catalog.project_requirement(project_id)}{standing}"
         + (f" · перк: {perk}" if perk else "")
     )
 
@@ -574,7 +582,8 @@ def render_state(
     for index, project_id in enumerate(board):
         # Exactly one project rotates out each round, and it is always the longest-standing one.
         suffix = "  ⏳ уходит под низ колоды в конце раунда" if index == 0 else ""
-        lines.append(_project_line(project_id, catalog) + suffix)
+        progress = (game.get("project_progress") or {}).get(project_id)
+        lines.append(_project_line(project_id, catalog, progress) + suffix)
     repeatable = [pid for pid, row in catalog.projects.items() if row.get("repeatable")]
     if repeatable:
         lines.append("    всегда доступны (берутся сколько угодно раз):")

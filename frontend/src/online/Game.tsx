@@ -27,6 +27,7 @@ import {
   cleanupPowerFor,
   projectPerkText,
   projectRequirementText,
+  projectProgressText,
   projectRerollMoney,
   rarityLabels,
   roofCost,
@@ -170,6 +171,8 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
   const buyActions = new Map(matching("buy_asset").map(action => [stringValue(action.payload.market_uid), action]));
   const buyCardAction = matching("buy_action_card")[0];
   const projectActions = new Map(matching("city_project").map(action => [stringValue(action.payload.project_id), action]));
+  // Development is offered on the district's own stars now, so the action has to travel to the map.
+  const developActions = new Map(matching("develop_district").map(action => [stringValue(action.payload.district), action]));
   const ranking = [...game.players].sort((a, b) => scoreOf(game, b) - scoreOf(game, a));
 
   return <div className="city-game">
@@ -190,7 +193,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
         <ProjectBoard game={game} meta={meta} me={me} projects={projects} actions={projectActions} reroll={matching("reroll_projects")[0]} busy={busy} onAction={send} />
         <DistrictMarket
           game={game} meta={meta} me={me} viewed={viewed} viewingOther={viewingOther} assets={assets}
-          selectedDistrict={selectedDistrict} onSelectDistrict={setSelectedDistrict}
+          selectedDistrict={selectedDistrict} onSelectDistrict={setSelectedDistrict} developActions={developActions}
           buyActions={buyActions} reroll={matching("reroll_market")[0]} busy={busy} onAction={send}
         />
         {!viewingOther && <CardDesk game={game} me={me} cards={cards} legal={legal} buyCard={buyCardAction} busy={busy} onAction={send} onOffer={offer} labelContext={labelContext} />}
@@ -200,7 +203,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
       <div className="city-side">
         <DecisionPanel
           game={game} me={me} meta={meta} roles={roles} districts={districts} assets={assets} legal={legal}
-          selectedDistrict={selectedDistrict} busy={busy} onAction={send} onOffer={offer}
+          busy={busy} onAction={send} onOffer={offer}
         />
         <Chronicle room={room} game={game} meta={meta} />
       </div>
@@ -283,6 +286,44 @@ function PlayerStrip({ game, viewedId, playerId, roles, onView }: {
   })}</section>;
 }
 
+// Development was a button in the decision panel that named a district you had selected somewhere
+// else on screen. It is a property of the district, so it lives on the district: the stars are the
+// button. The tooltip carries the two numbers a player actually needs — what it costs and what it
+// pays — and the payout comes from the server, because the +25% rounds up per level over whatever
+// objects the district holds.
+function DevelopStars({ district, level, count, game, viewingOther, busy, action, onAction }: {
+  district: { id: string; title: string };
+  level: number;
+  count: number;
+  game: GameState;
+  viewingOther: boolean;
+  busy: boolean;
+  action?: LegalAction;
+  onAction: (action: LegalAction) => Promise<void>;
+}) {
+  const cost = game.development_cost ?? 2;
+  const gain = game.development_preview?.[district.id] ?? 0;
+  const stars = `${"★".repeat(level)}${"☆".repeat(2 - level)}`;
+  const reason = viewingOther
+    ? "Это чужой планшет."
+    : level >= 2
+      ? "Район развит до максимума: 2 уровня."
+      : count < 2
+        ? `Нужно минимум 2 своих объекта в районе (у вас ${count}).`
+        : game.actions_left < 1
+          ? "Нужно 1 обычное действие."
+          : `Нужно ${cost}$.`;
+  const tooltip = action
+    ? `Развить «${district.title}» до уровня ${level + 1}: 1 обычное действие и ${cost}$, вы получаете +1◆. Доход района вырастет на ${gain}$ за раунд (+25% к базовому доходу каждого объекта, с округлением вверх на каждом уровне).`
+    : `Развитие района «${district.title}» сейчас недоступно. ${reason} Развитие стоит 1 обычное действие и ${cost}$, даёт +1◆ и +25% к базовому доходу объектов района.`;
+  return <button
+    className={`district-dev ${level ? "active" : ""} ${action ? "ready" : ""}`}
+    disabled={busy || !action}
+    title={tooltip}
+    onClick={event => { event.stopPropagation(); if (action) void onAction(action); }}
+  >{stars}{level ? ` +${level * 25}%` : ""}{action && gain > 0 ? ` (+${gain}$)` : ""}</button>;
+}
+
 function ProjectBoard({ game, meta, me, projects, actions, reroll, busy, onAction }: {
   game: GameState;
   meta: CityMeta;
@@ -312,13 +353,14 @@ function ProjectBoard({ game, meta, me, projects, actions, reroll, busy, onActio
         className={`project-card ${action ? "available" : "locked"}`}
         disabled={busy || !action}
         onClick={() => action && void onAction(action)}
-        title={`${project.text} Цена: ${project.cost_influence}◆ и ${project.cost_money}$ плюс 1 обычное действие. Условие: ${projectRequirementText(project, meta)}. Награда: ${project.points} очков и постоянный бонус — ${projectPerkText(project)}.`}
+        title={`${project.text} Цена: ${project.cost_influence}◆ и ${project.cost_money}$ плюс 1 обычное действие. Условие: ${projectRequirementText(project, meta)}${projectProgressText(game, projectId)}. Награда: ${project.points} очков и постоянный бонус — ${projectPerkText(project)}.`}
         key={projectId}
       >
         <strong>{project.title}<em>{project.points} очков</em></strong>
         <span className="project-cost">{project.cost_influence}◆ + {project.cost_money}${leaving && <i className="project-leaving"> ⏳ уходит в конце раунда</i>}</span>
         <small className={action ? "project-condition met" : "project-condition"}>
           {action ? "✅ " : affordable ? "🔒 " : "💸 "}{projectRequirementText(project, meta)}
+          <b className="project-progress">{projectProgressText(game, projectId)}</b>
         </small>
         <small className="project-perk">🎁 {projectPerkText(project)}</small>
       </button>;
@@ -340,7 +382,7 @@ function ProjectBoard({ game, meta, me, projects, actions, reroll, busy, onActio
   </section>;
 }
 
-function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selectedDistrict, onSelectDistrict, buyActions, reroll, busy, onAction }: {
+function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selectedDistrict, onSelectDistrict, buyActions, developActions, reroll, busy, onAction }: {
   game: GameState;
   meta: CityMeta;
   me: PlayerState;
@@ -348,6 +390,7 @@ function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selected
   viewingOther: boolean;
   assets: Map<string, AssetMeta>;
   selectedDistrict: string;
+  developActions: Map<string, LegalAction>;
   onSelectDistrict: (id: string) => void;
   buyActions: Map<string, LegalAction>;
   reroll?: LegalAction;
@@ -363,7 +406,7 @@ function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selected
       const level = viewed.district_levels[district.id] ?? 0;
       const market = game.market.filter(item => assets.get(item.card_id)?.district === district.id);
       return <article className={`district ${selectedDistrict === district.id ? "selected" : ""}`} style={{ "--district": district.color } as CSSProperties} onClick={() => onSelectDistrict(district.id)} key={district.id}>
-        <h3>{district.icon} {district.title}<span className="district-level"><span className="district-objects">{count}/4</span>{count >= 2 && <span className="district-synergy">синергия +{count >= 4 ? 2 : 1}$</span>}<span className={`district-dev ${level ? "active" : ""}`}>{"★".repeat(level)}{"☆".repeat(2 - level)}{level ? ` +${level * 25}%` : ""}</span></span></h3>
+        <h3>{district.icon} {district.title}<span className="district-level"><span className="district-objects">{count}/4</span>{count >= 2 && <span className="district-synergy">синергия +{count >= 4 ? 2 : 1}$</span>}<DevelopStars district={district} level={level} count={count} game={game} viewingOther={viewingOther} busy={busy} action={developActions.get(district.id)} onAction={onAction} /></span></h3>
         <p>{district.description}</p>
         <div className="market-cards">{market.length ? market.map(item => {
           const asset = assets.get(item.card_id);
@@ -521,7 +564,7 @@ function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines,
   </article>;
 }
 
-function DecisionPanel({ game, me, meta, roles, districts, assets, legal, selectedDistrict, busy, onAction, onOffer }: {
+function DecisionPanel({ game, me, meta, roles, districts, assets, legal, busy, onAction, onOffer }: {
   game: GameState;
   me: PlayerState;
   meta: CityMeta;
@@ -529,7 +572,6 @@ function DecisionPanel({ game, me, meta, roles, districts, assets, legal, select
   districts: Map<string, { title: string }>;
   assets: Map<string, AssetMeta>;
   legal: LegalAction[];
-  selectedDistrict: string;
   busy: boolean;
   onAction: (action: LegalAction) => Promise<void>;
   onOffer: (title: string, actions: LegalAction[]) => void;
@@ -540,7 +582,6 @@ function DecisionPanel({ game, me, meta, roles, districts, assets, legal, select
   const endTurn = find("end_turn");
   const roleHolder = (roleId: string) => game.players.find(player => player.role === roleId);
   const roleCost = (roleId: string) => roleHolder(roleId) ? game.role_price * 3 : game.role_price;
-  const districtAction = find("develop_district", action => action.payload.district === selectedDistrict);
   const displayRoleId = me.role;
   const powers = Array.from(new Set([
     ...(rolePowers[me.role ?? ""] ?? []),
@@ -594,7 +635,6 @@ function DecisionPanel({ game, me, meta, roles, districts, assets, legal, select
       <StaticAction action={find("reroll_market")} label={`🔄 Обновить рынок: ${marketRerollCost(meta)}$ + действие`} tooltip="Полностью сменить все шесть позиций рынка объектов, не дожидаясь ротации: 1 обычное действие и деньги, один раз за ход. Сам рынок и так обновляет три самые старые позиции в начале каждого раунда — эта кнопка для тех случаев, когда ждать нельзя." busy={busy} onAction={onAction} />
       <StaticAction action={find("reroll_projects")} label={`🔄 Пересобрать доску проектов: ${projectRerollMoney(meta)}$ + действие`} tooltip={`Все четыре проекта возвращаются в колоду, колода перемешивается и раздаётся заново. Цена: ${projectRerollMoney(meta)}$ и 1 обычное действие, один раз за ход. Доска общая: она меняется у всех.`} busy={busy} onAction={onAction} />
       <StaticAction action={find("buy_capacity")} label={`📦 ${capacityLabel(me)}`} tooltip="Купить постоянный дополнительный слот бизнеса. Можно потратить обычное либо инвестиционное действие; максимум 6 слотов." busy={busy} onAction={onAction} />
-      <StaticAction action={districtAction} label={`⭐ Развить «${districts.get(selectedDistrict)?.title}»`} tooltip="Нужно минимум 2 своих объекта в выбранном районе. Потратить 1 действие и 2$: +25% к базовому доходу всех ваших объектов района с округлением вверх (то есть минимум +1$ каждому) и +1◆. Максимум 2 уровня; уровень личный и соперникам ничего не даёт." busy={busy} onAction={onAction} />
     </div>
 
     <div className="action-group g-roles"><h3 className="group-title">🏷️ Роли <span className="group-hint">свободная {game.role_price}◆ · переворот {game.role_price * 3}◆</span></h3><div className="role-market">{meta.roles.map(role => {

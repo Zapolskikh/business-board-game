@@ -102,6 +102,12 @@ export interface GameState {
   players: PlayerState[];
   market: MarketAsset[];
   project_board: string[];
+  // What one more development level would pay in each district, and what a level costs. The
+  // +25% rounds up per level over the district's actual objects, so only the engine can say.
+  development_preview?: Record<string, number>;
+  development_cost?: number;
+  // The viewer's own standing on every board condition, counted by the engine — never here.
+  project_progress?: Record<string, { binary: boolean; met: boolean; have: number; needed: number }>;
   turn_flags: Record<string, unknown>;
   antitrust_active?: boolean;
   event_log: DomainEvent[];

@@ -6,6 +6,7 @@ from copy import deepcopy
 from functools import lru_cache
 from typing import Any
 
+from city_engine.constants import DISTRICT_IDS
 from city_engine.engine import CityEngine
 from city_engine.models import PlayerState
 from city_rooms.models import RoomState
@@ -102,6 +103,23 @@ def room_view(
             player["hand_count"] = len(player.pop("hand"))
     # The viewer's own price for every market slot: discounts are per-player, so the client
     # must not recompute them (two implementations of asset_price already drifted apart once).
+    # What one more development level would pay in each district, and what it costs. The +25%
+    # rounds up per level over whatever objects the district holds, so this is not a rate the
+    # client can print from the rules — it is an income calculation, and the engine owns those.
+    viewer_for_dev = next((player for player in room.game.players if player.id == viewer_id), None)
+    if viewer_for_dev is not None:
+        game["development_preview"] = {
+            district: engine.development_gain(room.game, viewer_for_dev, district) for district in DISTRICT_IDS
+        }
+        game["development_cost"] = engine.development_cost(viewer_for_dev)
+    # The viewer's own progress on every board condition. Only the viewer's: showing everybody's
+    # was considered and dropped — it turns four cards into a table nobody reads.
+    viewer = next((player for player in room.game.players if player.id == viewer_id), None)
+    if viewer is not None:
+        game["project_progress"] = {
+            project_id: engine.project_requirement_standing(viewer, engine.project(project_id))
+            for project_id in room.game.project_board
+        }
     # "The three oldest slots leave when the round opens" is a rule, and the three oldest are not
     # the first three of anything the client can see, so the engine answers instead of the client.
     leaving = set(engine.market_rotation_uids(room.game))

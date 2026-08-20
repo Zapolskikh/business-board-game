@@ -174,8 +174,12 @@ h1, h2, h3, p { margin-top: 0; }
 .district-objects, .district-synergy, .district-dev { padding: 2px 6px; border-radius: 10px; }
 .district-objects { color: #fff; background: var(--district); }
 .district-synergy { color: var(--city-dim); background: color-mix(in srgb, var(--district), transparent 80%); }
-.district-dev { color: var(--city-dim); background: rgba(255,255,255,.06); letter-spacing: 1px; }
+/* The stars are the develop button now, so they have to look pressable — and unmistakably so
+   when the move is actually available, because that is the whole point of moving it here. */
+.district-dev { color: var(--city-dim); background: rgba(255,255,255,.06); letter-spacing: 1px; border: 1px solid transparent; font: inherit; font-size: 9px; cursor: default; }
 .district-dev.active { color: #e3b341; }
+.district-dev.ready { cursor: pointer; color: #e3b341; border-color: #e3b341; background: color-mix(in srgb, #e3b341, transparent 88%); }
+.district-dev.ready:hover { background: color-mix(in srgb, #e3b341, transparent 75%); }
 .market-cards { display: flex; flex-wrap: wrap; gap: 5px; }
 /* Two columns: cost and payout on the left, what the object unlocks on the right. `wrap` instead of
    a media query — two cards in one district row leave no room for a second column, and the hint
@@ -186,6 +190,10 @@ h1, h2, h3, p { margin-top: 0; }
 .market-card span, .market-card small { color: var(--city-dim); font-size: 10px; line-height: 1.3; }
 .market-card b { font-size: 12px; }
 .market-expiry { color: #e3b341 !important; font-weight: 700; }
+/* The player's own count, bolted onto the condition text: the whole point is that it is louder
+   than the condition, because the condition was already being read and the count was not. */
+.project-progress { color: #e3b341; font-weight: 800; }
+.project-condition.met .project-progress { color: #7ee787; }
 .empty-district { padding: 14px 5px; color: var(--city-dim); font-size: 10px; }
 .rarity-badge { width: max-content; padding: 1px 6px; color: #05070c; background: var(--rarity, #8b949e); border: 0; border-radius: 8px; font-size: 8px !important; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
 .rarity-common { --rarity: #adb6c2; }.rarity-uncommon { --rarity: #3fb950; }.rarity-rare { --rarity: #4c9dff; }.rarity-epic { --rarity: #c07cff; }.rarity-legendary { --rarity: #ffa23e; }

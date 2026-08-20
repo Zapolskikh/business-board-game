@@ -241,6 +241,16 @@ export function projectRequirementText(project: ProjectMeta, meta: CityMeta): st
   }
 }
 
+// The player's own standing on a condition, printed straight after it. The counting is the
+// engine's (`project_requirement_standing`); this only formats what it sent. Without it a tag
+// condition is homework: 16 tag projects left the board unused across two measured games.
+export function projectProgressText(game: GameState, projectId: string): string {
+  const standing = game.project_progress?.[projectId];
+  if (!standing) return "";
+  if (standing.binary) return standing.met ? " (вы: да)" : " (вы: нет)";
+  return ` (вы: ${Math.min(standing.have, standing.needed)}/${standing.needed})`;
+}
+
 const perkLabels: Record<string, (value: number) => string> = {
   passiveMoney: value => `+${value}$ в каждый раунд`,
   passiveInfluence: value => `+${value}◆ в каждый раунд`,

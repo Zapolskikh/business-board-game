@@ -405,11 +405,25 @@ class CityEngine:
         accident. Conditions that cannot be approached gradually (a role, a scandal ceiling) stay
         binary, which is honest — there is no half of holding a role.
         """
+        standing = self.project_requirement_standing(player, project)
+        if standing["binary"]:
+            return 1.0 if standing["met"] else 0.0
+        return min(1.0, standing["have"] / standing["needed"])
+
+    def project_requirement_standing(self, player: PlayerState, project: ProjectDefinition) -> dict[str, Any]:
+        """Have/needed for a condition, or a plain yes/no for the ones with no halves.
+
+        The client used to print the condition and leave the counting to the player — 13 of the 42
+        projects gate on a tag, another 13 on a district, and across two measured games 16 tag
+        projects left the board unused. Nobody was doing the arithmetic. This is that arithmetic,
+        computed by the only component allowed to evaluate a condition.
+        """
         requirement = project.requirement
         kind = str(requirement.get("type", "none"))
         needed = max(1, int(requirement.get("count", 1)))
+        met = self.project_requirement_met(player, project)
         if kind in {"none", "role", "max_scandals"}:
-            return 1.0 if self.project_requirement_met(player, project) else 0.0
+            return {"binary": True, "met": met, "have": int(met), "needed": 1}
         if kind == "assets":
             have = len(player.assets)
         elif kind == "district_objects":
@@ -423,7 +437,7 @@ class CityEngine:
             have = sum(tag in self.owned_definition(asset).tags for asset in player.assets)
         else:
             raise InvalidCommandError(f"unknown project requirement: {kind}")
-        return min(1.0, have / needed)
+        return {"binary": False, "met": met, "have": have, "needed": needed}
 
     def asset_value(self, owned: OwnedAsset) -> int:
         return self.asset_value_of(owned.card_id)
@@ -867,6 +881,23 @@ class CityEngine:
     def _drop_asset(player: PlayerState, owned: OwnedAsset) -> None:
         player.assets = [asset for asset in player.assets if asset.uid != owned.uid]
 
+    def development_cost(self, player: PlayerState) -> int:
+        return max(0, 2 - self.effect_total(player, "developmentDiscount"))
+
+    def development_gain(self, state: GameState, player: PlayerState, district: str) -> int:
+        """What the next level of this district would add to the round income, in money.
+
+        The +25% rounds up at every level, so the answer is not a rate the client can print — it
+        depends on which objects are in the district and what they already earn. The engine runs
+        its own income function over a probe copy rather than reimplementing the arithmetic.
+        """
+        level = player.district_levels.get(district, 0)
+        if level >= 2 or self.district_count(player, district) < 2:
+            return 0
+        probe = PlayerState.from_dict(player.to_dict())
+        probe.district_levels[district] = level + 1
+        return self._round_income(state, probe) - self._round_income(state, player)
+
     def _develop_district(self, state: GameState, command: Command) -> None:
         player = state.current_player
         district = self._payload_string(command, "district")
@@ -876,8 +907,7 @@ class CityEngine:
             raise IllegalActionError("district development requires two owned objects")
         if player.district_levels[district] >= 2:
             raise IllegalActionError("district is already fully developed")
-        discount = self.effect_total(player, "developmentDiscount")
-        cost = max(0, 2 - discount)
+        cost = self.development_cost(player)
         if player.money < cost:
             raise IllegalActionError("not enough money for district development")
         self._spend_action(state)
