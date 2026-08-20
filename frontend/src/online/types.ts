@@ -49,8 +49,6 @@ export interface PlayerState {
   projects: string[];
   capacity: number;
   debt: number;
-  role_shields: number;
-  scandal_shields: number;
   zoning_district: string | null;
   district_levels: Record<string, number>;
   turns: number;

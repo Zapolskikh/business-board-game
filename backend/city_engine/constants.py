@@ -82,7 +82,7 @@ MARKET_REROLL_COST = 4
 # of influence: campaign was the only scalable source and it was capped at 2◆ per action, so a
 # player holding 264$ and 2◆ had no way to convert. Rates worsen as the tier grows (1.0 / 1.67 /
 # 2.25 $ per ◆), so the cheap trade stays the default and the expensive one is for a full wallet.
-CAMPAIGN_TIERS = {2: 2, 5: 3, 9: 4}
+CAMPAIGN_TIERS = {5: 3}
 # Refreshing the oldest project on the board: the expired card goes to the bottom of the deck.
 # Priced in money, but an order of magnitude above the market reroll. Influence was the wrong
 # currency: it is the one the projects themselves are bought with, so the reroll was a tax on the
@@ -119,7 +119,11 @@ CRISIS_PR_INFLUENCE = 3
 # against 9$ for 4◆, plus a scandal — and four expert bots used it zero times in 24 games. The gain
 # has to outpace the stake, or the grey channel is dominated by the basic action it is meant to
 # beat. It stays honest because a scandal is a point and the object costs a slot.
-LAUNDERING_BASE_GAIN = 2
+#
+# The campaign now has a single tier at 5$ → 3◆, which is a better rate than the old top tier, so
+# the grey channel had to move again: at 3 + round/3 it pays 9$ → 6◆ by round ten and stays ahead
+# of the button in every round of the game. That is the whole argument for owning the object.
+LAUNDERING_BASE_GAIN = 3
 LAUNDERING_BASE_COST = 4
 # Hacking used to block the target's best object for one round — worth about 4$ against a player
 # holding 264$, so it was used zero times in 24 games. It now takes influence instead, which is

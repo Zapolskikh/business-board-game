@@ -364,9 +364,9 @@ def describe_event(event: dict[str, Any], game: dict[str, Any], catalog: Catalog
         lost = f"роль {catalog.role_title(str(role_id))} потеряна" if role_id else "роли уже не было"
         jail = ", арест: следующий ход укорочен, скандалы сброшены до 3⚠, Крыша снята" if data.get("jailed") else ""
         return f"{head} набрал {data.get('limit')}⚠ — {lost}{jail}"
-    if kind == "scandal_shield_spent":
+    if kind == "scandal_blocked":
         absorbed = data.get("absorbed", 1)
-        return f"{head} погасил {absorbed}⚠ Щитом от скандала (щитов осталось {data.get('scandal_shields')})"
+        return f"{head} погасил {absorbed}⚠ Крышей (крыш осталось {data.get('roofs', 0)})"
     if kind == "game_finished":
         scores = data.get("scores") or {}
         table = ", ".join(f"{player_name(game, key)} {value}" for key, value in scores.items())
@@ -411,10 +411,6 @@ def _player_line(player: dict[str, Any], game: dict[str, Any], catalog: Catalog,
         flags.append(f"тюрьма {player['jail_turns']}")
     if int(player["debt"]) > 0:
         flags.append(f"кредит -{player['debt']}$")
-    if int(player["role_shields"]) > 0:
-        flags.append("щит роли")
-    if int(player["scandal_shields"]) > 0:
-        flags.append("щит скандала")
     return (
         f"{'*' if mine else ' '} {player['name']:<12} {player['id']:<8} {points:>3}оч "
         f"{player['money']:>3}$ {player['influence']:>2}◆ {player['scandals']}⚠ {player['roofs']}🛡 "

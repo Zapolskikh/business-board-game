@@ -145,7 +145,7 @@ export function marketAssetRounds(meta: CityMeta): number {
 }
 
 export function campaignTiers(meta: CityMeta): { spend: number; gain: number }[] {
-  return meta.scoring?.campaign_tiers ?? [{ spend: 2, gain: 2 }];
+  return meta.scoring?.campaign_tiers ?? [{ spend: 5, gain: 3 }];
 }
 
 // Matches the engine's `laundering_cost`/`laundering_gain`: both sides grow with the round, so the
@@ -166,6 +166,45 @@ export function campaignTier(meta: CityMeta, spend: unknown): { spend: number; g
 
 export function crisisPrInfluence(meta: CityMeta): number {
   return meta.scoring?.crisis_pr_influence ?? 3;
+}
+
+// Cleaning a scandal was 42 of the hottest events in two measured games and it was spread over
+// five buttons at five prices in two different panels: the basic action, three role powers and a
+// card. The mechanic stays; the screen shows one button, and it is the price *your* role pays.
+const cleanupPowers: Record<string, string> = {
+  politician: "politician_cleanup",
+  fraudster: "fraudster_cleanup",
+  mafia: "mafia_cleanup",
+};
+
+export function cleanupPowerFor(role: string | null): string | undefined {
+  return role ? cleanupPowers[role] : undefined;
+}
+
+export function cleanupOffer(power: string | undefined, meta: CityMeta): { label: string; tooltip: string } {
+  const base = `Базовый вариант — антикризисный PR: 1 действие и ${crisisPrInfluence(meta)}◆ за один скандал.`;
+  switch (power) {
+    case "politician_cleanup":
+      return {
+        label: "🧯 Урегулировать скандал: 2◆ → −1⚠",
+        tooltip: `Способность Политика: 1 обычное действие и 2◆ за один скандал — на 1◆ дешевле, чем у остальных. ${base}`,
+      };
+    case "fraudster_cleanup":
+      return {
+        label: "🧯 Замести следы: бесплатно → −1⚠",
+        tooltip: `Способность Афериста: 1 обычное действие и ничего больше за один скандал. У роли четыре действия за ход, так что чистка обходится дешевле всех в игре. ${base}`,
+      };
+    case "mafia_cleanup":
+      return {
+        label: "🧯 Замять дело: 3$ → −2⚠",
+        tooltip: `Способность Мафиози: 1 обычное действие и 3$ снимают сразу два скандала. Нужен активный объект Административного квартала — без него кнопка предлагает базовый вариант. ${base}`,
+      };
+    default:
+      return {
+        label: `🧯 Антикризисный PR: ${crisisPrInfluence(meta)}◆ → −1⚠`,
+        tooltip: `Потратить 1 обычное действие и ${crisisPrInfluence(meta)}◆, чтобы снять 1 свой скандал. Цена в влиянии, а не в деньгах: деньги слишком дёшевы в очках, чтобы скандал что-то значил. Роли Политика, Афериста и Мафиози чистят скандалы дешевле — эта же кнопка подставит их цену.`,
+      };
+  }
 }
 
 export function actionCardCost(meta: CityMeta): number {
@@ -337,7 +376,7 @@ const eventVerbs: Record<string, string> = {
   grey_operation: "проводит серую операцию",
   role_power_used: "использует способность роли",
   scandal_limit_reached: "доходит до предела скандалов",
-  scandal_shield_spent: "гасит скандал щитом",
+  scandal_blocked: "гасит скандал Крышей",
   player_jailed: "арестован",
   game_finished: "Партия завершена",
 };
@@ -546,8 +585,8 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
     case "targeted_card_resolved":
       return lead(txt(` эффект «${card ?? cardId}» на `), playerSeg(game, targetId), ...deltas);
     case "targeted_effect_blocked":
-      // The actor of this event is the defender, and the injunction defends as well as the roof.
-      return lead(txt(data.by === "role_shield" ? " отражает атаку судебным запретом" : " отражает атаку Крышей"));
+      // The actor of this event is the defender: one token now answers every kind of attack.
+      return lead(txt(" отражает атаку Крышей"));
     case "role_stripped":
       return lead(
         txt(" сливает компромат на "),
@@ -556,11 +595,11 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       );
     // Both of these used to be invisible: the only trace was the scandal counter, so a player
     // discovered a lost role by noticing their passive income had stopped.
-    case "scandal_shield_spent":
+    case "scandal_blocked":
       return lead(
         txt(" гасит "),
         num(`${numberValue(data.absorbed) || 1}⚠`, "good"),
-        txt(` Щитом от скандала (осталось щитов: ${numberValue(data.scandal_shields)})`),
+        txt(` Крышей (осталось Крыш: ${numberValue(data.roofs)})`),
       );
     case "scandal_limit_reached": {
       const limit = numberValue(data.limit) || 5;
@@ -957,8 +996,13 @@ export function activeBonuses(player: PlayerState, game: GameState, meta: CityMe
     });
   }
   if (player.debt > 0) result.push({ text: `Мостовой кредит: −${player.debt}$ при ближайшей выплате.`, active: false });
-  if (player.role_shields > 0) result.push({ text: `Судебный запрет защитит роль: ${player.role_shields}.`, active: true });
-  if (player.scandal_shields > 0) result.push({ text: `Репутационный резерв отменит следующее получение скандалов.`, active: true });
+  // One token, three jobs: the merged rule only reads as a rule if the panel states all three.
+  if (player.roofs > 0) {
+    result.push({
+      text: `Крыша (${player.roofs}): погасит следующую атаку — перехват роли, слив компромата или начисление скандалов.`,
+      active: true,
+    });
+  }
   // A finished project can neither be blocked nor confiscated, so its perk is always on.
   for (const projectId of player.projects) {
     const project = meta.projects.find(item => item.id === projectId);

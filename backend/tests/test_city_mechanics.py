@@ -306,6 +306,45 @@ def test_journalist_earns_two_money_per_standing_rival_scandal() -> None:
     assert settled_sources(state)[journalist.id]["journalist"] == 6
 
 
+def test_every_cleanup_costs_an_action_and_nothing_else_limits_it() -> None:
+    """One rule, one limit: the action. The per-turn counters were an invisible second limit."""
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.role = "politician"
+    player.influence = 10
+    player.scandals = 3
+    before = state.actions_left
+
+    state = run(engine, state, "use_role_power", {"power": "politician_cleanup"})
+    player = state.current_player
+    assert (player.scandals, player.influence, state.actions_left) == (2, 8, before - 1)
+
+    # Twice in a turn, which the old once-per-turn counter forbade: the actions are the limit.
+    state = run(engine, state, "use_role_power", {"power": "politician_cleanup"})
+    player = state.current_player
+    assert (player.scandals, player.influence, state.actions_left) == (1, 6, before - 2)
+
+
+def test_the_mafia_buries_a_case_for_money_and_needs_the_city_hall() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.role = "mafia"
+    player.money = 10
+    player.scandals = 3
+    player.roofs = 2
+
+    # A Крыша used to be an accepted payment. It is the whole defence now, so it is not for sale.
+    with pytest.raises(IllegalActionError):
+        run(engine, state, "use_role_power", {"power": "mafia_cleanup"})
+
+    give_asset(state, player, "archive")  # government district
+    state = run(engine, state, "use_role_power", {"power": "mafia_cleanup"})
+    player = state.current_player
+    assert (player.scandals, player.money, player.roofs) == (1, 7, 2)
+
+
 def test_the_politician_taxes_every_residential_object_on_the_table() -> None:
     engine = CityEngine()
     state = make_state()
@@ -908,35 +947,35 @@ def test_replace_asset_no_longer_exists() -> None:
         run(engine, state, "replace_asset", {"asset_uid": player.assets[0].uid, "market_uid": "asset:replacement"})
 
 
-def test_campaign_tiers_trade_money_for_influence_at_worsening_rates() -> None:
+def test_the_campaign_is_one_button_at_one_rate() -> None:
+    """Three tiers were three buttons for the same idea, and the middle one was the only one used."""
     engine = CityEngine()
-    for spend, gain in CAMPAIGN_TIERS.items():
-        state = make_state()
-        player = state.current_player
-        player.money = 20
-        player.influence = 0
-        state = run(engine, state, "basic_action", {"kind": "campaign", "spend": spend})
-        player = state.current_player
-        assert (player.money, player.influence) == (20 - spend, gain)
+    assert CAMPAIGN_TIERS == {5: 3}
+    ((spend, gain),) = CAMPAIGN_TIERS.items()
 
-    # The action, not the money, was the price of influence: the tiers raise the ceiling per action
-    # from 2◆ to 4◆ while making every extra point dearer.
-    rates = [spend / gain for spend, gain in sorted(CAMPAIGN_TIERS.items())]
-    assert rates == sorted(rates) and rates[0] < rates[-1]
-
-    # Laundering is the unbounded channel, so from the mid-game on it has to beat the best tier —
-    # otherwise it is dominated by the basic action and nobody ever runs it (measured: zero uses).
     state = make_state()
-    best_tier = max(rates)
+    player = state.current_player
+    player.money = 20
+    player.influence = 0
+    state = run(engine, state, "basic_action", {"kind": "campaign", "spend": spend})
+    player = state.current_player
+    assert (player.money, player.influence) == (20 - spend, gain)
+
+    # Laundering is the unbounded channel, so from the mid-game on it has to beat the button —
+    # otherwise it is dominated by the basic action and nobody ever runs it (measured: zero uses).
+    rate = spend / gain
+    state = make_state()
     for round_number in (6, 10, 15):
         state.round_number = round_number
         grey_rate = engine.laundering_cost(state) / engine.laundering_gain(state)
-        assert grey_rate < best_tier, f"laundering is dominated in round {round_number}"
+        assert grey_rate < rate, f"laundering is dominated in round {round_number}"
 
+    # Every other amount is gone, including the two tiers that used to exist.
     state = make_state()
     state.current_player.money = 20
-    with pytest.raises(InvalidCommandError):
-        run(engine, state, "basic_action", {"kind": "campaign", "spend": 4})
+    for rejected in (2, 4, 9):
+        with pytest.raises(InvalidCommandError):
+            run(engine, state, "basic_action", {"kind": "campaign", "spend": rejected})
 
 
 def test_journalist_keeps_the_role_one_scandal_longer() -> None:
@@ -989,18 +1028,46 @@ def test_being_jailed_by_somebody_else_is_announced() -> None:
     assert (victim.scandals, victim.jail_turns) == (3, 1)
 
 
-def test_a_spent_scandal_shield_reports_itself_like_a_roof() -> None:
+def test_one_token_answers_a_takeover_a_leak_and_a_scandal() -> None:
+    """The merge: Крыша is the whole defence, so all three attacks spend the same token."""
+    engine = CityEngine()
+
+    # A scandal, however big, is absorbed whole — and says so in the log.
+    state = make_state()
+    player = state.current_player
+    player.roofs = 1
+    engine.add_scandal(state, player, 2)
+    event = state.event_log[-1]
+    assert event.type == "scandal_blocked"
+    assert (event.data["absorbed"], event.data["roofs"]) == (2, 0)
+    assert player.scandals == 0
+
+    # A role takeover: the token goes, the attacker's influence comes back.
+    state = make_state()
+    attacker, holder = state.players[0], state.players[1]
+    holder.role = "capitalist"
+    holder.roofs = 1
+    attacker.influence = 30
+    state = run(engine, state, "claim_role", {"role_id": "capitalist"})
+    attacker, holder = state.players[0], state.players[1]
+    assert (holder.role, holder.roofs, attacker.influence) == ("capitalist", 0, 30)
+
+    # And the compromat leak, which used to want a card of its own.
+    state = make_state()
+    target = state.players[1]
+    target.role = "military"
+    target.roofs = 1
+    engine._resolve_compromat(state, state.players[0], target)
+    assert (target.role, target.roofs) == ("military", 0)
+
+
+def test_two_tokens_is_the_ceiling_and_a_perk_refills_one_a_turn() -> None:
     engine = CityEngine()
     state = make_state()
     player = state.current_player
-    player.scandal_shields = 1
-
-    engine.add_scandal(state, player, 2)
-
-    event = state.event_log[-1]
-    assert event.type == "scandal_shield_spent"
-    assert (event.data["absorbed"], event.data["scandal_shields"]) == (2, 0)
-    assert player.scandals == 0
+    assert engine.roof_limit(player) == 2
+    player.role = "mafia"
+    assert engine.roof_limit(player) == 3
 
 
 def test_roof_blocks_a_journalist_scandal_like_any_other_attack() -> None:

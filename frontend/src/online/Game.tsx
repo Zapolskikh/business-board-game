@@ -10,7 +10,6 @@ import {
   buildGameLogMarkdown,
   campaignTiers,
   capacityLabel,
-  crisisPrInfluence,
   describeEventSegments,
   difficultyLabels,
   districtCount,
@@ -23,6 +22,8 @@ import {
   marketRerollCost,
   moneyPerPoint,
   powerLabels,
+  cleanupOffer,
+  cleanupPowerFor,
   projectPerkText,
   projectRequirementText,
   projectRerollMoney,
@@ -57,21 +58,23 @@ interface ChoiceState { title: string; actions: LegalAction[] }
 type MobileGameTab = "city" | "players" | "actions" | "log" | "menu";
 
 const playerColors = ["#58a6ff", "#3fb950", "#f0883e", "#d65db1", "#e3b341", "#9b6ee7"];
+// Cleanups are missing on purpose: they all live on the single 🧯 button in «Защита и репутация»,
+// which substitutes the price of whichever role the viewer holds.
 const rolePowers: Record<string, string[]> = {
   capitalist: [],
-  politician: ["politician_cleanup"],
+  politician: [],
   journalist: ["journalist_inflate", "journalist_publish"],
-  mafia: ["mafia_racket", "mafia_cleanup"],
+  mafia: ["mafia_racket"],
   military: ["military_sanction"],
-  fraudster: ["fraudster_cleanup", "fraudster_crypto_scam"],
+  fraudster: ["fraudster_crypto_scam"],
 };
 
 const powerDescriptions: Record<string, string> = {
-  politician_cleanup: "Действие не расходуется, один раз за ход: потратить 2◆ и снять 1 свой скандал.",
+  politician_cleanup: "За 1 действие: потратить 2◆ и снять 1 свой скандал. Ограничения по числу применений нет — только действия.",
   journalist_inflate: "Действие не расходуется, один раз за ход: вы и выбранный соперник получаете по 1 скандалу. У Журналиста порог сдвинут: роль теряется на 6 скандалах, тюрьма на 7 — у всех остальных на 5 и 6.",
   journalist_publish: "Действие не расходуется, один раз за ход: потратить 3◆ и дать выбранному сопернику 1 скандал.",
   mafia_racket: "Один раз за ход и за 1 действие: нужен активный объект Серого сектора. Базово отбирает до 2$, сумма растёт от раунда, ваших объектов и лидерства цели; её Крыша отменяет рэкет.",
-  mafia_cleanup: "Действие не расходуется, один раз за ход: снять до 2 скандалов, потратив 1 Крышу либо 3$ при наличии административного объекта.",
+  mafia_cleanup: "За 1 действие: 3$ и активный административный объект — снять до 2 своих скандалов.",
   military_sanction: "Один раз за ход и за 1 действие: цель должна иметь минимум 2 скандала. Снимает ей скандал и взыскивает деньги либо объект; Крыша принимает удар.",
   fraudster_cleanup: "За 1 действие снять 1 свой скандал.",
   fraudster_crypto_scam: "Один раз за ход и за 1 действие: нужна активная Городская криптобиржа. Украсть у каждого соперника выбранную сумму и получить столько же скандалов (Аферист — на 1 меньше со снижением). Внимание: на 5 скандалах теряется роль, на 6 — тюрьма (пропуск хода), поэтому большая сумма может вас посадить.",
@@ -541,7 +544,13 @@ function DecisionPanel({ game, me, meta, roles, districts, legal, selectedDistri
   const powers = Array.from(new Set([
     ...(rolePowers[me.role ?? ""] ?? []),
     ...all("use_role_power").map(action => stringValue(action.payload.power)),
-  ])).filter(Boolean);
+  ])).filter(power => power && !power.endsWith("_cleanup"));
+  // One cleanup button: the role's own price when the role can actually pay it, the basic
+  // antikrizisny PR otherwise. The engine still offers both commands; only the panel merges them.
+  const cleanupPower = cleanupPowerFor(me.role);
+  const cleanupRoleAction = cleanupPower ? find("use_role_power", action => action.payload.power === cleanupPower) : undefined;
+  const cleanupAction = cleanupRoleAction ?? find("crisis_pr");
+  const cleanup = cleanupOffer(cleanupRoleAction ? cleanupPower : undefined, meta);
   const dotCount = Math.max(3, game.actions_left);
   const greyRequirement = (assetId: string): string => {
     const info = greyOperationInfo[assetId];
@@ -602,7 +611,7 @@ function DecisionPanel({ game, me, meta, roles, districts, legal, selectedDistri
       return <button className="described-action" disabled={busy || variants.length === 0} onClick={() => onOffer(label, variants)} title={`Требуется «${info.asset}». Эффект при успехе: ${effect}. Базовый шанс успеха ${info.chance}%; у Афериста он может быть выше. ${info.failure} Страховка при провале тратит 1 Крышу и отменяет денежный либо объектный штраф, но скандалы всё равно начисляются и действие расходуется.`} key={assetId}><strong>{label}</strong><small>{variants.length ? `${effect} · шанс от ${info.chance}%` : greyRequirement(assetId)}</small></button>;
     })}</div>
 
-    <div className="action-group g-defence"><h3 className="group-title">🛡️ Защита и репутация</h3><StaticAction action={find("crisis_pr")} label={`🧯 Антикризисный PR: ${crisisPrInfluence(meta)}◆ → −1⚠`} tooltip={`Потратить 1 обычное действие и ${crisisPrInfluence(meta)}◆, чтобы снять 1 свой скандал. Цена в влиянии, а не в деньгах: деньги слишком дёшевы в очках, чтобы скандал что-то значил.`} busy={busy} onAction={onAction} /><StaticAction action={find("buy_roof")} label={`🛡️ Купить Крышу (${roofCost(me, game)}$)`} tooltip={`Потратить 1 обычное действие и ${roofCost(me, game)}$. Цена растёт на 1$ каждые два раунда. Крыша гасит направленный на вас эффект другого игрока: карту, рэкет, санкцию, взлом, попытку отобрать роль. Последствия ваших собственных решений она не отменяет, но может застраховать провал вашей серой операции. Лимит 1, у Мафиози 2.`} busy={busy} onAction={onAction} /></div>
+    <div className="action-group g-defence"><h3 className="group-title">🛡️ Защита и репутация</h3><StaticAction action={cleanupAction} label={cleanup.label} tooltip={cleanup.tooltip} busy={busy} onAction={onAction} /><StaticAction action={find("buy_roof")} label={`🛡️ Купить Крышу (${roofCost(me, game)}$)`} tooltip={`Потратить 1 обычное действие и ${roofCost(me, game)}$. Цена растёт на 1$ каждые два раунда. Крыша — единственная защита в игре: она гасит направленный на вас эффект другого игрока (карту, рэкет, санкцию, взлом), попытку отобрать роль и любое начисление скандалов целиком. Последствия ваших собственных решений она не отменяет, но может застраховать провал вашей серой операции. Лимит 2, у Мафиози 3.`} busy={busy} onAction={onAction} /></div>
     <button className="end-turn" disabled={busy || !endTurn} onClick={() => endTurn && void onAction(endTurn)} title="Завершить текущий ход. Неиспользованные обычные действия пропадут, кроме разрешённого переносимого действия; затем сервер выполнит ходы ботов.">✅ Завершить ход</button>
   </aside>;
 }

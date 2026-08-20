@@ -294,13 +294,12 @@ class CityEngine:
                     for power in ("journalist_inflate", "journalist_publish")
                 )
         if self.has_role(player, "mafia"):
-            candidates.extend(
+            candidates.append(
                 Command(
                     type="use_role_power",
                     actor_id=actor_id,
-                    payload={"power": "mafia_cleanup", "method": method},
+                    payload={"power": "mafia_cleanup"},
                 )
-                for method in ("roof", "money")
             )
             candidates.extend(
                 Command(
@@ -485,7 +484,12 @@ class CityEngine:
         return assets + perks
 
     def roof_limit(self, player: PlayerState) -> int:
-        return (2 if self.has_role(player, "mafia") else 1) + self.effect_total(player, "roofCapacity")
+        """How many Крыша tokens a player may hold at once.
+
+        Two, because one token now absorbs what three used to: a takeover, a leak and a scandal.
+        The Мафия keeps its extra one — protection is the role's whole theme.
+        """
+        return (3 if self.has_role(player, "mafia") else 2) + self.effect_total(player, "roofCapacity")
 
     @staticmethod
     def _round_scaled(state: GameState, base: int) -> int:
@@ -719,14 +723,9 @@ class CityEngine:
         self._spend_action(state)
         player.influence -= cost
 
-        # A blocked takeover costs the attempt (the action) and the defender's shield, but the
+        # A blocked takeover costs the attempt (the action) and the defender's token, but the
         # influence comes back: paying full price for nothing was a silent 3-point tax, and in the
         # arena game it decided a match that finished four points apart.
-        if holder and holder.role_shields > 0:
-            holder.role_shields -= 1
-            player.influence += cost
-            state.append_event("role_takeover_blocked", player.id, role_id=role_id, by="role_shield", refund=cost)
-            return
         if holder and holder.roofs > 0:
             holder.roofs -= 1
             player.influence += cost
@@ -1136,10 +1135,6 @@ class CityEngine:
                 cost_money=project.cost_money,
                 source_card_id=card.id,
             )
-        elif kind == "role_shield":
-            player.role_shields += 1
-        elif kind == "scandal_shield":
-            player.scandal_shields += 1
         elif kind == "unblock":
             blocked = max(
                 (asset for asset in player.assets if asset.blocked),
@@ -1255,9 +1250,11 @@ class CityEngine:
         before = self._resource_snapshot(state)
         if power == "politician_cleanup":
             self._require_role(player, "politician")
-            self._once_per_turn(state, power)
             if player.influence < 2 or player.scandals < 1:
                 raise IllegalActionError("political cleanup requires 2 influence and a scandal")
+            # An action instead of a per-turn counter: the limit is now the same one every other
+            # cleanup lives under, and the player can see it on the action tokens.
+            self._spend_action(state)
             player.influence -= 2
             player.scandals -= 1
         elif power in {"journalist_inflate", "journalist_publish"}:
@@ -1340,22 +1337,21 @@ class CityEngine:
             self.add_scandal(state, player, 1)
 
     def _mafia_cleanup(self, state: GameState, command: Command) -> None:
+        """Bury a case for money. One method, not two.
+
+        Paying with a Крыша was the same button twice over, and now that one token answers every
+        attack, spending it on paperwork is strictly worse than keeping it. The administrative
+        object stays required: the power erases two scandals at once, and the role should have to
+        own a piece of the city hall to do it.
+        """
         player = state.current_player
         self._require_role(player, "mafia")
-        self._once_per_turn(state, "mafia_cleanup")
         if player.scandals < 1:
             raise IllegalActionError("there is no scandal to clean")
-        method = self._payload_string(command, "method")
-        if method == "roof":
-            if player.roofs < 1:
-                raise IllegalActionError("cleanup requires a roof")
-            player.roofs -= 1
-        elif method == "money":
-            if player.money < 3 or self.district_count(player, "government") < 1:
-                raise IllegalActionError("paid cleanup requires 3 money and a government object")
-            player.money -= 3
-        else:
-            raise InvalidCommandError("mafia cleanup method must be roof or money")
+        if player.money < 3 or self.district_count(player, "government") < 1:
+            raise IllegalActionError("paid cleanup requires 3 money and a government object")
+        self._spend_action(state)
+        player.money -= 3
         player.scandals = max(0, player.scandals - 2)
 
     def _log_asset_state_change(
@@ -1597,15 +1593,7 @@ class CityEngine:
             self._resolve_compromat(state, player, target)
 
     def _resolve_compromat(self, state: GameState, player: PlayerState, target: PlayerState) -> None:
-        """Strip the target's role unless a court injunction or a roof takes the hit instead.
-
-        Order matches ``_claim_role``: the injunction is the dedicated answer to role attacks, so it
-        is spent first and the roof is the general-purpose fallback.
-        """
-        if target.role_shields > 0:
-            target.role_shields -= 1
-            state.append_event("targeted_effect_blocked", target.id, asset_id="influence_broker", by="role_shield")
-            return
+        """Strip the target's role unless a Крыша takes the hit instead."""
         if target.roofs > 0:
             target.roofs -= 1
             state.append_event("targeted_effect_blocked", target.id, asset_id="influence_broker", by="roof")
@@ -1663,21 +1651,20 @@ class CityEngine:
     def add_scandal(self, state: GameState, player: PlayerState, amount: int) -> None:
         """Charge scandals and announce every consequence that is not a plain counter change.
 
-        Losing a role, being jailed and spending a scandal shield used to happen in silence: the
-        only trace was the scandal counter moving, so a player found out their role was gone by
-        diffing their own state. A roof already reports itself through ``targeted_effect_blocked``
-        and the shield has to do the same, or the two defences read completely differently.
+        Losing a role, being jailed and spending a Крыша used to happen in silence: the only trace
+        was the scandal counter moving, so a player found out their role was gone by diffing their
+        own state.
         """
         if amount <= 0:
             player.scandals = max(0, player.scandals + amount)
             return
-        if player.scandal_shields > 0:
-            player.scandal_shields -= 1
+        if player.roofs > 0:
+            player.roofs -= 1
             state.append_event(
-                "scandal_shield_spent",
+                "scandal_blocked",
                 player.id,
                 absorbed=amount,
-                scandal_shields=player.scandal_shields,
+                roofs=player.roofs,
             )
             return
         limit = self.scandal_limit(player)
@@ -1796,7 +1783,10 @@ class CityEngine:
         if player.role is None and player.scandals > 0:
             player.scandals -= 1
         player.scandals = max(0, player.scandals - self.effect_total(player, "scandalReduction"))
-        player.roofs = min(self.roof_limit(player), player.roofs + self.effect_total(player, "turnRoof"))
+        # At most one token a turn, however many sources say otherwise: stacked refills made a
+        # player permanently unattackable, which is the one thing no defence should buy.
+        if self.effect_total(player, "turnRoof"):
+            player.roofs = min(self.roof_limit(player), player.roofs + 1)
         base_actions = 1 if jailed else (4 if player.role == "fraudster" else 3)
         bonus = min(1, self.effect_total(player, "extraActions"))
         state.actions_left = base_actions + (0 if jailed else bonus + player.banked_actions)

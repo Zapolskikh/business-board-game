@@ -110,8 +110,6 @@ class PlayerState:
     capacity: int = 3
     scandal_gained_this_round: int = 0
     debt: int = 0
-    role_shields: int = 0
-    scandal_shields: int = 0
     zoning_district: str | None = None
     district_levels: dict[str, int] = field(default_factory=empty_district_levels)
     turns: int = 0
@@ -140,8 +138,6 @@ class PlayerState:
             "capacity": self.capacity,
             "scandal_gained_this_round": self.scandal_gained_this_round,
             "debt": self.debt,
-            "role_shields": self.role_shields,
-            "scandal_shields": self.scandal_shields,
             "zoning_district": self.zoning_district,
             "district_levels": dict(self.district_levels),
             "turns": self.turns,
@@ -170,8 +166,6 @@ class PlayerState:
             capacity=int(data.get("capacity", 3)),
             scandal_gained_this_round=int(data.get("scandal_gained_this_round", 0)),
             debt=int(data.get("debt", 0)),
-            role_shields=int(data.get("role_shields", 0)),
-            scandal_shields=int(data.get("scandal_shields", 0)),
             zoning_district=data.get("zoning_district"),
             district_levels={key: int(value) for key, value in data.get("district_levels", {}).items()}
             or empty_district_levels(),

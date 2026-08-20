@@ -200,7 +200,7 @@ def _position_value(
     # were unreachable rather than mispriced.
     recurring = engine._round_income(state, player) + engine.passive_influence(player) * profile.influence_weight
     scandal_risk = player.scandals**2 * profile.risk_penalty
-    defence = (player.roofs + player.role_shields + player.scandal_shields) * profile.defence
+    defence = player.roofs * profile.defence
     role_value = _role_position_value(engine, state, player, player.role, profile)
     hand_value = sum(_card_value(engine, card.card_id, player) for card in player.hand) * 0.35
     # Money counts toward the score at 10$ = 1 point, so simply holding it looks profitable and
@@ -365,7 +365,7 @@ def _strategic_action_bonus(
             gain -= _role_utility(engine, state, player, player.role)
         bonus += gain * 0.5
         holder = engine.role_holder(state, role_id)
-        if holder is not None and profile.planning and (holder.roofs > 0 or holder.role_shields > 0):
+        if holder is not None and profile.planning and holder.roofs > 0:
             # The defence is face-up, so a blocked takeover is a knowingly wasted action.
             bonus -= 6.0
         if role_id == preferred:
@@ -519,9 +519,9 @@ def _grey_operation_utility(
         target = state.player_by_id(str(payload["target_id"]))
         if target.role is None or player.compromat_round == state.round_number:
             return -100.0
-        # Stripping a role costs the target 3 points and the passive behind it; a face-up roof or
-        # injunction makes the attempt a knowingly wasted action, exactly like a blocked takeover.
-        defended = target.roofs > 0 or target.role_shields > 0
+        # Stripping a role costs the target 3 points and the passive behind it; a face-up Крыша
+        # makes the attempt a knowingly wasted action, exactly like a blocked takeover.
+        defended = target.roofs > 0
         denial = (3 + _role_utility(engine, state, target, target.role) * 0.3) * (1 + profile.aggression)
         # The seat also reopens at the free price instead of the threefold takeover, and that is the
         # attacker's own reason to pull the trigger. Counting only the denial made a leak pure
@@ -554,7 +554,7 @@ def _card_value(engine: CityEngine, card_id: str, player: PlayerState) -> float:
         # A free slot is worth the object that will fill it, and by the time cards are flowing the
         # bot has the money — the slot is the half of the purchase it cannot buy any other way.
         return 8
-    if card.kind in {"project", "role_shield", "scandal_shield"}:
+    if card.kind == "project":
         return 6
     return max(1, card.value)
 
