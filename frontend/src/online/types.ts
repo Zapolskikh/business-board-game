@@ -101,7 +101,6 @@ export interface GameState {
   turns_taken_in_round?: number;
   turn_serial?: number;
   actions_left: number;
-  event_id: string;
   players: PlayerState[];
   market: MarketAsset[];
   project_board: string[];
@@ -160,16 +159,6 @@ export interface ProjectMeta {
   // Repeatable initiatives are never in the deck and never leave the table.
   repeatable?: boolean;
 }
-export interface EventMeta {
-  id: string;
-  title: string;
-  text: string;
-  district?: string;
-  incomeMultiplier?: number;
-  marketDiscount?: number;
-  globalIncome?: number;
-  globalMarketDiscount?: number;
-}
 // Rates owned by the engine (`city_engine/constants.py`) and shipped with the catalog, so no
 // client hardcodes the conversion.
 export interface ScoringMeta {
@@ -201,5 +190,4 @@ export interface CityMeta {
   assets: AssetMeta[];
   action_cards: ActionMeta[];
   projects: ProjectMeta[];
-  events: EventMeta[];
 }

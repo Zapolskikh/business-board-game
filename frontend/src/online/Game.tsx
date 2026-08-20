@@ -367,7 +367,7 @@ function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selected
           const buy = buyActions.get(item.uid);
           const remaining = Math.max(0, item.expires_at_round - game.round_number);
           const price = marketPrice(asset, item);
-          const effectLines = assetEffectLines(asset, me, game, meta, assets, { includeSynergy: true });
+          const effectLines = assetEffectLines(asset, me, meta, assets, { includeSynergy: true });
           // Not owned yet, so nothing it unlocks is `ready` — the panel is advertising, not status.
           const hints = assetHints(asset, me, game, meta, assets, { market: true });
           const points = assetPoints(asset);
@@ -460,7 +460,7 @@ function BusinessBoard({ viewed, me, game, meta, assets, legal, viewingOther, bu
     <div className="owned-grid">{viewed.assets.map((owned, index) => {
       const assetMeta = assets.get(owned.card_id);
       const districtInfo = meta.districts.find(d => d.id === assetMeta?.district);
-      const effectLines = assetMeta ? assetEffectLines(assetMeta, viewed, game, meta, assets, { includeSynergy: true }) : [];
+      const effectLines = assetMeta ? assetEffectLines(assetMeta, viewed, meta, assets, { includeSynergy: true }) : [];
       // A blocked object opens nothing: every gate in the engine checks `not asset.blocked`.
       const hints = assetMeta
         ? assetHints(assetMeta, viewed, game, meta, assets, { active: !owned.blocked })

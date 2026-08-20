@@ -509,10 +509,6 @@ class CityEngine:
 
     def asset_price(self, state: GameState, player: PlayerState, card_id: str) -> int:
         asset = self.asset(card_id)
-        event = self.catalog.events[state.event_id]
-        event_discount = event.global_market_discount
-        if event.district == asset.district:
-            event_discount += event.market_discount
         role_discount = int(
             self.has_role(player, "capitalist")
             and not any(self.owned_definition(item).district == asset.district for item in player.assets)
@@ -521,7 +517,7 @@ class CityEngine:
             asset.district == "industrial" and any(item.card_id == "logistics" for item in player.assets)
         )
         card_discount = int(state.turn_flags.get("market_discount", 0))
-        return max(1, asset.cost - event_discount - role_discount - logistics_discount - card_discount)
+        return max(1, asset.cost - role_discount - logistics_discount - card_discount)
 
     def _spend_action(self, state: GameState) -> None:
         if state.actions_left < 1:
@@ -1932,22 +1928,19 @@ class CityEngine:
         No asset in the catalog carries ``passiveMoney`` — it is a project-perk key — so the
         ``projects`` row is exactly what the finished projects pay.
         """
-        event = self.catalog.events[state.event_id]
         objects = 0
         antitrust = 0
         for owned in player.assets:
             if owned.blocked:
                 continue
             asset = self.owned_definition(owned)
-            event_multiplier = event.income_multiplier if event.district == asset.district else 1
             base = asset.income
             # +25% per development level, each level rounded up on its own. A single floor over the
             # whole product paid nothing for the first level on every 1-3$ object, and the early
             # market is made of exactly those, so the step was dead by definition.
             for _ in range(player.district_levels[asset.district]):
                 base = ceil(base * 1.25)
-            base = floor(base * (event_multiplier or 1))
-            object_income = base + self.object_synergy_income(state, player, owned) + event.global_income
+            object_income = base + self.object_synergy_income(state, player, owned)
             objects += object_income
             if state.antitrust_active and self.district_count(player, asset.district) >= 4:
                 antitrust += object_income - floor(object_income / 2)
@@ -2001,9 +1994,6 @@ class CityEngine:
         asset = self.owned_definition(owned)
         effects = asset.effects
         result = 0
-        event_bonus = effects.get("eventBonus")
-        if event_bonus and event_bonus.get("eventId") == state.event_id:
-            result += int(event_bonus["value"])
         district_bonus = effects.get("districtBonus")
         if district_bonus:
             district = district_bonus["district"]

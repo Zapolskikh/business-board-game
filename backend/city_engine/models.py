@@ -222,7 +222,6 @@ class GameState:
     turns_taken_in_round: int = 0
     turn_serial: int = 0
     actions_left: int = 3
-    event_id: str = "stable_year"
     market_deck: list[str] = field(default_factory=list)
     market: list[MarketAsset] = field(default_factory=list)
     action_deck: list[str] = field(default_factory=list)
@@ -355,7 +354,6 @@ class GameState:
             "turns_taken_in_round": self.turns_taken_in_round,
             "turn_serial": self.turn_serial,
             "actions_left": self.actions_left,
-            "event_id": self.event_id,
             "players": [player.to_dict() for player in self.players],
             "market_deck": list(self.market_deck),
             "market": [item.to_dict() for item in self.market],
@@ -389,7 +387,6 @@ class GameState:
             turns_taken_in_round=int(data.get("turns_taken_in_round", 0)),
             turn_serial=int(data.get("turn_serial", 0)),
             actions_left=int(data.get("actions_left", 3)),
-            event_id=str(data.get("event_id", "stable_year")),
             players=[PlayerState.from_dict(item) for item in data["players"]],
             market_deck=[str(item) for item in data.get("market_deck", [])],
             market=[MarketAsset.from_dict(item) for item in data.get("market", [])],

@@ -727,7 +727,6 @@ const districtRoleMap: Record<string, string> = Object.fromEntries(
 export function assetEffectLines(
   asset: AssetMeta,
   owner: PlayerState,
-  game: GameState,
   meta: CityMeta,
   assets: Map<string, AssetMeta>,
   options?: { includeSynergy?: boolean },
@@ -756,12 +755,6 @@ export function assetEffectLines(
     if (synergyRole) {
       lines.push({ text: `+1$ пока вы «${roleTitle(synergyRole)}» (синергия сектора)`, active: hasRole(synergyRole), boosted: false });
     }
-  }
-
-  const eventBonus = effects.eventBonus as { eventId: string; value: number } | undefined;
-  if (eventBonus) {
-    const eventTitle = meta.events.find(item => item.id === eventBonus.eventId)?.title ?? eventBonus.eventId;
-    lines.push({ text: `+${eventBonus.value}$/раунд во время события «${eventTitle}»`, active: game.event_id === eventBonus.eventId, boosted: false });
   }
 
   const influenceBonus = effects.influenceBonus as { value: number; district?: string; role?: string } | undefined;

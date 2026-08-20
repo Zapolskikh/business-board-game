@@ -123,18 +123,6 @@ class ProjectDefinition:
 
 
 @dataclass(frozen=True, slots=True)
-class EventDefinition:
-    id: str
-    title: str
-    text: str
-    district: str | None = None
-    income_multiplier: float | None = None
-    market_discount: int = 0
-    global_income: int = 0
-    global_market_discount: int = 0
-
-
-@dataclass(frozen=True, slots=True)
 class ContentCatalog:
     schema_version: int
     content_version: str
@@ -143,7 +131,6 @@ class ContentCatalog:
     assets: dict[str, AssetDefinition]
     action_cards: dict[str, ActionCardDefinition]
     projects: dict[str, ProjectDefinition]
-    events: dict[str, EventDefinition]
     # Round from which each rarity may appear on the market. Epic and legendary arrive late on
     # purpose: bought early they are unaffordable, and bought out early the late market is empty.
     rarity_min_round: dict[str, int]
@@ -166,8 +153,8 @@ class ContentCatalog:
             raise StateValidationError("catalog districts do not match engine district ids/order")
         if tuple(self.roles) != ROLE_IDS:
             raise StateValidationError("catalog roles do not match engine role ids/order")
-        if len(self.assets) < 6 or len(self.action_cards) < 3 or not self.events:
-            raise StateValidationError("catalog does not contain enough cards/events to start a game")
+        if len(self.assets) < 6 or len(self.action_cards) < 3:
+            raise StateValidationError("catalog does not contain enough cards to start a game")
         if len(self.deck_project_ids()) < PROJECT_BOARD_SIZE:
             raise StateValidationError(f"catalog needs at least {PROJECT_BOARD_SIZE} projects to fill the board")
         if tuple(sorted(self.repeatable_project_ids())) != tuple(sorted(REPEATABLE_PROJECT_IDS)):
@@ -258,7 +245,6 @@ def load_catalog(path: Path = CATALOG_PATH) -> ContentCatalog:
     asset_rows = _unique_by_id(raw["assets"], "asset")
     action_rows = _unique_by_id(raw["action_cards"], "action card")
     project_rows = _unique_by_id(raw["projects"], "project")
-    event_rows = _unique_by_id(raw["events"], "event")
 
     catalog = ContentCatalog(
         schema_version=int(raw["schema_version"]),
@@ -318,19 +304,6 @@ def load_catalog(path: Path = CATALOG_PATH) -> ContentCatalog:
             for key, row in project_rows.items()
         },
         rarity_min_round={str(key): int(value) for key, value in raw["rarity_min_round"].items()},
-        events={
-            key: EventDefinition(
-                id=row["id"],
-                title=row["title"],
-                text=row["text"],
-                district=row.get("district"),
-                income_multiplier=row.get("incomeMultiplier"),
-                market_discount=int(row.get("marketDiscount", 0)),
-                global_income=int(row.get("globalIncome", 0)),
-                global_market_discount=int(row.get("globalMarketDiscount", 0)),
-            )
-            for key, row in event_rows.items()
-        },
     )
     catalog.validate()
     return catalog

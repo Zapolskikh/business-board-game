@@ -61,7 +61,6 @@ class Catalog:
     assets: dict[str, dict[str, Any]]
     cards: dict[str, dict[str, Any]]
     projects: dict[str, dict[str, Any]]
-    events: dict[str, dict[str, Any]]
     # Not all of `scoring` is a number: the campaign tiers travel as a list of {spend, gain} pairs.
     scoring: dict[str, Any]
 
@@ -76,7 +75,6 @@ class Catalog:
             assets=index(meta.get("assets", [])),
             cards=index(meta.get("action_cards", [])),
             projects=index(meta.get("projects", [])),
-            events=index(meta.get("events", [])),
             scoring=dict(meta.get("scoring") or {}),
         )
 
@@ -522,12 +520,10 @@ def render_state(
         return f"комната «{room['name']}» ({room['id']}) · {room['status']} · места: {seats}\nигра ещё не начата"
 
     me = next(player for player in game["players"] if player["id"] == player_id)
-    event = catalog.events.get(str(game["event_id"]), {})
     current = game["players"][int(game["current_player_index"])]
     lines = [
         f"комната «{room['name']}» ({room['id']}) · rev {game['revision']} · {game['status']}",
-        f"раунд {game['round_number']}/{game['max_rounds']} · событие «{event.get('title', game['event_id'])}»: "
-        f"{event.get('text', '')}",
+        f"раунд {game['round_number']}/{game['max_rounds']}",
         f"ходит {current['name']}"
         + (f" — ЭТО Я · действий {game['actions_left']}" if current["id"] == player_id else " (не я)"),
         "— игроки —",

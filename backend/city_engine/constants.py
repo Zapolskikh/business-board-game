@@ -33,8 +33,6 @@ ROLE_IDS = (
     "military",
 )
 BOT_DIFFICULTIES = ("easy", "medium", "hard", "expert")
-# Events are off while the base mechanics are tuned; every game runs the neutral year.
-NEUTRAL_EVENT_ID = "stable_year"
 
 MIN_PLAYERS = 2
 MAX_PLAYERS = 6

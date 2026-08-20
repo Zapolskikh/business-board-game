@@ -13,7 +13,6 @@ from city_engine.constants import (
     MIN_PLAYERS,
     MIN_ROLE_PRICE,
     MIN_ROUNDS,
-    NEUTRAL_EVENT_ID,
     PROJECT_BOARD_SIZE,
     ROLE_IDS,
 )
@@ -46,7 +45,6 @@ def create_game(
     asset_ids: list[str],
     action_card_ids: list[str],
     project_ids: list[str],
-    event_ids: list[str],
     settings: GameSettings | None = None,
     asset_unlock_rounds: dict[str, int] | None = None,
 ) -> GameState:
@@ -67,8 +65,6 @@ def create_game(
         raise StateValidationError("at least 3 unique action card ids are required")
     if len(project_ids) < PROJECT_BOARD_SIZE or len(set(project_ids)) != len(project_ids):
         raise StateValidationError(f"at least {PROJECT_BOARD_SIZE} unique project ids are required")
-    if NEUTRAL_EVENT_ID not in event_ids:
-        raise StateValidationError(f"event ids must contain the neutral {NEUTRAL_EVENT_ID!r}")
 
     for player in players:
         if player.difficulty not in BOT_DIFFICULTIES:
@@ -127,16 +123,11 @@ def create_game(
         action_deck=action_deck,
         project_board=project_deck[:PROJECT_BOARD_SIZE],
         project_deck=project_deck[PROJECT_BOARD_SIZE:],
-        # Events are switched off while the base mechanics are being tuned: a single event was
-        # drawn once and then never changed for the whole match, which added variance between
-        # games and none inside one. The machinery stays, pinned to the neutral year.
-        event_id=NEUTRAL_EVENT_ID,
     )
     state.append_event(
         "game_created",
         player_count=len(players),
         starting_player_id=state.current_player.id,
-        event_id=state.event_id,
         seed=rng_state.seed,
     )
     state.validate()
@@ -159,7 +150,6 @@ def create_game_from_catalog(
         asset_ids=list(catalog.assets),
         action_card_ids=list(catalog.action_cards),
         project_ids=catalog.deck_project_ids(),
-        event_ids=list(catalog.events),
         settings=settings,
         asset_unlock_rounds={asset.id: catalog.rarity_min_round[asset.rarity] for asset in catalog.assets.values()},
     )
