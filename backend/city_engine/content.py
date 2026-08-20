@@ -11,7 +11,6 @@ from typing import Any
 
 from city_engine.constants import (
     ACTION_CARD_COST,
-    AUTOMATION_COST,
     CAMPAIGN_TIERS,
     CARD_DISCARD_VALUE,
     COMPROMAT_INFLUENCE,
@@ -52,7 +51,6 @@ def asset_points(cost: int) -> int:
 PROJECT_REQUIREMENTS = {
     "none",
     "assets",
-    "automation",
     "role",
     "max_scandals",
     "district_objects",
@@ -220,7 +218,6 @@ class ContentCatalog:
             "influence_per_point": INFLUENCE_PER_POINT,
             "project_board_size": PROJECT_BOARD_SIZE,
             "market_reroll_cost": MARKET_REROLL_COST,
-            "automation_cost": AUTOMATION_COST,
             "project_reroll_money": PROJECT_REROLL_MONEY,
             # How many rounds a market slot lasts, so the client can say "rounds" and mean it.
             "market_asset_rounds": MARKET_ASSET_ROUNDS,

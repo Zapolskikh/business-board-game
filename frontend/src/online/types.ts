@@ -54,9 +54,6 @@ export interface PlayerState {
   zoning_district: string | null;
   district_levels: Record<string, number>;
   turns: number;
-  automation_owned: boolean;
-  automation_uid: string | null;
-  automation_disabled: boolean;
 }
 
 export interface DomainEvent {
@@ -84,7 +81,7 @@ export interface ScoreBreakdown {
 // a `total`; every other key sums to it. A permanent project perk paying +1◆ a round used to be
 // indistinguishable from one paying nothing, because nothing on screen added the passives up.
 export interface RoundForecast {
-  money: { objects: number; projects: number; maintenance: number; antitrust: number; journalist: number; debt: number; total: number };
+  money: { objects: number; projects: number; residents_tax: number; antitrust: number; journalist: number; debt: number; total: number };
   influence: { objects: number; administrative: number; projects: number; news: number; rating: number; total: number };
 }
 
@@ -115,10 +112,6 @@ export interface GameState {
   action_deck_count: number;
   project_deck_count: number;
   score_breakdown: Record<string, ScoreBreakdown>;
-  // Round income for every possible home of the viewer's automation token, keyed by asset uid.
-  automation_preview: Record<string, number>;
-  // Round income with the token parked: every preview above minus this is what the token adds.
-  automation_baseline?: number | null;
   round_forecast?: RoundForecast | null;
   final_scores?: Record<string, number>;
 }
@@ -184,7 +177,6 @@ export interface ScoringMeta {
   influence_per_point: number;
   project_board_size: number;
   market_reroll_cost: number;
-  automation_cost: number;
   project_reroll_money: number;
   market_asset_rounds: number;
   crisis_pr_influence: number;

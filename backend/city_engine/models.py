@@ -36,7 +36,7 @@ class OwnedAsset:
 
     Per-object upgrades were a ritual: three or four identical purchases per player, and they
     welded value into objects that then could never be replaced. Automation is now a single
-    player-level token (see ``PlayerState.automation_uid``).
+    the market or a player's tableau.
     """
 
     uid: str
@@ -116,12 +116,6 @@ class PlayerState:
     district_levels: dict[str, int] = field(default_factory=empty_district_levels)
     turns: int = 0
     banked_actions: int = 0
-    # One automation token per player: bought once, moved between own objects for free once per
-    # turn. It doubles the hosting object's own effects and exempts it from maintenance, so the
-    # best place for it shifts as the portfolio changes instead of being sunk into one card.
-    automation_owned: bool = False
-    automation_uid: str | None = None
-    automation_disabled: bool = False
     # Round in which this player last attempted a compromat leak. ``turn_flags`` cannot hold it:
     # they are cleared on every turn boundary, and the leak is limited per round, not per turn.
     compromat_round: int = 0
@@ -152,9 +146,6 @@ class PlayerState:
             "district_levels": dict(self.district_levels),
             "turns": self.turns,
             "banked_actions": self.banked_actions,
-            "automation_owned": self.automation_owned,
-            "automation_uid": self.automation_uid,
-            "automation_disabled": self.automation_disabled,
             "compromat_round": self.compromat_round,
         }
 
@@ -186,9 +177,6 @@ class PlayerState:
             or empty_district_levels(),
             turns=int(data.get("turns", 0)),
             banked_actions=int(data.get("banked_actions", 0)),
-            automation_owned=bool(data.get("automation_owned", False)),
-            automation_uid=data.get("automation_uid"),
-            automation_disabled=bool(data.get("automation_disabled", False)),
             compromat_round=int(data.get("compromat_round", 0)),
         )
 
@@ -345,11 +333,6 @@ class GameState:
                 raise StateValidationError(f"invalid district level for {player.id}")
             if min(player.money, player.influence, player.scandals, player.roofs) < 0:
                 raise StateValidationError(f"negative public resource for {player.id}")
-            if player.automation_uid is not None:
-                if not player.automation_owned:
-                    raise StateValidationError(f"player {player.id} placed an automation token they do not own")
-                if player.automation_uid not in {asset.uid for asset in player.assets}:
-                    raise StateValidationError(f"automation token of {player.id} sits on an object they do not own")
             all_uids.extend(asset.uid for asset in player.assets)
             all_uids.extend(card.uid for card in player.hand)
         if len(all_uids) != len(set(all_uids)):

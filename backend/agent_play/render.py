@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from typing import Any
 
 POWER_LABELS = {
-    "politician_tax": "налог района",
     "politician_cleanup": "снять скандал",
     "journalist_inflate": "раздуть историю",
     "journalist_publish": "публикация",
@@ -30,7 +29,6 @@ FREE_ACTION_TYPES = frozenset(
         "reroll_projects",
         "play_action_card",
         "convert_action_card",
-        "move_automation",
         # Selling is free: the only reason to sell is the purchase that follows, and charging an
         # action for the sale made a swap cost two actions where a purchase costs one.
         "sell_asset",
@@ -38,7 +36,6 @@ FREE_ACTION_TYPES = frozenset(
 )
 FREE_POWERS = frozenset(
     {
-        "politician_tax",
         "politician_cleanup",
         "journalist_inflate",
         "journalist_publish",
@@ -94,8 +91,6 @@ class Catalog:
             return "без условия"
         if kind == "assets":
             return f"объектов ≥{count}"
-        if kind == "automation":
-            return "нужен жетон автоматизации"
         if kind == "role":
             return "любая роль"
         if kind == "max_scandals":
@@ -159,17 +154,6 @@ def _payload_hint(action: dict[str, Any], game: dict[str, Any], me: dict[str, An
         owned = next((entry for entry in me["assets"] if entry["uid"] == asset_uid), None)
         if owned:
             bits.append(f"«{catalog.asset_title(owned['card_id'])}»")
-        if action["type"] in {"move_automation", "buy_automation"}:
-            # A total reads as a price tag; the decision is the difference against where the
-            # token stands now — or against no token at all when it is still being bought.
-            income = (game.get("automation_preview") or {}).get(asset_uid)
-            baseline = game.get("automation_baseline")
-            current = (game.get("automation_preview") or {}).get(me.get("automation_uid"))
-            reference = baseline if action["type"] == "buy_automation" else current
-            if income is not None and reference is not None:
-                bits.append(f"{income - reference:+d}$/раунд (итого {income}$)")
-            elif income is not None:
-                bits.append(f"доход станет {income}$/раунд")
     card_uid = payload.get("card_uid")
     if card_uid:
         held = next((entry for entry in me.get("hand", []) if entry["uid"] == card_uid), None)
@@ -242,7 +226,6 @@ def describe_action(
 FOLD_AFTER = 6
 FOLD_HINTS = {
     "sell_asset": "продать свой объект за половину цены (без действия)",
-    "move_automation": "перенести жетон автоматизации (бесплатно, раз в ход)",
     "buy_asset": "купить объект с рынка",
     "convert_action_card": "сбросить карту в 1$ или 1◆",
     "claim_role": "занять роль",
@@ -252,7 +235,6 @@ FOLD_HINTS = {
     "use_role_power": "способность роли",
     "grey_operation": "серая операция",
     "develop_district": "развить район",
-    "buy_automation": "купить жетон автоматизации и поставить на объект",
     "buy_capacity": "купить дополнительный слот бизнеса",
 }
 
@@ -446,15 +428,6 @@ def _player_line(player: dict[str, Any], game: dict[str, Any], catalog: Catalog,
 def _owned_line(owned: dict[str, Any], me: dict[str, Any], game: dict[str, Any], catalog: Catalog) -> str:
     asset = catalog.assets.get(owned["card_id"], {})
     marks = []
-    if me.get("automation_uid") == owned["uid"]:
-        marks.append("⚙жетон отключён до выплаты" if me.get("automation_disabled") else "⚙жетон здесь")
-    elif me.get("automation_owned"):
-        # Moving is free, so the payoff of every option belongs on screen, not in the head.
-        preview = game.get("automation_preview") or {}
-        here, now = preview.get(owned["uid"]), preview.get(me.get("automation_uid"))
-        if here is not None:
-            delta = here - now if now is not None else here
-            marks.append(f"перенос жетона: доход {here}$/раунд ({delta:+d})")
     if owned["blocked"]:
         marks.append("🔒заблокирован")
     return (
@@ -483,7 +456,7 @@ def _market_line(item: dict[str, Any], game: dict[str, Any], catalog: Catalog) -
 
 ROLE_POWERS = {
     "capitalist": (),
-    "politician": ("politician_tax", "politician_cleanup"),
+    "politician": ("politician_cleanup",),
     "journalist": ("journalist_inflate", "journalist_publish"),
     "mafia": ("mafia_racket", "mafia_cleanup"),
     "military": ("military_sanction",),
@@ -556,11 +529,7 @@ def render_state(
         f"раунд {game['round_number']}/{game['max_rounds']} · событие «{event.get('title', game['event_id'])}»: "
         f"{event.get('text', '')}",
         f"ходит {current['name']}"
-        + (
-            f" — ЭТО Я · действий {game['actions_left']}"
-            if current["id"] == player_id
-            else " (не я)"
-        ),
+        + (f" — ЭТО Я · действий {game['actions_left']}" if current["id"] == player_id else " (не я)"),
         "— игроки —",
     ]
     lines.extend(_player_line(player, game, catalog, player["id"] == player_id) for player in game["players"])
@@ -581,19 +550,13 @@ def render_state(
     lines.append(f"    районы: {districts or 'пусто'}")
     slot = CAPACITY_COSTS.get(int(me["capacity"]))
     reroll = catalog.scoring.get("market_reroll_cost", 4)
-    automation = catalog.scoring.get("automation_cost", 6)
     project_reroll = catalog.scoring.get("project_reroll_money", 10)
     card_cost = catalog.scoring.get("action_card_cost", 3)
-    token = (
-        "жетон автоматизации: куплен"
-        if me.get("automation_owned")
-        else f"жетон автоматизации {automation}$ (один на партию, переносится бесплатно раз в ход)"
-    )
     tiers = " / ".join(
         f"{int(row['spend'])}$→{int(row['gain'])}◆" for row in catalog.scoring.get("campaign_tiers") or []
     )
     lines.append(
-        f"    цены сейчас: Крыша {roof_price(game, me)}$ · {token} · "
+        f"    цены сейчас: Крыша {roof_price(game, me)}$ · "
         f"две карты {card_cost}$+1◆ и действие · "
         f"реролл рынка {reroll}$ и доски проектов {project_reroll}$ — без действия, доски общие · "
         + (f"кампания {tiers} за одно действие · " if tiers else "")

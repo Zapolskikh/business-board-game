@@ -48,9 +48,9 @@ def test_production_simulation_reports_engine_games() -> None:
         "antitrust",
         "debt",
         "journalist",
-        "maintenance",
         "objects",
         "projects",
+        "residents_tax",
     }
     assert round(sum(result["seat_win_pct"].values()), 2) == 100.0
     assert sum(result["seat_wins"].values()) == 2

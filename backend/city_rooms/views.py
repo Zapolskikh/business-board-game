@@ -26,22 +26,6 @@ def _viewer(room: RoomState, viewer_id: str | None) -> PlayerState | None:
         return None
 
 
-def _automation_preview(room: RoomState, viewer_id: str | None) -> dict[str, int]:
-    """Round income for every possible home of the viewer's automation token."""
-    player = _viewer(room, viewer_id)
-    if player is None or room.game is None:
-        return {}
-    return _scoring_engine().automation_preview(room.game, player)
-
-
-def _automation_baseline(room: RoomState, viewer_id: str | None) -> int | None:
-    """Round income without the token, so the client can show its contribution and not a total."""
-    player = _viewer(room, viewer_id)
-    if player is None or room.game is None:
-        return None
-    return _scoring_engine().automation_baseline(room.game, player)
-
-
 def _round_forecast(room: RoomState, viewer_id: str | None) -> dict[str, dict[str, int]] | None:
     """The viewer's itemised round payout, from the same code that pays it out."""
     player = _viewer(room, viewer_id)
@@ -103,8 +87,6 @@ def room_view(
     engine = _scoring_engine()
     game["score_breakdown"] = {player.id: engine.score_breakdown(player) for player in room.game.players}
     # Moving the token is free, so the payoff of each option must be on screen, not in the head.
-    game["automation_preview"] = _automation_preview(room, viewer_id)
-    game["automation_baseline"] = _automation_baseline(room, viewer_id)
     # A permanent project perk paying +1◆ a round was indistinguishable from one paying nothing.
     game["round_forecast"] = _round_forecast(room, viewer_id)
     game.pop("rng", None)

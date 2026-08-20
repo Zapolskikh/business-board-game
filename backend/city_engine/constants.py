@@ -61,11 +61,6 @@ REPEATABLE_PROJECT_IDS = ("city_initiative", "municipal_programme")
 # of all project points in the arena match, and one player's last sixteen actions were twelve
 # identical clicks. Three per game keeps them as a way out of a dead hand, not as a strategy.
 MAX_REPEATABLE_PROJECTS = 3
-# Upkeep per object each round. Doubling it to 2$ was measured: dead capital halved (194$ → 96$)
-# but the winner-loser spread doubled with it (35% → 67%), because upkeep hits hardest whoever is
-# already behind and cannot replace the object. Left at 1$; the money surplus needs a sink that
-# scales with success, not with ownership.
-MAINTENANCE_PER_ASSET = 1
 # How many rounds a market slot survives before it rotates out.
 #
 # This used to be counted in turns — `turn_serial + players * 2` — and pruned on every turn pass,
@@ -90,8 +85,6 @@ MARKET_REROLL_COST = 4
 # player holding 264$ and 2◆ had no way to convert. Rates worsen as the tier grows (1.0 / 1.67 /
 # 2.25 $ per ◆), so the cheap trade stays the default and the expensive one is for a full wallet.
 CAMPAIGN_TIERS = {2: 2, 5: 3, 9: 4}
-# One automation token per player, bought once and then moved between own objects for free.
-AUTOMATION_COST = 6
 # Refreshing the oldest project on the board: the expired card goes to the bottom of the deck.
 # Priced in money, but an order of magnitude above the market reroll. Influence was the wrong
 # currency: it is the one the projects themselves are bought with, so the reroll was a tax on the

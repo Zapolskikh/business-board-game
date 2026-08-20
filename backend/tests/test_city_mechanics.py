@@ -54,19 +54,13 @@ def give_card(state, player, card_id: str) -> HeldCard:
     return held
 
 
-def test_automate_sell_and_develop_district() -> None:
+def test_develop_a_district_then_sell_the_object() -> None:
     engine = CityEngine()
     state = make_state()
     player = state.current_player
     first = give_asset(state, player, "delivery")
     give_asset(state, player, "media")
     player.money = 30
-
-    state = run(engine, state, "buy_automation", {"asset_uid": first.uid})
-    player = state.current_player
-    assert player.money == 24
-    assert player.automation_owned
-    assert player.automation_uid == first.uid
 
     state = run(engine, state, "develop_district", {"district": "residential"})
     player = state.current_player
@@ -76,10 +70,7 @@ def test_automate_sell_and_develop_district() -> None:
     state = run(engine, state, "sell_asset", {"asset_uid": first.uid})
     player = state.current_player
     assert first.uid not in {asset.uid for asset in player.assets}
-    assert player.money == 24  # 22 after development + half price 2.
-    # Selling the host frees the token instead of destroying it.
-    assert player.automation_owned
-    assert player.automation_uid is None
+    assert player.money == 30 - 2 + 2  # development cost 2$, sale refunds half of a 4$ object
 
 
 def test_buying_cards_draws_two_blind_for_one_action() -> None:
@@ -166,10 +157,10 @@ def test_binary_conditions_stay_binary() -> None:
     state = make_state()
     player = state.current_player
 
-    automation = engine.project("exhibition")  # needs the automation token
-    assert engine.project_requirement_progress(player, automation) == 0.0
-    player.automation_owned = True
-    assert engine.project_requirement_progress(player, automation) == 1.0
+    charter = engine.project("city_charter")  # needs any role
+    assert engine.project_requirement_progress(player, charter) == 0.0
+    player.role = "capitalist"
+    assert engine.project_requirement_progress(player, charter) == 1.0
 
 
 def test_roof_price_grows_with_the_round_and_mafia_pays_less() -> None:
@@ -315,20 +306,31 @@ def test_journalist_earns_two_money_per_standing_rival_scandal() -> None:
     assert settled_sources(state)[journalist.id]["journalist"] == 6
 
 
-def test_politician_tax_charges_influence_and_pays_per_city_object() -> None:
+def test_the_politician_taxes_every_residential_object_on_the_table() -> None:
     engine = CityEngine()
     state = make_state()
     player = state.current_player
+    give_asset(state, player, "delivery")  # residential
+    give_asset(state, state.players[1], "media")  # residential, opponent's
+
+    assert engine.residents_tax(state, player) == 0  # no role, no tax
     player.role = "politician"
-    player.influence = 10
-    give_asset(state, player, "delivery")
-    give_asset(state, state.players[1], "media")
+    # Both objects pay, including the opponent's: the passive scales with how built-up the city is.
+    assert engine.residents_tax(state, player) == 2
+    assert engine._income_breakdown(state, player)["residents_tax"] == 2
 
-    state = run(engine, state, "use_role_power", {"power": "politician_tax", "district": "residential"})
+
+def test_the_capitalist_earns_a_dollar_from_every_object() -> None:
+    engine = CityEngine()
+    state = make_state()
     player = state.current_player
+    give_asset(state, player, "delivery")
+    give_asset(state, player, "warehouse")
+    baseline = engine._round_income(state, player)
 
-    # Every residential object on the table pays, including the opponent's.
-    assert (player.influence, player.money) == (6, 12)
+    player.role = "capitalist"
+    # Two objects, so two dollars — the passive that replaced a power nobody used.
+    assert engine._round_income(state, player) == baseline + 2
 
 
 def test_journalist_powers_use_scandal_rules() -> None:
@@ -646,11 +648,10 @@ def test_every_action_card_has_a_working_engine_path(card_id: str) -> None:
         payload["target_id"] = target.id
         if card.kind == "role_pressure":
             target.role = "mafia"
-        if card.kind in {"freeze", "remove_upgrade"}:
-            owned = give_asset(state, target, "delivery")
-            if card.kind == "remove_upgrade":
-                target.automation_owned = True
-                target.automation_uid = owned.uid
+        if card.kind == "freeze":
+            give_asset(state, target, "delivery")
+        if card.kind == "remove_development":
+            target.district_levels["residential"] = 1
     elif card.kind in {"district_cash", "zoning", "develop"}:
         payload["district"] = "residential"
         give_asset(state, player, "delivery")
@@ -663,8 +664,6 @@ def test_every_action_card_has_a_working_engine_path(card_id: str) -> None:
         state.project_board = ["art_museum", *state.project_board[:-1]]
         state.project_deck = [item for item in state.project_deck if item not in state.project_board]
         payload["project_id"] = "art_museum"
-    elif card.kind == "automation":
-        payload["asset_uid"] = give_asset(state, player, "delivery").uid
     elif card.kind == "unblock":
         give_asset(state, player, "delivery").blocked = True
 
@@ -826,83 +825,33 @@ def test_the_trailing_player_opens_the_next_round() -> None:
     assert state.players[state.starting_player_index].id == trailing.id
 
 
-def test_automation_doubles_everything_the_object_earns() -> None:
+def test_demolition_order_takes_a_development_level() -> None:
     engine = CityEngine()
     state = make_state()
     player = state.current_player
-    # `battery` prints "+2$ if you own a residential object"; two industrial objects also switch
-    # on the flat district synergy. The token multiplies the whole bonus, not just the printed one.
-    battery = give_asset(state, player, "battery")
-    give_asset(state, player, "warehouse")
-    give_asset(state, player, "delivery")
-    player.automation_owned = True
-
-    plain = engine.object_synergy_income(state, player, battery)
-    player.automation_uid = battery.uid
-    automated = engine.object_synergy_income(state, player, battery)
-
-    assert plain == 1 + 2  # district synergy 1 + own cross-district bonus 2
-    assert automated == 2 * plain
-
-
-def test_automation_token_moves_free_once_per_turn() -> None:
-    engine = CityEngine()
-    state = make_state()
-    player = state.current_player
-    first = give_asset(state, player, "battery")
-    second = give_asset(state, player, "delivery")
-    player.money = 20
-
-    state = run(engine, state, "buy_automation", {"asset_uid": first.uid})
-    actions_after_purchase = state.actions_left
-    state = run(engine, state, "move_automation", {"asset_uid": second.uid})
-    player = state.current_player
-
-    assert player.automation_uid == second.uid
-    assert state.actions_left == actions_after_purchase  # moving is free
-    with pytest.raises(IllegalActionError):
-        run(engine, state, "move_automation", {"asset_uid": first.uid})
-
-
-def test_automation_preview_shows_the_income_of_every_home() -> None:
-    engine = CityEngine()
-    state = make_state()
-    player = state.current_player
-    battery = give_asset(state, player, "battery")
-    delivery = give_asset(state, player, "delivery")
-    player.automation_owned = True
-    player.automation_uid = delivery.uid
-
-    preview = engine.automation_preview(state, player)
-
-    assert set(preview) == {battery.uid, delivery.uid}
-    # The cross-district card is the better host, and the client shows that without any arithmetic.
-    assert preview[battery.uid] > preview[delivery.uid]
-    assert player.automation_uid == delivery.uid  # preview must not move the token
-
-
-def test_demolition_order_only_disables_the_token_until_settlement() -> None:
-    engine = CityEngine()
-    state = make_state()
-    attacker = state.current_player
-    target = next(player for player in state.players if player.id != attacker.id)
-    owned = give_asset(state, target, "battery")
-    target.automation_owned = True
-    target.automation_uid = owned.uid
-    held = give_card(state, attacker, "antitrust")
+    target = state.players[1]
+    give_asset(state, target, "delivery")
+    give_asset(state, target, "media")
+    target.district_levels["residential"] = 2
+    held = give_card(state, player, "antitrust")
 
     state = run(engine, state, "play_action_card", {"card_uid": held.uid, "target_id": target.id})
-    hit = state.player_by_id(target.id)
 
-    # A single card must not destroy the engine for good: the token is owned, just not working.
-    assert hit.automation_owned
-    assert hit.automation_uid == owned.uid
-    assert hit.automation_disabled
-    assert not engine.is_automated(hit, hit.assets[0])
+    # A level, not the object: districts are the long game, and erasing one outright would make
+    # this the strongest attack in the deck.
+    assert state.players[1].district_levels["residential"] == 1
+    assert any(event.type == "development_removed" for event in state.event_log)
 
-    while state.round_number == 1:
-        state = run(engine, state, "end_turn")
-    assert not state.player_by_id(target.id).automation_disabled
+
+def test_demolition_order_needs_a_developed_district() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    target = state.players[1]
+    held = give_card(state, player, "antitrust")
+
+    with pytest.raises(IllegalActionError):
+        run(engine, state, "play_action_card", {"card_uid": held.uid, "target_id": target.id})
 
 
 def test_selling_costs_no_action_so_a_swap_costs_only_the_purchase() -> None:
@@ -914,8 +863,6 @@ def test_selling_costs_no_action_so_a_swap_costs_only_the_purchase() -> None:
     give_asset(state, player, "media")
     give_asset(state, player, "warehouse")
     player.capacity = 3  # full slots: the case the swap command used to exist for
-    player.automation_owned = True
-    player.automation_uid = cheap.uid
     player.money = 30
     state.market.append(MarketAsset(uid="asset:replacement", card_id="robotics", expires_at_round=99))
     price = engine.asset_price(state, player, "robotics")
@@ -925,16 +872,12 @@ def test_selling_costs_no_action_so_a_swap_costs_only_the_purchase() -> None:
     player = state.current_player
     assert player.money == 32
     assert state.actions_left == actions_before  # the sale itself is free
-    assert player.automation_uid is None  # the token is freed, and the event says so
 
     state = run(engine, state, "buy_asset", {"market_uid": "asset:replacement"})
     player = state.current_player
     assert [asset.card_id for asset in player.assets] == ["media", "warehouse", "robotics"]
     assert player.money == 32 - price
     assert state.actions_left == actions_before - 1  # one action for the whole swap, as before
-
-    sold = next(event for event in state.event_log if event.type == "asset_sold")
-    assert sold.data["automation_freed"] is True
 
 
 def test_selling_is_offered_with_an_empty_action_counter() -> None:

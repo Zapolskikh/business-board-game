@@ -7,7 +7,6 @@ import {
   assetEffectLines,
   assetHints,
   assetPoints,
-  automationCost,
   buildGameLogMarkdown,
   campaignTiers,
   capacityLabel,
@@ -60,7 +59,7 @@ type MobileGameTab = "city" | "players" | "actions" | "log" | "menu";
 const playerColors = ["#58a6ff", "#3fb950", "#f0883e", "#d65db1", "#e3b341", "#9b6ee7"];
 const rolePowers: Record<string, string[]> = {
   capitalist: [],
-  politician: ["politician_tax", "politician_cleanup"],
+  politician: ["politician_cleanup"],
   journalist: ["journalist_inflate", "journalist_publish"],
   mafia: ["mafia_racket", "mafia_cleanup"],
   military: ["military_sanction"],
@@ -68,7 +67,6 @@ const rolePowers: Record<string, string[]> = {
 };
 
 const powerDescriptions: Record<string, string> = {
-  politician_tax: "Действие не расходуется, один раз за ход: потратить 4◆ и получить по 1$ за каждый объект всех игроков в выбранном районе.",
   politician_cleanup: "Действие не расходуется, один раз за ход: потратить 2◆ и снять 1 свой скандал.",
   journalist_inflate: "Действие не расходуется, один раз за ход: вы и выбранный соперник получаете по 1 скандалу. У Журналиста порог сдвинут: роль теряется на 6 скандалах, тюрьма на 7 — у всех остальных на 5 и 6.",
   journalist_publish: "Действие не расходуется, один раз за ход: потратить 3◆ и дать выбранному сопернику 1 скандал.",
@@ -456,25 +454,20 @@ function BusinessBoard({ viewed, me, game, meta, assets, legal, viewingOther, bu
   onAction: (action: LegalAction) => Promise<void>;
 }) {
   const actionFor = (type: string, uid: string) => legal.find(action => action.type === type && action.payload.asset_uid === uid);
-  const currentIncome = viewed.automation_uid ? game.automation_preview?.[viewed.automation_uid] : undefined;
   return <section className="business-board">
     <h2>{viewingOther ? `Бизнес: ${viewed.name}` : "Ваш бизнес"} <small>слоты {viewed.assets.length}/{viewed.capacity}</small></h2>
     <div className="active-bonuses"><strong>Активные бонусы</strong><ul>{activeBonuses(viewed, game, meta, assets).map(item => <li key={item.text} className={item.active ? "bonus-active" : "bonus-inactive"}>{item.text}</li>)}</ul></div>
     <div className="owned-grid">{viewed.assets.map((owned, index) => {
       const assetMeta = assets.get(owned.card_id);
       const districtInfo = meta.districts.find(d => d.id === assetMeta?.district);
-      const automated = viewed.automation_uid === owned.uid;
-      const effectLines = assetMeta ? assetEffectLines(assetMeta, viewed, game, meta, assets, { automated: automated && !viewed.automation_disabled, includeSynergy: true }) : [];
+      const effectLines = assetMeta ? assetEffectLines(assetMeta, viewed, game, meta, assets, { includeSynergy: true }) : [];
       // A blocked object opens nothing: every gate in the engine checks `not asset.blocked`.
       const hints = assetMeta
         ? assetHints(assetMeta, viewed, game, meta, assets, { active: !owned.blocked })
         : { special: false, hints: [] };
       return <OwnedAssetCard
         key={owned.uid} owned={owned} index={index} owner={viewed} asset={assetMeta} districtInfo={districtInfo}
-        effectLines={effectLines} hints={hints} viewingOther={viewingOther} busy={busy} automated={automated}
-        incomeHere={game.automation_preview?.[owned.uid]} incomeNow={currentIncome}
-        baseline={viewingOther ? undefined : game.automation_baseline ?? undefined} tokenPrice={automationCost(meta)}
-        automate={actionFor("buy_automation", owned.uid) ?? actionFor("move_automation", owned.uid)}
+        effectLines={effectLines} hints={hints} viewingOther={viewingOther} busy={busy}
         sell={actionFor("sell_asset", owned.uid)}
         onAction={onAction}
       />;
@@ -483,7 +476,7 @@ function BusinessBoard({ viewed, me, game, meta, assets, legal, viewingOther, bu
   </section>;
 }
 
-function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines, hints, viewingOther, busy, automated, incomeHere, incomeNow, baseline, tokenPrice, automate, sell, onAction }: {
+function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines, hints, viewingOther, busy, sell, onAction }: {
   owned: OwnedAsset;
   index: number;
   owner: PlayerState;
@@ -493,12 +486,6 @@ function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines,
   hints: { special: boolean; hints: AssetHint[] };
   viewingOther: boolean;
   busy: boolean;
-  automated: boolean;
-  incomeHere?: number;
-  incomeNow?: number;
-  baseline?: number;
-  tokenPrice: number;
-  automate?: LegalAction;
   sell?: LegalAction;
   onAction: (action: LegalAction) => Promise<void>;
 }) {
@@ -506,24 +493,8 @@ function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines,
   const managed = index < owner.capacity;
   // One number, two meanings: the refund in money equals the points the object is carrying.
   const sellValue = assetPoints(asset);
-  // Every automation figure is a *difference*, never a total: the raw "30$/раунд" that used to sit
-  // on the button is the whole round income with the token here, which reads as a price tag.
-  // `buying` compares against no token at all, a move compares against where the token stands now.
-  const buying = automate?.type === "buy_automation";
-  const reference = buying ? baseline : incomeNow;
-  const delta = incomeHere !== undefined && reference !== undefined ? incomeHere - reference : undefined;
-  const signed = (value: number) => `${value >= 0 ? "+" : "−"}${Math.abs(value)}$`;
-  // What the token is worth where it already stands — otherwise "I placed it, and now what?".
-  const worthNow = automated && !owner.automation_disabled && incomeNow !== undefined && baseline !== undefined
-    ? incomeNow - baseline
-    : undefined;
-  const status = owned.blocked ? "🔒 заблокирован"
-    : automated
-      ? owner.automation_disabled
-        ? "⚙ жетон не работает до выплаты"
-        : `⚙ жетон${worthNow !== undefined ? `: ${signed(worthNow)}/раунд` : " автоматизации"}`
-      : "работает";
-  return <article className={`owned-asset rarity-${asset.rarity} ${owned.blocked ? "blocked" : ""} ${!managed ? "unmanaged" : ""} ${automated ? "automated" : ""} ${hints.special ? "special" : ""}`}>
+  const status = owned.blocked ? "🔒 заблокирован" : "работает";
+  return <article className={`owned-asset rarity-${asset.rarity} ${owned.blocked ? "blocked" : ""} ${!managed ? "unmanaged" : ""} ${hints.special ? "special" : ""}`}>
     <header>
       <span className="rarity-badge">{rarityLabels[asset.rarity]}</span>
       {districtInfo && <span className="asset-district" style={{ color: districtInfo.color }}>{districtInfo.icon} {districtInfo.title}</span>}
@@ -538,18 +509,6 @@ function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines,
       : asset.text && <small className="asset-summary">{asset.text}</small>}
     <AssetHintPanel hints={hints} />
     {!viewingOther && <div className="owned-actions">
-      {!automated && <button
-        className={delta !== undefined && delta <= 0 ? "automation-pointless" : ""}
-        disabled={busy || !automate}
-        onClick={() => automate && void onAction(automate)}
-        title={`${buying ? `Купить жетон автоматизации за ${tokenPrice}$ и сразу поставить его сюда. Расходует обычное либо инвестиционное действие. ` : "Перенести жетон на этот объект. Перенос бесплатный и не расходует действие, один раз за ход. "}Жетон удваивает собственные бонусы объекта (кросс-районные, ролевые, влияние) и снимает с него содержание; районная и ролевая синергия не удваиваются.${incomeHere !== undefined ? ` Доход раунда с жетоном здесь: ${incomeHere}$ (сейчас ${reference ?? "—"}$).` : ""}`}
-      >
-        <strong>⚙ {buying ? `Купить жетон · ${tokenPrice}$` : "Перенести жетон сюда"}</strong>
-        <small>{delta === undefined ? "автоматизация"
-          : delta > 0 ? `${signed(delta)}/раунд к доходу`
-          : delta === 0 ? "ничего не изменит"
-          : `${signed(delta)}/раунд — станет хуже`}</small>
-      </button>}
       {/* The sale is free, so "sell then buy" costs exactly the one action a purchase costs — which
           is what the separate replacement command used to cost, without its choice matrix. */}
       <button className="danger" disabled={busy || !sell} onClick={() => sell && void onAction(sell)} title={`Продать объект за ${sellValue}$ и потерять его ${sellValue} очков в финальном счёте — возврат и очки это одно и то же число. Смысл продажи только в том, что покупается вместо: объект дороже даст больше очков. Продажа бесплатна и не расходует действие, слот освобождается сразу. Жетон автоматизации, если он стоит здесь, снимается — перенесите его бесплатно на другой объект.`}>

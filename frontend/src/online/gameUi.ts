@@ -28,7 +28,6 @@ export const difficultyLabels: Record<string, string> = {
 };
 
 export const powerLabels: Record<string, string> = {
-  politician_tax: "Налог района",
   politician_cleanup: "Урегулировать скандал",
   journalist_inflate: "Раздуть историю",
   journalist_publish: "Опубликовать расследование",
@@ -137,10 +136,6 @@ export function marketRerollCost(meta: CityMeta): number {
   return meta.scoring?.market_reroll_cost ?? 4;
 }
 
-export function automationCost(meta: CityMeta): number {
-  return meta.scoring?.automation_cost ?? 6;
-}
-
 export function projectRerollMoney(meta: CityMeta): number {
   return meta.scoring?.project_reroll_money ?? 10;
 }
@@ -189,7 +184,6 @@ export function projectRequirementText(project: ProjectMeta, meta: CityMeta): st
   switch (requirement.type) {
     case "none": return "без условия";
     case "assets": return `объектов не меньше ${count}`;
-    case "automation": return "нужен жетон автоматизации";
     case "role": return "нужна любая роль";
     case "max_scandals": return `скандалов не больше ${count}`;
     case "district_objects": return `объектов в «${districtTitle(requirement.district)}» не меньше ${count}`;
@@ -205,7 +199,6 @@ const perkLabels: Record<string, (value: number) => string> = {
   passiveInfluence: value => `+${value}◆ в каждый раунд`,
   scandalReduction: value => `−${value} скандал в начале хода`,
   greyScandalReduction: value => `−${value} скандал от серых операций`,
-  maintenanceReduction: value => `первые ${value} объектов без содержания`,
   turnRoof: () => "+1 Крыша в начале каждого хода",
   roofCapacity: value => `+${value} к пределу Крыш`,
   extraInvestmentActions: () => "+1 инвестиционное действие в начале хода",
@@ -287,18 +280,6 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
     const points = asset ? assetPoints(asset) : 0;
     return `Продать «${asset?.title ?? "объект"}» за ${points}$ (−${points} очков)`;
   }
-  if (action.type === "buy_automation" || action.type === "move_automation") {
-    const owned = player.assets.find(item => item.uid === payload.asset_uid);
-    const title = assets.get(owned?.card_id ?? "")?.title ?? "объект";
-    const income = game.automation_preview?.[stringValue(payload.asset_uid)];
-    const verb = action.type === "buy_automation"
-      ? `Купить жетон автоматизации (${automationCost(meta)}$)`
-      : "Перенести жетон";
-    const baseline = game.automation_baseline;
-    const gain = income !== undefined && baseline !== undefined && baseline !== null ? income - baseline : undefined;
-    const payoff = gain !== undefined ? ` · ${gain >= 0 ? "+" : "−"}${Math.abs(gain)}$/раунд` : "";
-    return `${verb} → «${title}»${payoff}`;
-  }
   if (action.type === "develop_district") return `Развить район «${district?.title ?? payload.district}»`;
   if (action.type === "buy_action_card") return `Купить «${cards.get(stringValue(payload.card_id))?.title ?? payload.card_id}»`;
   if (action.type === "convert_action_card") {
@@ -346,8 +327,6 @@ const eventVerbs: Record<string, string> = {
   asset_bought: "покупает объект",
   asset_sold: "продаёт объект",
   asset_replaced: "меняет объект",
-  automation_bought: "покупает жетон автоматизации",
-  automation_moved: "переносит жетон автоматизации",
   district_developed: "развивает район",
   role_claimed: "получает роль",
   role_taken: "захватывает роль",
@@ -537,16 +516,7 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
         num(`${numberValue(data.value)}$`, "good"),
       ];
       // The token is freed by the sale; without this line it silently vanished from the board.
-      if (data.automation_freed) tail.push(txt(" · жетон автоматизации снят"));
       return lead(...tail);
-    }
-    case "automation_bought":
-      return lead(txt(" покупает жетон автоматизации ("), signed(-numberValue(data.cost), "$"), txt(")"));
-    case "automation_moved": {
-      const owner = game.players.find(player => player.id === event.actor_id);
-      const host = owner?.assets.find(item => item.uid === stringValue(data.asset_uid))?.card_id;
-      const title = meta.assets.find(item => item.id === host)?.title;
-      return lead(txt(` переносит жетон автоматизации на «${title ?? "объект"}»`));
     }
     case "district_developed":
       return lead(txt(` развивает район «${district ?? stringValue(data.district)}» до ${numberValue(data.level)}★ (`), signed(-numberValue(data.cost), "$"), txt(", "), num("+1◆", "good"), txt(")"));
@@ -619,8 +589,6 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
     case "asset_state_changed": {
       const changes: Record<string, string> = {
         blocked: "заблокирован на раунд",
-        automation_disabled: "жетон автоматизации не работает до выплаты раунда",
-        blocked_and_automation_disabled: "заблокирован, жетон автоматизации не работает до выплаты",
       };
       const sourceCard = meta.action_cards.find(item => item.id === stringValue(data.source))?.title;
       const via = sourceCard ? ` (карта «${sourceCard}»)` : ` (${greyOperationLabels[stringValue(data.source)] ?? stringValue(data.source)})`;
@@ -681,7 +649,7 @@ const forecastLabels: Record<string, string> = {
   objects: "🏢 Объекты",
   projects: "🏗️ Проекты",
   administrative: "🏛️ Административный ресурс",
-  maintenance: "🔧 Содержание",
+  residents_tax: "🏘️ Налог с жителей",
   antitrust: "⚖️ Антимонопольное",
   journalist: "📰 Публикации",
   debt: "🏦 Кредит",
@@ -739,7 +707,7 @@ export function buildGameLogMarkdown(room: RoomView, meta: CityMeta, version: st
 }
 
 // A single bonus line for an object card. `active` → condition met for the owner right now
-// (rendered green); `boosted` → value already doubled by automation.
+// (rendered green).
 export interface AssetEffectLine { text: string; active: boolean; boosted: boolean }
 
 const roleDistrictMap: Record<string, string> = {
@@ -762,9 +730,8 @@ export function assetEffectLines(
   game: GameState,
   meta: CityMeta,
   assets: Map<string, AssetMeta>,
-  options?: { automated?: boolean; includeSynergy?: boolean },
+  options?: { includeSynergy?: boolean },
 ): AssetEffectLine[] {
-  const automated = options?.automated ?? false;
   const includeSynergy = options?.includeSynergy ?? false;
   const effects = (asset.effects ?? {}) as Record<string, unknown>;
   const lines: AssetEffectLine[] = [];
@@ -775,10 +742,8 @@ export function assetEffectLines(
     districtCount(owner, district, assets) > 0
     || (district === "business" && hasRole("capitalist"))
     || (district === "government" && hasRole("politician"));
-  const doubled = (base: number): number => (automated ? base * 2 : base);
 
   // Generic district + role synergy (only for owned cards, where it is not shown elsewhere).
-  // Never doubled by the token: automation multiplies the object's own printed effects only.
   if (includeSynergy) {
     const count = districtCount(owner, asset.district, assets);
     const synergy = count >= 4 ? 2 : count >= 2 ? 1 : 0;
@@ -796,7 +761,7 @@ export function assetEffectLines(
   const eventBonus = effects.eventBonus as { eventId: string; value: number } | undefined;
   if (eventBonus) {
     const eventTitle = meta.events.find(item => item.id === eventBonus.eventId)?.title ?? eventBonus.eventId;
-    lines.push({ text: `+${doubled(eventBonus.value)}$/раунд во время события «${eventTitle}»`, active: game.event_id === eventBonus.eventId, boosted: automated });
+    lines.push({ text: `+${eventBonus.value}$/раунд во время события «${eventTitle}»`, active: game.event_id === eventBonus.eventId, boosted: false });
   }
 
   const influenceBonus = effects.influenceBonus as { value: number; district?: string; role?: string } | undefined;
@@ -807,7 +772,7 @@ export function assetEffectLines(
       influenceBonus.district ? `объект «${districtTitle(influenceBonus.district)}»` : "",
       influenceBonus.role ? `роль «${roleTitle(influenceBonus.role)}»` : "",
     ].filter(Boolean).join(" и ");
-    lines.push({ text: `+${doubled(influenceBonus.value)}◆/раунд${cond ? ` при наличии ${cond}` : ""}`, active: roleOk && districtOk, boosted: automated });
+    lines.push({ text: `+${influenceBonus.value}◆/раунд${cond ? ` при наличии ${cond}` : ""}`, active: roleOk && districtOk, boosted: false });
   }
 
   const districtBonus = effects.districtBonus as
@@ -818,27 +783,25 @@ export function assetEffectLines(
       const adjust = districtBonus.excludeSelf && asset.district === districtBonus.district ? 1 : 0;
       const virtual = districtBonus.virtualRole && hasRole(districtBonus.virtualRole) ? 1 : 0;
       const count = Math.max(0, districtCount(owner, districtBonus.district, assets) - adjust + virtual);
-      const per = doubled(districtBonus.value);
-      lines.push({ text: `+${per}$ за каждый объект «${districtTitle(districtBonus.district)}» · сейчас ${count} → +${per * count}$`, active: count > 0, boosted: automated });
+      const per = districtBonus.value;
+      lines.push({ text: `+${per}$ за каждый объект «${districtTitle(districtBonus.district)}» · сейчас ${count} → +${per * count}$`, active: count > 0, boosted: false });
     } else {
-      lines.push({ text: `+${doubled(districtBonus.value)}$ при наличии объекта «${districtTitle(districtBonus.district)}»`, active: hasLink(districtBonus.district), boosted: automated });
+      lines.push({ text: `+${districtBonus.value}$ при наличии объекта «${districtTitle(districtBonus.district)}»`, active: hasLink(districtBonus.district), boosted: false });
     }
   }
 
   const roleBonus = effects.roleBonus as { role: string; value: number } | undefined;
   if (roleBonus) {
-    lines.push({ text: `+${doubled(roleBonus.value)}$ пока вы «${roleTitle(roleBonus.role)}»`, active: hasRole(roleBonus.role), boosted: automated });
+    lines.push({ text: `+${roleBonus.value}$ пока вы «${roleTitle(roleBonus.role)}»`, active: hasRole(roleBonus.role), boosted: false });
   }
   for (const bonus of (effects.roleBonuses as { role: string; value: number }[] | undefined) ?? []) {
-    lines.push({ text: `+${doubled(bonus.value)}$ пока вы «${roleTitle(bonus.role)}»`, active: hasRole(bonus.role), boosted: automated });
+    lines.push({ text: `+${bonus.value}$ пока вы «${roleTitle(bonus.role)}»`, active: hasRole(bonus.role), boosted: false });
   }
   for (const link of (effects.districtLinks as { district: string; value: number }[] | undefined) ?? []) {
-    lines.push({ text: `+${doubled(link.value)}$ при наличии «${districtTitle(link.district)}»`, active: hasLink(link.district), boosted: automated });
+    lines.push({ text: `+${link.value}$ при наличии «${districtTitle(link.district)}»`, active: hasLink(link.district), boosted: false });
   }
 
   const passive: [string, string][] = [];
-  const maintenance = numberValue(effects.maintenanceReduction);
-  if (maintenance) passive.push([`Первые ${maintenance} объектов не требуют содержания`, "true"]);
   if (numberValue(effects.extraActions)) passive.push([`+1 обычное действие в начале хода`, "true"]);
   if (numberValue(effects.extraInvestmentActions)) passive.push([`+1 инвестиционное действие в начале хода`, "true"]);
   if (numberValue(effects.turnRoof)) passive.push([`+1 Крыша в начале каждого хода`, "true"]);
@@ -1008,19 +971,6 @@ export function activeBonuses(player: PlayerState, game: GameState, meta: CityMe
     const project = meta.projects.find(item => item.id === projectId);
     if (project) result.push({ text: `Проект «${project.title}»: ${project.points} очков, ${projectPerkText(project)}.`, active: true });
   }
-  result.push({ text: `Содержание бизнеса: −${Math.max(0, player.assets.length - maintenanceReduction(player, meta, assets))}$ в конце раунда.`, active: false });
   return result;
 }
 
-function maintenanceReduction(player: PlayerState, meta: CityMeta, assets: Map<string, AssetMeta>): number {
-  const fromAssets = player.assets.reduce((sum, item) => {
-    if (item.blocked) return sum;
-    const value = assets.get(item.card_id)?.effects?.maintenanceReduction;
-    return sum + numberValue(value);
-  }, 0);
-  const fromProjects = player.projects.reduce((sum, projectId) => {
-    const perk = meta.projects.find(item => item.id === projectId)?.perk ?? {};
-    return sum + numberValue(perk.maintenanceReduction);
-  }, 0);
-  return fromAssets + fromProjects;
-}

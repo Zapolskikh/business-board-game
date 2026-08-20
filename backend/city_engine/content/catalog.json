@@ -227,12 +227,14 @@
       "cost": 16,
       "income": 2,
       "influence": 1,
-      "text": "Первые 3 ваших объекта не требуют содержания каждый раунд.",
+      "text": "+2◆ за раунд.",
       "tags": [
         "infrastructure"
       ],
       "effects": {
-        "maintenanceReduction": 3
+        "influenceBonus": {
+          "value": 2
+        }
       }
     },
     {
@@ -354,12 +356,14 @@
       "cost": 18,
       "income": 1,
       "influence": 2,
-      "text": "В начале каждого хода даёт 1 дополнительное инвестиционное действие.",
+      "text": "+2◆ за раунд.",
       "tags": [
         "finance"
       ],
       "effects": {
-        "extraInvestmentActions": 1
+        "influenceBonus": {
+          "value": 2
+        }
       }
     },
     {
@@ -1587,8 +1591,8 @@
       "id": "antitrust",
       "title": "Предписание о демонтаже",
       "tone": "attack",
-      "text": "Цель теряет одно улучшение на самом ценном объекте.",
-      "kind": "remove_upgrade",
+      "text": "Цель теряет один уровень развития в самом развитом своём районе.",
+      "kind": "remove_development",
       "value": 1,
       "targeted": true
     },
@@ -1944,7 +1948,7 @@
         "count": 2
       },
       "perk": {
-        "extraInvestmentActions": 1
+        "passiveInfluence": 1
       }
     },
     {
@@ -2094,12 +2098,14 @@
     {
       "id": "exhibition",
       "title": "Городская выставка",
-      "text": "Выставка достижений: нужен жетон автоматизации.",
+      "text": "Городская выставка держится на связях: нужны два объекта с политическим весом.",
       "cost_influence": 4,
       "cost_money": 4,
       "points": 6,
       "requirement": {
-        "type": "automation"
+        "type": "tag_objects",
+        "tag": "politics",
+        "count": 2
       },
       "perk": {
         "passiveMoney": 1
@@ -2430,12 +2436,14 @@
     {
       "id": "engineering_bureau",
       "title": "Инженерное бюро",
-      "text": "Автоматизация должна быть на чём-то обкатана.",
+      "text": "Бюро проектирует город: нужны два инфраструктурных объекта.",
       "cost_influence": 4,
       "cost_money": 4,
       "points": 6,
       "requirement": {
-        "type": "automation"
+        "type": "tag_objects",
+        "tag": "infrastructure",
+        "count": 2
       },
       "perk": {
         "passiveMoney": 1
