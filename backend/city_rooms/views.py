@@ -6,7 +6,7 @@ from copy import deepcopy
 from functools import lru_cache
 from typing import Any
 
-from city_engine.constants import DISTRICT_IDS
+from city_engine.constants import DISTRICT_IDS, REPEATABLE_PROJECT_IDS
 from city_engine.engine import CityEngine
 from city_engine.models import PlayerState
 from city_rooms.models import RoomState
@@ -124,6 +124,18 @@ def room_view(
         game["project_progress"] = {
             project_id: engine.project_requirement_standing(viewer, engine.project(project_id))
             for project_id in room.game.project_board
+        }
+        # Initiatives get dearer with every one the viewer already holds, so their price is a
+        # per-player number like the market discounts — the engine answers, the client prints.
+        game["initiative_cost"] = {
+            project_id: dict(
+                zip(
+                    ("cost_influence", "cost_money"),
+                    engine.project_cost(viewer, engine.project(project_id)),
+                    strict=True,
+                )
+            )
+            for project_id in REPEATABLE_PROJECT_IDS
         }
     # "The three oldest slots leave when the round opens" is a rule, and the three oldest are not
     # the first three of anything the client can see, so the engine answers instead of the client.

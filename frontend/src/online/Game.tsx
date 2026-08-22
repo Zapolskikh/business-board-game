@@ -397,13 +397,18 @@ function ProjectBoard({ game, meta, me, projects, actions, reroll, busy, onActio
     {initiatives.length > 0 && <>
       {/* The floor: always available, any number of times, priced worse than a real project — so
           the last rounds always have somewhere to put money and influence. */}
-      <h3 className="group-title">Всегда доступны <span className="group-hint">берутся сколько угодно раз</span></h3>
+      <h3 className="group-title">Всегда доступны <span className="group-hint">берутся сколько угодно раз · каждая следующая дороже</span></h3>
       <div className="project-grid">{initiatives.map(project => {
         const action = actions.get(project.id);
-        return <button className={`project-card repeatable ${action ? "available" : "locked"}`} disabled={busy || !action} onClick={() => action && void onAction(action)} title={`${project.text} Цена: ${project.cost_influence}◆ и ${project.cost_money}$ плюс 1 обычное действие.`} key={project.id}>
+        // Per-player price from the engine: the catalog number is only the price of your first.
+        const price = game.initiative_cost?.[project.id];
+        const costInfluence = price?.cost_influence ?? project.cost_influence;
+        const costMoney = price?.cost_money ?? project.cost_money;
+        const raised = costInfluence > project.cost_influence || costMoney > project.cost_money;
+        return <button className={`project-card repeatable ${action ? "available" : "locked"}`} disabled={busy || !action} onClick={() => action && void onAction(action)} title={`${project.text} Цена сейчас: ${costInfluence}◆ и ${costMoney}$ плюс 1 обычное действие.${raised ? ` Базовая цена ${project.cost_influence}◆ и ${project.cost_money}$ — каждая взятая вами инициатива делает следующую дороже.` : " Каждая взятая вами инициатива делает следующую дороже."}`} key={project.id}>
           <strong>{project.title}<em>{project.points} очков</em></strong>
-          <span className="project-cost">{project.cost_influence}◆ + {project.cost_money}$</span>
-          <small className="project-condition met">♾ без условия, сколько угодно раз</small>
+          <span className="project-cost">{costInfluence}◆ + {costMoney}${raised && <i className="project-leaving"> ↑ база {project.cost_influence}◆+{project.cost_money}$</i>}</span>
+          <small className="project-condition met">♾ без условия, сколько угодно раз · дорожает</small>
         </button>;
       })}</div>
     </>}

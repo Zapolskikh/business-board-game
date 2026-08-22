@@ -3,5 +3,20 @@
   "python.testing.pytestArgs": ["backend/tests"],
   "python.analysis.extraPaths": ["backend"],
   "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
-  "ruff.configuration": "${workspaceFolder}/backend/pyproject.toml"
+  "ruff.configuration": "${workspaceFolder}/backend/pyproject.toml",
+
+  // Терминал: разрешено всё. Реальный YOLO включается в Chat view
+  // через выбор уровня разрешений "Bypass Approvals".
+  "chat.tools.terminal.enableAutoApprove": true,
+  "chat.tools.terminal.autoApprove": {
+    "/.*/": true
+  },
+
+  // Правки файлов без подтверждения, кроме секретов.
+  "chat.tools.edits.autoApprove": {
+    "**": true,
+    "**/.env*": false,
+    "**/*.pem": false,
+    "**/*.key": false
+  }
 }

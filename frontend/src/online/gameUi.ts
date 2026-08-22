@@ -690,6 +690,8 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       const tail: LogSegment[] = [txt(` ${greyOperationLabels[assetId] ?? assetId}`)];
       if (target) tail.push(txt(" → "), playerSeg(game, targetId));
       tail.push(txt(": "), data.success ? num("успех", "good") : num("провал", "bad"), txt(` (${chance}%)`));
+      const points = numberValue(data.points);
+      if (points) tail.push(txt(" "), num(`+${points} очков`, "good"));
       return lead(...tail, ...deltas);
     }
     case "role_power_used": {
@@ -769,7 +771,12 @@ const rolePerkLabels: Record<string, { label: string; unit: string; hint: string
   fraudster_chance: {
     label: "Бонус к шансу серых операций",
     unit: "%",
-    hint: "+20% всегда и ещё +10% при вашем объекте Технокластера",
+    hint: "+30% к любой серой операции, без условий",
+  },
+  fraudster_comeback: {
+    label: "Камбэк за отставание",
+    unit: "◆ за операцию",
+    hint: "1◆ за каждую позицию отставания в рейтинге при успешной серой операции",
   },
   mafia_racket_money: {
     label: "Деньги рэкета",

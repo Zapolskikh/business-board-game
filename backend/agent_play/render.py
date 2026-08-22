@@ -464,7 +464,12 @@ ROLE_POWERS = {
 }
 
 
-def _project_line(project_id: str, catalog: Catalog, progress: dict[str, Any] | None = None) -> str:
+def _project_line(
+    project_id: str,
+    catalog: Catalog,
+    progress: dict[str, Any] | None = None,
+    price: dict[str, Any] | None = None,
+) -> str:
     project = catalog.projects.get(project_id, {})
     perk = ", ".join(f"{key} {value}" for key, value in (project.get("perk") or {}).items())
     # The server counts the condition for the viewer; an agent that has to count tags itself
@@ -475,10 +480,17 @@ def _project_line(project_id: str, catalog: Catalog, progress: dict[str, Any] | 
             standing = " (вы: да)" if progress.get("met") else " (вы: нет)"
         else:
             standing = f" (вы: {min(int(progress['have']), int(progress['needed']))}/{progress['needed']})"
+    # An initiative's price depends on how many the viewer already holds, so the catalog number
+    # would be a lie after the first one.
+    cost_influence = (price or {}).get("cost_influence", project.get("cost_influence", "?"))
+    cost_money = (price or {}).get("cost_money", project.get("cost_money", "?"))
+    surcharge = ""
+    if price and cost_influence != project.get("cost_influence"):
+        surcharge = f" (база {project.get('cost_influence')}◆+{project.get('cost_money')}$, дорожает)"
     return (
         f"    {project_id:<22} {catalog.project_title(project_id):<30} "
-        f"{project.get('cost_influence', '?')}◆+{project.get('cost_money', '?')}$ → "
-        f"{project.get('points', '?')} очков · условие: {catalog.project_requirement(project_id)}{standing}"
+        f"{cost_influence}◆+{cost_money}$ → "
+        f"{project.get('points', '?')} очков{surcharge} · условие: {catalog.project_requirement(project_id)}{standing}"
         + (f" · перк: {perk}" if perk else "")
     )
 
@@ -602,8 +614,9 @@ def render_state(
         lines.append(_project_line(project_id, catalog, progress) + suffix)
     repeatable = [pid for pid, row in catalog.projects.items() if row.get("repeatable")]
     if repeatable:
-        lines.append("    всегда доступны (берутся сколько угодно раз):")
-        lines.extend(_project_line(pid, catalog) for pid in repeatable)
+        prices = game.get("initiative_cost") or {}
+        lines.append("    всегда доступны (берутся сколько угодно раз, каждая следующая дороже):")
+        lines.extend(_project_line(pid, catalog, price=prices.get(pid)) for pid in repeatable)
     if me["projects"]:
         taken = ", ".join(catalog.project_title(project_id) for project_id in me["projects"])
         lines.append(f"    мои проекты: {taken}")

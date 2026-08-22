@@ -111,6 +111,9 @@ export interface GameState {
   development_cost?: number;
   // The viewer's own standing on every board condition, counted by the engine — never here.
   project_progress?: Record<string, { binary: boolean; met: boolean; have: number; needed: number }>;
+  // Initiatives get dearer with every one you already hold, so the price is per-player and the
+  // engine owns it — never print ProjectMeta.cost_* for a repeatable project.
+  initiative_cost?: Record<string, { cost_influence: number; cost_money: number }>;
   turn_flags: Record<string, unknown>;
   antitrust_active?: boolean;
   event_log: DomainEvent[];

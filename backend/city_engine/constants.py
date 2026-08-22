@@ -104,10 +104,19 @@ PROJECT_BOARD_SIZE = 4
 # Listed here (and cross-checked against the catalog) so state validation can exempt them from
 # the "every project exists once" rule without loading content.
 REPEATABLE_PROJECT_IDS = ("city_initiative", "municipal_programme")
-# ...but a floor that can be pressed forever becomes the engine: unlimited initiatives took 38%
-# of all project points in the arena match, and one player's last sixteen actions were twelve
-# identical clicks. Three per game keeps them as a way out of a dead hand, not as a strategy.
-MAX_REPEATABLE_PROJECTS = 3
+# These are genuinely unlimited. A per-game cap of three lived here for a while, but it was a rule
+# no surface ever printed: the board header, the card face and the catalog text all promise "any
+# number of times", so the cap only ever showed up as a project silently vanishing from the legal
+# moves. The influence sink is the point — without it a politician ends the game sitting on 55◆ of
+# dead weight once the board stops offering projects whose condition he meets.
+#
+# What stops the sink from becoming the whole game is price, not a wall: every initiative already
+# taken makes the next one dearer. Uncapped and flat, initiatives took 31% of all project points
+# and one live game ended 18 initiatives out of 21 projects — nine identical clicks in the last
+# three rounds. Escalating keeps the first few as the good deal they should be, and makes the
+# eleventh arithmetically worse than lobbying, which is what should be reclaiming those actions.
+INITIATIVE_SURCHARGE_INFLUENCE = 1
+INITIATIVE_SURCHARGE_MONEY = 2
 # How many market slots the opening of a round replaces: the oldest three of six.
 #
 # This used to be a per-slot countdown — six independent timers printed as "⏳2р" on every card —
@@ -131,10 +140,22 @@ JOURNALIST_RATING_BASE = 2
 # *and* publish on top of three ordinary actions — was the journalist's real edge over every other
 # role, none of which has a power that skips the action cost.
 PUBLICATION_SCANDALS = 2
-# The fraudster's grey bonus, flat. It used to be a ladder by rank plus a ladder by tech objects:
-# a percentage that changed every turn and that nobody could read off the screen.
-FRAUDSTER_GREY_BONUS = 0.20
-FRAUDSTER_TECH_BONUS = 0.10
+# The fraudster's grey bonus, flat and single. It used to be split in two — +20% for the role and
+# +10% more for holding any Технокластер object — which meant the crypto exchange, itself a
+# Технокластер object, silently granted both and pinned every fraudster operation at the 0.9 ceiling.
+# One number that the player can read off the role card is worth more than two that stack invisibly.
+FRAUDSTER_GREY_BONUS = 0.30
+# Grey operations pay victory points on success, not just money. Measured over four games: a
+# fraudster who ran ten operations converted them into roughly twelve points, because the payout was
+# money and money is the weakest currency in the game at 10$ per point. An operation now scores like
+# a small project, and the odds pay for it — every base chance below dropped by 15 points, so the
+# move became a real bet instead of a formality. Fraudster at 75% on the crypto exchange nets 4.1
+# points per action against 2.3 before; everybody else sits near a coin flip, slightly ahead of the
+# 2 points a patronage would have paid, which is exactly where a gamble belongs.
+GREY_OPERATION_POINTS = 3
+# The hack and the compromat leak cost two scandals apiece and the leak strips a role outright, so
+# they carry the higher payout — and, after the 15-point cut, the two longest odds on the board.
+GREY_OPERATION_POINTS_HARD = 5
 # The crypto scam takes this share of every rival's cash and hands the fraudster five scandals —
 # its entire scandal budget. Bare, the role loses itself; with two reduction perks it survives.
 CRYPTO_SCAM_SHARE = 25

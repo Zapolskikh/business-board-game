@@ -7,12 +7,15 @@ from city_engine.constants import (
     CAMPAIGN_TIERS,
     CASH_TO_INFLUENCE_MONEY,
     COMPROMAT_INFLUENCE,
+    GREY_OPERATION_POINTS,
+    GREY_OPERATION_POINTS_HARD,
     HACK_INFLUENCE_STEAL,
     INFLUENCE_PER_POINT,
+    INITIATIVE_SURCHARGE_INFLUENCE,
+    INITIATIVE_SURCHARGE_MONEY,
     LOBBYING_INFLUENCE,
     LOBBYING_POINTS,
     MARKET_ROTATION_SIZE,
-    MAX_REPEATABLE_PROJECTS,
     MONEY_PER_POINT,
     PATRONAGE_MONEY,
     PATRONAGE_POINTS,
@@ -202,18 +205,20 @@ def test_district_development_pays_at_least_one_per_level() -> None:
     assert engine._round_income(state, player) == baseline + 4  # 3 → 4 and 2 → 3
 
 
-def test_asset_purchase_event_reports_the_grey_scandal_in_deltas() -> None:
+def test_buying_a_grey_asset_costs_no_scandal() -> None:
     engine = CityEngine()
     state = make_state()
     player = state.current_player
     player.money = 20
-    # A grey object charges a scandal on purchase; below the limit that writes no event of its own.
+    # Objects never charge scandals any more, not even the grey ones: the market card shows money
+    # and influence only, so a hidden ⚠ there pushed the fraudster over the limit during setup.
     state.market.append(MarketAsset(uid="asset:grey-test", card_id="market"))
 
     price = engine.asset_price(state, player, "market")
     state = run(engine, state, "buy_asset", {"market_uid": "asset:grey-test"})
     bought = next(event for event in reversed(state.event_log) if event.type == "asset_bought")
-    assert bought.data["deltas"][player.id] == {"money": -price, "influence": 1, "scandals": 1, "roofs": 0}
+    assert bought.data["deltas"][player.id] == {"money": -price, "influence": 1, "scandals": 0, "roofs": 0}
+    assert state.player_by_id(player.id).scandals == 0
 
 
 def test_targeted_card_auto_blocked_by_roof() -> None:
@@ -646,9 +651,11 @@ def test_roof_insurance_is_not_offered_without_a_roof() -> None:
     "card_id",
     [asset.id for asset in load_catalog().assets.values() if "grey" in asset.tags],
 )
-def test_grey_assets_warn_about_the_purchase_scandal(card_id: str) -> None:
-    # The scandal comes from the `grey` tag, so the card text is the only place a player can read it.
-    assert "скандал" in load_catalog().assets[card_id].text.lower()
+def test_grey_assets_do_not_promise_a_purchase_scandal(card_id: str) -> None:
+    # Purchases are clean now, so no card may advertise a scandal it will not charge.
+    asset = load_catalog().assets[card_id]
+    assert "scandals" not in asset.effects.get("purchase", {})
+    assert "при покупке" not in asset.text.lower() or "скандал" not in asset.text.lower()
 
 
 def test_grey_operation_uses_serialized_rng_for_success_and_failure() -> None:
@@ -674,7 +681,53 @@ def test_grey_operation_uses_serialized_rng_for_success_and_failure() -> None:
     # The launderer keeps the stake and delivers nothing.
     assert failure.current_player.money == 20 - stake
     assert failure.current_player.influence == 2
-    assert failure.current_player.scandals == 2
+
+
+def test_successful_grey_operations_score_points_and_failures_score_none() -> None:
+    engine = CityEngine()
+    state = make_state()
+    actor = state.current_player
+    give_asset(state, actor, "cash")
+    actor.money = 20
+    state.rng.state = 0  # next random ~= .236, below the .65 laundering chance.
+    state = run(engine, state, "grey_operation", {"asset_id": "cash"})
+    # The loot is money and influence; the points are what make the action worth taking.
+    assert state.current_player.bonus_points == GREY_OPERATION_POINTS
+    resolved = next(event for event in reversed(state.event_log) if event.type == "grey_operation_resolved")
+    assert resolved.data["points"] == GREY_OPERATION_POINTS
+
+    failed = make_state()
+    actor = failed.current_player
+    give_asset(failed, actor, "cash")
+    actor.money = 20
+    failed.rng.state = 100_000  # next random ~= .991, above every chance in the table.
+    failed = run(engine, failed, "grey_operation", {"asset_id": "cash"})
+    assert failed.current_player.bonus_points == 0
+    resolved = next(event for event in reversed(failed.event_log) if event.type == "grey_operation_resolved")
+    assert resolved.data["points"] == 0
+
+
+def test_the_two_scandal_operations_pay_the_higher_score() -> None:
+    engine = CityEngine()
+    # A hack and a compromat leak cost two scandals apiece, so they carry the bigger payout.
+    for asset_id in ("datacenter", "influence_broker"):
+        assert engine.grey_operation_points(asset_id) == GREY_OPERATION_POINTS_HARD
+    for asset_id in ("cash", "market", "crypto"):
+        assert engine.grey_operation_points(asset_id) == GREY_OPERATION_POINTS
+
+
+def test_the_fraudster_bonus_is_flat_and_needs_no_tech_object() -> None:
+    engine = CityEngine()
+    state = make_state()
+    actor = state.current_player
+    actor.role = "fraudster"
+    give_asset(state, actor, "cash")  # Серый сектор, not Технокластер.
+    actor.money = 20
+
+    state = run(engine, state, "grey_operation", {"asset_id": "cash"})
+    resolved = next(event for event in reversed(state.event_log) if event.type == "grey_operation_resolved")
+    # 0.65 base + 0.30 flat, capped at the 0.9 ceiling — no tech object involved.
+    assert resolved.data["chance"] == pytest.approx(0.9)
 
 
 def test_hacking_takes_influence_instead_of_blocking_an_object() -> None:
@@ -1253,22 +1306,59 @@ def test_roof_blocks_a_journalist_scandal_like_any_other_attack() -> None:
     assert any(event.type == "targeted_effect_blocked" for event in state.event_log)
 
 
-def test_initiatives_are_capped_per_game() -> None:
+def test_initiatives_are_unlimited_but_get_dearer_each_time() -> None:
+    """The board, the card face and the catalog all promise "any number of times" — so it is.
+
+    They are the sink that keeps late influence from turning into dead weight. What stops the
+    sink from becoming the whole game is price: uncapped and flat, initiatives took 31% of all
+    project points and one live game ended with 18 of them out of 21 projects.
+    """
     engine = CityEngine()
     state = make_state()
     player = state.current_player
-    player.money = 200
-    player.influence = 200
+    player.money = 400
+    player.influence = 400
+    base = engine.project("city_initiative")
 
-    for _ in range(MAX_REPEATABLE_PROJECTS):
+    for taken in range(8):
+        expected = (
+            base.cost_influence + INITIATIVE_SURCHARGE_INFLUENCE * taken,
+            base.cost_money + INITIATIVE_SURCHARGE_MONEY * taken,
+        )
+        assert engine.project_cost(player, base) == expected
+        before_influence, before_money = player.influence, player.money
+        state = run(engine, state, "city_project", {"project_id": "city_initiative"})
+        state.actions_left = 3
+        player = state.current_player
+        assert (before_influence - player.influence, before_money - player.money) == expected
+
+    assert player.projects == ["city_initiative"] * 8
+    # The surcharge counts every initiative, not every copy of one: a different initiative on top
+    # of eight of the first is legal and priced as the ninth.
+    programme = engine.project("municipal_programme")
+    assert engine.project_cost(player, programme) == (
+        programme.cost_influence + INITIATIVE_SURCHARGE_INFLUENCE * 8,
+        programme.cost_money + INITIATIVE_SURCHARGE_MONEY * 8,
+    )
+    state = run(engine, state, "city_project", {"project_id": "municipal_programme"})
+    assert state.current_player.projects[-1] == "municipal_programme"
+
+
+def test_unique_projects_are_not_touched_by_the_initiative_surcharge() -> None:
+    """Only the repeatable sink escalates; a one-off project always costs what the card says."""
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.money = 400
+    player.influence = 400
+
+    for _ in range(3):
         state = run(engine, state, "city_project", {"project_id": "city_initiative"})
         state.actions_left = 3
         player = state.current_player
 
-    assert player.projects == ["city_initiative"] * MAX_REPEATABLE_PROJECTS
-    # Unlimited initiatives took 38% of all project points in the arena match.
-    with pytest.raises(IllegalActionError):
-        run(engine, state, "city_project", {"project_id": "municipal_programme"})
+    unique = engine.project(state.project_board[0])
+    assert engine.project_cost(player, unique) == (unique.cost_influence, unique.cost_money)
 
 
 def test_the_market_holds_still_for_a_whole_round_then_rotates_three_slots() -> None:

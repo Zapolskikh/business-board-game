@@ -22,9 +22,12 @@ from city_engine.constants import (
     CRISIS_PR_INFLUENCE,
     DISTRICT_IDS,
     FRAUDSTER_GREY_BONUS,
-    FRAUDSTER_TECH_BONUS,
+    GREY_OPERATION_POINTS,
+    GREY_OPERATION_POINTS_HARD,
     HACK_INFLUENCE_STEAL,
     INFLUENCE_PER_POINT,
+    INITIATIVE_SURCHARGE_INFLUENCE,
+    INITIATIVE_SURCHARGE_MONEY,
     JOURNALIST_RATING_BASE,
     JOURNALIST_SCANDAL_LIMIT,
     LAUNDERING_BASE_COST,
@@ -33,7 +36,6 @@ from city_engine.constants import (
     LOBBYING_POINTS,
     MARKET_ROTATION_SIZE,
     MAX_CAPACITY,
-    MAX_REPEATABLE_PROJECTS,
     MONEY_PER_POINT,
     PATRONAGE_MONEY,
     PATRONAGE_POINTS,
@@ -658,24 +660,41 @@ class CityEngine:
             raise InvalidCommandError(f"campaign spend must be one of: {allowed}")
         return spend
 
+    def initiatives_taken(self, player: PlayerState) -> int:
+        """How many repeatable initiatives this player already holds — the surcharge multiplier."""
+        return sum(1 for item in player.projects if self.project(item).repeatable)
+
+    def project_cost(self, player: PlayerState, project: ProjectDefinition) -> tuple[int, int]:
+        """What this project costs *this* player right now, as (influence, money).
+
+        Unique projects are priced by the catalog. Initiatives get dearer with every one already
+        taken, so the sink stays open forever without ever being the best button twice in a row.
+        Everything that prints or charges a price goes through here — the client must not
+        recompute it, for the same reason it no longer recomputes asset discounts.
+        """
+        if not project.repeatable:
+            return project.cost_influence, project.cost_money
+        taken = self.initiatives_taken(player)
+        return (
+            project.cost_influence + INITIATIVE_SURCHARGE_INFLUENCE * taken,
+            project.cost_money + INITIATIVE_SURCHARGE_MONEY * taken,
+        )
+
     def _city_project(self, state: GameState, command: Command) -> None:
         """Projects are a shared board: taking one denies it to everybody else for the whole game."""
         player = state.current_player
         project_id = self._payload_string(command, "project_id")
         project = self.project(project_id)
-        if project.repeatable:
-            taken = sum(1 for item in player.projects if self.project(item).repeatable)
-            if taken >= MAX_REPEATABLE_PROJECTS:
-                raise IllegalActionError(f"initiatives are limited to {MAX_REPEATABLE_PROJECTS} per game")
-        elif project_id not in state.project_board:
+        if not project.repeatable and project_id not in state.project_board:
             raise IllegalActionError("this project is not on the city board")
-        if player.influence < project.cost_influence or player.money < project.cost_money:
+        cost_influence, cost_money = self.project_cost(player, project)
+        if player.influence < cost_influence or player.money < cost_money:
             raise IllegalActionError("not enough resources for the project")
         if not self.project_requirement_met(player, project):
             raise IllegalActionError("the project condition is not met")
         self._spend_action(state)
-        player.influence -= project.cost_influence
-        player.money -= project.cost_money
+        player.influence -= cost_influence
+        player.money -= cost_money
         player.projects.append(project_id)
         if not project.repeatable:
             state.project_board = [item for item in state.project_board if item != project_id]
@@ -685,8 +704,8 @@ class CityEngine:
             player.id,
             project_id=project_id,
             points=project.points,
-            cost_influence=project.cost_influence,
-            cost_money=project.cost_money,
+            cost_influence=cost_influence,
+            cost_money=cost_money,
         )
 
     def _refill_project_board(self, state: GameState) -> None:
@@ -864,9 +883,12 @@ class CityEngine:
                     source_asset_id=asset.id,
                     card_id=drawn.card_id,
                 )
-        raw_scandals = int(purchase.get("scandals", 1 if "grey" in asset.tags else 0))
-        reduction = self.effect_total(player, "greyScandalReduction") if "grey" in asset.tags else 0
-        self.add_scandal(state, player, max(0, raw_scandals - reduction))
+        # Buying an object never costs scandals. The old rule charged +1⚠ for every «grey» tag and
+        # +2⚠ for a couple of named cards, but it was invisible on the market card — the price line
+        # showed money and influence only. A fraudster walking the intended route (grey objects →
+        # greyScandalReduction projects) hit the 5⚠ limit during the purchases themselves, lost the
+        # role and got arrested before the protection came online. Scandals now come only from
+        # actions the player consciously takes: grey operations, publications, the crypto scam.
         self._refill_market(state, 1)
 
     @staticmethod
@@ -1534,15 +1556,27 @@ class CityEngine:
     GREY_TARGETED_IDS = ("market", "datacenter", "influence_broker")
     # Trimmed with the gate: both of these are now reachable from any Серый сектор object rather
     # than from one card, and the two cheapest operations were the ones already being used.
+    # Every chance below is 15 points under what it used to be, because success now pays victory
+    # points on top of the loot — see GREY_OPERATION_POINTS. The two that cost two scandals are the
+    # two longest odds and carry the larger payout.
     GREY_BASE_CHANCE = {
-        "cash": 0.80,
-        "market": 0.70,
-        "crypto": 0.60,
-        "datacenter": 0.55,
+        "cash": 0.65,
+        "market": 0.55,
+        "crypto": 0.45,
+        "datacenter": 0.40,
         "influence_broker": COMPROMAT_CHANCE,
     }
     # A leak and a hack are two scandals; the rest are one.
     GREY_SUCCESS_SCANDALS = {"datacenter": 2, "influence_broker": 2}
+    # The same two pay the higher score: they are the dangerous ones.
+    GREY_SUCCESS_POINTS = {
+        "datacenter": GREY_OPERATION_POINTS_HARD,
+        "influence_broker": GREY_OPERATION_POINTS_HARD,
+    }
+
+    def grey_operation_points(self, asset_id: str) -> int:
+        """Victory points a successful run of this operation scores."""
+        return self.GREY_SUCCESS_POINTS.get(asset_id, GREY_OPERATION_POINTS)
 
     def grey_operation_unlocked(self, player: PlayerState, operation_id: str) -> bool:
         """Does the player hold an active object of a district this operation runs out of?"""
@@ -1580,22 +1614,22 @@ class CityEngine:
             player.compromat_round = state.round_number
 
         place = next(index for index, ranked in enumerate(self.ranking(state), start=1) if ranked.id == player.id)
-        # Two flat numbers instead of two ladders. The old bonus was "+5/10/20% by rank, plus 5% per
-        # tech object up to 10%": a percentage that changed every turn and that no player could read
-        # off the screen. This is slightly stronger and legible, which is the trade we wanted.
+        # One flat number. The old bonus was "+20% for the role, +10% more for any Технокластер
+        # object", and the crypto exchange is a Технокластер object, so the fraudster's own signature
+        # operation always granted both and landed on the 0.9 ceiling regardless of anything else.
         fraud_bonus = FRAUDSTER_GREY_BONUS if self.has_role(player, "fraudster") else 0
-        tech_bonus = (
-            FRAUDSTER_TECH_BONUS
-            if self.has_role(player, "fraudster") and self.district_count(player, "tech") > 0
-            else 0
-        )
-        chance = min(0.9, self.GREY_BASE_CHANCE[asset_id] + fraud_bonus + tech_bonus)
+        chance = min(0.9, self.GREY_BASE_CHANCE[asset_id] + fraud_bonus)
         success = GameRNG(state.rng).chance(chance)
         # The comeback pays influence now, not money: the fraudster already has three money levers
         # and no influence at all. Kept deliberately small — 1◆ is worth 3.3 times a dollar.
         comeback = (place - 1) if self.has_role(player, "fraudster") else 0
+        points = 0
         if success:
             self._resolve_grey_success(state, player, target, asset_id, comeback)
+            # The point payout is the reason the odds came down; it is what makes the operation
+            # worth an action at all, since the loot alone is money and money is 10$ to the point.
+            points = self.grey_operation_points(asset_id)
+            player.bonus_points += points
             operation_scandals = self.GREY_SUCCESS_SCANDALS.get(asset_id, 1)
             self.add_scandal(
                 state,
@@ -1613,6 +1647,7 @@ class CityEngine:
             target_id=target.id if target else None,
             success=success,
             chance=chance,
+            points=points,
             deltas=self._resource_deltas(state, before),
         )
 
@@ -1636,19 +1671,21 @@ class CityEngine:
             # Reversed: money buys influence. See LAUNDERING_BASE_GAIN for why both sides scale.
             player.money -= self.laundering_cost(state)
             player.influence += self.laundering_gain(state)
-            player.money += comeback
+            player.influence += comeback
         elif asset_id == "market" and target is not None:
             cap = 3 + floor(state.round_number / 2)
             if target.roofs > 0:
                 target.roofs -= 1
-                player.money += comeback
+                player.influence += comeback
                 state.append_event("targeted_effect_blocked", target.id, asset_id=asset_id, by="roof")
             else:
                 stolen = min(cap, target.money)
                 target.money -= stolen
-                player.money += stolen + comeback
+                player.money += stolen
+                player.influence += comeback
         elif asset_id == "crypto":
-            player.money += 6 + state.round_number + comeback
+            player.money += 6 + state.round_number
+            player.influence += comeback
             leader = self.ranking(state)[0]
             if leader.id != player.id:
                 if leader.roofs > 0:
@@ -1659,7 +1696,7 @@ class CityEngine:
         elif asset_id == "datacenter" and target is not None:
             # Straight influence theft. It used to block the target's best object for a round —
             # worth about 4$ to somebody sitting on 264$, and used zero times in 24 games.
-            player.money += comeback
+            player.influence += comeback
             if target.roofs > 0:
                 # A roof absorbs any incoming negative effect, hacking included.
                 target.roofs -= 1
@@ -1670,7 +1707,7 @@ class CityEngine:
                 player.influence += stolen
         elif asset_id == "influence_broker" and target is not None:
             player.influence -= COMPROMAT_INFLUENCE
-            player.money += comeback
+            player.influence += comeback
             self._resolve_compromat(state, player, target)
 
     def _resolve_compromat(self, state: GameState, player: PlayerState, target: PlayerState) -> None:
@@ -2173,13 +2210,25 @@ class CityEngine:
             )
         elif player.role == "fraudster":
             rows.append({"key": "fraudster_actions", "value": 1, "needs": None})
-            bonus = int(FRAUDSTER_GREY_BONUS * 100) + (int(FRAUDSTER_TECH_BONUS * 100) if count("tech") else 0)
             rows.append(
                 {
                     "key": "fraudster_chance",
-                    "value": bonus,
-                    "potential": int((FRAUDSTER_GREY_BONUS + FRAUDSTER_TECH_BONUS) * 100),
-                    "needs": "tech",
+                    "value": int(FRAUDSTER_GREY_BONUS * 100),
+                    "potential": int(FRAUDSTER_GREY_BONUS * 100),
+                    "needs": None,
+                }
+            )
+            # Динамическая строка: значение меняется каждый ход вместе с местом в рейтинге.
+            # Без неё камбэк был невидим — он растворялся в общей дельте события.
+            place = next(
+                index for index, ranked in enumerate(self.ranking(state), start=1) if ranked.id == player.id
+            )
+            rows.append(
+                {
+                    "key": "fraudster_comeback",
+                    "value": place - 1,
+                    "potential": max(0, len(state.players) - 1),
+                    "needs": None,
                 }
             )
         elif player.role == "mafia":
