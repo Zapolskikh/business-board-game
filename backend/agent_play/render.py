@@ -23,10 +23,10 @@ POWER_LABELS = {
 # Which offers do not consume one of the three turn actions. The engine spends an action inside
 # each handler, so this is the only place a reader can learn it — and a whole match was misplayed
 # on the assumption that a role power costs a turn action the way a basic action does.
+# Both rerolls cost an action now: the market rotates three slots by itself every round, and the
+# project board is re-dealt whole, so buying either out of turn is worth a turn.
 FREE_ACTION_TYPES = frozenset(
     {
-        "reroll_market",
-        "reroll_projects",
         "play_action_card",
         "convert_action_card",
         # Selling is free: the only reason to sell is the purchase that follows, and charging an
@@ -34,12 +34,12 @@ FREE_ACTION_TYPES = frozenset(
         "sell_asset",
     }
 )
+# Every scandal cleanup costs an action now — the action *is* the limit, in place of the hidden
+# once-per-turn counters. The journalist's two powers are the only ones still free.
 FREE_POWERS = frozenset(
     {
-        "politician_cleanup",
         "journalist_inflate",
         "journalist_publish",
-        "mafia_cleanup",
     }
 )
 
@@ -187,7 +187,11 @@ def _payload_hint(action: dict[str, Any], game: dict[str, Any], me: dict[str, An
         price = int(game["role_price"]) * (3 if holder else 1)
         bits.append(f"{price}◆" + (f", перехват у {holder['name']}" if holder else ", свободна"))
     if action["type"] == "develop_district":
-        bits.append("2$ · +25% к базовому доходу ваших объектов района, максимум 2 уровня, +1◆")
+        # The server computes what the next level pays: +25% rounds up per level over whatever
+        # objects the district holds, so the figure is not one the client can print from the rules.
+        cost = int(game.get("development_cost", 2))
+        gain = int((game.get("development_preview") or {}).get(str(payload.get("district")), 0))
+        bits.append(f"{cost}$ · +{gain}$ к доходу за раунд, +1◆, максимум 2 уровня")
     if action["type"] == "crisis_pr":
         bits.append("снять 1 скандал")
     if action["type"] == "buy_action_card":
@@ -202,7 +206,7 @@ def _payload_hint(action: dict[str, Any], game: dict[str, Any], me: dict[str, An
         elif payload.get("kind") == "work":
             bits.append("+2$")
     if action["type"] == "sell_asset":
-        bits.append("слот освобождается, жетон автоматизации снимается")
+        bits.append("слот освобождается, возврат = очки объекта")
     return " ".join(bits)
 
 
@@ -427,6 +431,7 @@ def _owned_line(owned: dict[str, Any], me: dict[str, Any], game: dict[str, Any],
     return (
         f"    {owned['uid']:<28} {catalog.asset_title(owned['card_id']):<26} "
         f"{catalog.district_title(str(asset.get('district', ''))):<18} доход {asset.get('income', '?')}$ "
+        f"{asset.get('points', '?')}очк "
         f"[{','.join(asset.get('tags', [])) or '—'}] " + " ".join(marks)
     )
 
@@ -438,6 +443,7 @@ def _market_line(item: dict[str, Any], game: dict[str, Any], catalog: Catalog) -
     return (
         f"    {item['uid']:<28} {catalog.asset_title(item['card_id']):<26} "
         f"{catalog.district_title(str(asset.get('district', ''))):<18} {price}$ доход {asset.get('income', '?')}$"
+        + f" {asset.get('points', '?')}очк"
         + f" [{','.join(asset.get('tags', [])) or '—'}]"
         + (f" +{influence}◆ разово" if influence else "")
         + f" {asset.get('rarity', '')}{' ⏳ уходит' if item.get('leaving') else ''}"
@@ -557,7 +563,7 @@ def render_state(
     lines.append(
         f"    цены сейчас: Крыша {roof_price(game, me)}$ · "
         f"две карты {card_cost}$+1◆ и действие · "
-        f"реролл рынка {reroll}$ и доски проектов {project_reroll}$ — без действия, доски общие · "
+        f"реролл рынка {reroll}$ и доски проектов {project_reroll}$ — каждый с действием, доски общие · "
         + (f"кампания {tiers} за одно действие · " if tiers else "")
         + (f"слот {int(me['capacity']) + 1} за {slot}$" if slot else "слоты максимум")
     )
@@ -568,6 +574,7 @@ def render_state(
         lines.append(
             f"    мои очки {breakdown.get('total', 0)}: проекты {breakdown.get('projects', 0)} · "
             f"объекты {breakdown.get('assets', 0)} · роль {breakdown.get('role', 0)} · "
+            f"прочие {breakdown.get('bonus', 0)} · "
             f"деньги {breakdown.get('money', 0)} ({per_money}$=1) · "
             f"влияние {breakdown.get('influence', 0)} ({per_influence}◆=1) · "
             f"скандалы {breakdown.get('scandals', 0)}"

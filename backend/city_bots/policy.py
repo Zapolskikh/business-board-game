@@ -7,15 +7,21 @@ still validated and executed by the authoritative engine.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from math import floor
 from typing import Any
 
 from city_engine.commands import Command
 from city_engine.constants import (
+    CASH_TO_INFLUENCE_MONEY,
     COMPROMAT_INFLUENCE,
     HACK_INFLUENCE_STEAL,
+    INFLUENCE_PER_POINT,
     MARKET_REROLL_COST,
+    MAX_CAPACITY,
+    MONEY_PER_POINT,
+    POINTS_CARD_RATE,
 )
 from city_engine.engine import CityEngine
 from city_engine.models import GameState, PlayerState
@@ -52,6 +58,10 @@ class PolicyProfile:
     # What a point of recurring influence is worth against a dollar of recurring income. The older
     # profiles keep 1.0 — the ratio they were tuned against. See ``_position_value``.
     influence_weight: float = 1.0
+    # Whether the bot values money and influence at their exact rate instead of the floored score.
+    # Only the reborn profile does: see ``_fractional_score`` for what it buys, and the note above
+    # for why the older profiles are left playing the game they were tuned against.
+    exact_resources: bool = False
 
 
 # What one influence is worth in dollars when both are about to be spent, not hoarded: a project
@@ -77,6 +87,7 @@ PROFILES = {
         defence=1.0,
         planning=1.0,
         influence_weight=INFLUENCE_IN_MONEY,
+        exact_resources=True,
     ),
 }
 
@@ -174,16 +185,42 @@ def _action_utility(
         return _grey_operation_utility(engine, state, player, payload, profile)
 
     before = _position_value(engine, state, player, profile)
-    opponents_before = sum(engine.score(other) for other in state.players if other.id != player.id)
+    score = _score_function(engine, profile)
+    opponents_before = sum(score(other) for other in state.players if other.id != player.id)
     after_state = preview_state
     after_player = after_state.player_by_id(player.id)
     after = _position_value(engine, after_state, after_player, profile)
-    opponents_after = sum(engine.score(other) for other in after_state.players if other.id != player.id)
+    opponents_after = sum(score(other) for other in after_state.players if other.id != player.id)
     utility = after - before + (opponents_before - opponents_after) * profile.aggression
     utility += _strategic_action_bonus(engine, state, player, action, profile)
     if profile.planning:
         utility += _project_planning_bonus(engine, state, player, after_player, profile) * profile.planning
     return utility
+
+
+def _score_function(engine: CityEngine, profile: PolicyProfile) -> Callable[[PlayerState], float]:
+    """Which score a profile judges positions by. Only the reborn bot gets the exact one."""
+    if profile.exact_resources:
+        return lambda player: _fractional_score(engine, player)
+    return engine.score
+
+
+def _fractional_score(engine: CityEngine, player: PlayerState) -> float:
+    """The engine's own score, with money and influence counted at their exact rate.
+
+    ``score`` floors both, and it has to: a player holding 28$ owns two points, not 2.8. But a
+    policy that values *positions* with a floored number cannot see any small resource move at
+    all. Measured on 1.4.0: the mafia racket taking 8$ and 1◆ off a rival scored 0.30 against 2.28
+    for a hack, and the whole 0.30 came from the victim happening to cross a ten-dollar boundary —
+    the bot's own gain was invisible. Four expert bots claimed the mafia role and never once used
+    its money power in twelve games.
+
+    Nothing here re-implements a rule: the itemised score comes from the engine, and only the two
+    rows that are floored by design are recomputed at the same rate the engine used.
+    """
+    breakdown = engine.score_breakdown(player)
+    exact = player.money / MONEY_PER_POINT + player.influence / INFLUENCE_PER_POINT
+    return breakdown["total"] - breakdown["money"] - breakdown["influence"] + exact
 
 
 def _position_value(
@@ -217,7 +254,13 @@ def _position_value(
     # statement about the scoring rate and the width of the board, not about the policy.
     cash_drag = max(0, player.money - profile.cash_comfort) * profile.cash_drag * profile.planning
     return (
-        engine.score(player) + recurring * horizon * 0.55 + defence + role_value + hand_value - scandal_risk - cash_drag
+        _score_function(engine, profile)(player)
+        + recurring * horizon * 0.55
+        + defence
+        + role_value
+        + hand_value
+        - scandal_risk
+        - cash_drag
     )
 
 
@@ -246,12 +289,20 @@ def _role_utility(engine: CityEngine, state: GameState, player: PlayerState, rol
         default=0,
     )
     if role_id == "capitalist":
-        return engine.district_count(player, "business") * 4 + distinct * 1.2 + min(3, player.money / 6)
-    if role_id == "politician":
+        # The role pays +1$ per *own* object of any district now, on top of the business synergy,
+        # so a wide tableau is worth as much to it as a deep business quarter.
         return (
-            engine.district_count(player, "residential") * 3
-            + engine.district_count(player, "government") * 4
-            + engine.passive_influence(player) * 1.5
+            engine.district_count(player, "business") * 3
+            + len(player.assets)
+            + distinct * 1.2
+            + min(3, player.money / 6)
+        )
+    if role_id == "politician":
+        # The residents tax is charged on every residential object *on the table*, including the
+        # rivals' — see ``CityEngine.residents_tax``. Counting only its own was the old power.
+        city_residential = sum(engine.district_count(other, "residential") for other in state.players)
+        return (
+            city_residential + engine.district_count(player, "government") * 4 + engine.passive_influence(player) * 1.5
         )
     if role_id == "journalist":
         return enemy_scandals * 2 + sum(other.role is not None for other in state.players if other.id != player.id)
@@ -403,10 +454,26 @@ def _strategic_action_bonus(
                 bonus += 2 * profile.aggression
             if target.roofs > 0:
                 bonus += 1.5 * profile.aggression
-    elif action_type == "crisis_pr":
+    elif action_type == "crisis_pr" or (
+        action_type == "use_role_power" and str(payload.get("power", "")).endswith("_cleanup")
+    ):
+        # One mechanic, several prices: the basic PR and every role's own cleanup all spend an
+        # action to drop scandals. Bonusing only the basic button made the cheaper power look worse
+        # than the dearer one — measured in a live 15-round game, a fraudster bot ran the 3◆ PR
+        # fifteen times and its own free cleanup three, burning 45◆ (fifteen points) on nothing.
         bonus += player.scandals * profile.defence
-    elif action_type == "buy_roof" and player.role == preferred:
-        bonus += 3 * profile.defence
+    elif action_type == "buy_roof":
+        if player.role is not None:
+            # A held role is three points plus its passive, and this token is the only thing that
+            # stops a takeover or a compromat leak. The old bonus keyed on `preferred_role`, which
+            # an ordinary game never sets, so it never fired: across a measured 15-round game not
+            # one player bought a Крыша while two roles changed hands by force.
+            bonus += (3 if player.role == preferred else 1.5) * profile.defence
+        # All three of the things a token stops are things that have not happened yet, so a
+        # one-step utility sees only the money leaving. It is worth most near the scandal limit.
+        headroom = engine.scandal_limit(player) - player.scandals
+        if headroom <= 2:
+            bonus += (3 - headroom) * profile.defence
     elif action_type == "city_project":
         # Projects are unique now: taking one denies it to everybody else, so a contested board
         # is worth more than the points alone.
@@ -543,8 +610,22 @@ def _card_value(engine: CityEngine, card_id: str, player: PlayerState) -> float:
     card = engine.action_card(card_id)
     if card.kind in {"clean", "deep_clean"}:
         return min(card.value, player.scandals) * 3
+    if card.kind == "buy_points":
+        # The largest family in the deck (five cards) and the only points sink that needs no slot.
+        # Priced in money the bot usually has too much of, so what it is worth is almost the whole
+        # face value; unaffordable, it is a discard waiting to happen.
+        price = card.value * POINTS_CARD_RATE
+        if player.money < price:
+            return 0.5
+        return card.value * 3 - price / MONEY_PER_POINT
+    if card.kind == "cash_to_influence":
+        if player.money < CASH_TO_INFLUENCE_MONEY:
+            return 0.5
+        return card.value / INFLUENCE_PER_POINT * 3 - CASH_TO_INFLUENCE_MONEY / MONEY_PER_POINT
     if card.kind == "roof":
-        return 5
+        # Three cards hand out the same token, and the limit is two: at the ceiling the card is
+        # unplayable, and pretending otherwise is how a hand fills up with dead defence.
+        return 0.5 if player.roofs >= engine.roof_limit(player) else 5
     if card.kind == "extra_action":
         return card.value * 4
     if card.kind == "district_points":
@@ -553,7 +634,7 @@ def _card_value(engine: CityEngine, card_id: str, player: PlayerState) -> float:
     if card.kind == "capacity":
         # A free slot is worth the object that will fill it, and by the time cards are flowing the
         # bot has the money — the slot is the half of the purchase it cannot buy any other way.
-        return 8
+        return 0.5 if player.capacity >= MAX_CAPACITY else 8
     if card.kind == "project":
         return 6
     return max(1, card.value)

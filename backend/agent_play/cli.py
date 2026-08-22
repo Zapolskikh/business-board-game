@@ -61,9 +61,18 @@ def parse_pairs(items: list[str]) -> dict[str, Any]:
     return pairs
 
 
-def load_catalog(client: CityClient, session: Session) -> Catalog:
+def load_catalog(client: CityClient, session: Session, room: dict[str, Any] | None = None) -> Catalog:
+    """The catalog the room is actually being played with.
+
+    ``/meta`` is 52KB, so it is cached on disk and a turn costs one request. For six days that
+    cache silently outlived two content versions: a session opened on 1.4.0 drew the previous
+    catalog — project perks that no longer exist, prices from before the reroll was repriced, none
+    of the object point values — and nothing said so. The room states its own content version, so
+    the cache is checked against it instead of trusted.
+    """
     cached = session.cached_meta()
-    if cached is None:
+    wanted = str((room or {}).get("game", {}).get("content_version") or "") if room else ""
+    if cached is None or (wanted and str(cached.get("content_version") or "") != wanted):
         cached = client.meta()
         session.store_meta(cached)
     return Catalog.from_meta(cached)
@@ -162,14 +171,16 @@ def command_start(args: argparse.Namespace) -> int:
     session = Session.load(session_dir(args.dir))
     client.start(session.room_id, password=session.password, seed=args.seed)
     session.journal({"action": "start", "seed": args.seed})
-    print_state(fetch_state(client, session), load_catalog(client, session), session, args)
+    room = fetch_state(client, session)
+    print_state(room, load_catalog(client, session, room), session, args)
     return 0
 
 
 def command_state(args: argparse.Namespace) -> int:
     client = CityClient(args.url)
     session = Session.load(session_dir(args.dir))
-    print_state(fetch_state(client, session), load_catalog(client, session), session, args)
+    room = fetch_state(client, session)
+    print_state(room, load_catalog(client, session, room), session, args)
     return 0
 
 
