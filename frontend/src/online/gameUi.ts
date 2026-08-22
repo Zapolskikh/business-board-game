@@ -398,7 +398,6 @@ const eventVerbs: Record<string, string> = {
   grey_operation: "проводит серую операцию",
   role_power_used: "использует способность роли",
   scandal_limit_reached: "доходит до предела скандалов",
-  scandal_blocked: "гасит скандал Крышей",
   player_jailed: "арестован",
   game_finished: "Партия завершена",
 };
@@ -622,12 +621,6 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       );
     // Both of these used to be invisible: the only trace was the scandal counter, so a player
     // discovered a lost role by noticing their passive income had stopped.
-    case "scandal_blocked":
-      return lead(
-        txt(" гасит "),
-        num(`${numberValue(data.absorbed) || 1}⚠`, "good"),
-        txt(` Крышей (осталось Крыш: ${numberValue(data.roofs)})`),
-      );
     case "scandal_limit_reached": {
       const limit = numberValue(data.limit) || 5;
       const roleTitle = meta.roles.find(item => item.id === stringValue(data.role_id))?.title;

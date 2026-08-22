@@ -1126,15 +1126,16 @@ def test_one_token_answers_a_takeover_a_leak_and_a_scandal() -> None:
     """The merge: Крыша is the whole defence, so all three attacks spend the same token."""
     engine = CityEngine()
 
-    # A scandal, however big, is absorbed whole — and says so in the log.
+    # A scandal thrown at you by somebody else is absorbed whole, card and all.
     state = make_state()
-    player = state.current_player
-    player.roofs = 1
-    engine.add_scandal(state, player, 2)
-    event = state.event_log[-1]
-    assert event.type == "scandal_blocked"
-    assert (event.data["absorbed"], event.data["roofs"]) == (2, 0)
-    assert player.scandals == 0
+    reporter, target = state.players[0], state.players[1]
+    reporter.role = "journalist"
+    reporter.influence = 5
+    target.roofs = 1
+    state = run(engine, state, "use_role_power", {"power": "journalist_publish", "target_id": target.id})
+    target = state.players[1]
+    assert (target.scandals, target.roofs) == (0, 0)
+    assert state.event_log[-2].type == "targeted_effect_blocked"
 
     # A role takeover: the token goes, the attacker's influence comes back.
     state = make_state()
@@ -1153,6 +1154,31 @@ def test_one_token_answers_a_takeover_a_leak_and_a_scandal() -> None:
     target.roofs = 1
     engine._resolve_compromat(state, state.players[0], target)
     assert (target.role, target.roofs) == ("military", 0)
+
+
+def test_a_defence_never_cancels_the_consequences_of_your_own_move() -> None:
+    """Caught in a live game: a Крыша ate the scandal from the owner's own laundering run.
+
+    Every hostile path spends the token before charging the scandal, so anything that reaches
+    ``add_scandal`` is self-inflicted — and a defence that cancelled those would make the grey
+    layer free.
+    """
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.roofs = 2
+
+    engine.add_scandal(state, player, 1)
+    assert (player.scandals, player.roofs) == (1, 2)
+
+    # The journalist's own scandal is the same rule, and it is the one the comment in the engine
+    # has always pointed at.
+    player.role = "journalist"
+    player.influence = 5
+    rival = state.players[1]
+    state = run(engine, state, "use_role_power", {"power": "journalist_inflate", "target_id": rival.id})
+    player = state.current_player
+    assert (player.scandals, player.roofs) == (2, 2)
 
 
 def test_two_tokens_is_the_ceiling_and_a_perk_refills_one_a_turn() -> None:

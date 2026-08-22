@@ -1687,21 +1687,19 @@ class CityEngine:
     def add_scandal(self, state: GameState, player: PlayerState, amount: int) -> None:
         """Charge scandals and announce every consequence that is not a plain counter change.
 
-        Losing a role, being jailed and spending a Крыша used to happen in silence: the only trace
-        was the scandal counter moving, so a player found out their role was gone by diffing their
-        own state.
+        Losing a role and being jailed used to happen in silence: the only trace was the scandal
+        counter moving, so a player found out their role was gone by diffing their own state.
+
+        **No Крыша check here, on purpose.** Every hostile path — a card, the racket, a sanction, a
+        publication, a hack — spends the defender's token *before* it calls this, and cancels the
+        whole effect when it does. What reaches this function is a scandal the player brought on
+        themselves: buying a grey object, running or botching their own grey operation, the
+        journalist's self-scandal. A defence that cancelled those would be a licence to spam the
+        grey layer for free, and the rule that it must not is older than the merged token.
+        A live game caught exactly that: a Крыша ate the scandal from my own laundering run.
         """
         if amount <= 0:
             player.scandals = max(0, player.scandals + amount)
-            return
-        if player.roofs > 0:
-            player.roofs -= 1
-            state.append_event(
-                "scandal_blocked",
-                player.id,
-                absorbed=amount,
-                roofs=player.roofs,
-            )
             return
         limit = self.scandal_limit(player)
         next_value = player.scandals + amount

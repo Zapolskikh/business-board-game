@@ -372,9 +372,6 @@ def describe_event(event: dict[str, Any], game: dict[str, Any], catalog: Catalog
         lost = f"роль {catalog.role_title(str(role_id))} потеряна" if role_id else "роли уже не было"
         jail = ", арест: следующий ход укорочен, скандалы сброшены до 3⚠, Крыша снята" if data.get("jailed") else ""
         return f"{head} набрал {data.get('limit')}⚠ — {lost}{jail}"
-    if kind == "scandal_blocked":
-        absorbed = data.get("absorbed", 1)
-        return f"{head} погасил {absorbed}⚠ Крышей (крыш осталось {data.get('roofs', 0)})"
     if kind == "game_finished":
         scores = data.get("scores") or {}
         table = ", ".join(f"{player_name(game, key)} {value}" for key, value in scores.items())
