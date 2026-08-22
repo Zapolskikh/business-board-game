@@ -8,9 +8,10 @@ from city_engine.constants import (
     CASH_TO_INFLUENCE_MONEY,
     COMPROMAT_INFLUENCE,
     HACK_INFLUENCE_STEAL,
+    LOBBYING_INFLUENCE,
+    LOBBYING_POINTS,
     MARKET_ROTATION_SIZE,
     MAX_REPEATABLE_PROJECTS,
-    MONEY_PER_POINT,
     PATRONAGE_MONEY,
     PATRONAGE_POINTS,
     PROJECT_BOARD_SIZE,
@@ -820,19 +821,21 @@ def put_on_board(state, project_id: str) -> None:
 
 
 def test_money_and_influence_are_fuel_not_score() -> None:
+    """Neither currency scores. Two measured games ended with a third of the score unspent."""
     engine = CityEngine()
     state = make_state()
     player = state.current_player
-    player.money = 47
-    player.influence = 11
     player.scandals = 2
 
     breakdown = engine.score_breakdown(player)
-    # 47$ → 4 points, 11◆ → 3: hoarding a round's income is worth less than a single object.
-    assert breakdown["money"] == 4
-    assert breakdown["influence"] == 3
-    assert breakdown["scandals"] == -2
-    assert breakdown["total"] == engine.score(player)
+    assert "money" not in breakdown and "influence" not in breakdown
+    before = breakdown["total"]
+
+    player.money = 470
+    player.influence = 110
+    assert engine.score(player) == before
+    assert set(engine.score_breakdown(player)) == {"assets", "projects", "bonus", "role", "scandals", "total"}
+    assert engine.score_breakdown(player)["scandals"] == -2
 
     player.projects.append("art_museum")
     assert engine.score_breakdown(player)["projects"] == engine.project("art_museum").points
@@ -1019,8 +1022,8 @@ def test_patronage_turns_dead_money_into_points_without_a_slot() -> None:
     assert player.bonus_points == PATRONAGE_POINTS
     assert engine.score_breakdown(player)["bonus"] == PATRONAGE_POINTS
     assert state.actions_left == actions - 1
-    # The rate is deliberately worse than an object: 10$ leaving is a point of score too.
-    assert engine.score(player) == before + PATRONAGE_POINTS - PATRONAGE_MONEY // MONEY_PER_POINT
+    # Money scores nothing by itself, so the whole gain is the two points the action bought.
+    assert engine.score(player) == before + PATRONAGE_POINTS
 
     # Once a turn, with money left over: unbounded, the biggest pile would simply buy the game.
     assert player.money >= PATRONAGE_MONEY
@@ -1039,6 +1042,28 @@ def test_patronage_turns_dead_money_into_points_without_a_slot() -> None:
         action["type"] == "basic_action" and action["payload"].get("kind") == "patronage"
         for action in engine.legal_actions(state, state.current_player.id)
     )
+
+
+def test_lobbying_is_the_same_floor_for_influence() -> None:
+    """Влияние тоже ничего не стоит само по себе: 72◆ lay unspent in a measured game."""
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.influence = LOBBYING_INFLUENCE * 2
+    before = engine.score(player)
+
+    state = run(engine, state, "basic_action", {"kind": "lobbying"})
+    player = state.current_player
+    assert player.influence == LOBBYING_INFLUENCE
+    assert engine.score(player) == before + LOBBYING_POINTS
+    assert engine.score_breakdown(player)["bonus"] == LOBBYING_POINTS
+
+    # One press a turn, exactly like patronage, and the two do not share the limit.
+    with pytest.raises(IllegalActionError):
+        run(engine, state, "basic_action", {"kind": "lobbying"})
+    player.money = PATRONAGE_MONEY
+    state = run(engine, state, "basic_action", {"kind": "patronage"})
+    assert state.current_player.bonus_points == LOBBYING_POINTS + PATRONAGE_POINTS
 
 
 def test_the_campaign_is_one_button_at_one_rate() -> None:

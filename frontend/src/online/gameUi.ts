@@ -132,12 +132,9 @@ export function scoreOf(game: GameState, player: PlayerState): number {
 }
 
 // Scoring rates come from the engine via `/meta`; the fallbacks only cover a stale cached meta.
-export function moneyPerPoint(meta: CityMeta): number {
-  return meta.scoring?.money_per_point ?? 10;
-}
-
-export function influencePerPoint(meta: CityMeta): number {
-  return meta.scoring?.influence_per_point ?? 3;
+// Neither currency scores by itself: these two are the only conversions, one press of each a turn.
+export function lobbying(meta: CityMeta): { influence: number; points: number } {
+  return { influence: meta.scoring?.lobbying_influence ?? 6, points: meta.scoring?.lobbying_points ?? 2 };
 }
 
 export function projectRerollMoney(meta: CityMeta): number {
@@ -316,6 +313,10 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
     if (payload.kind === "patronage") {
       const deal = patronage(meta);
       return `Патронаж: ${deal.money}$ → ${deal.points} очка`;
+    }
+    if (payload.kind === "lobbying") {
+      const deal = lobbying(meta);
+      return `Лоббирование: ${deal.influence}◆ → ${deal.points} очка`;
     }
     const tier = campaignTier(meta, payload.spend);
     return tier ? `Кампания: ${tier.spend}$ → ${tier.gain}◆` : "Кампания";
@@ -518,6 +519,13 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
           txt(" вкладывается в город ("),
           num(`${numberValue(data.spend)}$→${numberValue(data.gain)} очка`, "good"),
           txt(`, стало ${numberValue(data.money)}$)`),
+        );
+      }
+      if (data.kind === "lobbying") {
+        return lead(
+          txt(" лоббирует свои интересы ("),
+          num(`${numberValue(data.spend)}◆→${numberValue(data.gain)} очка`, "good"),
+          txt(`, стало ${numberValue(data.influence)}◆)`),
         );
       }
       return data.kind === "work"

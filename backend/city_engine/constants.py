@@ -11,6 +11,12 @@ SCHEMA_VERSION = 1
 # free, object replacement is gone, both rerolls are priced in money, and two grey operations now
 # trade in influence instead of cash. Snapshots taken under 1.2.x would be scored against rules
 # their players never agreed to, so state validation rejects them.
+# 1.5.0: money and influence stop scoring. They used to pay 1 point per 10$ and per 3◆, and two
+# measured games ended with a quarter to a third of every final score sitting in a wallet its owner
+# never spent — one bot finished last holding 410$, another ended on 72◆ with nothing left to buy.
+# Both are fuel now. The only way out of a pile is an action: patronage (10$ → 2) for money,
+# lobbying (6◆ → 2) for influence, one press of each a turn.
+#
 # 1.4.1: patronage. A live 15-round game on 1.4.0 finished with 1217$ unspent across the table —
 # 121 points of dead capital — because the only sinks need a slot or influence. One basic action now
 # turns 10$ into 2 points, unbounded and repeatable, at a rate deliberately worse than an object or
@@ -22,7 +28,7 @@ SCHEMA_VERSION = 1
 # one card; the asset market rotates its three oldest slots once a round; cards can buy points
 # outright. Snapshots taken under 1.3.x describe a game with different rules, so state validation
 # rejects them — old rooms will not open.
-RULES_VERSION = "city-1.4.1"
+RULES_VERSION = "city-1.5.0"
 # 2026-08-21a: 37 action cards. The automation and role-forgery cards are gone, replaced by the
 # «деньги → очки» family and «Предписание о демонтаже» (takes a development level); the two defence
 # cards now hand out the same Крыша as the third; the two projects that required automation ask for
@@ -56,11 +62,18 @@ MAX_ROLE_PRICE = 10
 MAX_CAPACITY = 6
 CAPACITY_COSTS = {3: 6, 4: 10, 5: 15}
 
-# Money and influence are fuel, not score: hoarding converts at a deliberately poor rate so the
-# only good use of income is spending it. Kept as constants because these two numbers set the
-# whole strategic tempo and are the first thing to retune after a measurement run.
-MONEY_PER_POINT = 10
-INFLUENCE_PER_POINT = 3
+# Money and influence do not score at all. Two measured games ended with 25-45 points per player
+# sitting in a wallet nobody had spent — a third of the final score decided by a resource its owner
+# never played. The passive rates are gone; both currencies are pure fuel, and the only way out of a
+# pile is an action: patronage for money, lobbying for influence, one press of each a turn.
+#
+# What the rates were, for the record: 10$ and 3◆ a point. The sinks below are priced against them —
+# money is dearer per point than it used to be for a reason (income runs to 60$ a round), influence
+# keeps the same 3◆ because it was never the currency in surplus.
+PATRONAGE_MONEY = 10
+PATRONAGE_POINTS = 2
+LOBBYING_INFLUENCE = 6
+LOBBYING_POINTS = 2
 # Unique city projects are the score engine, so the board is a shared race, not a personal counter.
 PROJECT_BOARD_SIZE = 4
 # Repeatable initiatives: never in the deck, never leave, may be taken any number of times by
@@ -110,19 +123,6 @@ ACTION_CARD_COST = 3
 # channel, so a full tableau had nowhere to put money: two measured matches ended with 248$ and 864$
 # unspent across the table, 24 and 86 points nobody made a decision about.
 POINTS_CARD_RATE = 5
-# The same rate as a basic action, repeatable, and the reason it exists: a measured 15-round game
-# on 1.4.0 finished with 1217$ across the table — 121 points of capital nobody could spend. Six
-# object slots and four shared project slots are the only sinks, and both need something other than
-# money: a slot, or the influence a project is priced in. By round 13 a developed tableau paid
-# 47-63$ a round against a printed income of 1-3$ per object, so the surplus only grew.
-#
-# An action *and* once a turn. The rate has to beat holding money or nobody would press it, and
-# anything that beats holding money is pressed by whoever has the most of it: unbounded, it moved
-# the winner's margin from 7.5 points to 13 over 24 measured games. Capped at one press a turn it
-# is worth at most 2 points a round — a floor for a full wallet, never a win condition. Compare an
-# object (2$ a point) and a project (~1$ a point): both stay strictly better.
-PATRONAGE_MONEY = 10
-PATRONAGE_POINTS = 2
 # What discarding a card returns, so a bad draw is not a dead 3$.
 CARD_DISCARD_VALUE = 2
 # What the tax manoeuvre pays to run money into influence. It has to beat the discard — a card that

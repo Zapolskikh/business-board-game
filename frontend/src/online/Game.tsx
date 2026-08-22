@@ -18,10 +18,9 @@ import {
   greyOperationInfo,
   greyOperationDistricts,
   greyOperationLabels,
-  influencePerPoint,
+  lobbying,
   launderingCost,
   marketPrice,
-  moneyPerPoint,
   powerLabels,
   cleanupOffer,
   cleanupPowerFor,
@@ -442,7 +441,7 @@ function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selected
           // Not owned yet, so nothing it unlocks is `ready` — the panel is advertising, not status.
           const hints = assetHints(asset, me, game, meta, assets, { market: true });
           const points = assetPoints(asset);
-          return <button className={`market-card rarity-${asset.rarity} ${hints.special ? "special" : ""}`} disabled={busy || viewingOther || !buy} onClick={event => { event.stopPropagation(); if (buy) void onAction(buy); }} title={`Купить за ${price}$. Занимает свободный слот и расходует обычное либо инвестиционное действие. В финальном счёте объект стоит ${points} очков — это ${moneyPerPoint(meta) / 2}$ за очко против ${moneyPerPoint(meta)}$ за очко у денег в кошельке, поэтому объекты и есть главный сток денег.${asset.influence > 0 ? ` Даёт ${asset.influence}◆ разово в момент покупки.` : ""} ${asset.text}${hints.special ? ` Специальный объект: без него серая операция «${greyOperationLabels[asset.id]}» недоступна вообще.` : ""}`} key={item.uid}>
+          return <button className={`market-card rarity-${asset.rarity} ${hints.special ? "special" : ""}`} disabled={busy || viewingOther || !buy} onClick={event => { event.stopPropagation(); if (buy) void onAction(buy); }} title={`Купить за ${price}$. Занимает свободный слот и расходует обычное либо инвестиционное действие. В финальном счёте объект стоит ${points} очков — это ${(asset.cost / Math.max(1, points)).toFixed(1)}$ за очко, тогда как деньги в кошельке не дают очков вовсе (только патронаж: ${patronage(meta).money}$ → ${patronage(meta).points}), поэтому объекты и есть главный сток денег.${asset.influence > 0 ? ` Даёт ${asset.influence}◆ разово в момент покупки.` : ""} ${asset.text}${hints.special ? ` Специальный объект: без него серая операция «${greyOperationLabels[asset.id]}» недоступна вообще.` : ""}`} key={item.uid}>
             <span className="card-main">
               <span className="rarity-badge">{rarityLabels[asset.rarity] ?? asset.rarity}</span><b>{asset.title}</b>
               {asset.tags.length > 0 && <span className="asset-tags">{asset.tags.map(tag => <i key={tag}>{tag}</i>)}</span>}
@@ -647,7 +646,7 @@ function DecisionPanel({ game, me, meta, roles, districts, assets, legal, busy, 
     <IncomePanel game={game} />
 
     <div className="action-group g-city"><h3 className="group-title">🏙️ Город <span className="group-hint">доход и развитие</span></h3>
-      <StaticAction action={find("basic_action", item => item.payload.kind === "work")} label="💵 Городской заказ: +2$" tooltip={`Потратить 1 обычное действие и сразу получить 2$. Деньги — топливо: в конце партии ${moneyPerPoint(meta)}$ дают лишь 1 очко, поэтому копить их невыгодно.`} busy={busy} onAction={onAction} />
+      <StaticAction action={find("basic_action", item => item.payload.kind === "work")} label="💵 Городской заказ: +2$" tooltip={`Потратить 1 обычное действие и сразу получить 2$. Деньги — чистое топливо: в финальном счёте они не дают очков вовсе, поэтому копить их бессмысленно, а +2$ — худшее действие в игре, годное лишь чтобы добрать монеты до покупки.`} busy={busy} onAction={onAction} />
       {/* One action, three rates: the action — not the money — was the real price of influence, so a
           single 2$→2◆ tier capped everybody at 2◆ per action no matter how rich they were. */}
       <div className="campaign-tiers">{campaignTiers(meta).map(tier => {
@@ -661,6 +660,7 @@ function DecisionPanel({ game, me, meta, roles, districts, assets, legal, busy, 
       })}</div>
       {/* The last resort of a full wallet: no slot, no card, and a rate deliberately worse than
           an object or a project. A measured game ended with 1217$ on the table. */}
+      <StaticAction action={find("basic_action", item => item.payload.kind === "lobbying")} label={`🏛️ Лоббирование: ${lobbying(meta).influence}◆ → ${lobbying(meta).points} очка`} tooltip={`Потратить 1 обычное действие и ${lobbying(meta).influence}◆, чтобы получить ${lobbying(meta).points} очка в «Прочие очки». Один раз за ход. Влияние само по себе очков не даёт, а городской проект платит примерно очко за 1◆ — так что это floor для влияния, которое уже некуда девать.`} busy={busy} onAction={onAction} />
       <StaticAction action={find("basic_action", item => item.payload.kind === "patronage")} label={`🎖️ Патронаж: ${patronage(meta).money}$ → ${patronage(meta).points} очка`} tooltip={`Потратить 1 обычное действие и ${patronage(meta).money}$, чтобы получить ${patronage(meta).points} очка в «Прочие очки». Слот не нужен, карта не нужна, но не больше одного раза за ход. Курс ${patronage(meta).money / patronage(meta).points}$ за очко — хуже объекта (половина цены в очках) и проекта, поэтому это сток для лишних денег, а не план на партию.`} busy={busy} onAction={onAction} />
       <StaticAction action={find("reroll_projects")} label={`🔄 Пересобрать доску проектов: ${projectRerollMoney(meta)}$ + действие`} tooltip={`Все четыре проекта возвращаются в колоду, колода перемешивается и раздаётся заново. Цена: ${projectRerollMoney(meta)}$ и 1 обычное действие, один раз за ход. Доска общая: она меняется у всех.`} busy={busy} onAction={onAction} />
       <StaticAction action={find("buy_capacity")} label={`📦 ${capacityLabel(me)}`} tooltip="Купить постоянный дополнительный слот бизнеса. Можно потратить обычное либо инвестиционное действие; максимум 6 слотов." busy={busy} onAction={onAction} />
@@ -704,12 +704,14 @@ function ScorePanel({ game, me, meta }: { game: GameState; me: PlayerState; meta
     { label: "🏢 Объекты", value: score.assets, hint: "Половина цены объекта: дорогие карточки дают больше очков" },
     { label: "🎖️ Прочие очки", value: score.bonus ?? 0, hint: "Очки, купленные картами: 5$ за очко, слот не нужен" },
     { label: "🏷️ Роль", value: score.role, hint: "3 очка, пока роль у вас" },
-    { label: `💰 ${me.money}$`, value: score.money, hint: `Деньги — топливо: ${moneyPerPoint(meta)}$ дают 1 очко` },
-    { label: `◆ ${me.influence}`, value: score.influence, hint: `Влияние: ${influencePerPoint(meta)}◆ дают 1 очко` },
+
     { label: "⚠ Скандалы", value: score.scandals, hint: "Минус очко за каждый скандал" },
   ];
+  // Neither currency scores by itself any more, so the panel says what the wallet is *for*.
+  const fuel = `💰 ${me.money}$ и ◆ ${me.influence} очков не дают: патронаж ${patronage(meta).money}$ → ${patronage(meta).points}, лоббирование ${lobbying(meta).influence}◆ → ${lobbying(meta).points}, каждое раз за ход`;
   return <div className="score-panel">
     <h3 className="group-title">🏆 Мой счёт <span className="group-hint">{score.total} очков</span></h3>
+    <p className="dim card-rule">{fuel}</p>
     <ul>{rows.map(row => <li key={row.label} title={row.hint} className={row.value === 0 ? "score-zero" : ""}>
       <span>{row.label}</span><b>{row.value > 0 ? `+${row.value}` : row.value}</b>
     </li>)}</ul>

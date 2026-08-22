@@ -18,11 +18,11 @@ from city_engine.constants import (
     CRISIS_PR_INFLUENCE,
     DISTRICT_IDS,
     HACK_INFLUENCE_STEAL,
-    INFLUENCE_PER_POINT,
     LAUNDERING_BASE_COST,
     LAUNDERING_BASE_GAIN,
+    LOBBYING_INFLUENCE,
+    LOBBYING_POINTS,
     MARKET_ROTATION_SIZE,
-    MONEY_PER_POINT,
     PATRONAGE_MONEY,
     PATRONAGE_POINTS,
     PROJECT_BOARD_SIZE,
@@ -202,12 +202,12 @@ class ContentCatalog:
         for asset in raw["assets"]:
             asset["points"] = asset_points(int(asset["cost"]))
         raw["scoring"] = {
-            "money_per_point": MONEY_PER_POINT,
-            "influence_per_point": INFLUENCE_PER_POINT,
             "project_board_size": PROJECT_BOARD_SIZE,
             "project_reroll_money": PROJECT_REROLL_MONEY,
             # How many rounds a market slot lasts, so the client can say "rounds" and mean it.
             "market_rotation_size": MARKET_ROTATION_SIZE,
+            "lobbying_influence": LOBBYING_INFLUENCE,
+            "lobbying_points": LOBBYING_POINTS,
             "patronage_money": PATRONAGE_MONEY,
             "patronage_points": PATRONAGE_POINTS,
             "crisis_pr_influence": CRISIS_PR_INFLUENCE,

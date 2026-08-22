@@ -22,14 +22,14 @@ from city_engine.constants import (
     CRISIS_PR_INFLUENCE,
     DISTRICT_IDS,
     HACK_INFLUENCE_STEAL,
-    INFLUENCE_PER_POINT,
     JOURNALIST_SCANDAL_LIMIT,
     LAUNDERING_BASE_COST,
     LAUNDERING_BASE_GAIN,
+    LOBBYING_INFLUENCE,
+    LOBBYING_POINTS,
     MARKET_ROTATION_SIZE,
     MAX_CAPACITY,
     MAX_REPEATABLE_PROJECTS,
-    MONEY_PER_POINT,
     PATRONAGE_MONEY,
     PATRONAGE_POINTS,
     POINTS_CARD_RATE,
@@ -149,6 +149,8 @@ class CityEngine:
             )
             if player.money >= PATRONAGE_MONEY:
                 candidates.append(Command(type="basic_action", actor_id=actor_id, payload={"kind": "patronage"}))
+            if player.influence >= LOBBYING_INFLUENCE:
+                candidates.append(Command(type="basic_action", actor_id=actor_id, payload={"kind": "lobbying"}))
             candidates.extend(
                 Command(type="city_project", actor_id=actor_id, payload={"project_id": project_id})
                 for project_id in [*state.project_board, *self.catalog.repeatable_project_ids()]
@@ -562,11 +564,12 @@ class CityEngine:
         return deltas
 
     def _basic_action(self, state: GameState, command: Command) -> None:
-        """The three buttons that turn an action into something else.
+        """The four buttons that turn an action into something else.
 
-        Campaign buys influence, work buys the coins that round a purchase up, and patronage is the
-        floor of the money economy: the only unbounded way to turn cash into points without a slot
-        or a card. See ``PATRONAGE_MONEY`` for the 1217$ that motivated it.
+        Campaign buys influence and work buys the coins that round a purchase up. Patronage and
+        lobbying are the floor of the economy: neither currency scores by itself any more, so these
+        two are the only way a pile becomes points without a slot, a card or a project condition.
+        Both are priced badly on purpose and both are capped at one press a turn.
         """
         kind = command.payload.get("kind")
         player = state.current_player
@@ -583,6 +586,14 @@ class CityEngine:
             player.money -= spend
             player.influence += CAMPAIGN_TIERS[spend]
             tier = {"spend": spend, "gain": CAMPAIGN_TIERS[spend]}
+        elif kind == "lobbying":
+            if player.influence < LOBBYING_INFLUENCE:
+                raise IllegalActionError(f"lobbying requires {LOBBYING_INFLUENCE} influence")
+            self._once_per_turn(state, "lobbying")
+            self._spend_action(state)
+            player.influence -= LOBBYING_INFLUENCE
+            player.bonus_points += LOBBYING_POINTS
+            tier = {"spend": LOBBYING_INFLUENCE, "gain": LOBBYING_POINTS}
         elif kind == "patronage":
             if player.money < PATRONAGE_MONEY:
                 raise IllegalActionError(f"patronage requires {PATRONAGE_MONEY} money")
@@ -595,7 +606,7 @@ class CityEngine:
             player.bonus_points += PATRONAGE_POINTS
             tier = {"spend": PATRONAGE_MONEY, "gain": PATRONAGE_POINTS}
         else:
-            raise InvalidCommandError("basic_action kind must be work, campaign or patronage")
+            raise InvalidCommandError("basic_action kind must be work, campaign, patronage or lobbying")
         state.append_event(
             "basic_action",
             player.id,
@@ -2084,16 +2095,15 @@ class CityEngine:
     def score(self, player: PlayerState) -> int:
         """Points come from what you built, not from what you hoarded.
 
-        Money and influence used to convert 1:1, which made ``work`` (+2$ for one action) a
-        competitive scoring move — 60% of every bot game was spent pressing it, and 90% of the
-        final score was the untouched wallet. Both are fuel now: they convert at a deliberately
-        poor rate, so a round's income is only worth what it buys.
+        Money and influence score **nothing**. They used to convert at 10$ and 3◆ a point, and
+        two measured games ended with a quarter to a third of every final score sitting in a wallet
+        its owner never spent — a bot finished last on 410$. Both are fuel: the only way out of a
+        pile is an action, patronage for money and lobbying for influence, and both are capped at
+        one press a turn so the biggest pile cannot simply buy the game.
         """
         asset_score = sum(self.asset_value(asset) for asset in player.assets)
         return (
-            player.money // MONEY_PER_POINT
-            + player.influence // INFLUENCE_PER_POINT
-            + asset_score
+            asset_score
             + self.project_points(player)
             + player.bonus_points
             + (3 if player.role else 0)
@@ -2104,8 +2114,6 @@ class CityEngine:
         """Same numbers as ``score``, itemised — the client must never re-derive the formula."""
         asset_score = sum(self.asset_value(asset) for asset in player.assets)
         return {
-            "money": player.money // MONEY_PER_POINT,
-            "influence": player.influence // INFLUENCE_PER_POINT,
             "assets": asset_score,
             "projects": self.project_points(player),
             "bonus": player.bonus_points,

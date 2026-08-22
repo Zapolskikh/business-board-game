@@ -48,12 +48,13 @@ def test_all_bot_game_finishes_through_authoritative_engine() -> None:
     assert {player.difficulty for player in state.players} == {"easy", "medium", "hard"}
 
 
-def test_a_small_resource_move_is_visible_to_the_policy() -> None:
-    """The engine floors money and influence into points; a policy valuing positions cannot.
+def test_a_wallet_is_worth_what_the_sinks_pay_for_it() -> None:
+    """Money and influence score nothing, so the score alone cannot guide a policy.
 
-    Measured before this: the mafia racket taking 8$ and 1◆ off a rival scored 0.30 against 2.28
-    for a hack, because the bot's own gain rounded to nothing and only the victim crossing a
-    ten-dollar boundary showed up at all.
+    A bot judging positions by the score would treat a 300$ pile and an empty one as identical and
+    never bother to earn, steal or protect a coin. The floor value of any pile is what patronage
+    and lobbying pay for it, and it has to be fractional: the mafia racket taking 8$ and 1◆ off a
+    rival scored 0.30 against 2.28 for a hack when small moves rounded away.
     """
     engine = CityEngine()
     state = bot_game()
@@ -64,11 +65,11 @@ def test_a_small_resource_move_is_visible_to_the_policy() -> None:
 
     player.money += 8
     player.influence += 1
-    assert engine.score(player) == before_score  # both gains floor away
+    assert engine.score(player) == before_score  # neither currency is on the scoresheet
     assert _fractional_score(engine, player) > before_value + 1.0
 
-    # Everything except the two floored rows still comes from the engine untouched.
-    player.money, player.influence = 30, 9
+    # An empty wallet is worth exactly the score, and nothing here re-implements the score itself.
+    player.money, player.influence = 0, 0
     assert _fractional_score(engine, player) == engine.score(player)
 
 
@@ -83,7 +84,9 @@ def test_the_policy_prices_the_new_card_families() -> None:
     player.money = 0
     assert _card_value(engine, patronage.id, player) < 1
     player.money = 200
-    assert _card_value(engine, patronage.id, player) > patronage.value * 2
+    # With money worth nothing on its own the card is a saved action rather than a better rate:
+    # «Меценатство» pays 5$ a point and so does patronage. It still has to beat a blank draw.
+    assert _card_value(engine, patronage.id, player) >= patronage.value * 2
 
     # A defence card at the Крыша limit is a dead draw, and there are three of them in the deck.
     insurance = next(card for card in engine.catalog.action_cards.values() if card.kind == "roof")

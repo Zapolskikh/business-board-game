@@ -3,8 +3,10 @@ from __future__ import annotations
 import pytest
 
 from city_engine.constants import (
-    INFLUENCE_PER_POINT,
-    MONEY_PER_POINT,
+    LOBBYING_INFLUENCE,
+    LOBBYING_POINTS,
+    PATRONAGE_MONEY,
+    PATRONAGE_POINTS,
     PROJECT_BOARD_SIZE,
 )
 from city_engine.content import load_catalog
@@ -102,8 +104,10 @@ def test_public_meta_ships_the_scoring_rates() -> None:
     """Clients print "N$ = 1 очко" from here; hardcoding it on either side would drift."""
     scoring = load_catalog().public_meta()["scoring"]
 
-    assert scoring["money_per_point"] == MONEY_PER_POINT
-    assert scoring["influence_per_point"] == INFLUENCE_PER_POINT
+    assert scoring["patronage_money"] == PATRONAGE_MONEY
+    assert scoring["patronage_points"] == PATRONAGE_POINTS
+    assert scoring["lobbying_influence"] == LOBBYING_INFLUENCE
+    assert scoring["lobbying_points"] == LOBBYING_POINTS
     assert scoring["project_board_size"] == PROJECT_BOARD_SIZE
 
 
