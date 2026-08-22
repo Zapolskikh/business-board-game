@@ -17,11 +17,11 @@ from city_engine.constants import (
     CASH_TO_INFLUENCE_MONEY,
     COMPROMAT_INFLUENCE,
     HACK_INFLUENCE_STEAL,
+    INFLUENCE_PER_POINT,
     LOBBYING_INFLUENCE,
-    LOBBYING_POINTS,
     MAX_CAPACITY,
+    MONEY_PER_POINT,
     PATRONAGE_MONEY,
-    PATRONAGE_POINTS,
     POINTS_CARD_RATE,
 )
 from city_engine.engine import CityEngine
@@ -207,22 +207,23 @@ def _score_function(engine: CityEngine, profile: PolicyProfile) -> Callable[[Pla
 
 
 def _fractional_score(engine: CityEngine, player: PlayerState) -> float:
-    """The engine's score plus what the wallet is worth as fuel.
+    """The engine's own score, with money and influence counted at their exact passive rate.
 
-    Money and influence score nothing on their own now, so a policy that judged positions by the
-    score alone would treat a 300$ pile and an empty one as identical and never bother to earn,
-    steal or protect a single coin. What a pile is actually worth is what the two sinks pay for it —
-    the patronage and lobbying rates — because that is the floor any spare resource can always
-    reach. Fractional on purpose: the mafia racket taking 8$ and 1◆ off a rival has to be visible,
-    and rounding it into whole points is exactly how it scored 0.30 against 2.28 for a hack.
+    ``score`` floors both, and it has to: a player holding 28$ owns two points, not 2.8. But a
+    policy that values *positions* with a floored number cannot see a small resource move at all —
+    the mafia racket taking 8$ and 1◆ off a rival scored 0.30 against 2.28 for a hack, and the whole
+    0.30 came from the victim happening to cross a ten-dollar boundary.
+
+    The passive rate, not the sink rate: holding is what an unspent pile is really worth, and the
+    sinks then show the gain they actually give (double, for an action). Valuing the pile at the sink
+    rate instead is circular — the bots pressed lobbying nought times in twelve games that way.
+
+    Nothing here re-implements a rule: the itemised score comes from the engine, and only the two
+    rows that are floored by design are recomputed at the same rate the engine used.
     """
-    # Valued a fifth *below* the sink rate on purpose. At exactly the rate the arithmetic is
-    # circular: converting a pile the policy already counted as converted shows a gain of zero, and
-    # the bots pressed lobbying nought times in twelve games. The discount is the action the
-    # conversion costs — a pile is only worth the sink rate if you have the turns to spend it.
-    money_rate = PATRONAGE_POINTS / PATRONAGE_MONEY * 0.8
-    influence_rate = LOBBYING_POINTS / LOBBYING_INFLUENCE * 0.8
-    return engine.score(player) + player.money * money_rate + player.influence * influence_rate
+    breakdown = engine.score_breakdown(player)
+    exact = player.money / MONEY_PER_POINT + player.influence / INFLUENCE_PER_POINT
+    return breakdown["total"] - breakdown["money"] - breakdown["influence"] + exact
 
 
 def _position_value(
@@ -619,14 +620,11 @@ def _card_value(engine: CityEngine, card_id: str, player: PlayerState) -> float:
         price = card.value * POINTS_CARD_RATE
         if player.money < price:
             return 0.5
-        return card.value * 3 - price * PATRONAGE_POINTS / PATRONAGE_MONEY
+        return card.value * 3 - price / MONEY_PER_POINT
     if card.kind == "cash_to_influence":
         if player.money < CASH_TO_INFLUENCE_MONEY:
             return 0.5
-        return (
-            card.value * LOBBYING_POINTS / LOBBYING_INFLUENCE * 3
-            - CASH_TO_INFLUENCE_MONEY * PATRONAGE_POINTS / PATRONAGE_MONEY
-        )
+        return card.value / INFLUENCE_PER_POINT * 3 - CASH_TO_INFLUENCE_MONEY / MONEY_PER_POINT
     if card.kind == "roof":
         # Three cards hand out the same token, and the limit is two: at the ceiling the card is
         # unplayable, and pretending otherwise is how a hand fills up with dead defence.

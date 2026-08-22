@@ -22,6 +22,7 @@ from city_engine.constants import (
     CRISIS_PR_INFLUENCE,
     DISTRICT_IDS,
     HACK_INFLUENCE_STEAL,
+    INFLUENCE_PER_POINT,
     JOURNALIST_SCANDAL_LIMIT,
     LAUNDERING_BASE_COST,
     LAUNDERING_BASE_GAIN,
@@ -30,6 +31,7 @@ from city_engine.constants import (
     MARKET_ROTATION_SIZE,
     MAX_CAPACITY,
     MAX_REPEATABLE_PROJECTS,
+    MONEY_PER_POINT,
     PATRONAGE_MONEY,
     PATRONAGE_POINTS,
     POINTS_CARD_RATE,
@@ -2095,15 +2097,16 @@ class CityEngine:
     def score(self, player: PlayerState) -> int:
         """Points come from what you built, not from what you hoarded.
 
-        Money and influence score **nothing**. They used to convert at 10$ and 3◆ a point, and
-        two measured games ended with a quarter to a third of every final score sitting in a wallet
-        its owner never spent — a bot finished last on 410$. Both are fuel: the only way out of a
-        pile is an action, patronage for money and lobbying for influence, and both are capped at
-        one press a turn so the biggest pile cannot simply buy the game.
+        Money and influence pay at a deliberately poor rate — 10$ and 3◆ a point — and the two
+        sinks pay double that for an action. Dropping the passive payout entirely was measured and
+        reverted: the score got honest and the table got 70% less close, because the wallets of the
+        trailing players were what kept the standings tight.
         """
         asset_score = sum(self.asset_value(asset) for asset in player.assets)
         return (
-            asset_score
+            player.money // MONEY_PER_POINT
+            + player.influence // INFLUENCE_PER_POINT
+            + asset_score
             + self.project_points(player)
             + player.bonus_points
             + (3 if player.role else 0)
@@ -2114,6 +2117,8 @@ class CityEngine:
         """Same numbers as ``score``, itemised — the client must never re-derive the formula."""
         asset_score = sum(self.asset_value(asset) for asset in player.assets)
         return {
+            "money": player.money // MONEY_PER_POINT,
+            "influence": player.influence // INFLUENCE_PER_POINT,
             "assets": asset_score,
             "projects": self.project_points(player),
             "bonus": player.bonus_points,

@@ -11,7 +11,11 @@ SCHEMA_VERSION = 1
 # free, object replacement is gone, both rerolls are priced in money, and two grey operations now
 # trade in influence instead of cash. Snapshots taken under 1.2.x would be scored against rules
 # their players never agreed to, so state validation rejects them.
-# 1.5.0: money and influence stop scoring. They used to pay 1 point per 10$ and per 3◆, and two
+# 1.5.1: the passive payout is back at 10$ and 3◆ a point, and lobbying is repriced to 3◆ → 2
+# points so that both sinks pay double what hoarding pays. See the note above the constants for the
+# measurement that reverted 1.5.0.
+#
+# 1.5.0: money and influence stopped scoring. They used to pay 1 point per 10$ and per 3◆, and two
 # measured games ended with a quarter to a third of every final score sitting in a wallet its owner
 # never spent — one bot finished last holding 410$, another ended on 72◆ with nothing left to buy.
 # Both are fuel now. The only way out of a pile is an action: patronage (10$ → 2) for money,
@@ -28,7 +32,7 @@ SCHEMA_VERSION = 1
 # one card; the asset market rotates its three oldest slots once a round; cards can buy points
 # outright. Snapshots taken under 1.3.x describe a game with different rules, so state validation
 # rejects them — old rooms will not open.
-RULES_VERSION = "city-1.5.0"
+RULES_VERSION = "city-1.5.1"
 # 2026-08-21a: 37 action cards. The automation and role-forgery cards are gone, replaced by the
 # «деньги → очки» family and «Предписание о демонтаже» (takes a development level); the two defence
 # cards now hand out the same Крыша as the third; the two projects that required automation ask for
@@ -62,17 +66,22 @@ MAX_ROLE_PRICE = 10
 MAX_CAPACITY = 6
 CAPACITY_COSTS = {3: 6, 4: 10, 5: 15}
 
-# Money and influence do not score at all. Two measured games ended with 25-45 points per player
-# sitting in a wallet nobody had spent — a third of the final score decided by a resource its owner
-# never played. The passive rates are gone; both currencies are pure fuel, and the only way out of a
-# pile is an action: patronage for money, lobbying for influence, one press of each a turn.
-#
-# What the rates were, for the record: 10$ and 3◆ a point. The sinks below are priced against them —
-# money is dearer per point than it used to be for a reason (income runs to 60$ a round), influence
-# keeps the same 3◆ because it was never the currency in surplus.
+# Both currencies score at the end, at a deliberately poor rate. Removing the payout entirely was
+# tried and reverted: the score became honest — only what a player had actually played — but the
+# winner's margin doubled from 11 points to 19, because the trailing players' wallets had been the
+# thing keeping the table close. A cushion that flatters the loser turns out to be doing real work.
+MONEY_PER_POINT = 10
+INFLUENCE_PER_POINT = 3
+# ...and the two sinks stay, because holding is not supposed to be the best a pile can do. Each
+# costs an action, each may be pressed once a turn, and each pays **exactly double** what the same
+# resource would score sitting still: 10$ scores 1 point but patronage pays 2, and 3◆ scores 1 point
+# but lobbying pays 2. That factor is the whole design — enough to be worth a turn when the board
+# has nothing left to sell you, never enough to beat an object (2$ a point) or a project (~1◆ a
+# point). Lobbying was 6◆ for 2 while the passive rate was gone; at 3◆ = 1 point it had to halve or
+# it would have been an action spent to gain nothing.
 PATRONAGE_MONEY = 10
 PATRONAGE_POINTS = 2
-LOBBYING_INFLUENCE = 6
+LOBBYING_INFLUENCE = 3
 LOBBYING_POINTS = 2
 # Unique city projects are the score engine, so the board is a shared race, not a personal counter.
 PROJECT_BOARD_SIZE = 4

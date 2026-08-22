@@ -166,6 +166,8 @@ export interface ProjectMeta {
 // Rates owned by the engine (`city_engine/constants.py`) and shipped with the catalog, so no
 // client hardcodes the conversion.
 export interface ScoringMeta {
+  money_per_point: number;
+  influence_per_point: number;
   lobbying_influence: number;
   lobbying_points: number;
   project_board_size: number;

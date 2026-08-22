@@ -132,9 +132,18 @@ export function scoreOf(game: GameState, player: PlayerState): number {
 }
 
 // Scoring rates come from the engine via `/meta`; the fallbacks only cover a stale cached meta.
-// Neither currency scores by itself: these two are the only conversions, one press of each a turn.
+// Scoring rates come from the engine via `/meta`; the fallbacks only cover a stale cached meta.
+export function moneyPerPoint(meta: CityMeta): number {
+  return meta.scoring?.money_per_point ?? 10;
+}
+
+export function influencePerPoint(meta: CityMeta): number {
+  return meta.scoring?.influence_per_point ?? 3;
+}
+
+// Both sinks pay double the passive rate above, for one action and once a turn each.
 export function lobbying(meta: CityMeta): { influence: number; points: number } {
-  return { influence: meta.scoring?.lobbying_influence ?? 6, points: meta.scoring?.lobbying_points ?? 2 };
+  return { influence: meta.scoring?.lobbying_influence ?? 3, points: meta.scoring?.lobbying_points ?? 2 };
 }
 
 export function projectRerollMoney(meta: CityMeta): number {

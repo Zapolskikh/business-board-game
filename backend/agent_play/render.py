@@ -569,20 +569,23 @@ def render_state(
     )
     breakdown = dict(game.get("score_breakdown", {}).get(player_id, {}))
     if breakdown:
-        # Money and influence are not on this line because they do not score: the only way out of
-        # a pile is patronage or lobbying, and both land in «прочие».
+        per_money = catalog.scoring.get("money_per_point", 10)
+        per_influence = catalog.scoring.get("influence_per_point", 3)
         patronage_money = catalog.scoring.get("patronage_money", 10)
         patronage_points = catalog.scoring.get("patronage_points", 2)
-        lobbying_influence = catalog.scoring.get("lobbying_influence", 6)
+        lobbying_influence = catalog.scoring.get("lobbying_influence", 3)
         lobbying_points = catalog.scoring.get("lobbying_points", 2)
         lines.append(
             f"    мои очки {breakdown.get('total', 0)}: проекты {breakdown.get('projects', 0)} · "
             f"объекты {breakdown.get('assets', 0)} · роль {breakdown.get('role', 0)} · "
             f"прочие {breakdown.get('bonus', 0)} · "
+            f"деньги {breakdown.get('money', 0)} ({per_money}$=1) · "
+            f"влияние {breakdown.get('influence', 0)} ({per_influence}◆=1) · "
             f"скандалы {breakdown.get('scandals', 0)}"
         )
+        # Both sinks pay double the passive rate, which is the only reason to spend an action on one.
         lines.append(
-            f"    деньги и влияние очков не дают: патронаж {patronage_money}$={patronage_points} очка, "
+            f"    стоки вдвое выгоднее хранения: патронаж {patronage_money}$={patronage_points} очка, "
             f"лоббирование {lobbying_influence}◆={lobbying_points} очка, каждое раз за ход"
         )
 
