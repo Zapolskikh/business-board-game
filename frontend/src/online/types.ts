@@ -104,6 +104,9 @@ export interface GameState {
   project_board: string[];
   // What one more development level would pay in each district, and what a level costs. The
   // +25% rounds up per level over the district's actual objects, so only the engine can say.
+  // Every perk of the viewer's role: what it pays now, the ceiling, and the district that
+  // unlocks the difference. Computed by the engine — the client only prints labels.
+  role_perks?: { key: string; value: number; potential?: number; needs?: string | null }[];
   development_preview?: Record<string, number>;
   development_cost?: number;
   // The viewer's own standing on every board condition, counted by the engine — never here.

@@ -394,6 +394,7 @@ const eventVerbs: Record<string, string> = {
   role_stripped: "сливает компромат и снимает роль",
   roof_bought: "покупает Крышу",
   crisis_pr: "проводит антикризисный PR",
+  military_sanction: "вводит санкции",
   capacity_bought: "расширяет бизнес",
   asset_bought: "покупает объект",
   asset_sold: "продаёт объект",
@@ -587,6 +588,16 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       return lead(txt(` расширяет бизнес до ${numberValue(data.capacity)} слотов (`), signed(-numberValue(data.cost), "$"), txt(")"));
     case "roof_bought":
       return lead(txt(" покупает Крышу ("), signed(-numberValue(data.cost), "$"), txt(`, крыш: ${numberValue(data.roofs)})`));
+    case "military_sanction": {
+      const stripped = stringValue(data.role_id);
+      const roleTitle = meta.roles.find(item => item.id === stripped)?.title;
+      const tail: LogSegment[] = [txt(" вводит санкции против "), playerSeg(game, stringValue(data.target_id))];
+      tail.push(txt(` (${numberValue(data.scandals)}⚠): `));
+      tail.push(num(`−${numberValue(data.money)}$`, "bad"));
+      if (numberValue(data.influence)) tail.push(txt(", "), num(`−${numberValue(data.influence)}◆`, "bad"));
+      if (roleTitle) tail.push(txt(` и роль «${roleTitle}» снята`));
+      return lead(...tail);
+    }
     case "crisis_pr":
       return lead(txt(" антикризисный PR ("), signed(-numberValue(data.cost), "◆"), txt(", "), num("−1⚠", "good"), txt(`, осталось ${numberValue(data.scandals)}⚠)`));
     case "asset_bought":
@@ -647,20 +658,6 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
         tail.push(txt(", арест: следующий ход укорочен, скандалы сброшены до "), num("3⚠", "neutral"), txt(", Крыша снята"));
       }
       return lead(...tail);
-    }
-    case "asset_confiscated": {
-      const resolutions: Record<string, string> = {
-        seized: "объект переходит в его бизнес",
-        swapped: "объект вытесняет слабейший в его бизнесе",
-        cashed: "слоты заняты, объект обращён в деньги",
-      };
-      return lead(
-        txt(` конфискует «${asset ?? assetId}» у `),
-        playerSeg(game, stringValue(data.victim_id)),
-        txt(` — ${resolutions[stringValue(data.resolution)] ?? "объект изъят"} (`),
-        num(`${numberValue(data.value)} очков`, "neutral"),
-        txt(")"),
-      );
     }
     case "asset_state_changed": {
       const changes: Record<string, string> = {
@@ -729,9 +726,104 @@ const forecastLabels: Record<string, string> = {
   antitrust: "⚖️ Антимонопольное",
   journalist: "📰 Публикации",
   debt: "🏦 Кредит",
-  news: "📰 Новости",
   rating: "⭐ Рейтинг",
+  industrial: "🏭 Промышленный ресурс",
 };
+
+// One row per perk of the viewer's role. `unit` is what the number means, and the second string is
+// the sentence shown when a foreign district would raise the ceiling — a perk that quietly pays
+// less is the same invisibility bug we fixed on the project board.
+const rolePerkLabels: Record<string, { label: string; unit: string; hint: string }> = {
+  capitalist_objects: { label: "Доход с каждого объекта", unit: "$/раунд", hint: "+1$ за каждый ваш активный объект" },
+  capitalist_business_charter: {
+    label: "Условия на Деловой центр",
+    unit: "",
+    hint: "Любое условие проекта, где назван Деловой центр, считается выполненным",
+  },
+  capitalist_industrial_influence: {
+    label: "Влияние с Промзоны",
+    unit: "◆/раунд",
+    hint: "+1◆ за каждый ваш объект Промзоны — купите объект Промзоны, чтобы включить",
+  },
+  politician_residents_tax: {
+    label: "Налог с жителей",
+    unit: "$/раунд",
+    hint: "+1$ за каждый жилой объект на столе, включая чужие",
+  },
+  politician_administrative: {
+    label: "Административный ресурс",
+    unit: "◆/раунд",
+    hint: "+2◆ за каждый ваш объект Административного квартала",
+  },
+  journalist_money: {
+    label: "Деньги за чужие скандалы",
+    unit: "$/раунд",
+    hint: "1$ за каждый чужой скандал, 2$ при вашем объекте Делового центра",
+  },
+  journalist_rating: {
+    label: "Влияние за свои скандалы",
+    unit: "◆/раунд",
+    hint: "Потолок 2 плюс 1 за каждый ваш объект Спального района",
+  },
+  fraudster_actions: { label: "Четыре действия за ход", unit: "", hint: "Больше, чем у любой другой роли" },
+  fraudster_chance: {
+    label: "Бонус к шансу серых операций",
+    unit: "%",
+    hint: "+20% всегда и ещё +10% при вашем объекте Технокластера",
+  },
+  mafia_racket_money: {
+    label: "Деньги рэкета",
+    unit: "$",
+    hint: "2$ плюс 2$ за каждый ваш объект Серого сектора (+5$ если цель лидер)",
+  },
+  mafia_racket_influence: {
+    label: "Влияние рэкета",
+    unit: "◆",
+    hint: "1◆ за каждый ваш объект Административного квартала",
+  },
+  mafia_roofs: { label: "Предел Крыш", unit: "", hint: "3 вместо 2, и каждая на 1$ дешевле" },
+  military_sanction_targets: {
+    label: "Цели для санкции",
+    unit: "",
+    hint: "Соперники с 2+ скандалами: 2 — деньги, 3 — деньги и влияние, 4 — ещё и роль",
+  },
+  role_district_income: {
+    label: "Профильный район",
+    unit: "$/раунд",
+    hint: "+1$ к доходу каждого вашего объекта профильного района",
+  },
+};
+
+export interface RolePerkRow {
+  key: string;
+  label: string;
+  text: string;
+  hint: string;
+  locked: boolean;
+}
+
+export function rolePerkRows(game: GameState, meta: CityMeta): RolePerkRow[] {
+  const districts = new Map(meta.districts.map(item => [item.id, item.title]));
+  return (game.role_perks ?? []).flatMap(perk => {
+    const label = rolePerkLabels[perk.key];
+    if (!label) return [];
+    const ceiling = perk.potential ?? perk.value;
+    const locked = perk.value === 0 || (perk.potential !== undefined && perk.value < perk.potential);
+    const need = perk.needs ? districts.get(perk.needs) ?? perk.needs : "";
+    const text = label.unit
+      ? `${perk.value}${label.unit}${ceiling > perk.value ? ` (может быть ${ceiling}${label.unit})` : ""}`
+      : perk.value > 0
+        ? "работает"
+        : "не работает";
+    return [{
+      key: perk.key,
+      label: label.label,
+      text,
+      hint: need ? `${label.hint}. Район-ключ: ${need}.` : label.hint,
+      locked,
+    }];
+  });
+}
 
 export interface ForecastRow { key: string; label: string; value: number }
 

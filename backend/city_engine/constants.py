@@ -11,6 +11,16 @@ SCHEMA_VERSION = 1
 # free, object replacement is gone, both rerolls are priced in money, and two grey operations now
 # trade in influence instead of cash. Snapshots taken under 1.2.x would be scored against rules
 # their players never agreed to, so state validation rejects them.
+# 1.6.0: the role pass. Every perk either earns its place or leaves, and three roles gain a tie to
+# a district that is not their own. Capitalist: the -1$ discount goes, business conditions are
+# satisfied by charter, +1◆ per own industrial object. Politician: the flat +1◆ and the housing
+# influence go, administrative objects pay 2◆ each. Journalist: the news line goes, money is 1$ a
+# rival scandal and 2$ with a business object, the rating ceiling is 2 plus one per housing object,
+# and the publication costs an action for two scandals. Fraudster: flat +20%/+10% chance instead of
+# two ladders, the comeback pays influence, and the crypto scam is now 25% of every wallet for five
+# scandals. Mafia: racket money from Серый сектор objects, influence from administrative ones.
+# Military: a sanction ladder at 2/3/4 scandals, no object confiscation, no healing the target.
+#
 # 1.5.1: the passive payout is back at 10$ and 3◆ a point, and lobbying is repriced to 3◆ → 2
 # points so that both sinks pay double what hoarding pays. See the note above the constants for the
 # measurement that reverted 1.5.0.
@@ -32,12 +42,16 @@ SCHEMA_VERSION = 1
 # one card; the asset market rotates its three oldest slots once a round; cards can buy points
 # outright. Snapshots taken under 1.3.x describe a game with different rules, so state validation
 # rejects them — old rooms will not open.
-RULES_VERSION = "city-1.5.1"
+RULES_VERSION = "city-1.6.0"
+# 2026-08-22a: the role texts finally describe the game. They still advertised investment
+# actions, forged roles, the burn-contacts power and the district tribute — all deleted between
+# 1.4.0 and 1.5.1 — and a player read them in the role tooltip.
+#
 # 2026-08-21a: 37 action cards. The automation and role-forgery cards are gone, replaced by the
 # «деньги → очки» family and «Предписание о демонтаже» (takes a development level); the two defence
 # cards now hand out the same Крыша as the third; the two projects that required automation ask for
 # tagged objects instead. The events array is gone from the catalog entirely.
-CONTENT_VERSION = "city-content-2026-08-21a"
+CONTENT_VERSION = "city-content-2026-08-22a"
 
 DISTRICT_IDS = (
     "residential",
@@ -107,6 +121,32 @@ MAX_REPEATABLE_PROJECTS = 3
 # rich has to coincide with the round the card appears, which turns the top of the catalog into a
 # lottery. Cards that rotate out go to the bottom of the deck, so nothing leaves the game.
 MARKET_ROTATION_SIZE = 3
+
+# --- roles ------------------------------------------------------------------------------------
+# The journalist owns no district, so both of its lines hang off somebody else's quarter: the
+# influence ceiling starts here and rises by one for every housing object it owns (readers), and
+# the money rate is 1$ per rival scandal, doubled by a single business object (connections).
+JOURNALIST_RATING_BASE = 2
+# The publication costs an action now and lands twice as hard. Two free attacks a turn — inflate
+# *and* publish on top of three ordinary actions — was the journalist's real edge over every other
+# role, none of which has a power that skips the action cost.
+PUBLICATION_SCANDALS = 2
+# The fraudster's grey bonus, flat. It used to be a ladder by rank plus a ladder by tech objects:
+# a percentage that changed every turn and that nobody could read off the screen.
+FRAUDSTER_GREY_BONUS = 0.20
+FRAUDSTER_TECH_BONUS = 0.10
+# The crypto scam takes this share of every rival's cash and hands the fraudster five scandals —
+# its entire scandal budget. Bare, the role loses itself; with two reduction perks it survives.
+CRYPTO_SCAM_SHARE = 25
+CRYPTO_SCAM_SCANDALS = 5
+# What the racket adds when its target is leading the table. The rest of the demand comes from the
+# mafia's own districts: 2$ per Серый сектор object, plus a slow drift with the round.
+RACKET_LEADER_BONUS = 5
+# The sanction reads the target's own scandal counter: money at two, money and influence at three,
+# and the role itself at four.
+SANCTION_MONEY_TIER = 2
+SANCTION_INFLUENCE_TIER = 3
+SANCTION_ROLE_TIER = 4
 
 # The journalist trades in scandals, so the role-loss threshold that everybody else hits at 5
 # would put their optimal play one point from collapse. Jail still follows one step later.

@@ -193,6 +193,14 @@ h1, h2, h3, p { margin-top: 0; }
 /* The player's own count, bolted onto the condition text: the whole point is that it is louder
    than the condition, because the condition was already being read and the count was not. */
 .project-progress { color: #e3b341; font-weight: 800; }
+/* The role panel: a locked perk has to look locked, or we are back to numbers nobody can see. */
+.role-perks { display: grid; gap: 3px; padding: 6px 7px; border: 1px solid var(--city-line); border-radius: 9px; }
+.role-perks > strong { font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
+.role-perk { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 10px; cursor: help; }
+.role-perk i { color: var(--city-dim); font-style: normal; }
+.role-perk b { color: #7ee787; white-space: nowrap; }
+.role-perk.locked i { opacity: .65; }
+.role-perk.locked b { color: var(--city-dim); }
 .project-condition.met .project-progress { color: #7ee787; }
 .empty-district { padding: 14px 5px; color: var(--city-dim); font-size: 10px; }
 .rarity-badge { width: max-content; padding: 1px 6px; color: #05070c; background: var(--rarity, #8b949e); border: 0; border-radius: 8px; font-size: 8px !important; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }

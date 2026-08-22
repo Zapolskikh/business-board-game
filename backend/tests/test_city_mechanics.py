@@ -296,7 +296,8 @@ def settled_sources(state) -> dict:
     return settled.data["income_sources"]
 
 
-def test_journalist_earns_two_money_per_standing_rival_scandal() -> None:
+def test_journalist_money_doubles_with_a_business_object() -> None:
+    """The journalist owns no district, so its money line hangs off somebody else's quarter."""
     engine = CityEngine()
     state = make_state()
     journalist = state.current_player
@@ -307,8 +308,14 @@ def test_journalist_earns_two_money_per_standing_rival_scandal() -> None:
 
     state = run(engine, state, "end_turn")
     state = run(engine, state, "end_turn")
+    assert settled_sources(state)[journalist.id]["journalist"] == 3  # 1$ a scandal, bare
 
-    assert settled_sources(state)[journalist.id]["journalist"] == 6
+    give_asset(state, state.player_by_id(journalist.id), "insurance_agency")  # Деловой центр
+    for _ in state.players:
+        state = run(engine, state, "end_turn")
+    # settled_sources reads the first settlement, so take the last one explicitly.
+    last = [event for event in state.event_log if event.type == "round_settled"][-1]
+    assert last.data["income_sources"][journalist.id]["journalist"] == 6
 
 
 def test_the_engine_counts_a_project_condition_for_the_player() -> None:
@@ -448,6 +455,8 @@ def test_journalist_powers_use_scandal_rules() -> None:
     )
     assert state.current_player.scandals == 1
     assert state.player_by_id(target.id).scandals == 1
+    # The publication costs an action now, and lands twice as hard for it.
+    actions_before = state.actions_left
     state = run(
         engine,
         state,
@@ -455,7 +464,8 @@ def test_journalist_powers_use_scandal_rules() -> None:
         {"power": "journalist_publish", "target_id": target.id},
     )
     assert state.current_player.influence == 7
-    assert state.player_by_id(target.id).scandals == 2
+    assert state.actions_left == actions_before - 1
+    assert state.player_by_id(target.id).scandals == 3  # one from the inflate, two from the story
 
 
 def test_mafia_racket_has_two_money_base_before_scaling() -> None:
@@ -482,25 +492,47 @@ def test_mafia_racket_has_two_money_base_before_scaling() -> None:
     assert state.current_player.scandals == 1
 
 
-def test_military_sanction_confiscates_asset_at_four_scandals() -> None:
-    engine = CityEngine()
-    state = make_state()
-    military = state.current_player
-    target = next(player for player in state.players if player.id != military.id)
-    military.role = "military"
-    target.scandals = 4
-    give_asset(state, target, "delivery")
-    valuable = give_asset(state, target, "urban_ecosystem")
+def test_the_sanction_ladder_reads_the_target_scandal_counter() -> None:
+    """Two scandals cost money, three cost influence too, four cost the role.
 
-    state = run(
-        engine,
-        state,
-        "use_role_power",
-        {"power": "military_sanction", "target_id": target.id},
-    )
-    assert valuable.uid in {asset.uid for asset in state.current_player.assets}
-    assert valuable.uid not in {asset.uid for asset in state.player_by_id(target.id).assets}
-    assert state.player_by_id(target.id).scandals == 3
+    The object confiscation is gone: attached to one role, it either did nothing with full slots or
+    removed nine points of score, and nothing in between could be planned around.
+    """
+    engine = CityEngine()
+
+    # Two scandals: money only, and the target keeps both its influence and its role.
+    state = make_state()
+    military, target = state.current_player, state.players[1]
+    military.role = "military"
+    target.role = "capitalist"
+    target.scandals, target.money, target.influence = 2, 40, 9
+    state = run(engine, state, "use_role_power", {"power": "military_sanction", "target_id": target.id})
+    target = state.players[1]
+    assert (target.money, target.influence, target.role) == (40 - (3 + state.round_number), 9, "capitalist")
+    # And the scandal stays: the sanction used to heal what it hit, knocking its own next tier away.
+    assert target.scandals == 2
+
+    # Three: influence goes too.
+    state = make_state()
+    military, target = state.current_player, state.players[1]
+    military.role = "military"
+    target.role = "capitalist"
+    target.scandals, target.money, target.influence = 3, 40, 9
+    state = run(engine, state, "use_role_power", {"power": "military_sanction", "target_id": target.id})
+    target = state.players[1]
+    assert target.influence < 9 and target.role == "capitalist"
+
+    # Four: the role itself.
+    state = make_state()
+    military, target = state.current_player, state.players[1]
+    military.role = "military"
+    target.role = "capitalist"
+    target.scandals, target.money, target.influence = 4, 40, 9
+    state = run(engine, state, "use_role_power", {"power": "military_sanction", "target_id": target.id})
+    assert state.players[1].role is None
+    event = state.event_log[-2]
+    assert event.type == "military_sanction"
+    assert event.data["role_id"] == "capitalist"
 
 
 def test_sanction_blocked_by_roof_does_not_clean_the_target() -> None:
@@ -521,39 +553,17 @@ def test_sanction_blocked_by_roof_does_not_clean_the_target() -> None:
     assert any(event.type == "targeted_effect_blocked" for event in state.event_log)
 
 
-def test_sanction_that_lands_still_clears_one_scandal() -> None:
+def test_an_upgrade_loss_is_logged_even_though_no_resource_moves() -> None:
     engine = CityEngine()
     state = make_state()
-    military = state.current_player
-    target = next(player for player in state.players if player.id != military.id)
-    military.role = "military"
-    target.scandals = 3
-    target.roofs = 0
-    target.money = 20
+    player = state.current_player
+    owned = give_asset(state, player, "delivery")
+    player.district_levels["residential"] = 2
 
-    state = run(engine, state, "use_role_power", {"power": "military_sanction", "target_id": target.id})
+    engine._log_asset_state_change(state, player, owned, change="blocked", source="test")
 
-    hit = state.player_by_id(target.id)
-    assert hit.scandals == 2
-    assert hit.money == 20 - (3 + state.round_number)
-
-
-def test_confiscation_and_upgrade_loss_are_logged() -> None:
-    engine = CityEngine()
-    state = make_state()
-    military = state.current_player
-    target = next(player for player in state.players if player.id != military.id)
-    military.role = "military"
-    target.scandals = 4
-    give_asset(state, target, "delivery")
-    valuable = give_asset(state, target, "urban_ecosystem")
-
-    state = run(engine, state, "use_role_power", {"power": "military_sanction", "target_id": target.id})
-
-    taken = next(event for event in state.event_log if event.type == "asset_confiscated")
-    assert taken.data["asset_id"] == valuable.card_id
-    assert taken.data["victim_id"] == target.id
-    assert taken.data["resolution"] == "seized"
+    logged = next(event for event in state.event_log if event.type == "asset_state_changed")
+    assert (logged.data["asset_id"], logged.data["change"]) == (owned.card_id, "blocked")
 
 
 def test_freeze_card_reports_which_object_it_blocked() -> None:
@@ -599,7 +609,7 @@ def test_settlement_reports_where_influence_came_from() -> None:
     state = make_state()
     politician = state.current_player
     politician.role = "politician"
-    give_asset(state, politician, "delivery")
+    give_asset(state, politician, "delivery")  # Спальный район: money through the residents tax
     give_asset(state, politician, "housing")
     influence_before = politician.influence
 
@@ -610,7 +620,9 @@ def test_settlement_reports_where_influence_came_from() -> None:
     breakdown = settled.data["influence_sources"][politician.id]
     # Itemised by source: a project perk paying +1◆ a round used to be indistinguishable from one
     # paying nothing, because the whole passive arrived as a single unlabelled number.
-    assert breakdown == {"objects": 0, "administrative": 2, "projects": 0, "news": 0, "rating": 0}
+    # Two administrative objects would pay 4◆; one housing object pays nothing in influence any
+    # more, because the housing tie of the politician is the residents tax, and that is money.
+    assert breakdown == {"objects": 0, "administrative": 0, "industrial": 0, "projects": 0, "rating": 0}
     assert sum(breakdown.values()) == state.player_by_id(politician.id).influence - influence_before
 
 

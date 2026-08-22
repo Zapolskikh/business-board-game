@@ -106,7 +106,12 @@ def room_view(
     # What one more development level would pay in each district, and what it costs. The +25%
     # rounds up per level over whatever objects the district holds, so this is not a rate the
     # client can print from the rules — it is an income calculation, and the engine owns those.
-    viewer_for_dev = next((player for player in room.game.players if player.id == viewer_id), None)
+    viewer_for_role = next((player for player in room.game.players if player.id == viewer_id), None)
+    viewer_for_dev = viewer_for_role
+    # Every perk of the viewer's role, with what it pays now and what the missing district would
+    # add. A perk that silently pays less is invisible, which is the bug we fixed on the board.
+    if viewer_for_role is not None:
+        game["role_perks"] = engine.role_perks(room.game, viewer_for_role)
     if viewer_for_dev is not None:
         game["development_preview"] = {
             district: engine.development_gain(room.game, viewer_for_dev, district) for district in DISTRICT_IDS

@@ -24,6 +24,7 @@ import {
   launderingCost,
   marketPrice,
   powerLabels,
+  rolePerkRows,
   cleanupOffer,
   cleanupPowerFor,
   projectPerkText,
@@ -675,6 +676,14 @@ function DecisionPanel({ game, me, meta, roles, districts, assets, legal, busy, 
       const holder = roleHolder(role.id);
       return <button disabled={busy || !claim} onClick={() => claim && void onAction(claim)} style={{ borderColor: role.color }} title={`${role.passive} Способность: ${role.power} Получение роли расходует 1 обычное действие и ${roleCost(role.id)}◆.${holder ? ` Сейчас роль у ${holder.name}; его Крыша или судебный запрет могут заблокировать захват.` : ""}`} key={role.id}><span className="role-line"><span className="role-icon" style={{ borderColor: role.color }}>{role.icon}</span>{role.title} · {roleCost(role.id)}◆</span><small>{holder ? `занята: ${holder.name}` : role.passive}</small></button>;
     })}</div></details>
+
+    {/* What the role pays right now, and what a district you do not own would add. */}
+    {displayRoleId && <div className="action-group g-roles"><div className="role-perks">
+      <strong>{roles.get(displayRoleId)?.icon} Перки роли</strong>
+      {rolePerkRows(game, meta).map(row => <span className={`role-perk ${row.locked ? "locked" : ""}`} key={row.key} title={row.hint}>
+        <i>{row.label}</i><b>{row.text}</b>
+      </span>)}
+    </div></div>}
 
     {/* The powers stay outside the fold: they are used every turn, unlike claiming a role. */}
     {displayRoleId && <div className="action-group g-roles"><div className="role-powers" style={{ borderColor: roles.get(displayRoleId)?.color }}><strong>{roles.get(displayRoleId)?.icon} Способности: {roles.get(displayRoleId)?.title}</strong><small>{roles.get(displayRoleId)?.power}</small>{powers.map(power => {

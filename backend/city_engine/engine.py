@@ -21,8 +21,11 @@ from city_engine.constants import (
     COMPROMAT_INFLUENCE,
     CRISIS_PR_INFLUENCE,
     DISTRICT_IDS,
+    FRAUDSTER_GREY_BONUS,
+    FRAUDSTER_TECH_BONUS,
     HACK_INFLUENCE_STEAL,
     INFLUENCE_PER_POINT,
+    JOURNALIST_RATING_BASE,
     JOURNALIST_SCANDAL_LIMIT,
     LAUNDERING_BASE_COST,
     LAUNDERING_BASE_GAIN,
@@ -37,7 +40,12 @@ from city_engine.constants import (
     POINTS_CARD_RATE,
     PROJECT_BOARD_SIZE,
     PROJECT_REROLL_MONEY,
+    PUBLICATION_SCANDALS,
+    RACKET_LEADER_BONUS,
     ROLE_IDS,
+    SANCTION_INFLUENCE_TIER,
+    SANCTION_MONEY_TIER,
+    SANCTION_ROLE_TIER,
 )
 from city_engine.content import (
     ActionCardDefinition,
@@ -375,6 +383,20 @@ class CityEngine:
         except KeyError as exc:
             raise InvalidCommandError(f"unknown city project: {project_id}") from exc
 
+    def owns_business_by_charter(self, player: PlayerState) -> bool:
+        """The capitalist satisfies any condition that names the Деловой центр by name.
+
+        Two projects on the board ask for it directly — «Деловой квартал» (2 objects, 6 points) and
+        «Финансовый район» (3 objects, 7 points) — so this is 13 points of board the role can take
+        without spending the slots it is always short of. That is the compensation for being the
+        only role with no active ability at all.
+
+        Deliberately *not* extended to `distinct_districts` and `district_depth`: those measure the
+        shape of your own tableau, and auto-filling four business objects for «Городская доминанта»
+        would be nonsense.
+        """
+        return self.has_role(player, "capitalist")
+
     def project_requirement_met(self, player: PlayerState, project: ProjectDefinition) -> bool:
         """Every condition is a count of things already on the table, so a player can read it."""
         requirement = project.requirement
@@ -390,7 +412,10 @@ class CityEngine:
         if kind == "max_scandals":
             return player.scandals <= needed
         if kind == "district_objects":
-            return self.district_count(player, str(requirement["district"])) >= needed
+            district = str(requirement["district"])
+            if district == "business" and self.owns_business_by_charter(player):
+                return True
+            return self.district_count(player, district) >= needed
         if kind == "district_depth":
             return max(self.district_count(player, district) for district in DISTRICT_IDS) >= needed
         if kind == "distinct_districts":
@@ -430,7 +455,11 @@ class CityEngine:
         if kind == "assets":
             have = len(player.assets)
         elif kind == "district_objects":
-            have = self.district_count(player, str(requirement["district"]))
+            district = str(requirement["district"])
+            if district == "business" and self.owns_business_by_charter(player):
+                have = needed
+            else:
+                have = self.district_count(player, district)
         elif kind == "district_depth":
             have = max(self.district_count(player, district) for district in DISTRICT_IDS)
         elif kind == "distinct_districts":
@@ -528,16 +557,14 @@ class CityEngine:
         return {item.uid: self.asset_price(state, player, item.card_id) for item in state.market}
 
     def asset_price(self, state: GameState, player: PlayerState, card_id: str) -> int:
+        """The viewer's own price. The capitalist's -1$ for opening a district is gone: it fired
+        three or four times a game for a dollar, against an income that reaches 39$ a round."""
         asset = self.asset(card_id)
-        role_discount = int(
-            self.has_role(player, "capitalist")
-            and not any(self.owned_definition(item).district == asset.district for item in player.assets)
-        )
         logistics_discount = int(
             asset.district == "industrial" and any(item.card_id == "logistics" for item in player.assets)
         )
         card_discount = int(state.turn_flags.get("market_discount", 0))
-        return max(1, asset.cost - role_discount - logistics_discount - card_discount)
+        return max(1, asset.cost - logistics_discount - card_discount)
 
     def _spend_action(self, state: GameState) -> None:
         if state.actions_left < 1:
@@ -1286,9 +1313,13 @@ class CityEngine:
             self._require_role(player, "journalist")
             self._once_per_turn(state, power)
             target = self._target_player(state, player, self._payload_string(command, "target_id"))
+            landed = PUBLICATION_SCANDALS if power == "journalist_publish" else 1
             if power == "journalist_publish":
                 if player.influence < 3:
                     raise IllegalActionError("publication requires 3 influence")
+                # Two free attacks a turn was the journalist's real edge: it played three ordinary
+                # actions plus both powers. The publication now costs a turn and hits twice as hard.
+                self._spend_action(state)
                 player.influence -= 3
             else:
                 # The self-scandal is your own choice, so a roof never cancels it.
@@ -1298,7 +1329,7 @@ class CityEngine:
                 target.roofs -= 1
                 state.append_event("targeted_effect_blocked", target.id, power=power, by="roof")
             else:
-                self.add_scandal(state, target, 1)
+                self.add_scandal(state, target, landed)
         elif power == "mafia_racket":
             self._mafia_racket(state, command)
         elif power == "mafia_cleanup":
@@ -1343,13 +1374,16 @@ class CityEngine:
             target.roofs -= 1
             return
         leader = self.ranking(state)[0].id == target.id
+        # Both halves of the demand hang off districts now, which is the point of the role: money
+        # from the Серый сектор it lives in, influence from the Административный квартал its cleanup
+        # already pushes it toward. The old formula also counted housing — a leftover from the
+        # deleted tribute — and drifted upward with the round on its own, rewarding the calendar
+        # instead of the tableau.
         money_demand = (
             2
-            + self.district_count(player, "shadows")
-            + self.district_count(player, "residential")
-            + int(state.turn_flags.get("mafia_operation_bonus", 0))
-            + floor(state.round_number * 2 / 4)
-            + (3 if leader else 0)
+            + 2 * self.district_count(player, "shadows")
+            + floor(state.round_number / 3)
+            + (RACKET_LEADER_BONUS if leader else 0)
         )
         influence_demand = self.district_count(player, "government")
         money = min(money_demand, target.money)
@@ -1400,73 +1434,52 @@ class CityEngine:
             **extra,
         )
 
-    def _log_asset_taken(
-        self,
-        state: GameState,
-        actor: PlayerState,
-        victim: PlayerState,
-        asset: OwnedAsset,
-        *,
-        reason: str,
-        resolution: str,
-    ) -> None:
-        """Record an object changing hands: ``deltas`` cannot show it, so nothing else would."""
-        state.append_event(
-            "asset_confiscated",
-            actor.id,
-            asset_id=asset.card_id,
-            asset_uid=asset.uid,
-            victim_id=victim.id,
-            value=self.asset_value(asset),
-            refund=self.asset_refund(asset),
-            reason=reason,
-            resolution=resolution,
-        )
-
     def _military_sanction(self, state: GameState, command: Command) -> None:
+        """A ladder that reads off the target's own scandal counter.
+
+        Two scandals cost money, three cost money and influence, four cost the role as well. The
+        object confiscation is gone: a mechanic attached to one role that either did nothing (full
+        slots) or removed nine points of score, with nothing in between to plan around.
+
+        The sanction no longer clears a scandal off the target either. It used to, which meant the
+        role healed what it hit and knocked its own next tier out of reach; the once-a-turn limit is
+        what stops a target being farmed.
+        """
         player = state.current_player
         self._require_role(player, "military")
         self._once_per_turn(state, "military_sanction")
         target = self._target_player(state, player, self._payload_string(command, "target_id"))
-        if target.scandals < 2:
-            raise IllegalActionError("sanction requires a target with at least two scandals")
+        if target.scandals < SANCTION_MONEY_TIER:
+            raise IllegalActionError(f"sanction requires a target with at least {SANCTION_MONEY_TIER} scandals")
         self._spend_action(state)
-        confiscated: OwnedAsset | None = None
-        landed = False
         if target.roofs > 0:
             target.roofs -= 1
             state.append_event("targeted_effect_blocked", target.id, power="military_sanction", by="roof")
-        elif target.scandals <= 3:
-            seized = min(target.money, 3 + state.round_number)
-            target.money -= seized
-            player.money += seized
-            landed = True
-        elif len(target.assets) > 1:
-            confiscated = max(target.assets, key=self.asset_value)
-            self._drop_asset(target, confiscated)
-            landed = True
-        # "Case closed" only when the sanction actually landed. A roof absorbs the whole effect, so
-        # it must not also clean the target's record — that used to make attacking a rival helpful,
-        # and made sitting on 4 scandals safer than sitting on 2.
-        if landed:
-            target.scandals = max(0, target.scandals - 1)
-        if confiscated is not None:
-            resolution = "seized"
-            if len(player.assets) < player.capacity:
-                player.assets.append(confiscated)
-            else:
-                weakest = min(player.assets, key=self.asset_value)
-                if self.asset_value(confiscated) > self.asset_value(weakest):
-                    self._drop_asset(player, weakest)
-                    player.money += self.asset_refund(weakest)
-                    player.assets.append(confiscated)
-                    resolution = "swapped"
-                else:
-                    player.money += self.asset_refund(confiscated)
-                    resolution = "cashed"
-            # Asset transfers move no resource the deltas cover, so without this event an object
-            # vanished from a portfolio with nothing in the chronicle to explain it.
-            self._log_asset_taken(state, player, target, confiscated, reason="military_sanction", resolution=resolution)
+            return
+        before = self._resource_snapshot(state)
+        tier = target.scandals
+        seized = min(target.money, 3 + state.round_number)
+        target.money -= seized
+        player.money += seized
+        influence = 0
+        if tier >= SANCTION_INFLUENCE_TIER:
+            influence = min(target.influence, 2 + floor(state.round_number / 4))
+            target.influence -= influence
+            player.influence += influence
+        stripped: str | None = None
+        if tier >= SANCTION_ROLE_TIER and target.role:
+            stripped = target.role
+            target.role = None
+        state.append_event(
+            "military_sanction",
+            player.id,
+            target_id=target.id,
+            scandals=tier,
+            money=seized,
+            influence=influence,
+            role_id=stripped,
+            deltas=self._resource_deltas(state, before),
+        )
 
     def _fraudster_crypto_scam(self, state: GameState, command: Command) -> None:
         player = state.current_player
@@ -1500,6 +1513,16 @@ class CityEngine:
     # Серый сектор opens all five, which is the point of the district: it is the grey shelf, and the
     # racket already works that way. Технокластер opens the two technical operations and the
     # Административный квартал opens the leak, so a clean city can still reach part of the layer.
+    # The quarter each role earns a dollar an object in. The journalist is absent on purpose: it
+    # owns no district and both of its lines are tied to other people's quarters instead.
+    ROLE_DISTRICTS = {
+        "capitalist": "business",
+        "politician": "residential",
+        "fraudster": "tech",
+        "mafia": "shadows",
+        "military": "industrial",
+    }
+
     GREY_OPERATION_DISTRICTS = {
         "cash": ("shadows",),
         "market": ("shadows",),
@@ -1557,11 +1580,20 @@ class CityEngine:
             player.compromat_round = state.round_number
 
         place = next(index for index, ranked in enumerate(self.ranking(state), start=1) if ranked.id == player.id)
-        fraud_bonus = [0, 0.05, 0.1, 0.2][min(3, place - 1)] if self.has_role(player, "fraudster") else 0
-        tech_bonus = min(0.1, self.district_count(player, "tech") * 0.05) if self.has_role(player, "fraudster") else 0
+        # Two flat numbers instead of two ladders. The old bonus was "+5/10/20% by rank, plus 5% per
+        # tech object up to 10%": a percentage that changed every turn and that no player could read
+        # off the screen. This is slightly stronger and legible, which is the trade we wanted.
+        fraud_bonus = FRAUDSTER_GREY_BONUS if self.has_role(player, "fraudster") else 0
+        tech_bonus = (
+            FRAUDSTER_TECH_BONUS
+            if self.has_role(player, "fraudster") and self.district_count(player, "tech") > 0
+            else 0
+        )
         chance = min(0.9, self.GREY_BASE_CHANCE[asset_id] + fraud_bonus + tech_bonus)
         success = GameRNG(state.rng).chance(chance)
-        comeback = floor((place - 1) * state.round_number / 3) if self.has_role(player, "fraudster") else 0
+        # The comeback pays influence now, not money: the fraudster already has three money levers
+        # and no influence at all. Kept deliberately small — 1◆ is worth 3.3 times a dollar.
+        comeback = (place - 1) if self.has_role(player, "fraudster") else 0
         if success:
             self._resolve_grey_success(state, player, target, asset_id, comeback)
             operation_scandals = self.GREY_SUCCESS_SCANDALS.get(asset_id, 1)
@@ -1923,26 +1955,22 @@ class CityEngine:
         influence_sources: dict[str, dict[str, int]] = {}
         for player in state.players:
             journalist = player.role == "journalist"
-            news_limit = 3 if any(asset.card_id == "data" for asset in player.assets) else 2
-            news = (
-                min(
-                    news_limit,
-                    sum(other.scandal_gained_this_round for other in state.players if other.id != player.id),
-                )
-                if journalist
-                else 0
-            )
-            rating = min(4, player.scandals) if journalist else 0
-            # 2$ per scandal still standing on a rival when the round is settled.
-            journalist_cash = (
-                2 * sum(other.scandals for other in state.players if other.id != player.id) if journalist else 0
-            )
+            # The journalist is the only role without a district of its own, so both of its lines
+            # are tied to somebody else's quarter: money doubles with a business object (connections
+            # sell the story), and the influence ceiling rises with housing (readers).
+            active = [asset for asset in player.assets if not asset.blocked]
+            rating = 0
+            journalist_cash = 0
+            if journalist:
+                readers = sum(1 for asset in active if self.owned_definition(asset).district == "residential")
+                rating = min(JOURNALIST_RATING_BASE + readers, player.scandals)
+                rate = 2 if any(self.owned_definition(asset).district == "business" for asset in active) else 1
+                journalist_cash = rate * sum(other.scandals for other in state.players if other.id != player.id)
             income_sources[player.id]["journalist"] = journalist_cash
             # Influence was settled silently: players had to diff their own state to see where
             # a politician's passive or a journalist's rating came from.
             influence_sources[player.id] = {
                 **self.passive_influence_breakdown(player),
-                "news": news,
                 "rating": rating,
             }
         return incomes, income_sources, influence_sources
@@ -2070,12 +2098,18 @@ class CityEngine:
         ``projects`` row is exactly what the finished projects pay.
         """
         active = [asset for asset in player.assets if not asset.blocked]
+        # The politician: 2◆ per own administrative object and nothing else. The flat +1◆ a round
+        # for merely holding the role is gone — it paid before the player did anything — and so is
+        # the housing half, because the housing tie is the residents tax, which is money.
         administrative = 0
         if self.has_role(player, "politician"):
-            administrative = sum(1 for asset in active if self.owned_definition(asset).district == "government")
-            administrative += 1 + floor(
-                sum(self.owned_definition(asset).district == "residential" for asset in active) / 2
-            )
+            administrative = 2 * sum(1 for asset in active if self.owned_definition(asset).district == "government")
+        # The capitalist: 1◆ per own industrial object. The role earns more money than anyone and
+        # spends actions converting it — this is the cross-district tie that pays it in the currency
+        # projects are actually bought with. Промзона because the Деловой центр is already its own.
+        industrial = 0
+        if self.has_role(player, "capitalist"):
+            industrial = sum(1 for asset in active if self.owned_definition(asset).district == "industrial")
         object_effects = 0
         for owned in active:
             bonus = self.owned_definition(owned).effects.get("influenceBonus")
@@ -2088,8 +2122,81 @@ class CityEngine:
         return {
             "objects": object_effects,
             "administrative": administrative,
+            "industrial": industrial,
             "projects": self.effect_total(player, "passiveInfluence"),
         }
+
+    def role_perks(self, state: GameState, player: PlayerState) -> list[dict[str, Any]]:
+        """What the viewer's role pays right now, and what it would pay with the missing district.
+
+        A perk that quietly pays less is the same bug we fixed on the project board: the number was
+        there, nobody could see it. Every row carries what it gives now (``value``), the ceiling it
+        could reach (``potential``) and the district that unlocks the difference (``needs``), so the
+        client only has to print labels — it never computes a rate.
+
+        Keys, not sentences: the labels live in the clients, exactly like the settlement rows.
+        """
+        if not player.role:
+            return []
+        active = [asset for asset in player.assets if not asset.blocked]
+
+        def count(district: str) -> int:
+            return sum(1 for asset in active if self.owned_definition(asset).district == district)
+
+        rows: list[dict[str, Any]] = []
+        if player.role == "capitalist":
+            rows.append({"key": "capitalist_objects", "value": len(active), "needs": None})
+            rows.append({"key": "capitalist_business_charter", "value": 1, "needs": None})
+            rows.append({"key": "capitalist_industrial_influence", "value": count("industrial"), "needs": "industrial"})
+        elif player.role == "politician":
+            rows.append({"key": "politician_residents_tax", "value": self.residents_tax(state, player), "needs": None})
+            rows.append({"key": "politician_administrative", "value": 2 * count("government"), "needs": "government"})
+        elif player.role == "journalist":
+            rivals = sum(other.scandals for other in state.players if other.id != player.id)
+            has_business = count("business") > 0
+            rows.append(
+                {
+                    "key": "journalist_money",
+                    "value": (2 if has_business else 1) * rivals,
+                    "potential": 2 * rivals,
+                    "needs": None if has_business else "business",
+                }
+            )
+            ceiling = JOURNALIST_RATING_BASE + count("residential")
+            rows.append(
+                {
+                    "key": "journalist_rating",
+                    "value": min(ceiling, player.scandals),
+                    "potential": ceiling,
+                    "needs": "residential",
+                }
+            )
+        elif player.role == "fraudster":
+            rows.append({"key": "fraudster_actions", "value": 1, "needs": None})
+            bonus = int(FRAUDSTER_GREY_BONUS * 100) + (int(FRAUDSTER_TECH_BONUS * 100) if count("tech") else 0)
+            rows.append(
+                {
+                    "key": "fraudster_chance",
+                    "value": bonus,
+                    "potential": int((FRAUDSTER_GREY_BONUS + FRAUDSTER_TECH_BONUS) * 100),
+                    "needs": "tech",
+                }
+            )
+        elif player.role == "mafia":
+            rows.append(
+                {"key": "mafia_racket_money", "value": 2 + 2 * count("shadows"), "needs": "shadows"},
+            )
+            rows.append(
+                {"key": "mafia_racket_influence", "value": count("government"), "needs": "government"},
+            )
+            rows.append({"key": "mafia_roofs", "value": self.roof_limit(player), "needs": None})
+        elif player.role == "military":
+            dirty = sum(1 for other in state.players if other.id != player.id and other.scandals >= SANCTION_MONEY_TIER)
+            rows.append({"key": "military_sanction_targets", "value": dirty, "needs": None})
+        district = self.ROLE_DISTRICTS.get(player.role)
+        if district:
+            rows.append({"key": "role_district_income", "value": count(district), "needs": district})
+        return rows
 
     def passive_influence(self, player: PlayerState) -> int:
         return sum(self.passive_influence_breakdown(player).values())
