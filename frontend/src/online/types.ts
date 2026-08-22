@@ -169,9 +169,10 @@ export interface ScoringMeta {
   money_per_point: number;
   influence_per_point: number;
   project_board_size: number;
-  market_reroll_cost: number;
   project_reroll_money: number;
   market_rotation_size: number;
+  patronage_money: number;
+  patronage_points: number;
   crisis_pr_influence: number;
   action_card_cost: number;
   // What discarding a card pays back, in money or in influence.

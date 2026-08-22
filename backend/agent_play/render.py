@@ -205,6 +205,10 @@ def _payload_hint(action: dict[str, Any], game: dict[str, Any], me: dict[str, An
             bits.append(f"{int(spend)}$ за {tiers[int(spend)]}◆")
         elif payload.get("kind") == "work":
             bits.append("+2$")
+        elif payload.get("kind") == "patronage":
+            money = catalog.scoring.get("patronage_money", 10)
+            points = catalog.scoring.get("patronage_points", 2)
+            bits.append(f"{money}$ за {points} очка, один раз за ход")
     if action["type"] == "sell_asset":
         bits.append("слот освобождается, возврат = очки объекта")
     return " ".join(bits)
@@ -554,7 +558,6 @@ def render_state(
     lines.extend(_owned_line(owned, me, game, catalog) for owned in me["assets"])
     lines.append(f"    районы: {districts or 'пусто'}")
     slot = CAPACITY_COSTS.get(int(me["capacity"]))
-    reroll = catalog.scoring.get("market_reroll_cost", 4)
     project_reroll = catalog.scoring.get("project_reroll_money", 10)
     card_cost = catalog.scoring.get("action_card_cost", 3)
     tiers = " / ".join(
@@ -563,7 +566,7 @@ def render_state(
     lines.append(
         f"    цены сейчас: Крыша {roof_price(game, me)}$ · "
         f"две карты {card_cost}$+1◆ и действие · "
-        f"реролл рынка {reroll}$ и доски проектов {project_reroll}$ — каждый с действием, доски общие · "
+        f"пересборка доски проектов {project_reroll}$ и действие · "
         + (f"кампания {tiers} за одно действие · " if tiers else "")
         + (f"слот {int(me['capacity']) + 1} за {slot}$" if slot else "слоты максимум")
     )

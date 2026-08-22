@@ -140,10 +140,6 @@ export function influencePerPoint(meta: CityMeta): number {
   return meta.scoring?.influence_per_point ?? 3;
 }
 
-export function marketRerollCost(meta: CityMeta): number {
-  return meta.scoring?.market_reroll_cost ?? 4;
-}
-
 export function projectRerollMoney(meta: CityMeta): number {
   return meta.scoring?.project_reroll_money ?? 10;
 }
@@ -170,6 +166,12 @@ export function launderingGain(meta: CityMeta, round: number): number {
 export function campaignTier(meta: CityMeta, spend: unknown): { spend: number; gain: number } | undefined {
   const wanted = numberValue(spend);
   return campaignTiers(meta).find(tier => tier.spend === wanted);
+}
+
+// The floor of the money economy: cash into points, no slot and no card needed. See
+// `PATRONAGE_MONEY` in the engine for the 1217$ of dead capital that put it there.
+export function patronage(meta: CityMeta): { money: number; points: number } {
+  return { money: meta.scoring?.patronage_money ?? 10, points: meta.scoring?.patronage_points ?? 2 };
 }
 
 export function crisisPrInfluence(meta: CityMeta): number {
@@ -311,11 +313,14 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
   const project = projects.get(stringValue(payload.project_id));
   if (action.type === "basic_action") {
     if (payload.kind === "work") return "Городской заказ: +2$";
+    if (payload.kind === "patronage") {
+      const deal = patronage(meta);
+      return `Патронаж: ${deal.money}$ → ${deal.points} очка`;
+    }
     const tier = campaignTier(meta, payload.spend);
     return tier ? `Кампания: ${tier.spend}$ → ${tier.gain}◆` : "Кампания";
   }
   if (action.type === "end_turn") return "Завершить ход";
-  if (action.type === "reroll_market") return `Обновить рынок объектов (${marketRerollCost(meta)}$ + действие)`;
   if (action.type === "reroll_projects") return `Пересобрать доску проектов (${projectRerollMoney(meta)}$ + действие)`;
   if (action.type === "city_project") {
     return project
@@ -375,7 +380,6 @@ const eventVerbs: Record<string, string> = {
   project_board_rotated: "Доска проектов обновилась",
   project_board_redealt: "пересобирает доску проектов",
   turn_order_set: "Порядок хода определён",
-  market_rerolled: "обновляет рынок объектов",
   role_takeover_blocked: "не смог перехватить роль",
   role_stripped: "сливает компромат и снимает роль",
   roof_bought: "покупает Крышу",
@@ -510,6 +514,13 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       return segments;
     }
     case "basic_action":
+      if (data.kind === "patronage") {
+        return lead(
+          txt(" вкладывается в город ("),
+          num(`${numberValue(data.spend)}$→${numberValue(data.gain)} очка`, "good"),
+          txt(`, стало ${numberValue(data.money)}$)`),
+        );
+      }
       return data.kind === "work"
         ? lead(txt(" берёт городской заказ ("), num("+2$", "good"), txt(`, стало ${numberValue(data.money)}$)`))
         : lead(
@@ -556,8 +567,6 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       });
       return segments;
     }
-    case "market_rerolled":
-      return lead(txt(" обновляет рынок объектов ("), signed(-numberValue(data.cost), "$"), txt(")"));
     case "capacity_bought":
       return lead(txt(` расширяет бизнес до ${numberValue(data.capacity)} слотов (`), signed(-numberValue(data.cost), "$"), txt(")"));
     case "roof_bought":

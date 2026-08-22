@@ -8,9 +8,11 @@ from city_engine.constants import (
     CASH_TO_INFLUENCE_MONEY,
     COMPROMAT_INFLUENCE,
     HACK_INFLUENCE_STEAL,
-    MARKET_REROLL_COST,
     MARKET_ROTATION_SIZE,
     MAX_REPEATABLE_PROJECTS,
+    MONEY_PER_POINT,
+    PATRONAGE_MONEY,
+    PATRONAGE_POINTS,
     PROJECT_BOARD_SIZE,
     PROJECT_REROLL_MONEY,
 )
@@ -1002,6 +1004,43 @@ def test_replace_asset_no_longer_exists() -> None:
         run(engine, state, "replace_asset", {"asset_uid": player.assets[0].uid, "market_uid": "asset:replacement"})
 
 
+def test_patronage_turns_dead_money_into_points_without_a_slot() -> None:
+    """A measured 15-round game finished with 1217$ on the table — 121 points nobody could spend."""
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.money = PATRONAGE_MONEY * 2
+    before = engine.score(player)
+    actions = state.actions_left
+
+    state = run(engine, state, "basic_action", {"kind": "patronage"})
+    player = state.current_player
+    assert player.money == PATRONAGE_MONEY
+    assert player.bonus_points == PATRONAGE_POINTS
+    assert engine.score_breakdown(player)["bonus"] == PATRONAGE_POINTS
+    assert state.actions_left == actions - 1
+    # The rate is deliberately worse than an object: 10$ leaving is a point of score too.
+    assert engine.score(player) == before + PATRONAGE_POINTS - PATRONAGE_MONEY // MONEY_PER_POINT
+
+    # Once a turn, with money left over: unbounded, the biggest pile would simply buy the game.
+    assert player.money >= PATRONAGE_MONEY
+    with pytest.raises(IllegalActionError):
+        run(engine, state, "basic_action", {"kind": "patronage"})
+    assert not any(
+        action["type"] == "basic_action" and action["payload"].get("kind") == "patronage"
+        for action in engine.legal_actions(state, player.id)
+    )
+
+    # Next turn it is offered again, and nothing but the money stops it then.
+    state = run(engine, state, "end_turn")
+    while state.current_player.id != player.id:
+        state = run(engine, state, "end_turn")
+    assert any(
+        action["type"] == "basic_action" and action["payload"].get("kind") == "patronage"
+        for action in engine.legal_actions(state, state.current_player.id)
+    )
+
+
 def test_the_campaign_is_one_button_at_one_rate() -> None:
     """Three tiers were three buttons for the same idea, and the middle one was the only one used."""
     engine = CityEngine()
@@ -1185,31 +1224,6 @@ def test_the_market_holds_still_for_a_whole_round_then_rotates_three_slots() -> 
     assert any(event.type == "market_rotated" for event in state.event_log)
 
 
-def test_market_reroll_costs_money_and_an_action() -> None:
-    engine = CityEngine()
-    state = make_state()
-    player = state.current_player
-    player.money = 10
-    state.actions_left = 0
-    # No actions, no reroll: the market rotates by itself every round, so impatience costs a turn.
-    assert not any(action["type"] == "reroll_market" for action in engine.legal_actions(state, player.id))
-    with pytest.raises(IllegalActionError):
-        run(engine, state, "reroll_market")
-    state.actions_left = 2
-    before = [item.card_id for item in state.market]
-
-    state = run(engine, state, "reroll_market")
-    player = state.current_player
-
-    assert player.money == 10 - MARKET_REROLL_COST
-    assert state.actions_left == 1
-    assert len(state.market) == len(before)
-    assert [item.card_id for item in state.market] != before
-    # One reroll per turn, so it cannot be used to fish the whole deck in a single turn.
-    with pytest.raises(IllegalActionError):
-        run(engine, state, "reroll_market")
-
-
 def test_project_reroll_redeals_the_whole_board_for_money_and_an_action() -> None:
     engine = CityEngine()
     state = make_state()
@@ -1228,7 +1242,6 @@ def test_project_reroll_redeals_the_whole_board_for_money_and_an_action() -> Non
     # has to be an order of magnitude above the market reroll, or the shared board churns for free,
     # and it costs an action because moving four cards is a decision, not an end-of-turn click.
     assert (player.influence, player.money) == (2, 100 - PROJECT_REROLL_MONEY)
-    assert PROJECT_REROLL_MONEY > MARKET_REROLL_COST * 2
     assert state.actions_left == 1
     # The whole board is re-dealt, not rotated by one: four cards go back, four come out.
     assert len(state.project_board) == PROJECT_BOARD_SIZE

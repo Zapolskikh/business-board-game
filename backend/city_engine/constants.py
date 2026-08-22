@@ -11,13 +11,18 @@ SCHEMA_VERSION = 1
 # free, object replacement is gone, both rerolls are priced in money, and two grey operations now
 # trade in influence instead of cash. Snapshots taken under 1.2.x would be scored against rules
 # their players never agreed to, so state validation rejects them.
+# 1.4.1: patronage. A live 15-round game on 1.4.0 finished with 1217$ unspent across the table —
+# 121 points of dead capital — because the only sinks need a slot or influence. One basic action now
+# turns 10$ into 2 points, unbounded and repeatable, at a rate deliberately worse than an object or
+# a project.
+#
 # 1.4.0: the simplification pass. Automation, city events, forged/copied roles, the investment
 # action pool and business upkeep leave the game; the three defences merge into one Крыша; campaign
 # has one tier; every scandal cleanup costs an action; grey operations gate on a district instead of
 # one card; the asset market rotates its three oldest slots once a round; cards can buy points
 # outright. Snapshots taken under 1.3.x describe a game with different rules, so state validation
 # rejects them — old rooms will not open.
-RULES_VERSION = "city-1.4.0"
+RULES_VERSION = "city-1.4.1"
 # 2026-08-21a: 37 action cards. The automation and role-forgery cards are gone, replaced by the
 # «деньги → очки» family and «Предписание о демонтаже» (takes a development level); the two defence
 # cards now hand out the same Крыша as the third; the two projects that required automation ask for
@@ -84,12 +89,6 @@ MARKET_ROTATION_SIZE = 3
 # The journalist trades in scandals, so the role-loss threshold that everybody else hits at 5
 # would put their optimal play one point from collapse. Jail still follows one step later.
 JOURNALIST_SCANDAL_LIMIT = 6
-# Refreshing the whole asset market, out of turn: 1 action and this much money, once per turn.
-# At 2$ and no action it was measured free — four expert bots spent 3.6$ each across a whole game
-# while finishing on 264$. Now that the market rotates by itself every round, the button is the
-# impatient option, and the action is its real price. If endgame conversion slows down, lower this
-# number rather than giving the action back.
-MARKET_REROLL_COST = 4
 # Money into influence, one action, three tiers. The action — not the money — was the real price
 # of influence: campaign was the only scalable source and it was capped at 2◆ per action, so a
 # player holding 264$ and 2◆ had no way to convert. Rates worsen as the tier grows (1.0 / 1.67 /
@@ -111,6 +110,19 @@ ACTION_CARD_COST = 3
 # channel, so a full tableau had nowhere to put money: two measured matches ended with 248$ and 864$
 # unspent across the table, 24 and 86 points nobody made a decision about.
 POINTS_CARD_RATE = 5
+# The same rate as a basic action, repeatable, and the reason it exists: a measured 15-round game
+# on 1.4.0 finished with 1217$ across the table — 121 points of capital nobody could spend. Six
+# object slots and four shared project slots are the only sinks, and both need something other than
+# money: a slot, or the influence a project is priced in. By round 13 a developed tableau paid
+# 47-63$ a round against a printed income of 1-3$ per object, so the surplus only grew.
+#
+# An action *and* once a turn. The rate has to beat holding money or nobody would press it, and
+# anything that beats holding money is pressed by whoever has the most of it: unbounded, it moved
+# the winner's margin from 7.5 points to 13 over 24 measured games. Capped at one press a turn it
+# is worth at most 2 points a round — a floor for a full wallet, never a win condition. Compare an
+# object (2$ a point) and a project (~1$ a point): both stay strictly better.
+PATRONAGE_MONEY = 10
+PATRONAGE_POINTS = 2
 # What discarding a card returns, so a bad draw is not a dead 3$.
 CARD_DISCARD_VALUE = 2
 # What the tax manoeuvre pays to run money into influence. It has to beat the discard — a card that

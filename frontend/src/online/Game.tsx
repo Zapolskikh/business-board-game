@@ -9,6 +9,7 @@ import {
   assetPoints,
   buildGameLogMarkdown,
   campaignTiers,
+  patronage,
   capacityLabel,
   describeEventSegments,
   difficultyLabels,
@@ -20,7 +21,6 @@ import {
   influencePerPoint,
   launderingCost,
   marketPrice,
-  marketRerollCost,
   moneyPerPoint,
   powerLabels,
   cleanupOffer,
@@ -217,7 +217,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
         <DistrictMarket
           game={game} meta={meta} me={me} viewed={viewed} viewingOther={viewingOther} assets={assets}
           selectedDistrict={selectedDistrict} onSelectDistrict={setSelectedDistrict} developActions={developActions}
-          buyActions={buyActions} reroll={matching("reroll_market")[0]} busy={busy} onAction={send}
+          buyActions={buyActions} busy={busy} onAction={send}
         />
         {!viewingOther && <CardDesk game={game} me={me} cards={cards} legal={legal} buyCard={buyCardAction} busy={busy} onAction={send} onOffer={offer} labelContext={labelContext} />}
         <BusinessBoard viewed={viewed} me={me} game={game} meta={meta} assets={assets} legal={legal} viewingOther={viewingOther} busy={busy} onAction={send} />
@@ -409,7 +409,7 @@ function ProjectBoard({ game, meta, me, projects, actions, reroll, busy, onActio
   </section>;
 }
 
-function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selectedDistrict, onSelectDistrict, buyActions, developActions, reroll, busy, onAction }: {
+function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selectedDistrict, onSelectDistrict, buyActions, developActions, busy, onAction }: {
   game: GameState;
   meta: CityMeta;
   me: PlayerState;
@@ -420,13 +420,11 @@ function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selected
   developActions: Map<string, LegalAction>;
   onSelectDistrict: (id: string) => void;
   buyActions: Map<string, LegalAction>;
-  reroll?: LegalAction;
   busy: boolean;
   onAction: (action: LegalAction) => Promise<void>;
 }) {
   return <section className="city-map">
     <h2>Районы и рынок <small className="market-remaining">уникальных объектов в колоде: {game.market_deck_count}</small>
-      <button className="market-reroll" disabled={busy || !reroll} onClick={() => reroll && void onAction(reroll)} title={`Обновить сразу все шесть позиций рынка за ${marketRerollCost(meta)}$. Рынок общий: текущие предложения исчезают у всех игроков. Действие не расходуется, один реролл за ход.`}>🔄 Обновить рынок · {marketRerollCost(meta)}$</button>
     </h2>
     <div className="district-grid">{meta.districts.map(district => {
       const count = districtCount(viewed, district.id, assets);
@@ -661,7 +659,9 @@ function DecisionPanel({ game, me, meta, roles, districts, assets, legal, busy, 
           title={`Потратить 1 обычное действие и ${tier.spend}$, чтобы получить ${tier.gain}◆. Курс ухудшается с ростом ступени (${(tier.spend / tier.gain).toFixed(2)}$ за 1◆), зато одно действие приносит больше влияния. Влияние нужно для проектов и ролей.`}
         >📣 {tier.spend}$ → {tier.gain}◆</button>;
       })}</div>
-      <StaticAction action={find("reroll_market")} label={`🔄 Обновить рынок: ${marketRerollCost(meta)}$ + действие`} tooltip="Полностью сменить все шесть позиций рынка объектов, не дожидаясь ротации: 1 обычное действие и деньги, один раз за ход. Сам рынок и так обновляет три самые старые позиции в начале каждого раунда — эта кнопка для тех случаев, когда ждать нельзя." busy={busy} onAction={onAction} />
+      {/* The last resort of a full wallet: no slot, no card, and a rate deliberately worse than
+          an object or a project. A measured game ended with 1217$ on the table. */}
+      <StaticAction action={find("basic_action", item => item.payload.kind === "patronage")} label={`🎖️ Патронаж: ${patronage(meta).money}$ → ${patronage(meta).points} очка`} tooltip={`Потратить 1 обычное действие и ${patronage(meta).money}$, чтобы получить ${patronage(meta).points} очка в «Прочие очки». Слот не нужен, карта не нужна, но не больше одного раза за ход. Курс ${patronage(meta).money / patronage(meta).points}$ за очко — хуже объекта (половина цены в очках) и проекта, поэтому это сток для лишних денег, а не план на партию.`} busy={busy} onAction={onAction} />
       <StaticAction action={find("reroll_projects")} label={`🔄 Пересобрать доску проектов: ${projectRerollMoney(meta)}$ + действие`} tooltip={`Все четыре проекта возвращаются в колоду, колода перемешивается и раздаётся заново. Цена: ${projectRerollMoney(meta)}$ и 1 обычное действие, один раз за ход. Доска общая: она меняется у всех.`} busy={busy} onAction={onAction} />
       <StaticAction action={find("buy_capacity")} label={`📦 ${capacityLabel(me)}`} tooltip="Купить постоянный дополнительный слот бизнеса. Можно потратить обычное либо инвестиционное действие; максимум 6 слотов." busy={busy} onAction={onAction} />
     </div>

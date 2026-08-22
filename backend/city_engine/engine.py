@@ -26,11 +26,12 @@ from city_engine.constants import (
     JOURNALIST_SCANDAL_LIMIT,
     LAUNDERING_BASE_COST,
     LAUNDERING_BASE_GAIN,
-    MARKET_REROLL_COST,
     MARKET_ROTATION_SIZE,
     MAX_CAPACITY,
     MAX_REPEATABLE_PROJECTS,
     MONEY_PER_POINT,
+    PATRONAGE_MONEY,
+    PATRONAGE_POINTS,
     POINTS_CARD_RATE,
     PROJECT_BOARD_SIZE,
     PROJECT_REROLL_MONEY,
@@ -65,7 +66,6 @@ class CityEngine:
             "buy_capacity": self._buy_capacity,
             "buy_roof": self._buy_roof,
             "buy_asset": self._buy_asset,
-            "reroll_market": self._reroll_market,
             "reroll_projects": self._reroll_projects,
             "sell_asset": self._sell_asset,
             "develop_district": self._develop_district,
@@ -147,6 +147,8 @@ class CityEngine:
                 for spend in CAMPAIGN_TIERS
                 if player.money >= spend
             )
+            if player.money >= PATRONAGE_MONEY:
+                candidates.append(Command(type="basic_action", actor_id=actor_id, payload={"kind": "patronage"}))
             candidates.extend(
                 Command(type="city_project", actor_id=actor_id, payload={"project_id": project_id})
                 for project_id in [*state.project_board, *self.catalog.repeatable_project_ids()]
@@ -185,9 +187,6 @@ class CityEngine:
                 for district in DISTRICT_IDS
                 if self.district_count(player, district) >= 2 and player.district_levels[district] < 2
             )
-        # The reroll spends an action now, so it disappears once the turn is out of them.
-        if can_act and player.money >= MARKET_REROLL_COST:
-            candidates.append(Command(type="reroll_market", actor_id=actor_id))
         # The project re-deal spends an action now, so unlike the market reroll it disappears once
         # the turn is out of actions.
         if can_act and player.money >= PROJECT_REROLL_MONEY and state.project_deck:
@@ -563,11 +562,11 @@ class CityEngine:
         return deltas
 
     def _basic_action(self, state: GameState, command: Command) -> None:
-        """The two buttons that turn an action into a resource.
+        """The three buttons that turn an action into something else.
 
-        Campaign takes a tier: the action, not the money, was the real price of influence, so a
-        single 2$→2◆ rate capped every player at 2◆ per action no matter how rich they were. The
-        rates get worse as the tier grows, so a full wallet buys throughput, never a bargain.
+        Campaign buys influence, work buys the coins that round a purchase up, and patronage is the
+        floor of the money economy: the only unbounded way to turn cash into points without a slot
+        or a card. See ``PATRONAGE_MONEY`` for the 1217$ that motivated it.
         """
         kind = command.payload.get("kind")
         player = state.current_player
@@ -584,8 +583,19 @@ class CityEngine:
             player.money -= spend
             player.influence += CAMPAIGN_TIERS[spend]
             tier = {"spend": spend, "gain": CAMPAIGN_TIERS[spend]}
+        elif kind == "patronage":
+            if player.money < PATRONAGE_MONEY:
+                raise IllegalActionError(f"patronage requires {PATRONAGE_MONEY} money")
+            # Once a turn, or the biggest pile simply buys the game: unbounded, four expert bots
+            # pressed it 196 times in twelve games and the winner's margin went from 7.5 points to
+            # 13. A drip is a decision; a dump is a conversion rate with extra steps.
+            self._once_per_turn(state, "patronage")
+            self._spend_action(state)
+            player.money -= PATRONAGE_MONEY
+            player.bonus_points += PATRONAGE_POINTS
+            tier = {"spend": PATRONAGE_MONEY, "gain": PATRONAGE_POINTS}
         else:
-            raise InvalidCommandError("basic_action kind must be work or campaign")
+            raise InvalidCommandError("basic_action kind must be work, campaign or patronage")
         state.append_event(
             "basic_action",
             player.id,
@@ -818,34 +828,6 @@ class CityEngine:
         reduction = self.effect_total(player, "greyScandalReduction") if "grey" in asset.tags else 0
         self.add_scandal(state, player, max(0, raw_scandals - reduction))
         self._refill_market(state, 1)
-
-    def _reroll_market(self, state: GameState, command: Command) -> None:
-        """Money and an action into market quality, once per turn.
-
-        The market rotates three slots by itself every round now, so this button is the impatient
-        option rather than the only one — and the action is what makes impatience cost something.
-        """
-        player = state.current_player
-        if self._flag(state, "market_rerolled"):
-            raise IllegalActionError("the market has already been rerolled this turn")
-        if player.money < MARKET_REROLL_COST:
-            raise IllegalActionError("not enough money to reroll the market")
-        if not state.market and not state.market_deck:
-            raise IllegalActionError("there is nothing left to reroll")
-        self._spend_action(state)
-        self._mark_flag(state, "market_rerolled")
-        player.money -= MARKET_REROLL_COST
-        replaced = len(state.market)
-        state.market_deck.extend(item.card_id for item in state.market)
-        state.market = []
-        GameRNG(state.rng).shuffle(state.market_deck)
-        self._refill_market(state, replaced)
-        state.append_event(
-            "market_rerolled",
-            player.id,
-            cost=MARKET_REROLL_COST,
-            card_ids=[item.card_id for item in state.market],
-        )
 
     @staticmethod
     def _optional_payload_string(command: Command, key: str) -> str | None:

@@ -18,9 +18,9 @@ from city_engine.constants import (
     COMPROMAT_INFLUENCE,
     HACK_INFLUENCE_STEAL,
     INFLUENCE_PER_POINT,
-    MARKET_REROLL_COST,
     MAX_CAPACITY,
     MONEY_PER_POINT,
+    PATRONAGE_MONEY,
     POINTS_CARD_RATE,
 )
 from city_engine.engine import CityEngine
@@ -487,23 +487,19 @@ def _strategic_action_bonus(
         if payload.get("kind") == "work":
             # Money past what the board can absorb is 0.1 points a dollar.
             bonus -= 1.5 if player.money > 25 else 0.0
+        elif payload.get("kind") == "patronage":
+            # The points land in the score, so the plain utility already sees them; what it cannot
+            # see is that this is the *floor*. Take it when the board has nothing to give and the
+            # wallet is past what a purchase can absorb — never instead of a reachable project.
+            spare = player.money - profile.cash_comfort - PATRONAGE_MONEY
+            bonus += 1.5 if spare > 0 else -2.0
+            bonus -= 2.0 if _affordable_projects(engine, state, player) else 0.0
         else:
             bonus += 1.0 if _affordable_projects(engine, state, player) else 0.0
     elif action_type == "buy_capacity" and profile.planning:
         # An empty slot is worth the object that will fill it, and the bot has the money by now.
         best = max((engine.asset_value_of(item.card_id) for item in state.market), default=3)
         bonus += best * 0.8 + min(4.0, player.money / 25)
-    elif action_type == "reroll_market":
-        # Rerolling is for "I have money and the market has nothing", not for "I am broke" —
-        # the old rule rewarded exactly the useless case and bots burned 2$ at the end of a turn.
-        worst_owned = min((engine.asset_value(asset) for asset in player.assets), default=0)
-        upgrade_on_offer = any(
-            engine.asset_value_of(item.card_id) > worst_owned
-            and player.money >= engine.asset_price(state, player, item.card_id)
-            for item in state.market
-        )
-        spare = player.money >= MARKET_REROLL_COST + 5
-        bonus += 2.0 if spare and not upgrade_on_offer else -2.0
     elif action_type == "sell_asset":
         bonus += _sell_asset_bonus(engine, state, player, str(payload["asset_uid"]), profile)
     return bonus

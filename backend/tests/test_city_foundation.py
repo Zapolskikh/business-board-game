@@ -4,7 +4,6 @@ import pytest
 
 from city_engine.constants import (
     INFLUENCE_PER_POINT,
-    MARKET_REROLL_COST,
     MONEY_PER_POINT,
     PROJECT_BOARD_SIZE,
 )
@@ -105,7 +104,6 @@ def test_public_meta_ships_the_scoring_rates() -> None:
 
     assert scoring["money_per_point"] == MONEY_PER_POINT
     assert scoring["influence_per_point"] == INFLUENCE_PER_POINT
-    assert scoring["market_reroll_cost"] == MARKET_REROLL_COST
     assert scoring["project_board_size"] == PROJECT_BOARD_SIZE
 
 
