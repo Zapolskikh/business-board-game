@@ -17,8 +17,12 @@ from city_engine.constants import (
     CONTENT_VERSION,
     CRISIS_PR_INFLUENCE,
     DISTRICT_IDS,
+    GREY_OPERATION_POINTS,
+    GREY_OPERATION_POINTS_HARD,
     HACK_INFLUENCE_STEAL,
     INFLUENCE_PER_POINT,
+    INITIATIVE_SURCHARGE_INFLUENCE,
+    INITIATIVE_SURCHARGE_MONEY,
     LAUNDERING_BASE_COST,
     LAUNDERING_BASE_GAIN,
     LOBBYING_INFLUENCE,
@@ -225,6 +229,10 @@ class ContentCatalog:
             # Both sides of laundering scale with the round, so the client is given the formula.
             "laundering_base_cost": LAUNDERING_BASE_COST,
             "laundering_base_gain": LAUNDERING_BASE_GAIN,
+            "grey_operation_points": GREY_OPERATION_POINTS,
+            "grey_operation_points_hard": GREY_OPERATION_POINTS_HARD,
+            "initiative_surcharge_influence": INITIATIVE_SURCHARGE_INFLUENCE,
+            "initiative_surcharge_money": INITIATIVE_SURCHARGE_MONEY,
             "hack_influence_steal": HACK_INFLUENCE_STEAL,
             "compromat_influence": COMPROMAT_INFLUENCE,
         }

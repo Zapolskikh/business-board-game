@@ -190,6 +190,10 @@ export interface ScoringMeta {
   // Laundering scales on both sides: cost = base + ⌊раунд/2⌋, gain = base + ⌊раунд/3⌋.
   laundering_base_cost: number;
   laundering_base_gain: number;
+  grey_operation_points: number;
+  grey_operation_points_hard: number;
+  initiative_surcharge_influence: number;
+  initiative_surcharge_money: number;
   hack_influence_steal: number;
   compromat_influence: number;
 }

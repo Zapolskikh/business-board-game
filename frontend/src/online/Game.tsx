@@ -16,6 +16,7 @@ import {
   districtCount,
   forecastRows,
   greyOperationInfo,
+  greyOperationPoints,
   greyOperationDistricts,
   greyOperationLabels,
   lobbying,
@@ -702,7 +703,8 @@ function DecisionPanel({ game, me, meta, roles, districts, assets, legal, busy, 
       const variants = all("grey_operation", action => action.payload.asset_id === assetId);
       const info = greyOperationInfo[assetId];
       const effect = info.effect(game.round_number, meta);
-      return <button className="described-action" disabled={busy || variants.length === 0} onClick={() => onOffer(label, variants)} title={`Открывает любой активный объект районов: ${(greyOperationDistricts[assetId] ?? []).map(id => districts.get(id)?.title ?? id).join(", ")}. Эффект при успехе: ${effect}. Базовый шанс успеха ${info.chance}%; у Афериста он может быть выше. ${info.failure} Страховка при провале тратит 1 Крышу и отменяет денежный либо объектный штраф, но скандалы всё равно начисляются и действие расходуется.`} key={assetId}><strong>{label}</strong><small>{variants.length ? `${effect} · шанс от ${info.chance}%` : greyRequirement(assetId)}</small></button>;
+      const points = greyOperationPoints(meta, assetId);
+      return <button className="described-action" disabled={busy || variants.length === 0} onClick={() => onOffer(label, variants)} title={`Открывает любой активный объект районов: ${(greyOperationDistricts[assetId] ?? []).map(id => districts.get(id)?.title ?? id).join(", ")}. Эффект при успехе: ${effect}, плюс ${points} очка в финальный счёт — провал не приносит ничего. Базовый шанс успеха ${info.chance}%; у Афериста он может быть выше. ${info.failure} Страховка при провале тратит 1 Крышу и отменяет денежный либо объектный штраф, но скандалы всё равно начисляются и действие расходуется.`} key={assetId}><strong>{label}</strong><small>{variants.length ? `${effect} · +${points} очк · шанс ${info.chance}%` : greyRequirement(assetId)}</small></button>;
     })}</details>
 
     <div className="action-group g-defence"><h3 className="group-title">🛡️ Защита и репутация</h3><StaticAction action={cleanupAction} label={cleanup.label} tooltip={cleanup.tooltip} busy={busy} onAction={onAction} /><StaticAction action={find("buy_roof")} label={`🛡️ Купить Крышу (${roofCost(me, game)}$)`} tooltip={`Потратить 1 обычное действие и ${roofCost(me, game)}$. Цена растёт на 1$ каждые два раунда. Крыша — единственная защита в игре: она гасит направленный на вас эффект другого игрока (карту, рэкет, санкцию, взлом), попытку отобрать роль и любое начисление скандалов целиком. Последствия ваших собственных решений она не отменяет, но может застраховать провал вашей серой операции. Лимит 2, у Мафиози 3.`} busy={busy} onAction={onAction} /></div>

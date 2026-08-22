@@ -171,7 +171,13 @@ def _payload_hint(action: dict[str, Any], game: dict[str, Any], me: dict[str, An
         if str(payload["power"]) in FREE_POWERS:
             bits.append("действие не расходуется")
     if payload.get("asset_id") and action["type"] == "grey_operation":
-        bits.append(GREY_LABELS.get(str(payload["asset_id"]), str(payload["asset_id"])))
+        asset_id = str(payload["asset_id"])
+        bits.append(GREY_LABELS.get(asset_id, asset_id))
+        hard = asset_id in {"datacenter", "influence_broker"}
+        points = catalog.scoring.get(
+            "grey_operation_points_hard" if hard else "grey_operation_points", 5 if hard else 3
+        )
+        bits.append(f"+{points} {'очков' if points >= 5 else 'очка'} при успехе, при провале ничего")
     if payload.get("target_id"):
         bits.append(f"→ {player_name(game, payload['target_id'])}")
     if payload.get("district"):

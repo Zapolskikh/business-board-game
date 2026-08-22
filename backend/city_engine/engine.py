@@ -2220,9 +2220,7 @@ class CityEngine:
             )
             # Динамическая строка: значение меняется каждый ход вместе с местом в рейтинге.
             # Без неё камбэк был невидим — он растворялся в общей дельте события.
-            place = next(
-                index for index, ranked in enumerate(self.ranking(state), start=1) if ranked.id == player.id
-            )
+            place = next(index for index, ranked in enumerate(self.ranking(state), start=1) if ranked.id == player.id)
             rows.append(
                 {
                     "key": "fraudster_comeback",

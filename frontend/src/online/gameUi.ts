@@ -58,31 +58,39 @@ export const greyOperationDistricts: Record<string, string[]> = {
   influence_broker: ["shadows", "government"],
 };
 
+// Points for a successful operation: the same two that cost two scandals pay the higher score.
+// Mirrors `CityEngine.grey_operation_points`.
+export function greyOperationPoints(meta: CityMeta, operationId: string): number {
+  const hard = meta.scoring?.grey_operation_points_hard ?? 5;
+  const plain = meta.scoring?.grey_operation_points ?? 3;
+  return operationId === "datacenter" || operationId === "influence_broker" ? hard : plain;
+}
+
 export const greyOperationInfo: Record<string, { asset: string; effect: (round: number, meta: CityMeta) => string; chance: number; failure: string }> = {
   cash: {
     asset: "Сеть наличных обменников",
     // Both sides scale with the round: a flat gain against a growing stake made the operation
     // strictly worse than the top campaign tier, and then nobody ever ran it.
     effect: (round, meta) => `${launderingCost(meta, round)}$ → ${launderingGain(meta, round)}◆`,
-    chance: 80,
+    chance: 65,
     failure: "Единственный неограниченный способ превратить лишние деньги во влияние, и с ростом раунда курс становится лучше, чем у кампании. При успехе: +1 скандал. При провале ставка теряется, влияния нет. Скандалы при провале: Аферист +1, остальные +2. На 5 скандалах теряется роль, на 6 — тюрьма.",
   },
   market: {
     asset: "Ночной рынок",
     effect: round => `украсть у цели до ${3 + Math.floor(round / 2)}$`,
-    chance: 70,
+    chance: 55,
     failure: "Крыша цели тратится и полностью отменяет кражу. При успехе: +1 скандал. При провале теряется Крыша, если она есть. Скандалы: Аферист +1, остальные +2. На 5 скандалах теряется роль, на 6 — тюрьма.",
   },
   crypto: {
     asset: "Городская криптобиржа",
     effect: round => `получить ${6 + round}$ и лишить лидера до ${2 + Math.floor(round / 2)}$`,
-    chance: 60,
+    chance: 45,
     failure: "Свой доход вы получаете всегда, но Крыша лидера тратится и отменяет списание с него. При успехе: +2 скандала. При провале: −5$, а жетон автоматизации на криптобирже выключается до выплаты раунда. Скандалы при провале: Аферист +1, остальные +3. На 5 скандалах теряется роль, на 6 — тюрьма.",
   },
   datacenter: {
     asset: "Нелегальный дата-центр",
     effect: (_round, meta) => `украсть у цели до ${meta.scoring?.hack_influence_steal ?? 4}◆`,
-    chance: 55,
+    chance: 40,
     failure: "Крыша цели тратится и полностью отменяет кражу. При успехе: +2 скандала. При провале: −2◆. Скандалы при провале: Аферист +1, остальные +3. На 5 скандалах теряется роль, на 6 — тюрьма.",
   },
   influence_broker: {
@@ -691,7 +699,7 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       if (target) tail.push(txt(" → "), playerSeg(game, targetId));
       tail.push(txt(": "), data.success ? num("успех", "good") : num("провал", "bad"), txt(` (${chance}%)`));
       const points = numberValue(data.points);
-      if (points) tail.push(txt(" "), num(`+${points} очков`, "good"));
+      if (points) tail.push(txt(" "), num(`+${points} ${points >= 5 ? "очков" : "очка"}`, "good"));
       return lead(...tail, ...deltas);
     }
     case "role_power_used": {

@@ -3,6 +3,10 @@ from __future__ import annotations
 import pytest
 
 from city_engine.constants import (
+    GREY_OPERATION_POINTS,
+    GREY_OPERATION_POINTS_HARD,
+    INITIATIVE_SURCHARGE_INFLUENCE,
+    INITIATIVE_SURCHARGE_MONEY,
     LOBBYING_INFLUENCE,
     LOBBYING_POINTS,
     PATRONAGE_MONEY,
@@ -104,6 +108,10 @@ def test_public_meta_ships_the_scoring_rates() -> None:
     """Clients print "N$ = 1 очко" from here; hardcoding it on either side would drift."""
     scoring = load_catalog().public_meta()["scoring"]
 
+    assert scoring["grey_operation_points"] == GREY_OPERATION_POINTS
+    assert scoring["grey_operation_points_hard"] == GREY_OPERATION_POINTS_HARD
+    assert scoring["initiative_surcharge_influence"] == INITIATIVE_SURCHARGE_INFLUENCE
+    assert scoring["initiative_surcharge_money"] == INITIATIVE_SURCHARGE_MONEY
     assert scoring["patronage_money"] == PATRONAGE_MONEY
     assert scoring["patronage_points"] == PATRONAGE_POINTS
     assert scoring["lobbying_influence"] == LOBBYING_INFLUENCE
