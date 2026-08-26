@@ -35,20 +35,20 @@ FREE_ACTION_TYPES = frozenset(
     }
 )
 # Every scandal cleanup costs an action now — the action *is* the limit, in place of the hidden
-# once-per-turn counters. The journalist's two powers are the only ones still free.
+# once-per-turn counters. Only the journalist's one-scandal story is still free; publication costs
+# an action and lands two scandals.
 FREE_POWERS = frozenset(
     {
         "journalist_inflate",
-        "journalist_publish",
     }
 )
 
 GREY_LABELS = {
-    "cash": "отмывание: за деньги получить влияние",
-    "market": "контрабанда: украсть деньги у цели",
-    "crypto": "памп и дамп: деньги и удар по лидеру",
+    "smear": "вброс: скандал каждому сопернику",
+    "crypto": "памп и дамп: забрать деньги у всех соперников",
+    "roof_break": "пробить крышу: снять всю защиту цели",
     "datacenter": "взлом: украсть влияние у цели",
-    "influence_broker": "слив компромата: снять роль с цели (раз в раунд, Крыша гасит)",
+    "influence_broker": "слив компромата: снять роль с цели",
 }
 
 CAPACITY_COSTS = {3: 6, 4: 10, 5: 15}
@@ -173,10 +173,13 @@ def _payload_hint(action: dict[str, Any], game: dict[str, Any], me: dict[str, An
     if payload.get("asset_id") and action["type"] == "grey_operation":
         asset_id = str(payload["asset_id"])
         bits.append(GREY_LABELS.get(asset_id, asset_id))
-        hard = asset_id in {"datacenter", "influence_broker"}
-        points = catalog.scoring.get(
-            "grey_operation_points_hard" if hard else "grey_operation_points", 5 if hard else 3
-        )
+        point_table = catalog.scoring.get("grey_operation_points")
+        if isinstance(point_table, dict):
+            points = int(point_table.get(asset_id, 0))
+        else:
+            # Compatibility with servers before the per-operation scoring table.
+            hard = asset_id in {"datacenter", "influence_broker"}
+            points = int(catalog.scoring.get("grey_operation_points_hard" if hard else "grey_operation_points", 3))
         bits.append(f"+{points} {'очков' if points >= 5 else 'очка'} при успехе, при провале ничего")
     if payload.get("target_id"):
         bits.append(f"→ {player_name(game, payload['target_id'])}")

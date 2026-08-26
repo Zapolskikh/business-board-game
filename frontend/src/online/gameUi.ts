@@ -110,7 +110,7 @@ export const greyOperationInfo: Record<string, { asset: string; effect: (round: 
 // checks a card id (`engine.py:1597`); the racket and the paid cleanup check a district
 // (`engine.py:1459`, `engine.py:1497`), so there every object of that district is the key.
 const assetGatedPowers: { power: string; role: string; asset?: string; district?: string; detail: string }[] = [
-  { power: "fraudster_crypto_scam", role: "fraudster", asset: "crypto", detail: "отобрать сумму у всех соперников" },
+  { power: "fraudster_crypto_scam", role: "fraudster", asset: "crypto", detail: "забрать 25% денег у всех соперников" },
   { power: "mafia_racket", role: "mafia", district: "shadows", detail: "дань с выбранного соперника" },
   { power: "mafia_cleanup", role: "mafia", district: "government", detail: "снять до 2 скандалов за 3$" },
 ];

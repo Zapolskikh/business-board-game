@@ -6,6 +6,8 @@ from city_engine.commands import Command
 from city_engine.constants import (
     CAMPAIGN_TIERS,
     CASH_TO_INFLUENCE_MONEY,
+    CRYPTO_SCAM_SCANDALS,
+    CRYPTO_SCAM_SHARE,
     GREY_FAILURE_SCANDALS,
     GREY_OPERATION_CHANCE,
     GREY_OPERATION_POINTS,
@@ -17,6 +19,7 @@ from city_engine.constants import (
     MONEY_PER_POINT,
     PATRONAGE_MONEY,
     PATRONAGE_POINTS,
+    POINTS_CARD_RATE,
     PROJECT_BOARD_SIZE,
     PROJECT_REROLL_MONEY,
     ROOF_BREAK_POINT_PER_ROOF,
@@ -126,6 +129,22 @@ def test_discarding_a_card_returns_two_units() -> None:
     assert not state.current_player.hand
 
 
+def test_point_cards_are_a_better_rate_than_the_always_available_patronage() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    held = give_card(state, player, "scholarship")
+    card = engine.action_card("scholarship")
+    price = card.value * POINTS_CARD_RATE
+    player.money = price
+
+    state = run(engine, state, "play_action_card", {"card_uid": held.uid})
+
+    assert state.current_player.money == 0
+    assert state.current_player.bonus_points == card.value
+    assert price / card.value < PATRONAGE_MONEY / PATRONAGE_POINTS
+
+
 def test_only_one_card_may_be_discarded_per_turn() -> None:
     engine = CityEngine()
     state = make_state()
@@ -200,9 +219,7 @@ def test_object_income_is_flat_and_nothing_multiplies_it() -> None:
     first = give_asset(state, player, "delivery")  # 2$
     second = give_asset(state, player, "media")  # 1$
     printed = engine.owned_definition(first).income + engine.owned_definition(second).income
-    synergy = engine.object_synergy_income(state, player, first) + engine.object_synergy_income(
-        state, player, second
-    )
+    synergy = engine.object_synergy_income(state, player, first) + engine.object_synergy_income(state, player, second)
 
     assert engine._round_income(state, player) == printed + synergy
 
@@ -982,6 +999,74 @@ def test_the_fraudster_bonus_is_flat_and_needs_no_tech_object() -> None:
     assert resolved.data["chance"] == pytest.approx(0.9)
 
 
+def test_crypto_scam_is_one_fixed_quarter_wallet_command() -> None:
+    engine = CityEngine()
+    state = make_state()
+    actor = state.current_player
+    actor.role = "fraudster"
+    actor.scandals = 0
+    give_asset(state, actor, "crypto")
+    target = rival_of(state, actor)
+    target.money = 101
+    target.roofs = 0
+
+    offers = [
+        action
+        for action in engine.legal_actions(state, actor.id)
+        if action["type"] == "use_role_power" and action["payload"].get("power") == "fraudster_crypto_scam"
+    ]
+    assert offers == [{"type": "use_role_power", "payload": {"power": "fraudster_crypto_scam"}}]
+
+    state = run(engine, state, "use_role_power", {"power": "fraudster_crypto_scam"})
+
+    taken = 101 * CRYPTO_SCAM_SHARE // 100
+    assert state.player_by_id(target.id).money == 101 - taken
+    assert state.current_player.money == 10 + taken
+    assert state.current_player.scandals == CRYPTO_SCAM_SCANDALS
+    assert state.current_player.role is None  # five scandals consume the unprepared role
+
+
+def test_crypto_scam_respects_roofs_and_stacked_reduction() -> None:
+    engine = CityEngine()
+    state = make_state()
+    actor = state.current_player
+    actor.role = "fraudster"
+    actor.scandals = 0
+    give_asset(state, actor, "crypto")
+    give_asset(state, actor, "offshore")
+    for project_id in ("night_quarter", "shadow_market"):
+        state.project_board = [item for item in state.project_board if item != project_id]
+        state.project_deck = [item for item in state.project_deck if item != project_id]
+        actor.projects.append(project_id)
+    target = rival_of(state, actor)
+    target.money = 100
+    target.roofs = 1
+
+    state = run(engine, state, "use_role_power", {"power": "fraudster_crypto_scam"})
+
+    assert state.player_by_id(target.id).money == 100
+    assert state.player_by_id(target.id).roofs == 0
+    assert state.current_player.scandals == CRYPTO_SCAM_SCANDALS - 3
+    assert state.current_player.role == "fraudster"
+
+
+def test_stacked_grey_reduction_can_make_a_failed_operation_free() -> None:
+    engine = CityEngine()
+    state = make_state()
+    actor = state.current_player
+    give_asset(state, actor, "cash")
+    give_asset(state, actor, "offshore")
+    for project_id in ("night_quarter", "shadow_market"):
+        state.project_board = [item for item in state.project_board if item != project_id]
+        state.project_deck = [item for item in state.project_deck if item != project_id]
+        actor.projects.append(project_id)
+    state.rng.state = 100_000
+
+    state = run(engine, state, "grey_operation", {"asset_id": "smear"})
+
+    assert state.current_player.scandals == 0
+
+
 def test_hacking_takes_influence_instead_of_blocking_an_object() -> None:
     engine = CityEngine()
     state = make_state()
@@ -1190,6 +1275,26 @@ def test_taking_a_project_pays_points_and_denies_it_to_everybody_else() -> None:
         for action in engine.legal_actions(state, player.id)
         if action["type"] == "city_project"
     )
+
+
+def test_multiple_city_projects_can_be_taken_per_turn() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    put_on_board(state, "art_museum")
+    put_on_board(state, "charity_fund")
+    project_id = "charity_fund"
+    player.money = 100
+    player.influence = 100
+
+    state = run(engine, state, "city_project", {"project_id": "art_museum"})
+
+    assert any(
+        action["type"] == "city_project" and action["payload"].get("project_id") == project_id
+        for action in engine.legal_actions(state, player.id)
+    )
+    state = run(engine, state, "city_project", {"project_id": project_id})
+    assert {"art_museum", project_id}.issubset(state.current_player.projects)
 
 
 def test_project_condition_is_enforced() -> None:

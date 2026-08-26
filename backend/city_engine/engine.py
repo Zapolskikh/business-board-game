@@ -18,6 +18,8 @@ from city_engine.constants import (
     CARD_DISCARD_VALUE,
     CASH_TO_INFLUENCE_MONEY,
     CRISIS_PR_INFLUENCE,
+    CRYPTO_SCAM_SCANDALS,
+    CRYPTO_SCAM_SHARE,
     DISTRICT_IDS,
     FRAUDSTER_GREY_BONUS,
     GREY_FAILURE_SCANDALS,
@@ -326,13 +328,12 @@ class CityEngine:
                     payload={"power": "fraudster_cleanup"},
                 )
             )
-            candidates.extend(
+            candidates.append(
                 Command(
                     type="use_role_power",
                     actor_id=actor_id,
-                    payload={"power": "fraudster_crypto_scam", "amount": amount},
+                    payload={"power": "fraudster_crypto_scam"},
                 )
-                for amount in range(1, 7)
             )
         return candidates
 
@@ -522,6 +523,14 @@ class CityEngine:
         )
         perks = sum(self.project(project_id).perk.get(key, 0) for project_id in player.projects)
         return assets + perks
+
+    def grey_scandal_reduction(self, player: PlayerState) -> int:
+        """Return the effective reduction for self-inflicted grey scandals.
+
+        Objects and projects deliberately stack: assembling several pieces is a visible engine and
+        earns the player the ability to make ordinary grey operations safe.
+        """
+        return self.effect_total(player, "greyScandalReduction")
 
     def roof_limit(self, player: PlayerState) -> int:
         """How many Крыша tokens a player may hold at once.
@@ -1428,23 +1437,22 @@ class CityEngine:
         self._once_per_turn(state, "fraudster_crypto_scam")
         if not any(asset.card_id == "crypto" and not asset.blocked for asset in player.assets):
             raise IllegalActionError("crypto scam requires an active crypto exchange")
-        try:
-            amount = int(command.payload.get("amount", 1))
-        except (TypeError, ValueError) as exc:
-            raise InvalidCommandError("crypto scam amount must be an integer") from exc
-        if not 1 <= amount <= 6:
-            raise InvalidCommandError("crypto scam amount must be between 1 and 6")
+        if "amount" in command.payload:
+            raise InvalidCommandError("crypto scam has no selectable amount")
         self._spend_action(state)
         gained = 0
         for target in state.players:
             if target.id == player.id:
                 continue
-            taken = min(amount, target.money)
+            if target.roofs > 0:
+                target.roofs -= 1
+                state.append_event("targeted_effect_blocked", target.id, power="fraudster_crypto_scam", by="roof")
+                continue
+            taken = target.money * CRYPTO_SCAM_SHARE // 100
             target.money -= taken
             gained += taken
         player.money += gained
-        reduction = self.effect_total(player, "greyScandalReduction")
-        self.add_scandal(state, player, max(0, amount - reduction))
+        self.add_scandal(state, player, max(0, CRYPTO_SCAM_SCANDALS - self.grey_scandal_reduction(player)))
 
     # Every operation used to demand one exact card out of 71 — which also had to hold one of the
     # six slots. Compare the racket, which asks for *any* Серый сектор object: 11 uses in a single
@@ -1567,7 +1575,7 @@ class CityEngine:
         A Крыша never touches these: the scandal is the player's own doing, and add_scandal is the
         line where that rule lives.
         """
-        self.add_scandal(state, player, max(0, amount - self.effect_total(player, "greyScandalReduction")))
+        self.add_scandal(state, player, max(0, amount - self.grey_scandal_reduction(player)))
 
     def _resolve_grey_success(
         self,

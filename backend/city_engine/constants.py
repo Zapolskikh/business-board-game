@@ -42,7 +42,12 @@ SCHEMA_VERSION = 1
 # one card; the asset market rotates its three oldest slots once a round; cards can buy points
 # outright. Snapshots taken under 1.3.x describe a game with different rules, so state validation
 # rejects them — old rooms will not open.
-RULES_VERSION = "city-1.7.0"
+RULES_VERSION = "city-1.8.0"
+# 1.8.0: the fraudster's crypto scam finally follows the rule printed on the role card: one
+# command takes 25% of every unprotected rival wallet and always creates five scandals.  The old
+# implementation exposed six flat amounts (1..6), which let a one-point reduction turn amount=1
+# into a free, repeatable table-wide drain.  Reduction perks remain deliberately stackable: their
+# payoff is the reward for assembling a specialised grey engine.
 # 1.7.0: district development is deleted outright — object income is the printed number plus
 # synergies, with no `ceil(base × 1.25)` per level. `district_levels` leaves the player state, so a
 # 1.6.0 snapshot describes a board this engine cannot score. Repeatable projects and their
@@ -64,7 +69,10 @@ RULES_VERSION = "city-1.7.0"
 # «деньги → очки» family and «Предписание о демонтаже» (takes a development level); the two defence
 # cards now hand out the same Крыша as the third; the two projects that required automation ask for
 # tagged objects instead. The events array is gone from the catalog entirely.
-CONTENT_VERSION = "city-content-2026-08-26a"
+CONTENT_VERSION = "city-content-2026-08-26b"
+# 2026-08-26b: point-buying action cards are the premium money sink again.  Their 5$/point rate
+# was strictly worse than the always-available 20$ -> 5 point patronage button, despite first
+# costing a blind draw, 3$, 1 influence and an action.  The card rate is now 3$/point.
 
 DISTRICT_IDS = (
     "residential",
@@ -184,7 +192,8 @@ GREY_FAILURE_SCANDALS = 2
 # The turn flag is spent on the attempt, not the hit — see _grey_operation.
 GREY_OPERATION_FLAG = "grey_operation_used"
 # The crypto scam takes this share of every rival's cash and hands the fraudster five scandals —
-# its entire scandal budget. Bare, the role loses itself; with two reduction perks it survives.
+# its entire scandal budget. Bare, the role loses itself; stacked reduction perks can make the
+# prepared strategy safe. A roof protects its owner's wallet, just like from the ordinary pump.
 CRYPTO_SCAM_SHARE = 25
 CRYPTO_SCAM_SCANDALS = 5
 # What the racket adds when its target is leading the table. The rest of the demand comes from the
@@ -219,7 +228,7 @@ ACTION_CARD_COST = 3
 # hoarded point (10$), and it needs no slot — which is the whole point. Six slots cap the object
 # channel, so a full tableau had nowhere to put money: two measured matches ended with 248$ and 864$
 # unspent across the table, 24 and 86 points nobody made a decision about.
-POINTS_CARD_RATE = 5
+POINTS_CARD_RATE = 3
 # What discarding a card returns, so a bad draw is not a dead 3$.
 CARD_DISCARD_VALUE = 2
 # What the tax manoeuvre pays to run money into influence. It has to beat the discard — a card that

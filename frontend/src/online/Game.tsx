@@ -76,12 +76,12 @@ const rolePowers: Record<string, string[]> = {
 const powerDescriptions: Record<string, string> = {
   politician_cleanup: "За 1 действие: потратить 2◆ и снять 1 свой скандал. Ограничения по числу применений нет — только действия.",
   journalist_inflate: "Действие не расходуется, один раз за ход: вы и выбранный соперник получаете по 1 скандалу. У Журналиста порог сдвинут: роль теряется на 6 скандалах, тюрьма на 7 — у всех остальных на 5 и 6.",
-  journalist_publish: "Действие не расходуется, один раз за ход: потратить 3◆ и дать выбранному сопернику 1 скандал.",
+  journalist_publish: "Один раз за ход и за 1 действие: потратить 3◆ и дать выбранному сопернику 2 скандала. Крыша цели поглощает публикацию.",
   mafia_racket: "Один раз за ход и за 1 действие: нужен активный объект Серого сектора. Базово отбирает до 2$, сумма растёт от раунда, ваших объектов и лидерства цели; её Крыша отменяет рэкет.",
   mafia_cleanup: "За 1 действие: 3$ и активный административный объект — снять до 2 своих скандалов.",
-  military_sanction: "Один раз за ход и за 1 действие: цель должна иметь минимум 2 скандала. Снимает ей скандал и взыскивает деньги либо объект; Крыша принимает удар.",
+  military_sanction: "Один раз за ход и за 1 действие: цель должна иметь минимум 2 скандала. На 2⚠ забирает деньги, на 3⚠ ещё и влияние, на 4⚠ также снимает роль. Скандалы цели не очищает; Крыша принимает весь удар.",
   fraudster_cleanup: "За 1 действие снять 1 свой скандал.",
-  fraudster_crypto_scam: "Один раз за ход и за 1 действие: нужна активная Городская криптобиржа. Украсть у каждого соперника выбранную сумму и получить столько же скандалов (Аферист — на 1 меньше со снижением). Внимание: на 5 скандалах теряется роль, на 6 — тюрьма (пропуск хода), поэтому большая сумма может вас посадить.",
+  fraudster_crypto_scam: "Один раз за ход и за 1 действие: нужна активная Городская криптобиржа. Забрать 25% денег у каждого соперника без Крыши и получить 5 скандалов. Все собранные эффекты снижения скандалов складываются. Без такой подготовки Аферист сразу теряет роль.",
 };
 
 export function Game({ roomId, password, playerId, meta, onExit }: Props) {
@@ -329,7 +329,7 @@ function ProjectBoard({ game, meta, me, projects, actions, reroll, busy, onActio
     <h2>🏗️ Городские проекты <small>главный источник очков · в колоде ещё {game.project_deck_count} · один проект уходит под низ колоды каждый раунд</small>
       <button className="market-reroll" disabled={busy || !reroll} onClick={() => reroll && void onAction(reroll)} title={`Все четыре проекта уходят обратно в колоду, колода перемешивается и раздаётся заново. Цена: ${projectRerollMoney(meta)}$ и 1 обычное действие, один раз за ход. Цена в деньгах, а не в влиянии: влияние — это то, чем сами проекты и покупаются. Доска общая: она меняется у всех, в том числе у того, кто уже собрал условие под лежащий на ней проект.`}>🔄 Пересобрать доску · {projectRerollMoney(meta)}$ + ⚡</button>
     </h2>
-    <p className="dim card-rule">Проект уникален: кто взял — тот и забрал очки, остальным он больше недоступен. Взятие стоит 1 обычное действие, влияние и деньги; условие проверяется по вашим объектам.</p>
+    <p className="dim card-rule">Проект уникален: кто взял — тот и забрал очки, остальным он больше недоступен. Взятие стоит 1 обычное действие, влияние и деньги; условие проверяется по вашим объектам. Если ресурсов и действий хватает, за ход можно забрать несколько проектов.</p>
     <div className="project-grid">{game.project_board.map((projectId, index) => {
       const project = projects.get(projectId);
       if (!project) return null;
@@ -652,7 +652,7 @@ function DecisionPanel({ game, me, meta, roles, districts, assets, legal, busy, 
       return <button className="described-action" disabled={busy || variants.length === 0} onClick={() => onOffer(label, variants)} title={`Открывает любой активный объект районов: ${(greyOperationDistricts[assetId] ?? []).map(id => districts.get(id)?.title ?? id).join(", ")}. При успехе (базовый шанс ${info.chance}%, у Афериста выше): ${effect}, плюс ${points} очка в финальный счёт и ${successScandals} скандал себе. При провале не происходит ничего, а скандалов ${failureScandals}. Действие тратится в обоих случаях, и за ход доступна только одна операция. Свои скандалы Крыша не гасит. ${info.failure}`} key={assetId}><strong>{label}</strong><small>{variants.length ? `${effect} · +${points} очк · шанс ${info.chance}%` : greyRequirement(assetId)}</small></button>;
     })}</details>
 
-    <div className="action-group g-defence"><h3 className="group-title">🛡️ Защита и репутация</h3><StaticAction action={cleanupAction} label={cleanup.label} tooltip={cleanup.tooltip} busy={busy} onAction={onAction} /><StaticAction action={find("buy_roof")} label={`🛡️ Купить Крышу (${roofCost(me, game)}$)`} tooltip={`Потратить 1 обычное действие и ${roofCost(me, game)}$. Цена растёт на 1$ каждые два раунда. Крыша — единственная защита в игре: она гасит направленный на вас эффект другого игрока (карту, рэкет, санкцию, взлом), попытку отобрать роль и любое начисление скандалов целиком. Последствия ваших собственных решений она не отменяет, но может застраховать провал вашей серой операции. Лимит 2, у Мафиози 3.`} busy={busy} onAction={onAction} /></div>
+    <div className="action-group g-defence"><h3 className="group-title">🛡️ Защита и репутация</h3><StaticAction action={cleanupAction} label={cleanup.label} tooltip={cleanup.tooltip} busy={busy} onAction={onAction} /><StaticAction action={find("buy_roof")} label={`🛡️ Купить Крышу (${roofCost(me, game)}$)`} tooltip={`Потратить 1 обычное действие и ${roofCost(me, game)}$. Цена растёт на 1$ каждые два раунда. Крыша — единственная защита в игре: она гасит направленный на вас эффект другого игрока (карту, рэкет, санкцию, взлом), попытку отобрать роль и любое начисление скандалов целиком. Последствия ваших собственных решений, включая провал серой операции, она не отменяет. Лимит 2, у Мафиози 3.`} busy={busy} onAction={onAction} /></div>
     <button className="end-turn" disabled={busy || !endTurn} onClick={() => endTurn && void onAction(endTurn)} title="Завершить текущий ход. Неиспользованные обычные действия пропадут, кроме разрешённого переносимого действия; затем сервер выполнит ходы ботов.">✅ Завершить ход</button>
   </aside>;
 }

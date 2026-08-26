@@ -242,7 +242,13 @@ def _position_value(
     # ever owned the compromat trader or the illegal datacentre, so two of the five grey operations
     # were unreachable rather than mispriced.
     recurring = engine._round_income(state, player) + engine.passive_influence(player) * profile.influence_weight
-    scandal_risk = player.scandals**2 * profile.risk_penalty
+    # One or two scandals are ordinary score loss, already present in the engine score.  The extra
+    # risk term is only for the danger zone near role loss.  Squaring the whole counter made an
+    # expert spend 19 actions and scarce influence cleaning from 2 -> 1 in one measured game,
+    # then finish with 180$ and too little influence for projects.
+    safe_scandals = max(0, engine.scandal_limit(player) - 3)
+    scandal_pressure = max(0, player.scandals - safe_scandals)
+    scandal_risk = scandal_pressure**2 * profile.risk_penalty
     defence = player.roofs * profile.defence
     role_value = _role_position_value(engine, state, player, player.role, profile)
     hand_value = sum(_card_value(engine, card.card_id, player) for card in player.hand) * 0.35
@@ -259,9 +265,14 @@ def _position_value(
     # scores more sitting in the wallet at 0.1 points a dollar than it does converted. That is a
     # statement about the scoring rate and the width of the board, not about the policy.
     cash_drag = max(0, player.money - profile.cash_comfort) * profile.cash_drag * profile.planning
+    # The quantum centre's printed income is zero, so a pure income horizon misses its defining
+    # effect.  It grants no action on the purchase turn, only on future turns.
+    future_turns = min(profile.horizon, max(0, state.max_rounds - state.round_number))
+    extra_action_value = min(1, engine.effect_total(player, "extraActions")) * future_turns * 1.8
     return (
         _score_function(engine, profile)(player)
         + recurring * horizon * 0.55
+        + extra_action_value
         + defence
         + role_value
         + hand_value
@@ -477,7 +488,10 @@ def _strategic_action_bonus(
         # action to drop scandals. Bonusing only the basic button made the cheaper power look worse
         # than the dearer one — measured in a live 15-round game, a fraudster bot ran the 3◆ PR
         # fifteen times and its own free cleanup three, burning 45◆ (fifteen points) on nothing.
-        bonus += player.scandals * profile.defence
+        safe_scandals = max(0, engine.scandal_limit(player) - 3)
+        bonus += max(0, player.scandals - safe_scandals) * profile.defence
+        if player.scandals <= safe_scandals:
+            bonus -= 1.0
     elif action_type == "buy_roof":
         if player.role is not None:
             # A held role is three points plus its passive, and this token is the only thing that
@@ -629,8 +643,32 @@ def _grey_operation_utility(
             success_value += denial + seat
     # One scandal for a hit, two for a miss — the same trade for every operation in the set, which
     # is what makes the layer paced by the scandal limit rather than by the price of each line.
-    scandal_cost = (chance * GREY_SUCCESS_SCANDALS + (1 - chance) * GREY_FAILURE_SCANDALS) * profile.risk_penalty
-    return chance * success_value - scandal_cost
+    reduction = engine.grey_scandal_reduction(player)
+    expected_scandals = chance * max(0, GREY_SUCCESS_SCANDALS - reduction) + (1 - chance) * max(
+        0, GREY_FAILURE_SCANDALS - reduction
+    )
+    scandal_cost = expected_scandals * profile.risk_penalty
+
+    def threshold_penalty(added: int) -> float:
+        resulting = player.scandals + added
+        limit = engine.scandal_limit(player)
+        penalty = 0.0
+        if resulting >= limit and player.role is not None:
+            # Three printed points plus the passive the bot already knows how to value.
+            # Losing the role is not just the three printed points: the seat and its passive are
+            # gone until another action and a much higher takeover price can win them back.  A
+            # majority of the role utility is therefore a real immediate consequence, while the
+            # remaining discount keeps a decisive late-game attack available when it can win now.
+            penalty += 4.5 + _role_utility(engine, state, player, player.role) * 0.6
+        if resulting >= limit + 1:
+            # Jail ends the current turn immediately, so every action after this attempt burns.
+            penalty += 2.0 + max(0, state.actions_left - 1) * 1.5
+        return penalty
+
+    success_added = max(0, GREY_SUCCESS_SCANDALS - reduction)
+    failure_added = max(0, GREY_FAILURE_SCANDALS - reduction)
+    consequence_cost = chance * threshold_penalty(success_added) + (1 - chance) * threshold_penalty(failure_added)
+    return chance * success_value - scandal_cost - consequence_cost
 
 
 def _card_value(engine: CityEngine, card_id: str, player: PlayerState) -> float:

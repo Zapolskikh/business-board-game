@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from agent_play.cli import main
 from agent_play.client import CityClient
-from agent_play.render import Catalog, render_state, resolve_action
+from agent_play.render import Catalog, describe_action, render_state, resolve_action
 from agent_play.session import Session
 from app.city_api import get_room_service
 from app.main import app
@@ -66,6 +66,41 @@ def test_client_transport_plays_a_full_turn_through_the_rest_api(tmp_path: Path)
         assert session.journal_path.read_text(encoding="utf-8").count("\n") == 1
     finally:
         app.dependency_overrides.clear()
+
+
+def test_grey_operation_hint_reads_the_per_operation_score_table() -> None:
+    catalog = Catalog.from_meta(CityRoomService(InMemoryRoomRepository()).engine.catalog.public_meta())
+    game = {
+        "players": [{"id": "seat-1", "name": "Claude"}, {"id": "seat-2", "name": "Bot"}],
+        "market": [],
+        "role_price": 3,
+        "round_number": 1,
+    }
+    me = {"assets": [], "capacity": 3, "role": None}
+    action = {"type": "grey_operation", "payload": {"asset_id": "smear"}}
+
+    text = describe_action(1, action, game, me, catalog)
+
+    assert "+2 очка" in text
+
+
+def test_journalist_publication_is_not_rendered_as_a_free_power() -> None:
+    catalog = Catalog.from_meta(CityRoomService(InMemoryRoomRepository()).engine.catalog.public_meta())
+    game = {
+        "players": [{"id": "seat-1", "name": "Claude"}, {"id": "seat-2", "name": "Bot"}],
+        "market": [],
+        "role_price": 3,
+        "round_number": 1,
+    }
+    me = {"assets": [], "capacity": 3, "role": "journalist"}
+    action = {
+        "type": "use_role_power",
+        "payload": {"power": "journalist_publish", "target_id": "seat-2"},
+    }
+
+    text = describe_action(1, action, game, me, catalog)
+
+    assert "действие не расходуется" not in text
 
 
 def test_cli_new_state_and_do_share_a_session(tmp_path: Path, monkeypatch, capsys) -> None:

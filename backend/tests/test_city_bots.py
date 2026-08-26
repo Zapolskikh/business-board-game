@@ -1,7 +1,17 @@
 from __future__ import annotations
 
+from copy import deepcopy
+
 from city_bots import choose_bot_command
-from city_bots.policy import PROFILES, _action_label, _action_utility, _card_value, _fractional_score
+from city_bots.policy import (
+    PROFILES,
+    _action_label,
+    _action_utility,
+    _card_value,
+    _fractional_score,
+    _grey_operation_utility,
+    _position_value,
+)
 from city_engine.engine import CityEngine
 from city_engine.factory import GameSettings, PlayerSetup, create_game_from_catalog
 from city_engine.models import OwnedAsset
@@ -78,14 +88,14 @@ def test_the_policy_prices_the_new_card_families() -> None:
     state = bot_game()
     player = state.current_player
 
-    # «Меценатство»: 4 points for 20$. Worth almost its face value with the money, near nothing
+    # «Меценатство»: 4 points for 12$. Worth almost its face value with the money, near nothing
     # without it — the bot used to score it at its raw `value` either way.
     patronage = next(card for card in engine.catalog.action_cards.values() if card.kind == "buy_points")
     player.money = 0
     assert _card_value(engine, patronage.id, player) < 1
     player.money = 200
-    # With money worth nothing on its own the card is a saved action rather than a better rate:
-    # «Меценатство» pays 5$ a point and so does patronage. It still has to beat a blank draw.
+    # The blind card is a premium sink (3$/point) next to patronage (4$/point), so it has to beat a
+    # blank draw once the player can pay it.
     assert _card_value(engine, patronage.id, player) >= patronage.value * 2
 
     # A defence card at the Крыша limit is a dead draw, and there are three of them in the deck.
@@ -134,3 +144,51 @@ def test_a_role_cleans_its_own_scandals_instead_of_paying_for_the_basic_one() ->
     own = utilities["use_role_power(power=fraudster_cleanup)"]
     basic = utilities["crisis_pr()"]
     assert own > basic, f"the free cleanup must beat the 3◆ one: {own} vs {basic}"
+
+
+def test_expert_does_not_burn_project_influence_cleaning_a_safe_counter() -> None:
+    engine = CityEngine()
+    state = bot_game()
+    player = state.current_player
+    player.difficulty = "expert"
+    player.role = "capitalist"
+    player.money, player.influence, player.scandals = 40, 10, 2
+    pool = [*state.project_board, *state.project_deck]
+    state.project_board = ["metro_line", "craft_quarter", "factory_cluster", "government_complex"]
+    state.project_deck = [project_id for project_id in pool if project_id not in state.project_board]
+    utilities = {
+        _action_label(action): _action_utility(engine, state, player, action, PROFILES["expert"], transition.state)
+        for action, transition in engine.legal_transitions(state, player.id)
+    }
+
+    assert utilities["end_turn()"] > utilities["crisis_pr()"]
+
+
+def test_expert_values_the_quantum_centres_future_actions() -> None:
+    engine = CityEngine()
+    state = bot_game()
+    state.max_rounds = 15
+    state.round_number = 8
+    player = state.current_player
+    player.difficulty = "expert"
+    before = _position_value(engine, state, player, PROFILES["expert"])
+    after_state = deepcopy(state)
+    after_player = after_state.current_player
+    after_player.assets.append(OwnedAsset(uid="owned:quantum", card_id="quantum"))
+    after = _position_value(engine, after_state, after_player, PROFILES["expert"])
+
+    assert after - before > engine.asset_value_of("quantum") + 8
+
+
+def test_expert_prices_role_loss_and_jail_into_a_grey_attempt() -> None:
+    engine = CityEngine()
+    state = bot_game()
+    player = state.current_player
+    player.difficulty = "expert"
+    player.role = "fraudster"
+    player.scandals = 4
+    player.assets.append(OwnedAsset(uid="owned:cash", card_id="cash"))
+
+    utility = _grey_operation_utility(engine, state, player, {"asset_id": "smear"}, PROFILES["expert"])
+
+    assert utility < -0.5  # ending the turn is better than certain role loss and possible jail
