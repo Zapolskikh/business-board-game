@@ -39,9 +39,9 @@ export const powerLabels: Record<string, string> = {
 };
 
 export const greyOperationLabels: Record<string, string> = {
-  cash: "Отмывание",
-  market: "Контрабанда",
+  smear: "Вброс",
   crypto: "Памп и дамп",
+  roof_break: "Пробить крышу",
   datacenter: "Взлом",
   influence_broker: "Слив компромата",
 };
@@ -51,53 +51,58 @@ export const greyOperationLabels: Record<string, string> = {
 // to say the same thing the operation panel says — the panel used to announce the requirement only
 // after you had already spent your money on something else.
 export const greyOperationDistricts: Record<string, string[]> = {
-  cash: ["shadows"],
-  market: ["shadows"],
+  smear: ["shadows"],
   crypto: ["tech", "shadows"],
+  roof_break: ["shadows"],
   datacenter: ["tech", "shadows"],
   influence_broker: ["shadows", "government"],
 };
 
-// Points for a successful operation: the same two that cost two scandals pay the higher score.
-// Mirrors `CityEngine.grey_operation_points`.
+// Mirrors `CityEngine.grey_operation_points`. Every operation carries its own score now, so this
+// reads a table instead of asking which ones are the "hard" ones.
 export function greyOperationPoints(meta: CityMeta, operationId: string): number {
-  const hard = meta.scoring?.grey_operation_points_hard ?? 5;
-  const plain = meta.scoring?.grey_operation_points ?? 3;
-  return operationId === "datacenter" || operationId === "influence_broker" ? hard : plain;
+  return meta.scoring?.grey_operation_points?.[operationId] ?? (operationId === "datacenter" || operationId === "influence_broker" ? 3 : 2);
+}
+
+// Mirrors `CityEngine.hack_influence_steal` and `CityEngine.pump_drain`.
+function hackSteal(meta: CityMeta, round: number): number {
+  return (meta.scoring?.hack_influence_base ?? 2) + Math.floor(round / 3);
+}
+
+function pumpDrain(meta: CityMeta, round: number): number {
+  return (meta.scoring?.pump_drain_base ?? 2) + Math.floor(round / 2);
 }
 
 export const greyOperationInfo: Record<string, { asset: string; effect: (round: number, meta: CityMeta) => string; chance: number; failure: string }> = {
-  cash: {
-    asset: "Сеть наличных обменников",
-    // Both sides scale with the round: a flat gain against a growing stake made the operation
-    // strictly worse than the top campaign tier, and then nobody ever ran it.
-    effect: (round, meta) => `${launderingCost(meta, round)}$ → ${launderingGain(meta, round)}◆`,
-    chance: 65,
-    failure: "Единственный неограниченный способ превратить лишние деньги во влияние, и с ростом раунда курс становится лучше, чем у кампании. При успехе: +1 скандал. При провале ставка теряется, влияния нет. Скандалы при провале: Аферист +1, остальные +2. На 5 скандалах теряется роль, на 6 — тюрьма.",
-  },
-  market: {
-    asset: "Ночной рынок",
-    effect: round => `украсть у цели до ${3 + Math.floor(round / 2)}$`,
-    chance: 55,
-    failure: "Крыша цели тратится и полностью отменяет кражу. При успехе: +1 скандал. При провале теряется Крыша, если она есть. Скандалы: Аферист +1, остальные +2. На 5 скандалах теряется роль, на 6 — тюрьма.",
+  smear: {
+    asset: "Сеть анонимных каналов",
+    effect: () => "по 1 скандалу каждому сопернику",
+    chance: 60,
+    failure: "Единственный ход в игре, который бьёт по всем троим сразу — поэтому шанс у него ниже, чем у соседей. Крыша каждого соперника считается отдельно: она гасит его скандал и тратится. Одна операция может снять сразу три Крыши.",
   },
   crypto: {
     asset: "Городская криптобиржа",
-    effect: round => `получить ${6 + round}$ и лишить лидера до ${2 + Math.floor(round / 2)}$`,
+    effect: (round, meta) => `забрать у каждого соперника до ${pumpDrain(meta, round)}$`,
     chance: 45,
-    failure: "Свой доход вы получаете всегда, но Крыша лидера тратится и отменяет списание с него. При успехе: +2 скандала. При провале: −5$, а жетон автоматизации на криптобирже выключается до выплаты раунда. Скандалы при провале: Аферист +1, остальные +3. На 5 скандалах теряется роль, на 6 — тюрьма.",
+    failure: "Деньги не появляются из воздуха — они переходят к вам из чужих кошельков, поэтому операция тем сильнее, чем больше игроков за столом. Крыша каждого соперника считается отдельно: она спасает его деньги и тратится.",
+  },
+  roof_break: {
+    asset: "Бригада поджигателей",
+    effect: (_round, meta) => `снять с цели все Крыши, +${meta.scoring?.roof_break_point_per_roof ?? 1} очко за каждую`,
+    chance: 60,
+    failure: "Единственная атака, которую Крыша не гасит — она по Крыше и бьёт. Доступна, только если у цели есть хотя бы одна Крыша. Крыша отражает 59% всех направленных атак в игре, так что это способ вскрыть игрока, который спрятался за защитой.",
   },
   datacenter: {
     asset: "Нелегальный дата-центр",
-    effect: (_round, meta) => `украсть у цели до ${meta.scoring?.hack_influence_steal ?? 4}◆`,
+    effect: (round, meta) => `украсть у цели до ${hackSteal(meta, round)}◆`,
     chance: 40,
-    failure: "Крыша цели тратится и полностью отменяет кражу. При успехе: +2 скандала. При провале: −2◆. Скандалы при провале: Аферист +1, остальные +3. На 5 скандалах теряется роль, на 6 — тюрьма.",
+    failure: "Влияние — самый дефицитный ресурс, поэтому шанс здесь самый низкий, а размер кражи растёт с раундом. Крыша цели тратится и полностью отменяет кражу.",
   },
   influence_broker: {
     asset: "Торговец компроматом",
-    effect: (_round, meta) => `${meta.scoring?.compromat_influence ?? 3}◆ → снять роль с цели`,
-    chance: 70,
-    failure: "Цель теряет роль: −3 очка, весь её пассив и место освобождается по свободной цене, а не по цене переворота. Судебный запрет или Крыша цели полностью гасят слив. Только раз в раунд. При успехе: +2 скандала. При провале: −2◆ и скандалы (Аферист +1, остальные +3). На 5 скандалах теряется роль, на 6 — тюрьма.",
+    effect: () => "снять роль с цели",
+    chance: 60,
+    failure: "Цель теряет роль: −3 очка, весь её пассив, а место освобождается по свободной цене, а не по цене переворота. Доступна, только если у цели есть роль. Крыша цели тратится и полностью гасит слив.",
   },
 };
 
@@ -164,16 +169,6 @@ export function marketRotationSize(meta: CityMeta): number {
 
 export function campaignTiers(meta: CityMeta): { spend: number; gain: number }[] {
   return meta.scoring?.campaign_tiers ?? [{ spend: 5, gain: 3 }];
-}
-
-// Matches the engine's `laundering_cost`/`laundering_gain`: both sides grow with the round, so the
-// grey channel stays ahead of the best campaign tier instead of being dominated by it.
-export function launderingCost(meta: CityMeta, round: number): number {
-  return (meta.scoring?.laundering_base_cost ?? 4) + Math.floor(round / 2);
-}
-
-export function launderingGain(meta: CityMeta, round: number): number {
-  return (meta.scoring?.laundering_base_gain ?? 2) + Math.floor(round / 3);
 }
 
 /** The tier of a campaign action, resolved from the payload the engine offered. */
@@ -276,7 +271,6 @@ const perkLabels: Record<string, (value: number) => string> = {
   roofCapacity: value => `+${value} к пределу Крыш`,
   extraInvestmentActions: () => "+1 инвестиционное действие в начале хода",
   carryAction: () => "переносит 1 неистраченное действие",
-  developmentDiscount: value => `−${value}$ к развитию района`,
 };
 
 export function projectPerkText(project: ProjectMeta): string {
@@ -360,7 +354,6 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
     const points = asset ? assetPoints(asset) : 0;
     return `Продать «${asset?.title ?? "объект"}» за ${points}$ (−${points} очков)`;
   }
-  if (action.type === "develop_district") return `Развить район «${district?.title ?? payload.district}»`;
   if (action.type === "buy_action_card") return `Купить «${cards.get(stringValue(payload.card_id))?.title ?? payload.card_id}»`;
   if (action.type === "convert_action_card") {
     const back = cardDiscardValue(meta);
@@ -377,8 +370,7 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
     return `${title}${detail}`;
   }
   if (action.type === "grey_operation") {
-    const protectedText = payload.protect_failure ? " · страховка Крышей" : "";
-    return `${greyOperationLabels[stringValue(payload.asset_id)] ?? payload.asset_id}${target ? ` → ${target.name}` : ""}${protectedText}`;
+    return `${greyOperationLabels[stringValue(payload.asset_id)] ?? payload.asset_id}${target ? ` → ${target.name}` : ""}`;
   }
   if (action.type === "use_role_power") {
     const details = target ? ` → ${target.name}` : district ? ` · ${district.title}` : role ? ` · ${role.title}` : payload.amount ? ` · ${payload.amount}⚠` : payload.method ? ` · ${payload.method === "roof" ? "Крышей" : "деньгами"}` : "";
@@ -407,7 +399,6 @@ const eventVerbs: Record<string, string> = {
   asset_bought: "покупает объект",
   asset_sold: "продаёт объект",
   asset_replaced: "меняет объект",
-  district_developed: "развивает район",
   role_claimed: "получает роль",
   role_taken: "захватывает роль",
   action_card_bought: "покупает карту действия",
@@ -619,8 +610,6 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       // The token is freed by the sale; without this line it silently vanished from the board.
       return lead(...tail);
     }
-    case "district_developed":
-      return lead(txt(` развивает район «${district ?? stringValue(data.district)}» до ${numberValue(data.level)}★ (`), signed(-numberValue(data.cost), "$"), txt(", "), num("+1◆", "good"), txt(")"));
     case "role_claimed":
     case "role_taken": {
       const tail: LogSegment[] = [txt(` получает роль «${role ?? roleId}» (`), signed(-numberValue(data.cost), "◆"), txt(")")];
@@ -675,18 +664,6 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       const via = sourceCard ? ` (карта «${sourceCard}»)` : ` (${greyOperationLabels[stringValue(data.source)] ?? stringValue(data.source)})`;
       return lead(txt(`: «${asset ?? assetId}» ${changes[stringValue(data.change)] ?? stringValue(data.change)}${via}`));
     }
-    case "antitrust_activated": {
-      const affected = (data.affected_player_ids as string[]) ?? [];
-      const tail: LogSegment[] = [txt(" вводит антимонопольное предписание: доход объектов в районах с 4+ объектами делится вдвое при расчёте раунда")];
-      if (affected.length > 0) {
-        tail.push(txt(" — под удар попадают "));
-        affected.forEach((playerId, index) => {
-          if (index > 0) tail.push(txt(", "));
-          tail.push(playerSeg(game, playerId));
-        });
-      }
-      return lead(...tail);
-    }
     case "player_jailed":
       // The arrest itself is reported by scandal_limit_reached, which knows the real limit —
       // it is 6 for everybody but the journalist, who survives one scandal longer.
@@ -697,7 +674,12 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       const chance = Math.round(numberValue(data.chance) * 100);
       const tail: LogSegment[] = [txt(` ${greyOperationLabels[assetId] ?? assetId}`)];
       if (target) tail.push(txt(" → "), playerSeg(game, targetId));
-      tail.push(txt(": "), data.success ? num("успех", "good") : num("провал", "bad"), txt(` (${chance}%)`));
+      tail.push(txt(": "));
+      // A blocked run is not a failed one: the roll came in, the Крыша ate it. Reading it as
+      // "провал" hid why the operation paid nothing.
+      if (data.blocked) tail.push(num("погашено Крышей", "bad"));
+      else tail.push(data.success ? num("успех", "good") : num("провал", "bad"));
+      tail.push(txt(` (${chance}%)`));
       const points = numberValue(data.points);
       if (points) tail.push(txt(" "), num(`+${points} ${points >= 5 ? "очков" : "очка"}`, "good"));
       return lead(...tail, ...deltas);
@@ -733,7 +715,6 @@ const forecastLabels: Record<string, string> = {
   projects: "🏗️ Проекты",
   administrative: "🏛️ Административный ресурс",
   residents_tax: "🏘️ Налог с жителей",
-  antitrust: "⚖️ Антимонопольное",
   journalist: "📰 Публикации",
   debt: "🏦 Кредит",
   rating: "⭐ Рейтинг",
@@ -986,7 +967,6 @@ export function assetEffectLines(
   if (numberValue(effects.greyScandalReduction)) passive.push([`−${numberValue(effects.greyScandalReduction)} скандала от серых операций`, "true"]);
   if (numberValue(effects.carryAction)) passive.push([`Переносит 1 неистраченное действие на следующий ход`, "true"]);
   if (numberValue(effects.takeoverCompensation)) passive.push([`+${numberValue(effects.takeoverCompensation)}◆, если у вас перехватят роль`, "true"]);
-  if (numberValue(effects.developmentDiscount)) passive.push([`−${numberValue(effects.developmentDiscount)}$ к стоимости развития района`, "true"]);
   for (const [text] of passive) lines.push({ text, active: true, boosted: false });
 
   const purchase = effects.purchase as
@@ -1134,7 +1114,7 @@ function boardProjectsFor(asset: AssetMeta, game: GameState, meta: CityMeta): Pr
     .slice(0, 3);
 }
 
-export function activeBonuses(player: PlayerState, game: GameState, meta: CityMeta, assets: Map<string, AssetMeta>): { text: string; active: boolean }[] {
+export function activeBonuses(player: PlayerState, meta: CityMeta, assets: Map<string, AssetMeta>): { text: string; active: boolean }[] {
   const role = meta.roles.find(item => item.id === player.role);
   const result: { text: string; active: boolean }[] = [
     role
@@ -1143,19 +1123,8 @@ export function activeBonuses(player: PlayerState, game: GameState, meta: CityMe
   ];
   for (const district of meta.districts) {
     const count = districtCount(player, district.id, assets);
-    const level = player.district_levels[district.id] ?? 0;
     if (count >= 2) result.push({ text: `${district.title}: ${count}/4 объекта, районная синергия активна.`, active: true });
-    if (level > 0) result.push({ text: `${district.title}: развитие ${"★".repeat(level)}${"☆".repeat(2 - level)}, +${level * 25}% к базовому доходу ваших объектов района (округление вверх).`, active: true });
-  }
-  // The antitrust card has no marker of its own; without this line a halved income is unexplainable.
-  if (game.antitrust_active) {
-    const exposed = meta.districts.filter(district => districtCount(player, district.id, assets) >= 4);
-    result.push({
-      text: exposed.length > 0
-        ? `Антимонопольное предписание: в этом раунде доход объектов района «${exposed.map(item => item.title).join("», «")}» будет уменьшен вдвое.`
-        : "Антимонопольное предписание действует, но у вас нет района с 4 объектами — вас оно не затронет.",
-      active: exposed.length === 0,
-    });
+    if (count >= 4) result.push({ text: `${district.title}: район собран полностью — эпические и легендарные объекты района приносят влияние каждый раунд.`, active: true });
   }
   if (player.debt > 0) result.push({ text: `Мостовой кредит: −${player.debt}$ при ближайшей выплате.`, active: false });
   // One token, three jobs: the merged rule only reads as a rule if the panel states all three.

@@ -6,7 +6,6 @@ from copy import deepcopy
 from functools import lru_cache
 from typing import Any
 
-from city_engine.constants import DISTRICT_IDS, REPEATABLE_PROJECT_IDS
 from city_engine.engine import CityEngine
 from city_engine.models import PlayerState
 from city_rooms.models import RoomState
@@ -103,20 +102,11 @@ def room_view(
             player["hand_count"] = len(player.pop("hand"))
     # The viewer's own price for every market slot: discounts are per-player, so the client
     # must not recompute them (two implementations of asset_price already drifted apart once).
-    # What one more development level would pay in each district, and what it costs. The +25%
-    # rounds up per level over whatever objects the district holds, so this is not a rate the
-    # client can print from the rules — it is an income calculation, and the engine owns those.
     viewer_for_role = next((player for player in room.game.players if player.id == viewer_id), None)
-    viewer_for_dev = viewer_for_role
     # Every perk of the viewer's role, with what it pays now and what the missing district would
     # add. A perk that silently pays less is invisible, which is the bug we fixed on the board.
     if viewer_for_role is not None:
         game["role_perks"] = engine.role_perks(room.game, viewer_for_role)
-    if viewer_for_dev is not None:
-        game["development_preview"] = {
-            district: engine.development_gain(room.game, viewer_for_dev, district) for district in DISTRICT_IDS
-        }
-        game["development_cost"] = engine.development_cost(viewer_for_dev)
     # The viewer's own progress on every board condition. Only the viewer's: showing everybody's
     # was considered and dropped — it turns four cards into a table nobody reads.
     viewer = next((player for player in room.game.players if player.id == viewer_id), None)
@@ -124,18 +114,6 @@ def room_view(
         game["project_progress"] = {
             project_id: engine.project_requirement_standing(viewer, engine.project(project_id))
             for project_id in room.game.project_board
-        }
-        # Initiatives get dearer with every one the viewer already holds, so their price is a
-        # per-player number like the market discounts — the engine answers, the client prints.
-        game["initiative_cost"] = {
-            project_id: dict(
-                zip(
-                    ("cost_influence", "cost_money"),
-                    engine.project_cost(viewer, engine.project(project_id)),
-                    strict=True,
-                )
-            )
-            for project_id in REPEATABLE_PROJECT_IDS
         }
     # "The three oldest slots leave when the round opens" is a rule, and the three oldest are not
     # the first three of anything the client can see, so the engine answers instead of the client.

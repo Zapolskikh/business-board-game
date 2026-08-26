@@ -113,7 +113,9 @@ def test_cli_new_state_and_do_share_a_session(tmp_path: Path, monkeypatch, capsy
         # One call can play a whole turn; the bot answers inside the same request.
         assert main(["--dir", str(tmp_path), "turn", "basic_action kind=work", "end_turn"]) == 0
         turn = capsys.readouterr().out
-        assert turn.count("→ ") == 2
+        # Only the lines that start with the arrow are the played commands: a targeted event in
+        # the log renders its victim as "→ Имя" and would inflate a bare substring count.
+        assert sum(1 for line in turn.splitlines() if line.startswith("→ ")) == 2
         assert "turn_ended" in turn
 
         assert main(["--dir", str(tmp_path), "do", "end_turn", "--board"]) == 0

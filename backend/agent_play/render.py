@@ -192,12 +192,6 @@ def _payload_hint(action: dict[str, Any], game: dict[str, Any], me: dict[str, An
         holder = next((p for p in game["players"] if p["role"] == payload.get("role_id")), None)
         price = int(game["role_price"]) * (3 if holder else 1)
         bits.append(f"{price}◆" + (f", перехват у {holder['name']}" if holder else ", свободна"))
-    if action["type"] == "develop_district":
-        # The server computes what the next level pays: +25% rounds up per level over whatever
-        # objects the district holds, so the figure is not one the client can print from the rules.
-        cost = int(game.get("development_cost", 2))
-        gain = int((game.get("development_preview") or {}).get(str(payload.get("district")), 0))
-        bits.append(f"{cost}$ · +{gain}$ к доходу за раунд, +1◆, максимум 2 уровня")
     if action["type"] == "crisis_pr":
         bits.append("снять 1 скандал")
     if action["type"] == "buy_action_card":
@@ -246,7 +240,6 @@ FOLD_HINTS = {
     "play_action_card": "разыграть карту из руки",
     "use_role_power": "способность роли",
     "grey_operation": "серая операция",
-    "develop_district": "развить район",
     "buy_capacity": "купить дополнительный слот бизнеса",
 }
 
@@ -560,14 +553,12 @@ def render_state(
 
     districts = ", ".join(
         f"{catalog.district_title(district)} {count}/4"
-        + ("★" * int(me["district_levels"].get(district, 0)) if me["district_levels"].get(district) else "")
         for district in catalog.districts
         if (
             count := sum(
                 1 for owned in me["assets"] if catalog.assets.get(owned["card_id"], {}).get("district") == district
             )
         )
-        or me["district_levels"].get(district)
     )
     lines.append("— мой бизнес —")
     lines.extend(_owned_line(owned, me, game, catalog) for owned in me["assets"])

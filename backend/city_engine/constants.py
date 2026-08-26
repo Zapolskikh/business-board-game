@@ -16,7 +16,7 @@ SCHEMA_VERSION = 1
 # satisfied by charter, +1◆ per own industrial object. Politician: the flat +1◆ and the housing
 # influence go, administrative objects pay 2◆ each. Journalist: the news line goes, money is 1$ a
 # rival scandal and 2$ with a business object, the rating ceiling is 2 plus one per housing object,
-# and the publication costs an action for two scandals. Fraudster: flat +20%/+10% chance instead of
+# and the publication costs an action for two scandals. Fraudster: one flat chance bonus instead of
 # two ladders, the comeback pays influence, and the crypto scam is now 25% of every wallet for five
 # scandals. Mafia: racket money from Серый сектор objects, influence from administrative ones.
 # Military: a sanction ladder at 2/3/4 scandals, no object confiscation, no healing the target.
@@ -42,7 +42,20 @@ SCHEMA_VERSION = 1
 # one card; the asset market rotates its three oldest slots once a round; cards can buy points
 # outright. Snapshots taken under 1.3.x describe a game with different rules, so state validation
 # rejects them — old rooms will not open.
-RULES_VERSION = "city-1.6.0"
+RULES_VERSION = "city-1.7.0"
+# 1.7.0: district development is deleted outright — object income is the printed number plus
+# synergies, with no `ceil(base × 1.25)` per level. `district_levels` leaves the player state, so a
+# 1.6.0 snapshot describes a board this engine cannot score. Repeatable projects and their
+# surcharge are gone with it, as is `antitrust_active`. Rooms opened under 1.6.0 will not load —
+# that is the point: the alternative is a game that loads and then fails on a card nobody can play.
+#
+# 2026-08-26a: 34 action cards, 40 projects. Removed: the two city initiatives (`city_initiative`,
+# `municipal_programme`), the two cards that referenced district development (`antitrust`,
+# `infrastructure`) and «Антимонопольное расследование», which punished the same
+# «4 objects in a district» threshold that `synergyInfluence` now rewards. Added: `self_target` on
+# the three scandal cards, `synergyInfluence` on all 19 epic and legendary assets. Repriced the
+# four projects whose permanent perk cost less than it paid.
+#
 # 2026-08-22a: the role texts finally describe the game. They still advertised investment
 # actions, forged roles, the burn-contacts power and the district tribute — all deleted between
 # 1.4.0 and 1.5.1 — and a player read them in the role tooltip.
@@ -51,7 +64,7 @@ RULES_VERSION = "city-1.6.0"
 # «деньги → очки» family and «Предписание о демонтаже» (takes a development level); the two defence
 # cards now hand out the same Крыша as the third; the two projects that required automation ask for
 # tagged objects instead. The events array is gone from the catalog entirely.
-CONTENT_VERSION = "city-content-2026-08-22a"
+CONTENT_VERSION = "city-content-2026-08-26a"
 
 DISTRICT_IDS = (
     "residential",
@@ -87,36 +100,24 @@ CAPACITY_COSTS = {3: 6, 4: 10, 5: 15}
 MONEY_PER_POINT = 10
 INFLUENCE_PER_POINT = 3
 # ...and the two sinks stay, because holding is not supposed to be the best a pile can do. Each
-# costs an action, each may be pressed once a turn, and each pays **exactly double** what the same
-# resource would score sitting still: 10$ scores 1 point but patronage pays 2, and 3◆ scores 1 point
-# but lobbying pays 2. That factor is the whole design — enough to be worth a turn when the board
-# has nothing left to sell you, never enough to beat an object (2$ a point) or a project (~1◆ a
-# point). Lobbying was 6◆ for 2 while the passive rate was gone; at 3◆ = 1 point it had to halve or
-# it would have been an action spent to gain nothing.
-PATRONAGE_MONEY = 10
-PATRONAGE_POINTS = 2
-LOBBYING_INFLUENCE = 3
-LOBBYING_POINTS = 2
+# costs an action and each may be pressed once a turn.
+#
+# The rate has to be read as a *delta*, not as a price. A pile already scores by itself, so what
+# the button really pays is the difference: patronage takes 20$ that were worth 2 points and pays
+# 5, lobbying takes 10◆ that were worth 3 and pays 6. Both net +3 against an action worth ~2, so
+# both are worth pressing and neither is worth building a strategy around.
+#
+# The thresholds are deliberately large. Small ones (10$ → 2, 3◆ → 2) made these a drip pressed
+# every turn by everybody, which is not a decision — it is a conversion rate with extra steps.
+# A big lump means a player has to *choose* the round in which the pile stops working for them.
+# Note there is no money → influence → points ladder to farm: campaign into lobbying is two actions
+# for what patronage does in one, so each currency has exactly one way out.
+PATRONAGE_MONEY = 20
+PATRONAGE_POINTS = 5
+LOBBYING_INFLUENCE = 10
+LOBBYING_POINTS = 6
 # Unique city projects are the score engine, so the board is a shared race, not a personal counter.
 PROJECT_BOARD_SIZE = 4
-# Repeatable initiatives: never in the deck, never leave, may be taken any number of times by
-# anybody. They are the floor that stops the last rounds from having no scoring outlet at all.
-# Listed here (and cross-checked against the catalog) so state validation can exempt them from
-# the "every project exists once" rule without loading content.
-REPEATABLE_PROJECT_IDS = ("city_initiative", "municipal_programme")
-# These are genuinely unlimited. A per-game cap of three lived here for a while, but it was a rule
-# no surface ever printed: the board header, the card face and the catalog text all promise "any
-# number of times", so the cap only ever showed up as a project silently vanishing from the legal
-# moves. The influence sink is the point — without it a politician ends the game sitting on 55◆ of
-# dead weight once the board stops offering projects whose condition he meets.
-#
-# What stops the sink from becoming the whole game is price, not a wall: every initiative already
-# taken makes the next one dearer. Uncapped and flat, initiatives took 31% of all project points
-# and one live game ended 18 initiatives out of 21 projects — nine identical clicks in the last
-# three rounds. Escalating keeps the first few as the good deal they should be, and makes the
-# eleventh arithmetically worse than lobbying, which is what should be reclaiming those actions.
-INITIATIVE_SURCHARGE_INFLUENCE = 1
-INITIATIVE_SURCHARGE_MONEY = 2
 # How many market slots the opening of a round replaces: the oldest three of six.
 #
 # This used to be a per-slot countdown — six independent timers printed as "⏳2р" on every card —
@@ -145,17 +146,43 @@ PUBLICATION_SCANDALS = 2
 # Технокластер object, silently granted both and pinned every fraudster operation at the 0.9 ceiling.
 # One number that the player can read off the role card is worth more than two that stack invisibly.
 FRAUDSTER_GREY_BONUS = 0.30
-# Grey operations pay victory points on success, not just money. Measured over four games: a
-# fraudster who ran ten operations converted them into roughly twelve points, because the payout was
-# money and money is the weakest currency in the game at 10$ per point. An operation now scores like
-# a small project, and the odds pay for it — every base chance below dropped by 15 points, so the
-# move became a real bet instead of a formality. Fraudster at 75% on the crypto exchange nets 4.1
-# points per action against 2.3 before; everybody else sits near a coin flip, slightly ahead of the
-# 2 points a patronage would have paid, which is exactly where a gamble belongs.
-GREY_OPERATION_POINTS = 3
-# The hack and the compromat leak cost two scandals apiece and the leak strips a role outright, so
-# they carry the higher payout — and, after the 15-point cut, the two longest odds on the board.
-GREY_OPERATION_POINTS_HARD = 5
+# --- grey operation payouts ---------------------------------------------------------------------
+# Every operation scores the same kind of thing, so the score sits in one table instead of being
+# split between a plain tier and a "hard" one. Three is the price of the two that reach into a
+# rival's sheet permanently — the hack takes influence outright, the leak takes the role — and two
+# is the price of the rest, which is roughly what a patronage pays for the same action.
+GREY_OPERATION_POINTS = {
+    "smear": 2,
+    "crypto": 2,
+    "roof_break": 2,
+    "datacenter": 3,
+    "influence_broker": 3,
+}
+# Base odds before the fraudster's bonus. The smear hits all three rivals at once and is the
+# strongest line in the table by a distance, so it deliberately sits below its neighbours rather
+# than above them; the hack is the longest shot because what it takes is the scarce resource.
+GREY_OPERATION_CHANCE = {
+    "smear": 0.60,
+    "crypto": 0.45,
+    "roof_break": 0.60,
+    "datacenter": 0.40,
+    "influence_broker": 0.60,
+}
+# One rule for the whole layer, replacing five bespoke failure penalties (lose the stake, lose a
+# roof, pay influence). A coin flip decides between "the effect happens and costs you one scandal"
+# and "nothing happens and it costs you two" — so an operation is worth 2 - chance ≈ 1.4 scandals
+# on average, and the five-scandal limit funds three or four runs a game before a cleanup is
+# mandatory. The scandal, not the odds and not the price, is what paces the grey layer now.
+GREY_SUCCESS_SCANDALS = 1
+GREY_FAILURE_SCANDALS = 2
+# One grey operation a turn, whichever the player picks. Measured over 80 games: 46.8% of every
+# fraudster turn ran two or more, and 45% of the role's grey points came from those repeats — the
+# fraudster finished 19 points (29%) ahead of the table on the strength of an engine it could fire
+# as many times as it had actions. The cap is on the whole layer rather than per operation type: a
+# limit of one *of each* raises the ceiling instead of lowering it, because a wide fraudster board
+# unlocks all five by the twelfth round and a diversified run scores more than a repeated one.
+# The turn flag is spent on the attempt, not the hit — see _grey_operation.
+GREY_OPERATION_FLAG = "grey_operation_used"
 # The crypto scam takes this share of every rival's cash and hands the fraudster five scandals —
 # its entire scandal budget. Bare, the role loses itself; with two reduction perks it survives.
 CRYPTO_SCAM_SHARE = 25
@@ -204,28 +231,44 @@ CASH_TO_INFLUENCE_MONEY = 8
 CRISIS_PR_INFLUENCE = 3
 
 # --- grey operations -------------------------------------------------------------------------
-# Laundering used to pay 2◆ for 5+round dollars: it spent the scarce resource to make the one
-# already in surplus, which is why it was taken 15 times in 24 measured games. Reversed, it is the
-# only unbounded money→influence channel in the game, and it charges scandals for the privilege.
+# The layer used to be five ways of asking the same question — "spend an action, get a resource" —
+# so a player picked whichever number was biggest and the other three lines were furniture: crypto
+# 41.9% of runs, smuggling 28.3%, hack 25.7%, laundering 4.9%, compromat 0.6%. Each operation now
+# produces something the others cannot, and the pick follows the position on the board rather than
+# a comparison of expected values:
 #
-# Both sides scale with the round, and that is the whole point. A flat 3◆ against a stake that grew
-# with the round was measured strictly worse than the top campaign tier by round six — 11$ for 3◆
-# against 9$ for 4◆, plus a scandal — and four expert bots used it zero times in 24 games. The gain
-# has to outpace the stake, or the grey channel is dominated by the basic action it is meant to
-# beat. It stays honest because a scandal is a point and the object costs a slot.
+#   behind on tempo        → Вброс         (a scandal on every rival at once)
+#   behind on money        → Памп и дамп   (drains every rival into your own wallet)
+#   target hides behind a  → Пробить крышу (strips the whole stack, pays per token taken)
+#     wall of Крыша
+#   a rival is banking     → Взлом         (takes influence, the only scarce currency)
+#     influence for a role
+#   a rival holds a role   → Слив компромата (takes the role itself)
 #
-# The campaign now has a single tier at 5$ → 3◆, which is a better rate than the old top tier, so
-# the grey channel had to move again: at 3 + round/3 it pays 9$ → 6◆ by round ten and stays ahead
-# of the button in every round of the game. That is the whole argument for owning the object.
-LAUNDERING_BASE_GAIN = 3
-LAUNDERING_BASE_COST = 4
-# Hacking used to block the target's best object for one round — worth about 4$ against a player
-# holding 264$, so it was used zero times in 24 games. It now takes influence instead, which is
-# the only resource anybody is short of, and the block mechanic leaves the operation entirely.
-HACK_INFLUENCE_STEAL = 4
+# Laundering left the set entirely: it traded money for influence, which is exactly what the
+# campaign does — for free, without a scandal, and at a better rate — so it was never the right
+# click. Smuggling left because the pump does the same job against all three rivals at once.
+#
+# The influence a hack takes, growing with the round. Flat 4◆ meant half of somebody's war chest in
+# the third round and a rounding error in the twelfth; the scarce resource has to be priced against
+# how much of it is in circulation, which is what every other money figure here already does.
+HACK_INFLUENCE_BASE = 2
+# What the pump takes from *every* rival, not just the leader. As a leader-only jab it was a rider
+# on an operation that already paid its owner, which made the operation two effects in one and the
+# smuggling run redundant next to it. As a table-wide drain it is the money operation, and it is
+# the only one that scales with the number of players.
+PUMP_DRAIN_BASE = 2
+# Пробить крышу pays a point per token it takes. Without it the operation is a pure set-up: you
+# spend the action and the scandal, and the defenceless target is defenceless for everybody —
+# two thirds of the value goes to the neighbours in a four-player game. Measured: Крыша absorbs
+# 59% of every targeted command in the game and 68.8% of the hits it eats land on a stack of two,
+# so the operation is worth exactly two tokens against the players it is aimed at and nothing at
+# all against the 36% who hold none. The per-token point is what makes aiming it worthwhile.
+ROOF_BREAK_POINT_PER_ROOF = 1
 # Leaking compromat strips a role: -3 points, the whole passive behind it, and the seat opens at
-# the free price instead of the threefold takeover. Priced in influence so it competes with the
-# projects, and limited to once a round because a per-turn cadence would let one player hold the
-# whole role board hostage. A roof or a court injunction absorbs it like any other attack.
-COMPROMAT_INFLUENCE = 3
-COMPROMAT_CHANCE = 0.7
+# the free price instead of the threefold takeover. It used to carry four separate conditions —
+# a target holding a role, 3◆ paid up front and forfeited on failure, one attempt per round, and
+# the per-turn cap — and it was run in 0.6% of all grey operations. Three of the four are gone.
+# The prepayment is the one that mattered: an operation that charges the scarce resource before
+# the dice, on top of the scandal it charges after, is not a gamble, it is a tax.
+# Its odds live in GREY_OPERATION_CHANCE with everybody else's.

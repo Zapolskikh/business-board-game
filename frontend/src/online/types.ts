@@ -50,7 +50,6 @@ export interface PlayerState {
   capacity: number;
   debt: number;
   zoning_district: string | null;
-  district_levels: Record<string, number>;
   turns: number;
 }
 
@@ -79,8 +78,8 @@ export interface ScoreBreakdown {
 // a `total`; every other key sums to it. A permanent project perk paying +1◆ a round used to be
 // indistinguishable from one paying nothing, because nothing on screen added the passives up.
 export interface RoundForecast {
-  money: { objects: number; projects: number; residents_tax: number; antitrust: number; journalist: number; debt: number; total: number };
-  influence: { objects: number; administrative: number; projects: number; news: number; rating: number; total: number };
+  money: { objects: number; projects: number; residents_tax: number; journalist: number; debt: number; total: number };
+  influence: { objects: number; administrative: number; projects: number; synergy: number; news: number; rating: number; total: number };
 }
 
 export interface GameState {
@@ -102,20 +101,12 @@ export interface GameState {
   players: PlayerState[];
   market: MarketAsset[];
   project_board: string[];
-  // What one more development level would pay in each district, and what a level costs. The
-  // +25% rounds up per level over the district's actual objects, so only the engine can say.
   // Every perk of the viewer's role: what it pays now, the ceiling, and the district that
   // unlocks the difference. Computed by the engine — the client only prints labels.
   role_perks?: { key: string; value: number; potential?: number; needs?: string | null }[];
-  development_preview?: Record<string, number>;
-  development_cost?: number;
   // The viewer's own standing on every board condition, counted by the engine — never here.
   project_progress?: Record<string, { binary: boolean; met: boolean; have: number; needed: number }>;
-  // Initiatives get dearer with every one you already hold, so the price is per-player and the
-  // engine owns it — never print ProjectMeta.cost_* for a repeatable project.
-  initiative_cost?: Record<string, { cost_influence: number; cost_money: number }>;
   turn_flags: Record<string, unknown>;
-  antitrust_active?: boolean;
   event_log: DomainEvent[];
   market_deck_count: number;
   action_deck_count: number;
@@ -166,8 +157,6 @@ export interface ProjectMeta {
   points: number;
   requirement: ProjectRequirement;
   perk: Record<string, number>;
-  // Repeatable initiatives are never in the deck and never leave the table.
-  repeatable?: boolean;
 }
 // Rates owned by the engine (`city_engine/constants.py`) and shipped with the catalog, so no
 // client hardcodes the conversion.
@@ -187,15 +176,16 @@ export interface ScoringMeta {
   card_discard_value?: number;
   // One entry per campaign tier: the same action buys more influence at a worsening rate.
   campaign_tiers: { spend: number; gain: number }[];
-  // Laundering scales on both sides: cost = base + ⌊раунд/2⌋, gain = base + ⌊раунд/3⌋.
-  laundering_base_cost: number;
-  laundering_base_gain: number;
-  grey_operation_points: number;
-  grey_operation_points_hard: number;
-  initiative_surcharge_influence: number;
-  initiative_surcharge_money: number;
-  hack_influence_steal: number;
-  compromat_influence: number;
+  // The grey layer arrives as whole tables, keyed by operation id, so the panel never has to know
+  // which operations are the expensive ones.
+  grey_operation_points: Record<string, number>;
+  grey_operation_chance: Record<string, number>;
+  grey_success_scandals: number;
+  grey_failure_scandals: number;
+  // Both grow with the round: hack = base + ⌊раунд/3⌋, pump = base + ⌊раунд/2⌋.
+  hack_influence_base: number;
+  pump_drain_base: number;
+  roof_break_point_per_roof: number;
 }
 
 export interface CityMeta {

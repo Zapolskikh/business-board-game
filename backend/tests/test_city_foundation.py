@@ -3,10 +3,8 @@ from __future__ import annotations
 import pytest
 
 from city_engine.constants import (
+    GREY_OPERATION_CHANCE,
     GREY_OPERATION_POINTS,
-    GREY_OPERATION_POINTS_HARD,
-    INITIATIVE_SURCHARGE_INFLUENCE,
-    INITIATIVE_SURCHARGE_MONEY,
     LOBBYING_INFLUENCE,
     LOBBYING_POINTS,
     PATRONAGE_MONEY,
@@ -97,9 +95,11 @@ def test_backend_catalog_is_complete_and_can_create_a_game() -> None:
     assert len(catalog.districts) == 6
     assert len(catalog.roles) == 6
     assert len(catalog.assets) == 71
-    assert len(catalog.action_cards) == 37
+    assert len(catalog.action_cards) == 34
+    # Every project is unique and every one is in the deck: the two repeatable initiatives that
+    # used to live outside it are gone, and so is the district development the two cards drove.
+    assert len(catalog.projects) == 40
     assert len(catalog.deck_project_ids()) == 40
-    assert len(catalog.repeatable_project_ids()) == 2
     assert len(state.market) == 6
     assert len(state.project_board) == PROJECT_BOARD_SIZE
 
@@ -109,9 +109,7 @@ def test_public_meta_ships_the_scoring_rates() -> None:
     scoring = load_catalog().public_meta()["scoring"]
 
     assert scoring["grey_operation_points"] == GREY_OPERATION_POINTS
-    assert scoring["grey_operation_points_hard"] == GREY_OPERATION_POINTS_HARD
-    assert scoring["initiative_surcharge_influence"] == INITIATIVE_SURCHARGE_INFLUENCE
-    assert scoring["initiative_surcharge_money"] == INITIATIVE_SURCHARGE_MONEY
+    assert scoring["grey_operation_chance"] == GREY_OPERATION_CHANCE
     assert scoring["patronage_money"] == PATRONAGE_MONEY
     assert scoring["patronage_points"] == PATRONAGE_POINTS
     assert scoring["lobbying_influence"] == LOBBYING_INFLUENCE

@@ -22,7 +22,6 @@ import {
   lobbying,
   moneyPerPoint,
   influencePerPoint,
-  launderingCost,
   marketPrice,
   powerLabels,
   rolePerkRows,
@@ -197,8 +196,6 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
   const buyActions = new Map(matching("buy_asset").map(action => [stringValue(action.payload.market_uid), action]));
   const buyCardAction = matching("buy_action_card")[0];
   const projectActions = new Map(matching("city_project").map(action => [stringValue(action.payload.project_id), action]));
-  // Development is offered on the district's own stars now, so the action has to travel to the map.
-  const developActions = new Map(matching("develop_district").map(action => [stringValue(action.payload.district), action]));
   const ranking = [...game.players].sort((a, b) => scoreOf(game, b) - scoreOf(game, a));
 
   return <div className="city-game">
@@ -219,7 +216,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
         <ProjectBoard game={game} meta={meta} me={me} projects={projects} actions={projectActions} reroll={matching("reroll_projects")[0]} busy={busy} onAction={send} />
         <DistrictMarket
           game={game} meta={meta} me={me} viewed={viewed} viewingOther={viewingOther} assets={assets}
-          selectedDistrict={selectedDistrict} onSelectDistrict={setSelectedDistrict} developActions={developActions}
+          selectedDistrict={selectedDistrict} onSelectDistrict={setSelectedDistrict}
           buyActions={buyActions} busy={busy} onAction={send}
         />
         {!viewingOther && <CardDesk game={game} me={me} cards={cards} legal={legal} buyCard={buyCardAction} busy={busy} onAction={send} onOffer={offer} labelContext={labelContext} />}
@@ -247,7 +244,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
 
     <MobileGameTabs active={mobileTab} onChange={selectMobileTab} actions={game.actions_left} events={unseenEvents} />
 
-    {choice && <ChoiceModal choice={choice} game={game} labelContext={labelContext} busy={busy} onClose={() => setChoice(null)} onAction={send} />}
+    {choice && <ChoiceModal choice={choice} game={game} roles={roles} playerId={playerId} labelContext={labelContext} busy={busy} onClose={() => setChoice(null)} onAction={send} />}
     {showRules && <RulesModal html={buildRulesHtml(meta, game.role_price)} onClose={() => setShowRules(false)} />}
   </div>;
 }
@@ -316,44 +313,6 @@ function PlayerStrip({ game, viewedId, playerId, roles, onView }: {
   })}</section>;
 }
 
-// Development was a button in the decision panel that named a district you had selected somewhere
-// else on screen. It is a property of the district, so it lives on the district: the stars are the
-// button. The tooltip carries the two numbers a player actually needs — what it costs and what it
-// pays — and the payout comes from the server, because the +25% rounds up per level over whatever
-// objects the district holds.
-function DevelopStars({ district, level, count, game, viewingOther, busy, action, onAction }: {
-  district: { id: string; title: string };
-  level: number;
-  count: number;
-  game: GameState;
-  viewingOther: boolean;
-  busy: boolean;
-  action?: LegalAction;
-  onAction: (action: LegalAction) => Promise<void>;
-}) {
-  const cost = game.development_cost ?? 2;
-  const gain = game.development_preview?.[district.id] ?? 0;
-  const stars = `${"★".repeat(level)}${"☆".repeat(2 - level)}`;
-  const reason = viewingOther
-    ? "Это чужой планшет."
-    : level >= 2
-      ? "Район развит до максимума: 2 уровня."
-      : count < 2
-        ? `Нужно минимум 2 своих объекта в районе (у вас ${count}).`
-        : game.actions_left < 1
-          ? "Нужно 1 обычное действие."
-          : `Нужно ${cost}$.`;
-  const tooltip = action
-    ? `Развить «${district.title}» до уровня ${level + 1}: 1 обычное действие и ${cost}$, вы получаете +1◆. Доход района вырастет на ${gain}$ за раунд (+25% к базовому доходу каждого объекта, с округлением вверх на каждом уровне).`
-    : `Развитие района «${district.title}» сейчас недоступно. ${reason} Развитие стоит 1 обычное действие и ${cost}$, даёт +1◆ и +25% к базовому доходу объектов района.`;
-  return <button
-    className={`district-dev ${level ? "active" : ""} ${action ? "ready" : ""}`}
-    disabled={busy || !action}
-    title={tooltip}
-    onClick={event => { event.stopPropagation(); if (action) void onAction(action); }}
-  >{stars}{level ? ` +${level * 25}%` : ""}{action && gain > 0 ? ` (+${gain}$)` : ""}</button>;
-}
-
 function ProjectBoard({ game, meta, me, projects, actions, reroll, busy, onAction }: {
   game: GameState;
   meta: CityMeta;
@@ -366,7 +325,6 @@ function ProjectBoard({ game, meta, me, projects, actions, reroll, busy, onActio
 }) {
   const mine = me.projects.map(id => projects.get(id)).filter(Boolean) as ProjectMeta[];
   const minePoints = mine.reduce((sum, project) => sum + project.points, 0);
-  const initiatives = meta.projects.filter(project => project.repeatable);
   return <section className="city-projects">
     <h2>🏗️ Городские проекты <small>главный источник очков · в колоде ещё {game.project_deck_count} · один проект уходит под низ колоды каждый раунд</small>
       <button className="market-reroll" disabled={busy || !reroll} onClick={() => reroll && void onAction(reroll)} title={`Все четыре проекта уходят обратно в колоду, колода перемешивается и раздаётся заново. Цена: ${projectRerollMoney(meta)}$ и 1 обычное действие, один раз за ход. Цена в деньгах, а не в влиянии: влияние — это то, чем сами проекты и покупаются. Доска общая: она меняется у всех, в том числе у того, кто уже собрал условие под лежащий на ней проект.`}>🔄 Пересобрать доску · {projectRerollMoney(meta)}$ + ⚡</button>
@@ -395,29 +353,11 @@ function ProjectBoard({ game, meta, me, projects, actions, reroll, busy, onActio
         <small className="project-perk">🎁 {projectPerkText(project)}</small>
       </button>;
     })}{game.project_board.length === 0 && <p className="empty-district">Проекты в городе закончились.</p>}</div>
-    {initiatives.length > 0 && <>
-      {/* The floor: always available, any number of times, priced worse than a real project — so
-          the last rounds always have somewhere to put money and influence. */}
-      <h3 className="group-title">Всегда доступны <span className="group-hint">берутся сколько угодно раз · каждая следующая дороже</span></h3>
-      <div className="project-grid">{initiatives.map(project => {
-        const action = actions.get(project.id);
-        // Per-player price from the engine: the catalog number is only the price of your first.
-        const price = game.initiative_cost?.[project.id];
-        const costInfluence = price?.cost_influence ?? project.cost_influence;
-        const costMoney = price?.cost_money ?? project.cost_money;
-        const raised = costInfluence > project.cost_influence || costMoney > project.cost_money;
-        return <button className={`project-card repeatable ${action ? "available" : "locked"}`} disabled={busy || !action} onClick={() => action && void onAction(action)} title={`${project.text} Цена сейчас: ${costInfluence}◆ и ${costMoney}$ плюс 1 обычное действие.${raised ? ` Базовая цена ${project.cost_influence}◆ и ${project.cost_money}$ — каждая взятая вами инициатива делает следующую дороже.` : " Каждая взятая вами инициатива делает следующую дороже."}`} key={project.id}>
-          <strong>{project.title}<em>{project.points} очков</em></strong>
-          <span className="project-cost">{costInfluence}◆ + {costMoney}${raised && <i className="project-leaving"> ↑ база {project.cost_influence}◆+{project.cost_money}$</i>}</span>
-          <small className="project-condition met">♾ без условия, сколько угодно раз · дорожает</small>
-        </button>;
-      })}</div>
-    </>}
     <p className="project-mine">Ваши проекты: {mine.length ? `${mine.map(project => project.title).join(", ")} — ${minePoints} очков` : "пока ни одного"}</p>
   </section>;
 }
 
-function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selectedDistrict, onSelectDistrict, buyActions, developActions, busy, onAction }: {
+function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selectedDistrict, onSelectDistrict, buyActions, busy, onAction }: {
   game: GameState;
   meta: CityMeta;
   me: PlayerState;
@@ -425,7 +365,6 @@ function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selected
   viewingOther: boolean;
   assets: Map<string, AssetMeta>;
   selectedDistrict: string;
-  developActions: Map<string, LegalAction>;
   onSelectDistrict: (id: string) => void;
   buyActions: Map<string, LegalAction>;
   busy: boolean;
@@ -436,10 +375,9 @@ function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selected
     </h2>
     <div className="district-grid">{meta.districts.map(district => {
       const count = districtCount(viewed, district.id, assets);
-      const level = viewed.district_levels[district.id] ?? 0;
       const market = game.market.filter(item => assets.get(item.card_id)?.district === district.id);
       return <article className={`district ${selectedDistrict === district.id ? "selected" : ""}`} style={{ "--district": district.color } as CSSProperties} onClick={() => onSelectDistrict(district.id)} key={district.id}>
-        <h3>{district.icon} {district.title}<span className="district-level"><span className="district-objects">{count}/4</span>{count >= 2 && <span className="district-synergy">синергия +{count >= 4 ? 2 : 1}$</span>}<DevelopStars district={district} level={level} count={count} game={game} viewingOther={viewingOther} busy={busy} action={developActions.get(district.id)} onAction={onAction} /></span></h3>
+        <h3>{district.icon} {district.title}<span className="district-level"><span className="district-objects">{count}/4</span>{count >= 2 && <span className="district-synergy" title="Синергия района: доход за каждый ваш объект района. На 4 объектах эпики и легендарки также начинают приносить влияние.">синергия +{count >= 4 ? 2 : 1}${count >= 4 ? " · +◆" : ""}</span>}</span></h3>
         <p>{district.description}</p>
         <div className="market-cards">{market.length ? market.map(item => {
           const asset = assets.get(item.card_id);
@@ -535,7 +473,7 @@ function BusinessBoard({ viewed, me, game, meta, assets, legal, viewingOther, bu
   const actionFor = (type: string, uid: string) => legal.find(action => action.type === type && action.payload.asset_uid === uid);
   return <section className="business-board">
     <h2>{viewingOther ? `Бизнес: ${viewed.name}` : "Ваш бизнес"} <small>слоты {viewed.assets.length}/{viewed.capacity}</small></h2>
-    <div className="active-bonuses"><strong>Активные бонусы</strong><ul>{activeBonuses(viewed, game, meta, assets).map(item => <li key={item.text} className={item.active ? "bonus-active" : "bonus-inactive"}>{item.text}</li>)}</ul></div>
+    <div className="active-bonuses"><strong>Активные бонусы</strong><ul>{activeBonuses(viewed, meta, assets).map(item => <li key={item.text} className={item.active ? "bonus-active" : "bonus-inactive"}>{item.text}</li>)}</ul></div>
     <div className="owned-grid">{viewed.assets.map((owned, index) => {
       const assetMeta = assets.get(owned.card_id);
       const districtInfo = meta.districts.find(d => d.id === assetMeta?.district);
@@ -629,20 +567,25 @@ function DecisionPanel({ game, me, meta, roles, districts, assets, legal, busy, 
   const dotCount = Math.max(3, game.actions_left);
   const greyAvailable = Object.keys(greyOperationLabels).filter(assetId => all("grey_operation", action => action.payload.asset_id === assetId).length > 0).length;
   const freeRoles = meta.roles.filter(role => !roleHolder(role.id)).length;
+  const greyUsed = Boolean(game.turn_flags?.grey_operation_used);
   const greyRequirement = (assetId: string): string => {
     // The gate is a district, so the lock message has to name districts — the old text named one
     // card out of 71, which is exactly why three of the five operations were never run.
     const gates = greyOperationDistricts[assetId] ?? [];
     if (!gates.some(district => districtCount(me, district, assets) > 0)) {
-      return `🔒 Нужен активный объект: ${gates.map(id => districts.get(id)?.title ?? id).join(" или ")}`;
+      return `🔒 Нужен активный объект: ${gates.map(id => districts.get(id)?.title ?? id).join(" или")}`;
     }
+    // The cap outranks the action counter in the message: with an operation already run, having
+    // actions left is exactly the state where a player would otherwise expect a second one.
+    if (greyUsed) return "🔒 Серая операция в этом ходу уже проведена";
     if (game.actions_left < 1) return "🔒 Нужно 1 обычное действие";
-    if (assetId === "cash" && me.money < launderingCost(meta, game.round_number)) return `🔒 Нужно ${launderingCost(meta, game.round_number)}$`;
-    if (assetId === "influence_broker") {
-      const cost = meta.scoring?.compromat_influence ?? 3;
-      if (me.influence < cost) return `🔒 Нужно ${cost}◆`;
-      if (!game.players.some(player => player.id !== me.id && player.role)) return "🔒 Ни у кого из соперников нет роли";
-      return "🔒 Уже использовано в этом раунде";
+    // Both of these need something to take away, so the panel says what is missing rather than
+    // leaving a live-looking button that the engine would refuse.
+    if (assetId === "roof_break" && !game.players.some(player => player.id !== me.id && player.roofs > 0)) {
+      return "🔒 Ни у кого из соперников нет Крыши";
+    }
+    if (assetId === "influence_broker" && !game.players.some(player => player.id !== me.id && player.role)) {
+      return "🔒 Ни у кого из соперников нет роли";
     }
     return "Недоступно в текущий ход";
   };
@@ -654,7 +597,7 @@ function DecisionPanel({ game, me, meta, roles, districts, assets, legal, busy, 
     <ScorePanel game={game} me={me} meta={meta} />
     <IncomePanel game={game} />
 
-    <div className="action-group g-city"><h3 className="group-title">🏙️ Город <span className="group-hint">доход и развитие</span></h3>
+    <div className="action-group g-city"><h3 className="group-title">🏙️ Город <span className="group-hint">доход и роли</span></h3>
       <StaticAction action={find("basic_action", item => item.payload.kind === "work")} label="💵 Городской заказ: +2$" tooltip={`Потратить 1 обычное действие и сразу получить 2$. Деньги — топливо: в конце партии ${moneyPerPoint(meta)}$ дают лишь 1 очко, поэтому копить их невыгодно, а +2$ — худшее действие в игре, годное лишь чтобы добрать монеты до покупки.`} busy={busy} onAction={onAction} />
       {/* One action, three rates: the action — not the money — was the real price of influence, so a
           single 2$→2◆ tier capped everybody at 2◆ per action no matter how rich they were. */}
@@ -699,12 +642,14 @@ function DecisionPanel({ game, me, meta, roles, districts, assets, legal, busy, 
 
     {/* Five lines of which four were locked all game. Open when at least one is actually
         available, folded to a single summary line the rest of the time. */}
-    <details className="action-group g-grey" open={greyAvailable > 0}><summary className="group-title">🌒 Серые операции <span className="group-hint">{greyAvailable > 0 ? `доступно: ${greyAvailable}` : "нужен объект Серого сектора, Технокластера или Администрации"}</span></summary><p className="dim card-rule">Операцию открывает любой активный объект нужного района, роль не нужна. Каждая стоит 1 обычное действие; при выборе можно застраховать провал Крышей.</p>{Object.entries(greyOperationLabels).map(([assetId, label]) => {
+    <details className="action-group g-grey" open={greyAvailable > 0}><summary className="group-title">🌒 Серые операции <span className="group-hint">{greyUsed ? "уже проведена в этом ходу" : greyAvailable > 0 ? `доступно: ${greyAvailable}` : "нужен объект Серого сектора, Технокластера или Администрации"}</span></summary><p className="dim card-rule">Операцию открывает любой активный объект нужного района, роль не нужна. Каждая стоит 1 обычное действие, но за ход можно провести только одну любую — попытка тратится даже при провале. При выборе можно застраховать провал Крышей.</p>{Object.entries(greyOperationLabels).map(([assetId, label]) => {
       const variants = all("grey_operation", action => action.payload.asset_id === assetId);
       const info = greyOperationInfo[assetId];
       const effect = info.effect(game.round_number, meta);
       const points = greyOperationPoints(meta, assetId);
-      return <button className="described-action" disabled={busy || variants.length === 0} onClick={() => onOffer(label, variants)} title={`Открывает любой активный объект районов: ${(greyOperationDistricts[assetId] ?? []).map(id => districts.get(id)?.title ?? id).join(", ")}. Эффект при успехе: ${effect}, плюс ${points} очка в финальный счёт — провал не приносит ничего. Базовый шанс успеха ${info.chance}%; у Афериста он может быть выше. ${info.failure} Страховка при провале тратит 1 Крышу и отменяет денежный либо объектный штраф, но скандалы всё равно начисляются и действие расходуется.`} key={assetId}><strong>{label}</strong><small>{variants.length ? `${effect} · +${points} очк · шанс ${info.chance}%` : greyRequirement(assetId)}</small></button>;
+      const successScandals = meta.scoring?.grey_success_scandals ?? 1;
+      const failureScandals = meta.scoring?.grey_failure_scandals ?? 2;
+      return <button className="described-action" disabled={busy || variants.length === 0} onClick={() => onOffer(label, variants)} title={`Открывает любой активный объект районов: ${(greyOperationDistricts[assetId] ?? []).map(id => districts.get(id)?.title ?? id).join(", ")}. При успехе (базовый шанс ${info.chance}%, у Афериста выше): ${effect}, плюс ${points} очка в финальный счёт и ${successScandals} скандал себе. При провале не происходит ничего, а скандалов ${failureScandals}. Действие тратится в обоих случаях, и за ход доступна только одна операция. Свои скандалы Крыша не гасит. ${info.failure}`} key={assetId}><strong>{label}</strong><small>{variants.length ? `${effect} · +${points} очк · шанс ${info.chance}%` : greyRequirement(assetId)}</small></button>;
     })}</details>
 
     <div className="action-group g-defence"><h3 className="group-title">🛡️ Защита и репутация</h3><StaticAction action={cleanupAction} label={cleanup.label} tooltip={cleanup.tooltip} busy={busy} onAction={onAction} /><StaticAction action={find("buy_roof")} label={`🛡️ Купить Крышу (${roofCost(me, game)}$)`} tooltip={`Потратить 1 обычное действие и ${roofCost(me, game)}$. Цена растёт на 1$ каждые два раунда. Крыша — единственная защита в игре: она гасит направленный на вас эффект другого игрока (карту, рэкет, санкцию, взлом), попытку отобрать роль и любое начисление скандалов целиком. Последствия ваших собственных решений она не отменяет, но может застраховать провал вашей серой операции. Лимит 2, у Мафиози 3.`} busy={busy} onAction={onAction} /></div>
@@ -878,19 +823,57 @@ function RulesModal({ html, onClose }: { html: string; onClose: () => void }) {
   </div>;
 }
 
-function ChoiceModal({ choice, game, labelContext, busy, onClose, onAction }: {
+function ChoiceModal({ choice, game, roles, playerId, labelContext, busy, onClose, onAction }: {
   choice: ChoiceState;
   game: GameState;
+  roles: Map<string, { title: string; icon: string; color: string }>;
+  playerId: string;
   labelContext: Parameters<typeof actionLabel>[1];
   busy: boolean;
   onClose: () => void;
   onAction: (action: LegalAction) => Promise<void>;
 }) {
-  return <div className="modal-backdrop" role="presentation" onMouseDown={onClose}><section className="choice-modal panel" role="dialog" aria-modal="true" onMouseDown={event => event.stopPropagation()}><header><div><small>Выбор команды</small><h2>{choice.title}</h2></div><button onClick={onClose}>✕</button></header><div className="choice-list">{choice.actions.map(action => {
-    const target = game.players.find(player => player.id === action.payload.target_id);
-    const label = actionLabel(action, labelContext);
-    return <button disabled={busy} onClick={() => void onAction(action)} title={label} key={actionIdentity(action)}>{target && <span className="choice-avatar">👤</span>}<span><strong>{label}</strong>{Boolean(action.payload.protect_failure) && <small>При провале Крыша отменит материальный штраф; скандалы останутся</small>}</span></button>;
-  })}</div></section></div>;
+  // A choice that is nothing but "which player" is a different question from "which command", and
+  // it deserves the board's own vocabulary: the same cards as the top strip. Availability comes
+  // from `legal_actions` — never from the player list — so a card the engine refuses (no roof to
+  // break, no role to buy off, a target already immune) stays visibly present but dead, and the
+  // player learns the precondition instead of wondering where the target went.
+  const byTarget = new Map(choice.actions.map(action => [stringValue(action.payload.target_id), action]));
+  const isTargetPick = choice.actions.length > 0 && choice.actions.every(action => stringValue(action.payload.target_id) !== "")
+    && byTarget.size === choice.actions.length;
+  const seat = new Map(game.players.map((player, index) => [player.id, index]));
+  return <div className="modal-backdrop" role="presentation" onMouseDown={onClose}><section className="choice-modal panel" role="dialog" aria-modal="true" onMouseDown={event => event.stopPropagation()}><header><div><small>{isTargetPick ? "Выбор цели" : "Выбор команды"}</small><h2>{choice.title}</h2></div><button onClick={onClose}>✕</button></header>
+    {isTargetPick
+      ? <div className="choice-targets">{game.players.map(player => {
+        const action = byTarget.get(player.id);
+        const role = roles.get(player.role ?? "");
+        const color = playerColors[(seat.get(player.id) ?? 0) % playerColors.length];
+        const roleLimit = player.role === "journalist" ? 6 : 5;
+        const title = action
+          ? actionLabel(action, labelContext)
+          : player.id === playerId
+            ? "Эту карту нельзя направить на себя."
+            : "Эта цель сейчас недоступна: карта не выполнима против неё (например, нечего ломать или нечего отбирать).";
+        return <button
+          className={`city-player choice-target ${player.id === playerId ? "mine" : ""} ${action ? "" : "unavailable"}`}
+          style={{ "--player": color } as CSSProperties}
+          disabled={busy || !action}
+          title={title}
+          onClick={() => action && void onAction(action)}
+          key={player.id}
+        >
+          <b><span className="player-name"><span className="player-avatar" style={{ borderColor: role?.color ?? "#3d4757" }}>{role?.icon ?? "👤"}</span><span style={{ color }}>{player.name}</span>{player.id === playerId && <span className="bot-badge">вы</span>}</span><em>{scoreOf(game, player)} оч.</em></b>
+          <span>💰 {player.money}　◆ {player.influence}　⚠ {player.scandals}/{roleLimit}　🛡 {player.roofs}</span>
+          <small>{role?.title ?? "без роли"} · объектов {player.assets.length}/{player.capacity} · проектов {player.projects.length}</small>
+          {!action && <small className="choice-target-locked">недоступна</small>}
+        </button>;
+      })}</div>
+      : <div className="choice-list">{choice.actions.map(action => {
+        const target = game.players.find(player => player.id === action.payload.target_id);
+        const label = actionLabel(action, labelContext);
+        return <button disabled={busy} onClick={() => void onAction(action)} title={label} key={actionIdentity(action)}>{target && <span className="choice-avatar">👤</span>}<span><strong>{label}</strong></span></button>;
+      })}</div>}
+  </section></div>;
 }
 
 function FinishPanel({ room, game, meta, ranking, roomId, password, playerId, onExit }: {

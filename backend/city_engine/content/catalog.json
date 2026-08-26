@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "content_version": "city-content-2026-08-22a",
+  "content_version": "city-content-2026-08-26a",
   "districts": [
     {
       "id": "residential",
@@ -204,7 +204,7 @@
       "cost": 12,
       "income": 3,
       "influence": 2,
-      "text": "+1$ за Политика и +2$ при наличии Административного объекта.",
+      "text": "+1$ за Политика и +2$ при наличии Административного объекта. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "politics"
       ],
@@ -216,7 +216,8 @@
         "districtBonus": {
           "district": "government",
           "value": 2
-        }
+        },
+        "synergyInfluence": 1
       }
     },
     {
@@ -227,14 +228,15 @@
       "cost": 16,
       "income": 2,
       "influence": 1,
-      "text": "+2◆ за раунд.",
+      "text": "+2◆ за раунд. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "infrastructure"
       ],
       "effects": {
         "influenceBonus": {
           "value": 2
-        }
+        },
+        "synergyInfluence": 1
       }
     },
     {
@@ -332,7 +334,7 @@
       "cost": 13,
       "income": 3,
       "influence": 1,
-      "text": "+1$ за Капиталиста и +2$ при наличии объекта Промзоны.",
+      "text": "+1$ за Капиталиста и +2$ при наличии объекта Промзоны. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "finance",
         "production"
@@ -345,7 +347,8 @@
         "districtBonus": {
           "district": "industrial",
           "value": 2
-        }
+        },
+        "synergyInfluence": 1
       }
     },
     {
@@ -356,14 +359,15 @@
       "cost": 18,
       "income": 1,
       "influence": 2,
-      "text": "+2◆ за раунд.",
+      "text": "+2◆ за раунд. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "finance"
       ],
       "effects": {
         "influenceBonus": {
           "value": 2
-        }
+        },
+        "synergyInfluence": 1
       }
     },
     {
@@ -452,7 +456,7 @@
       "cost": 13,
       "income": 4,
       "influence": 1,
-      "text": "+1$ за Силовика и +2$ при наличии Административного объекта.",
+      "text": "+1$ за Силовика и +2$ при наличии Административного объекта. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "production"
       ],
@@ -464,7 +468,8 @@
         "districtBonus": {
           "district": "government",
           "value": 2
-        }
+        },
+        "synergyInfluence": 1
       }
     },
     {
@@ -475,14 +480,15 @@
       "cost": 17,
       "income": 2,
       "influence": 0,
-      "text": "Можно иметь на 1 Крышу больше; в начале хода восстанавливает 1 Крышу до лимита.",
+      "text": "Можно иметь на 1 Крышу больше; в начале хода восстанавливает 1 Крышу до лимита. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "production",
         "security"
       ],
       "effects": {
         "roofCapacity": 1,
-        "turnRoof": 1
+        "turnRoof": 1,
+        "synergyInfluence": 1
       }
     },
     {
@@ -579,7 +585,7 @@
       "cost": 13,
       "income": 3,
       "influence": 2,
-      "text": "+1$ за Афериста и +2$ при наличии объекта Делового центра.",
+      "text": "+1$ за Афериста и +2$ при наличии объекта Делового центра. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "ai",
         "data"
@@ -592,7 +598,8 @@
         "districtBonus": {
           "district": "business",
           "value": 2
-        }
+        },
+        "synergyInfluence": 1
       }
     },
     {
@@ -603,12 +610,13 @@
       "cost": 18,
       "income": 0,
       "influence": 2,
-      "text": "Не приносит базовый доход, но даёт +1 обычное действие в начале каждого хода.",
+      "text": "Не приносит базовый доход, но даёт +1 обычное действие в начале каждого хода. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "tech"
       ],
       "effects": {
-        "extraActions": 1
+        "extraActions": 1,
+        "synergyInfluence": 1
       }
     },
     {
@@ -699,7 +707,7 @@
       "cost": 12,
       "income": 2,
       "influence": 3,
-      "text": "+1$ за Политика и +2$ при наличии объекта Делового центра.",
+      "text": "+1$ за Политика и +2$ при наличии объекта Делового центра. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "government",
         "finance"
@@ -712,7 +720,8 @@
         "districtBonus": {
           "district": "business",
           "value": 2
-        }
+        },
+        "synergyInfluence": 1
       }
     },
     {
@@ -723,12 +732,13 @@
       "cost": 15,
       "income": 0,
       "influence": 3,
-      "text": "Не приносит базовый доход; в начале каждого хода снимает 1 ваш скандал.",
+      "text": "Не приносит базовый доход; в начале каждого хода снимает 1 ваш скандал. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "government"
       ],
       "effects": {
-        "scandalReduction": 1
+        "scandalReduction": 1,
+        "synergyInfluence": 1
       }
     },
     {
@@ -739,12 +749,13 @@
       "cost": 16,
       "income": 1,
       "influence": 2,
-      "text": "Пассив: одно неиспользованное действие сохраняется и переносится на следующий ход.",
+      "text": "Пассив: одно неиспользованное действие сохраняется и переносится на следующий ход. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "government"
       ],
       "effects": {
-        "carryAction": 1
+        "carryAction": 1,
+        "synergyInfluence": 1
       }
     },
     {
@@ -850,7 +861,7 @@
       "cost": 12,
       "income": 3,
       "influence": 1,
-      "text": "+1$ за Мафиози и +2$ при наличии Административного объекта.",
+      "text": "+1$ за Мафиози и +2$ при наличии Административного объекта. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "grey",
         "government"
@@ -863,7 +874,8 @@
         "districtBonus": {
           "district": "government",
           "value": 2
-        }
+        },
+        "synergyInfluence": 1
       }
     },
     {
@@ -874,13 +886,14 @@
       "cost": 15,
       "income": 0,
       "influence": 1,
-      "text": "Не приносит базовый доход; серые операции дают на 1 скандал меньше, лимит Крыш увеличен на 1.",
+      "text": "Не приносит базовый доход; серые операции дают на 1 скандал меньше, лимит Крыш увеличен на 1. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "grey"
       ],
       "effects": {
         "greyScandalReduction": 1,
-        "roofCapacity": 1
+        "roofCapacity": 1,
+        "synergyInfluence": 1
       }
     },
     {
@@ -951,7 +964,7 @@
       "cost": 13,
       "income": 2,
       "influence": 1,
-      "text": "+1$ за каждый район, где у вас есть объект: Деловой центр, Промзона, Административный квартал.",
+      "text": "+1$ за каждый район, где у вас есть объект: Деловой центр, Промзона, Административный квартал. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "infrastructure"
       ],
@@ -969,7 +982,8 @@
             "district": "government",
             "value": 1
           }
-        ]
+        ],
+        "synergyInfluence": 1
       }
     },
     {
@@ -1057,7 +1071,7 @@
       "cost": 17,
       "income": 1,
       "influence": 2,
-      "text": "+1$ за каждый район, где у вас есть объект: Спальный, Промзона, Технокластер, Административный, Серый сектор.",
+      "text": "+1$ за каждый район, где у вас есть объект: Спальный, Промзона, Технокластер, Административный, Серый сектор. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "finance",
         "infrastructure"
@@ -1084,7 +1098,8 @@
             "district": "shadows",
             "value": 1
           }
-        ]
+        ],
+        "synergyInfluence": 1
       }
     },
     {
@@ -1175,7 +1190,7 @@
       "cost": 13,
       "income": 3,
       "influence": 0,
-      "text": "+1$ за каждый район, где у вас есть объект: Спальный, Деловой центр, Серый сектор.",
+      "text": "+1$ за каждый район, где у вас есть объект: Спальный, Деловой центр, Серый сектор. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "production",
         "infrastructure"
@@ -1194,7 +1209,8 @@
             "district": "shadows",
             "value": 1
           }
-        ]
+        ],
+        "synergyInfluence": 1
       }
     },
     {
@@ -1263,7 +1279,7 @@
       "cost": 13,
       "income": 2,
       "influence": 2,
-      "text": "+1$ за каждый район, где у вас есть объект: Спальный, Деловой центр, Административный квартал.",
+      "text": "+1$ за каждый район, где у вас есть объект: Спальный, Деловой центр, Административный квартал. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "data",
         "infrastructure"
@@ -1282,7 +1298,8 @@
             "district": "government",
             "value": 1
           }
-        ]
+        ],
+        "synergyInfluence": 1
       }
     },
     {
@@ -1370,7 +1387,7 @@
       "cost": 12,
       "income": 1,
       "influence": 2,
-      "text": "+1$ за каждый район, где у вас есть объект: Спальный, Деловой центр, Промзона, Технокластер.",
+      "text": "+1$ за каждый район, где у вас есть объект: Спальный, Деловой центр, Промзона, Технокластер. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "government",
         "infrastructure"
@@ -1393,7 +1410,8 @@
             "district": "tech",
             "value": 1
           }
-        ]
+        ],
+        "synergyInfluence": 1
       }
     },
     {
@@ -1485,7 +1503,7 @@
       "cost": 12,
       "income": 3,
       "influence": 0,
-      "text": "+1$ за каждый район, где у вас есть объект: Промзона, Технокластер, Административный квартал.",
+      "text": "+1$ за каждый район, где у вас есть объект: Промзона, Технокластер, Административный квартал. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "grey",
         "logistics"
@@ -1504,7 +1522,8 @@
             "district": "government",
             "value": 1
           }
-        ]
+        ],
+        "synergyInfluence": 1
       }
     }
   ],
@@ -1525,7 +1544,8 @@
       "text": "Цель получает 1 скандал.",
       "kind": "scandal",
       "value": 1,
-      "targeted": true
+      "targeted": true,
+      "self_target": true
     },
     {
       "id": "hostile",
@@ -1582,15 +1602,6 @@
       "targeted": true
     },
     {
-      "id": "antitrust",
-      "title": "Предписание о демонтаже",
-      "tone": "attack",
-      "text": "Цель теряет один уровень развития в самом развитом своём районе.",
-      "kind": "remove_development",
-      "value": 1,
-      "targeted": true
-    },
-    {
       "id": "disinformation",
       "title": "Информационная диверсия",
       "tone": "attack",
@@ -1606,7 +1617,8 @@
       "text": "Цель получает 2 скандала.",
       "kind": "scandal",
       "value": 2,
-      "targeted": true
+      "targeted": true,
+      "self_target": true
     },
     {
       "id": "surveillance",
@@ -1615,7 +1627,8 @@
       "text": "Цель получает 1 скандал.",
       "kind": "scandal",
       "value": 1,
-      "targeted": true
+      "targeted": true,
+      "self_target": true
     },
     {
       "id": "smear_campaign",
@@ -1625,14 +1638,6 @@
       "kind": "double_scandal",
       "value": 2,
       "targeted": true
-    },
-    {
-      "id": "antitrust_probe",
-      "title": "Антимонопольное расследование",
-      "tone": "attack",
-      "text": "В этот раунд объекты каждого игрока — включая ваши — в районах, где у него 4+ объектов, приносят вдвое меньше.",
-      "kind": "antitrust",
-      "value": 1
     },
     {
       "id": "grant",
@@ -1689,14 +1694,6 @@
       "text": "Выбранный район считается имеющим на один ваш объект больше до выплаты.",
       "kind": "zoning",
       "value": 1
-    },
-    {
-      "id": "infrastructure",
-      "title": "Инфраструктурный грант",
-      "tone": "deal",
-      "text": "Бесплатно развейте выбранный район и получите 2◆, если у вас там есть 2 объекта.",
-      "kind": "develop",
-      "value": 2
     },
     {
       "id": "temporary_mandate",
@@ -1869,9 +1866,9 @@
       "id": "city_park",
       "title": "Городской парк",
       "text": "Парк в жилой застройке гасит недовольство.",
-      "cost_influence": 3,
-      "cost_money": 2,
-      "points": 5,
+      "cost_influence": 5,
+      "cost_money": 6,
+      "points": 3,
       "requirement": {
         "type": "district_objects",
         "district": "residential",
@@ -2045,9 +2042,9 @@
       "id": "security_hub",
       "title": "Центр городской безопасности",
       "text": "Штаб охраны порядка; нужен объект с охраной; поднимает предел Крыш.",
-      "cost_influence": 4,
-      "cost_money": 4,
-      "points": 6,
+      "cost_influence": 5,
+      "cost_money": 6,
+      "points": 5,
       "requirement": {
         "type": "tag_objects",
         "tag": "security",
@@ -2241,9 +2238,9 @@
       "id": "defence_order",
       "title": "Оборонный заказ",
       "text": "Два охранных объекта — и город доверяет вам подряд; поднимает предел Крыш.",
-      "cost_influence": 4,
-      "cost_money": 5,
-      "points": 6,
+      "cost_influence": 5,
+      "cost_money": 7,
+      "points": 5,
       "requirement": {
         "type": "tag_objects",
         "tag": "security",
@@ -2258,9 +2255,9 @@
       "id": "city_clinics",
       "title": "Сеть городских клиник",
       "text": "Две сервисные точки разворачиваются в сеть.",
-      "cost_influence": 3,
-      "cost_money": 4,
-      "points": 5,
+      "cost_influence": 4,
+      "cost_money": 6,
+      "points": 4,
       "requirement": {
         "type": "tag_objects",
         "tag": "service",
@@ -2442,32 +2439,6 @@
       "perk": {
         "passiveMoney": 1
       }
-    },
-    {
-      "id": "city_initiative",
-      "title": "Городская инициатива",
-      "text": "Всегда доступна и берётся сколько угодно раз. Дешёвый способ превратить влияние и деньги в очки.",
-      "cost_influence": 4,
-      "cost_money": 6,
-      "points": 3,
-      "requirement": {
-        "type": "none"
-      },
-      "perk": {},
-      "repeatable": true
-    },
-    {
-      "id": "municipal_programme",
-      "title": "Муниципальная программа",
-      "text": "Всегда доступна и берётся сколько угодно раз. Дороже инициативы, но и очков больше.",
-      "cost_influence": 7,
-      "cost_money": 10,
-      "points": 5,
-      "requirement": {
-        "type": "none"
-      },
-      "perk": {},
-      "repeatable": true
     }
   ],
   "rarity_min_round": {

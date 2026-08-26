@@ -9,20 +9,23 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from math import floor
 from typing import Any
 
 from city_engine.commands import Command
 from city_engine.constants import (
     CASH_TO_INFLUENCE_MONEY,
-    COMPROMAT_INFLUENCE,
-    HACK_INFLUENCE_STEAL,
+    FRAUDSTER_GREY_BONUS,
+    GREY_FAILURE_SCANDALS,
+    GREY_OPERATION_POINTS,
+    GREY_SUCCESS_SCANDALS,
     INFLUENCE_PER_POINT,
+    JOURNALIST_RATING_BASE,
     LOBBYING_INFLUENCE,
     MAX_CAPACITY,
     MONEY_PER_POINT,
     PATRONAGE_MONEY,
     POINTS_CARD_RATE,
+    ROOF_BREAK_POINT_PER_ROOF,
 )
 from city_engine.engine import CityEngine
 from city_engine.models import GameState, PlayerState
@@ -450,7 +453,17 @@ def _strategic_action_bonus(
         card = engine.action_card(held.card_id)
         bonus += _card_value(engine, card.id, player) * 0.5
         target_id = payload.get("target_id")
-        if target_id:
+        if target_id == player.id:
+            # Aimed at itself. Only the journalist has a reason to buy a scandal — the rating pays
+            # for one — and even then only while the ceiling is above the counter and the role is
+            # not one scandal from falling. For anybody else this is a point thrown away.
+            ceiling = JOURNALIST_RATING_BASE + engine.district_count(player, "residential")
+            headroom = engine.scandal_limit(player) - player.scandals
+            if engine.has_role(player, "journalist") and player.scandals < ceiling and headroom > card.value + 1:
+                bonus += card.value * 1.5
+            else:
+                bonus -= 5.0
+        elif target_id:
             target = state.player_by_id(str(target_id))
             bonus += target.scandals * profile.aggression
             if engine.ranking(state)[0].id == target.id:
@@ -482,10 +495,6 @@ def _strategic_action_bonus(
         # is worth more than the points alone.
         project = engine.project(str(payload["project_id"]))
         bonus += project.points * 0.4 + len(state.players) * 0.5
-        if profile.planning and project.repeatable:
-            # An initiative is the way out of a dead hand, not a plan: prefer the board while
-            # anything on it is reachable.
-            bonus -= 3.0 if _affordable_projects(engine, state, player) else 0.0
     elif action_type == "basic_action" and profile.planning:
         if payload.get("kind") == "work":
             # Money past what the board can absorb is 0.1 points a dollar.
@@ -559,54 +568,69 @@ def _grey_operation_utility(
 ) -> float:
     """Grey operations are priced in expected units, so influence has to be converted to them.
 
-    Two of the five now trade in influence rather than cash, and a dollar and a point of influence
-    are nowhere near interchangeable: influence buys projects at roughly 1.5 points each, a dollar
-    buys 0.5 at best and 0.1 once the slots are full. ``INFLUENCE_IN_MONEY`` is that ratio, so a
-    3◆ laundering run is not compared against a 6$ one as if they were the same size.
+    Two of the five trade in influence rather than cash, and a dollar and a point of influence are
+    nowhere near interchangeable: influence buys projects at roughly 1.5 points each, a dollar buys
+    0.5 at best and 0.1 once the slots are full. ``INFLUENCE_IN_MONEY`` is that ratio.
+
+    A standing caveat on everything below: a bot scores one turn, and three of these operations pay
+    in an opponent's lost tempo over the following ten. It cannot see that, and it also cannot see
+    that denying the runaway leader is worth doing even when two thirds of the benefit lands on the
+    other seats. So the numbers here are a floor on the value of the aggressive lines, not a
+    measurement of them, and simulation results for this layer read the same way.
     """
     asset_id = str(payload["asset_id"])
-    place = next(index for index, item in enumerate(engine.ranking(state), start=1) if item.id == player.id)
-    fraud_bonus = [0, 0.05, 0.1, 0.2][min(3, place - 1)] if engine.has_role(player, "fraudster") else 0
-    tech_bonus = min(0.1, engine.district_count(player, "tech") * 0.05) if engine.has_role(player, "fraudster") else 0
-    chance = min(0.9, engine.GREY_BASE_CHANCE[asset_id] + fraud_bonus + tech_bonus)
-    if asset_id == "cash":
-        # Money into influence: worth the difference between what each buys, not the raw amounts.
-        stake = engine.laundering_cost(state)
-        success_value = engine.laundering_gain(state) * INFLUENCE_IN_MONEY - stake
-        failure_cost = stake
-    elif asset_id == "market":
-        target = state.player_by_id(str(payload["target_id"]))
-        success_value, failure_cost = min(3 + floor(state.round_number / 2), target.money), 1
+    fraud_bonus = FRAUDSTER_GREY_BONUS if engine.has_role(player, "fraudster") else 0
+    chance = min(0.9, engine.GREY_BASE_CHANCE[asset_id] + fraud_bonus)
+    rivals = [other for other in state.players if other.id != player.id]
+    # The score is the same for every operation, so it belongs outside the branch. It is the part
+    # of the payout a one-turn scorer can actually see.
+    success_value = float(GREY_OPERATION_POINTS[asset_id])
+    if asset_id == "smear":
+        # A scandal costs its owner an action and 3◆ to wash off, so value it near a whole action;
+        # a roof answers for its owner and eats the hit instead.
+        exposed = sum(1 for rival in rivals if rival.roofs == 0)
+        success_value += exposed * 2.0 * (1 + profile.aggression)
     elif asset_id == "crypto":
-        success_value, failure_cost = 6 + state.round_number, 9
+        drain = engine.pump_drain(state)
+        success_value += sum(min(drain, rival.money) for rival in rivals if rival.roofs == 0)
+    elif asset_id == "roof_break":
+        target = state.player_by_id(str(payload["target_id"]))
+        # The points are the honest half of this one: the opening it makes is shared with the whole
+        # table, and only a player who plans several turns ahead ever cashes it in.
+        success_value += target.roofs * ROOF_BREAK_POINT_PER_ROOF
+        success_value += target.roofs * profile.aggression
     elif asset_id == "datacenter":
         target = state.player_by_id(str(payload["target_id"]))
-        stolen = min(HACK_INFLUENCE_STEAL, target.influence)
-        # Taken from a rival, so the aggression profile values the denial on top of the gain.
-        success_value = stolen * INFLUENCE_IN_MONEY * (1 + profile.aggression)
-        failure_cost = 2 * INFLUENCE_IN_MONEY
+        if target.roofs > 0:
+            success_value = 0.0
+        else:
+            stolen = min(engine.hack_influence_steal(state), target.influence)
+            # Taken from a rival, so the aggression profile values the denial on top of the gain.
+            success_value += stolen * INFLUENCE_IN_MONEY * (1 + profile.aggression)
     else:
         target = state.player_by_id(str(payload["target_id"]))
-        if target.role is None or player.compromat_round == state.round_number:
+        if target.role is None:
             return -100.0
         # Stripping a role costs the target 3 points and the passive behind it; a face-up Крыша
         # makes the attempt a knowingly wasted action, exactly like a blocked takeover.
-        defended = target.roofs > 0
-        denial = (3 + _role_utility(engine, state, target, target.role) * 0.3) * (1 + profile.aggression)
-        # The seat also reopens at the free price instead of the threefold takeover, and that is the
-        # attacker's own reason to pull the trigger. Counting only the denial made a leak pure
-        # altruism in a four-player game — the cost is yours and the benefit is split three ways —
-        # so the bot correctly never ran one across 24 measured games.
-        held = _role_utility(engine, state, player, player.role) if player.role else 0.0
-        wanted = _role_utility(engine, state, player, target.role)
-        if target.role == player.preferred_role:
-            wanted += 5 * profile.role_focus
-        seat = (state.role_price * 2) * INFLUENCE_IN_MONEY * 0.5 if wanted > held else 0.0
-        success_value = (0.0 if defended else denial + seat) - COMPROMAT_INFLUENCE * INFLUENCE_IN_MONEY
-        failure_cost = 2 * INFLUENCE_IN_MONEY
-    scandal_cost = (1 if engine.has_role(player, "fraudster") else 2) * profile.risk_penalty
-    protection_cost = 1.5 if payload.get("protect_failure") and player.roofs > 0 else 0
-    return chance * success_value - (1 - chance) * failure_cost - scandal_cost - protection_cost
+        if target.roofs > 0:
+            success_value = 0.0
+        else:
+            denial = (3 + _role_utility(engine, state, target, target.role) * 0.3) * (1 + profile.aggression)
+            # The seat also reopens at the free price instead of the threefold takeover, and that is
+            # the attacker's own reason to pull the trigger. Counting only the denial made a leak
+            # pure altruism in a four-player game — the cost is yours and the benefit is split three
+            # ways — so the bot correctly never ran one across 24 measured games.
+            held = _role_utility(engine, state, player, player.role) if player.role else 0.0
+            wanted = _role_utility(engine, state, player, target.role)
+            if target.role == player.preferred_role:
+                wanted += 5 * profile.role_focus
+            seat = (state.role_price * 2) * INFLUENCE_IN_MONEY * 0.5 if wanted > held else 0.0
+            success_value += denial + seat
+    # One scandal for a hit, two for a miss — the same trade for every operation in the set, which
+    # is what makes the layer paced by the scandal limit rather than by the price of each line.
+    scandal_cost = (chance * GREY_SUCCESS_SCANDALS + (1 - chance) * GREY_FAILURE_SCANDALS) * profile.risk_penalty
+    return chance * success_value - scandal_cost
 
 
 def _card_value(engine: CityEngine, card_id: str, player: PlayerState) -> float:

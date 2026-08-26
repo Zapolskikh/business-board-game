@@ -45,7 +45,6 @@ def test_production_simulation_reports_engine_games() -> None:
     # `operations` was one opaque number; it is split into the lines a player can act on, and
     # `maintenance` in particular used to be invisible in both the chronicle and the report.
     assert set(result["avg_winner_income_sources"]) == {
-        "antitrust",
         "debt",
         "journalist",
         "objects",

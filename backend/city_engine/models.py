@@ -9,7 +9,6 @@ from typing import Any
 from city_engine.constants import (
     BOT_DIFFICULTIES,
     CONTENT_VERSION,
-    DISTRICT_IDS,
     MAX_CAPACITY,
     MAX_PLAYERS,
     MAX_ROLE_PRICE,
@@ -17,17 +16,12 @@ from city_engine.constants import (
     MIN_PLAYERS,
     MIN_ROLE_PRICE,
     MIN_ROUNDS,
-    REPEATABLE_PROJECT_IDS,
     ROLE_IDS,
     RULES_VERSION,
     SCHEMA_VERSION,
 )
 from city_engine.errors import StateValidationError
 from city_engine.rng import RNGState
-
-
-def empty_district_levels() -> dict[str, int]:
-    return {district: 0 for district in DISTRICT_IDS}
 
 
 @dataclass(slots=True)
@@ -109,12 +103,8 @@ class PlayerState:
     scandal_gained_this_round: int = 0
     debt: int = 0
     zoning_district: str | None = None
-    district_levels: dict[str, int] = field(default_factory=empty_district_levels)
     turns: int = 0
     banked_actions: int = 0
-    # Round in which this player last attempted a compromat leak. ``turn_flags`` cannot hold it:
-    # they are cleared on every turn boundary, and the leak is limited per round, not per turn.
-    compromat_round: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -137,10 +127,8 @@ class PlayerState:
             "scandal_gained_this_round": self.scandal_gained_this_round,
             "debt": self.debt,
             "zoning_district": self.zoning_district,
-            "district_levels": dict(self.district_levels),
             "turns": self.turns,
             "banked_actions": self.banked_actions,
-            "compromat_round": self.compromat_round,
         }
 
     @classmethod
@@ -165,11 +153,8 @@ class PlayerState:
             scandal_gained_this_round=int(data.get("scandal_gained_this_round", 0)),
             debt=int(data.get("debt", 0)),
             zoning_district=data.get("zoning_district"),
-            district_levels={key: int(value) for key, value in data.get("district_levels", {}).items()}
-            or empty_district_levels(),
             turns=int(data.get("turns", 0)),
             banked_actions=int(data.get("banked_actions", 0)),
-            compromat_round=int(data.get("compromat_round", 0)),
         )
 
 
@@ -220,7 +205,6 @@ class GameState:
     project_board: list[str] = field(default_factory=list)
     project_deck: list[str] = field(default_factory=list)
     turn_flags: dict[str, Any] = field(default_factory=dict)
-    antitrust_active: bool = False
     final_scores: dict[str, int] = field(default_factory=dict)
     processed_command_ids: list[str] = field(default_factory=list)
     command_log: list[dict[str, Any]] = field(default_factory=list)
@@ -295,14 +279,13 @@ class GameState:
             raise StateValidationError("turn order must contain every player exactly once")
         if self.turn_order and self.turn_order[self.turns_taken_in_round] != ids[self.current_player_index]:
             raise StateValidationError("current player must match the turn order position")
-        # Repeatable initiatives are deliberately exempt: they never enter the deck and may be
-        # taken again by anybody, so only the unique projects have to be globally unique.
+        # Every project is unique: the board is a shared race, so a project one player takes is
+        # gone from the game. There is no longer a repeatable class to exempt from this rule.
         project_ids = [*self.project_board, *self.project_deck]
         for player in self.players:
             project_ids.extend(player.projects)
-        deck_ids = [item for item in project_ids if item not in REPEATABLE_PROJECT_IDS]
-        if len(deck_ids) != len(set(deck_ids)):
-            raise StateValidationError("every unique city project may exist only once")
+        if len(project_ids) != len(set(project_ids)):
+            raise StateValidationError("every city project may exist only once")
 
         all_uids: list[str] = [item.uid for item in self.market]
         held_roles = [player.role for player in self.players if player.role is not None]
@@ -318,10 +301,6 @@ class GameState:
                 raise StateValidationError(f"invalid capacity for {player.id}")
             if len(player.assets) > player.capacity:
                 raise StateValidationError(f"player {player.id} owns more assets than capacity")
-            if set(player.district_levels) != set(DISTRICT_IDS):
-                raise StateValidationError(f"district levels are incomplete for {player.id}")
-            if any(level < 0 or level > 2 for level in player.district_levels.values()):
-                raise StateValidationError(f"invalid district level for {player.id}")
             if min(player.money, player.influence, player.scandals, player.roofs) < 0:
                 raise StateValidationError(f"negative public resource for {player.id}")
             all_uids.extend(asset.uid for asset in player.assets)
@@ -353,7 +332,6 @@ class GameState:
             "project_board": list(self.project_board),
             "project_deck": list(self.project_deck),
             "turn_flags": deepcopy(self.turn_flags),
-            "antitrust_active": self.antitrust_active,
             "final_scores": dict(self.final_scores),
             "processed_command_ids": list(self.processed_command_ids),
             "command_log": deepcopy(self.command_log),
@@ -386,7 +364,6 @@ class GameState:
             project_board=[str(item) for item in data.get("project_board", [])],
             project_deck=[str(item) for item in data.get("project_deck", [])],
             turn_flags=dict(data.get("turn_flags") or {}),
-            antitrust_active=bool(data.get("antitrust_active", False)),
             final_scores={str(key): int(value) for key, value in (data.get("final_scores") or {}).items()},
             processed_command_ids=[str(item) for item in data.get("processed_command_ids", [])],
             command_log=[dict(item) for item in data.get("command_log", [])],

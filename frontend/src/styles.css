@@ -100,7 +100,6 @@ h1, h2, h3, p { margin-top: 0; }
 .project-condition.met { color: #3fb950; }
 .project-perk { color: var(--city-dim); }
 .project-mine { margin: 6px 0 0; color: var(--city-dim); font-size: 11px; }
-.project-card.repeatable { border-style: dashed; }
 .project-leaving { color: #f0883e; font-size: 9px; font-style: normal; }
 .city-projects .group-title { margin: 8px 0 4px; font-size: 12px; }
 
@@ -171,15 +170,9 @@ h1, h2, h3, p { margin-top: 0; }
 .district h3 { margin: 0 0 4px; font-size: 15px; }
 .district > p { margin: 0 0 7px; color: var(--city-dim); font-size: 11px; }
 .district-level { display: inline-flex; float: right; align-items: center; gap: 4px; font-size: 9px; }
-.district-objects, .district-synergy, .district-dev { padding: 2px 6px; border-radius: 10px; }
+.district-objects, .district-synergy { padding: 2px 6px; border-radius: 10px; }
 .district-objects { color: #fff; background: var(--district); }
 .district-synergy { color: var(--city-dim); background: color-mix(in srgb, var(--district), transparent 80%); }
-/* The stars are the develop button now, so they have to look pressable — and unmistakably so
-   when the move is actually available, because that is the whole point of moving it here. */
-.district-dev { color: var(--city-dim); background: rgba(255,255,255,.06); letter-spacing: 1px; border: 1px solid transparent; font: inherit; font-size: 9px; cursor: default; }
-.district-dev.active { color: #e3b341; }
-.district-dev.ready { cursor: pointer; color: #e3b341; border-color: #e3b341; background: color-mix(in srgb, #e3b341, transparent 88%); }
-.district-dev.ready:hover { background: color-mix(in srgb, #e3b341, transparent 75%); }
 .market-cards { display: flex; flex-wrap: wrap; gap: 5px; }
 /* Two columns: cost and payout on the left, what the object unlocks on the right. `wrap` instead of
    a media query — two cards in one district row leave no room for a second column, and the hint
@@ -336,6 +329,13 @@ details.action-group:not([open]) > summary::after { content: "▸"; }
 .choice-modal, .rules-modal { width: min(680px, 100%); max-height: min(780px, calc(100vh - 36px)); overflow-y: auto; border-color: #51617c; box-shadow: 0 24px 80px #000a; }
 .choice-modal > header, .rules-modal > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }.choice-modal h2, .rules-modal h2 { margin: 2px 0 12px; }.choice-modal header small { color: var(--city-dim); text-transform: uppercase; }
 .choice-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }.choice-list button { display: flex; min-height: 54px; align-items: center; gap: 8px; text-align: left; }.choice-list button span:last-child { display: flex; flex-direction: column; gap: 2px; }.choice-list small { color: var(--city-dim); }.choice-avatar { font-size: 20px; }
+/* The target picker reuses the top strip's player card so the question "whom" is answered in the
+   same vocabulary it is asked in. Unavailable targets stay on screen, dimmed: their absence would
+   hide the precondition that made them unavailable. */
+.choice-targets { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.choice-target { text-align: left; }
+.choice-target.unavailable { opacity: .42; filter: grayscale(1); cursor: not-allowed; }
+.choice-target-locked { color: var(--city-dim); text-transform: uppercase; letter-spacing: .5px; }
 .help-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; }.help-grid article { padding: 10px; background: var(--city-panel-2); border: 1px solid var(--city-border); border-radius: 7px; }.help-grid h3 { margin: 0 0 5px; }.help-grid p { margin: 0; color: var(--city-dim); font-size: 11px; line-height: 1.5; }
 
 .rules-fullscreen { position: fixed; z-index: 1000; inset: 0; display: flex; flex-direction: column; background: var(--bg, #0b1017); }
@@ -368,7 +368,7 @@ details.action-group:not([open]) > summary::after { content: "▸"; }
   .city-cards { gap: 4px; }
 
   /* Single-column heavy grids */
-  .action-market, .hand-grid, .choice-list, .help-grid { grid-template-columns: 1fr; }
+  .action-market, .hand-grid, .choice-list, .choice-targets, .help-grid { grid-template-columns: 1fr; }
   .district-grid { grid-template-columns: 1fr; gap: 5px; }
   .owned-grid { grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 5px; }
   .city-players { grid-template-columns: 1fr 1fr; gap: 4px; }

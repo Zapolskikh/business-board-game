@@ -13,18 +13,15 @@ from city_engine.constants import (
     ACTION_CARD_COST,
     CAMPAIGN_TIERS,
     CARD_DISCARD_VALUE,
-    COMPROMAT_INFLUENCE,
     CONTENT_VERSION,
     CRISIS_PR_INFLUENCE,
     DISTRICT_IDS,
+    GREY_FAILURE_SCANDALS,
+    GREY_OPERATION_CHANCE,
     GREY_OPERATION_POINTS,
-    GREY_OPERATION_POINTS_HARD,
-    HACK_INFLUENCE_STEAL,
+    GREY_SUCCESS_SCANDALS,
+    HACK_INFLUENCE_BASE,
     INFLUENCE_PER_POINT,
-    INITIATIVE_SURCHARGE_INFLUENCE,
-    INITIATIVE_SURCHARGE_MONEY,
-    LAUNDERING_BASE_COST,
-    LAUNDERING_BASE_GAIN,
     LOBBYING_INFLUENCE,
     LOBBYING_POINTS,
     MARKET_ROTATION_SIZE,
@@ -33,8 +30,9 @@ from city_engine.constants import (
     PATRONAGE_POINTS,
     PROJECT_BOARD_SIZE,
     PROJECT_REROLL_MONEY,
-    REPEATABLE_PROJECT_IDS,
+    PUMP_DRAIN_BASE,
     ROLE_IDS,
+    ROOF_BREAK_POINT_PER_ROOF,
 )
 from city_engine.errors import StateValidationError
 
@@ -110,6 +108,11 @@ class ActionCardDefinition:
     kind: str
     value: int
     targeted: bool = False
+    # May this targeted card be aimed at its own player? Off by default, and a property of the
+    # card rather than of its kind: "scandal cards may hit you" would be a rule the player has to
+    # learn, while a flag is a line the card prints. The journalist wants their own scandals — the
+    # rating pays for them — and nothing else in the game let them buy one on purpose.
+    self_target: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,9 +127,6 @@ class ProjectDefinition:
     points: int
     requirement: dict[str, Any] = field(default_factory=dict)
     perk: dict[str, int] = field(default_factory=dict)
-    # Repeatable initiatives never enter the deck and never leave: they are the floor that keeps
-    # the last rounds from having no scoring outlet at all, priced worse than a real project.
-    repeatable: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,11 +143,13 @@ class ContentCatalog:
     rarity_min_round: dict[str, int]
 
     def deck_project_ids(self) -> list[str]:
-        """Unique projects only: repeatable initiatives are always available and never drawn."""
-        return [project.id for project in self.projects.values() if not project.repeatable]
+        """Every project is unique and enters the deck: the board is the only way to reach one.
 
-    def repeatable_project_ids(self) -> list[str]:
-        return [project.id for project in self.projects.values() if project.repeatable]
+        Two repeatable initiatives used to sit outside the deck as an always-open scoring outlet.
+        They were a second answer to the question patronage and lobbying already answer — turning a
+        pile into points — and the weaker one, so the sinks were raised and the initiatives removed.
+        """
+        return list(self.projects)
 
     def validate(self) -> None:
         if self.schema_version != 1:
@@ -164,11 +166,6 @@ class ContentCatalog:
             raise StateValidationError("catalog does not contain enough cards to start a game")
         if len(self.deck_project_ids()) < PROJECT_BOARD_SIZE:
             raise StateValidationError(f"catalog needs at least {PROJECT_BOARD_SIZE} projects to fill the board")
-        if tuple(sorted(self.repeatable_project_ids())) != tuple(sorted(REPEATABLE_PROJECT_IDS)):
-            raise StateValidationError(
-                "repeatable projects in the catalog must match REPEATABLE_PROJECT_IDS, "
-                "which state validation uses to exempt them from the uniqueness rule"
-            )
         for project in self.projects.values():
             if project.cost_influence < 0 or project.cost_money < 0 or project.points < 1:
                 raise StateValidationError(f"project {project.id} has invalid numeric values")
@@ -226,15 +223,16 @@ class ContentCatalog:
             # Campaign tiers travel as pairs so the client renders one button per tier without
             # knowing the rates; a dict would arrive with string keys through JSON.
             "campaign_tiers": [{"spend": spend, "gain": gain} for spend, gain in sorted(CAMPAIGN_TIERS.items())],
-            # Both sides of laundering scale with the round, so the client is given the formula.
-            "laundering_base_cost": LAUNDERING_BASE_COST,
-            "laundering_base_gain": LAUNDERING_BASE_GAIN,
+            # The grey layer travels as whole tables now: one score and one chance per operation,
+            # so the panel never has to know which operations are the "hard" ones.
             "grey_operation_points": GREY_OPERATION_POINTS,
-            "grey_operation_points_hard": GREY_OPERATION_POINTS_HARD,
-            "initiative_surcharge_influence": INITIATIVE_SURCHARGE_INFLUENCE,
-            "initiative_surcharge_money": INITIATIVE_SURCHARGE_MONEY,
-            "hack_influence_steal": HACK_INFLUENCE_STEAL,
-            "compromat_influence": COMPROMAT_INFLUENCE,
+            "grey_operation_chance": GREY_OPERATION_CHANCE,
+            "grey_success_scandals": GREY_SUCCESS_SCANDALS,
+            "grey_failure_scandals": GREY_FAILURE_SCANDALS,
+            # Both of these grow with the round, so the client is given the base and the formula.
+            "hack_influence_base": HACK_INFLUENCE_BASE,
+            "pump_drain_base": PUMP_DRAIN_BASE,
+            "roof_break_point_per_roof": ROOF_BREAK_POINT_PER_ROOF,
         }
         return raw
 
@@ -300,6 +298,7 @@ def load_catalog(path: Path = CATALOG_PATH) -> ContentCatalog:
                 kind=row["kind"],
                 value=int(row["value"]),
                 targeted=bool(row.get("targeted", False)),
+                self_target=bool(row.get("self_target", False)),
             )
             for key, row in action_rows.items()
         },
@@ -313,7 +312,6 @@ def load_catalog(path: Path = CATALOG_PATH) -> ContentCatalog:
                 points=int(row["points"]),
                 requirement=dict(row.get("requirement") or {"type": "none"}),
                 perk={str(key): int(value) for key, value in (row.get("perk") or {}).items()},
-                repeatable=bool(row.get("repeatable", False)),
             )
             for key, row in project_rows.items()
         },

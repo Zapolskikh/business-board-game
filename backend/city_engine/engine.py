@@ -7,7 +7,7 @@ as dispatch handlers here, never in FastAPI or React.
 
 from __future__ import annotations
 
-from math import ceil, floor
+from math import floor
 from typing import Any
 
 from city_engine.commands import Command
@@ -17,21 +17,18 @@ from city_engine.constants import (
     CAPACITY_COSTS,
     CARD_DISCARD_VALUE,
     CASH_TO_INFLUENCE_MONEY,
-    COMPROMAT_CHANCE,
-    COMPROMAT_INFLUENCE,
     CRISIS_PR_INFLUENCE,
     DISTRICT_IDS,
     FRAUDSTER_GREY_BONUS,
+    GREY_FAILURE_SCANDALS,
+    GREY_OPERATION_CHANCE,
+    GREY_OPERATION_FLAG,
     GREY_OPERATION_POINTS,
-    GREY_OPERATION_POINTS_HARD,
-    HACK_INFLUENCE_STEAL,
+    GREY_SUCCESS_SCANDALS,
+    HACK_INFLUENCE_BASE,
     INFLUENCE_PER_POINT,
-    INITIATIVE_SURCHARGE_INFLUENCE,
-    INITIATIVE_SURCHARGE_MONEY,
     JOURNALIST_RATING_BASE,
     JOURNALIST_SCANDAL_LIMIT,
-    LAUNDERING_BASE_COST,
-    LAUNDERING_BASE_GAIN,
     LOBBYING_INFLUENCE,
     LOBBYING_POINTS,
     MARKET_ROTATION_SIZE,
@@ -43,8 +40,10 @@ from city_engine.constants import (
     PROJECT_BOARD_SIZE,
     PROJECT_REROLL_MONEY,
     PUBLICATION_SCANDALS,
+    PUMP_DRAIN_BASE,
     RACKET_LEADER_BONUS,
     ROLE_IDS,
+    ROOF_BREAK_POINT_PER_ROOF,
     SANCTION_INFLUENCE_TIER,
     SANCTION_MONEY_TIER,
     SANCTION_ROLE_TIER,
@@ -80,7 +79,6 @@ class CityEngine:
             "buy_asset": self._buy_asset,
             "reroll_projects": self._reroll_projects,
             "sell_asset": self._sell_asset,
-            "develop_district": self._develop_district,
             "crisis_pr": self._crisis_pr,
             "buy_action_card": self._buy_action_card,
             "convert_action_card": self._convert_action_card,
@@ -165,7 +163,7 @@ class CityEngine:
                 candidates.append(Command(type="basic_action", actor_id=actor_id, payload={"kind": "lobbying"}))
             candidates.extend(
                 Command(type="city_project", actor_id=actor_id, payload={"project_id": project_id})
-                for project_id in [*state.project_board, *self.catalog.repeatable_project_ids()]
+                for project_id in state.project_board
             )
             if player.roofs < self.roof_limit(player) and player.money >= self.roof_price(state, player):
                 candidates.append(Command(type="buy_roof", actor_id=actor_id))
@@ -195,12 +193,6 @@ class CityEngine:
         for owned in player.assets:
             # Selling costs no action, so it stays available with an empty counter — see _sell_asset.
             candidates.append(Command(type="sell_asset", actor_id=actor_id, payload={"asset_uid": owned.uid}))
-        if can_act:
-            candidates.extend(
-                Command(type="develop_district", actor_id=actor_id, payload={"district": district})
-                for district in DISTRICT_IDS
-                if self.district_count(player, district) >= 2 and player.district_levels[district] < 2
-            )
         # The project re-deal spends an action now, so unlike the market reroll it disappears once
         # the turn is out of actions.
         if can_act and player.money >= PROJECT_REROLL_MONEY and state.project_deck:
@@ -226,9 +218,9 @@ class CityEngine:
                         payload={"card_uid": held.uid, "target_id": target.id},
                     )
                     for target in state.players
-                    if target.id != actor_id
+                    if target.id != actor_id or card.self_target
                 )
-            elif card.kind in {"district_cash", "zoning", "develop"}:
+            elif card.kind in {"district_cash", "zoning"}:
                 candidates.extend(
                     Command(
                         type="play_action_card",
@@ -249,36 +241,30 @@ class CityEngine:
             else:
                 candidates.append(Command(type="play_action_card", actor_id=actor_id, payload={"card_uid": held.uid}))
         candidates.extend(self._role_power_candidates(state, actor_id))
-        # Insuring a failure spends a roof, so without one the flag silently did nothing.
-        protect_options = (False, True) if player.roofs > 0 else (False,)
-        for asset_id in ("cash", "crypto"):
-            if not can_act or not self.grey_operation_unlocked(player, asset_id):
+        # One grey operation a turn, so once it is spent none of them are on offer any more.
+        can_run_grey = can_act and not self._flag(state, GREY_OPERATION_FLAG)
+        for asset_id in ("smear", "crypto"):
+            if not can_run_grey or not self.grey_operation_unlocked(player, asset_id):
                 continue
-            candidates.extend(
-                Command(
-                    type="grey_operation",
-                    actor_id=actor_id,
-                    payload={"asset_id": asset_id, "protect_failure": protect},
-                )
-                for protect in protect_options
-            )
-        for asset_id in ("market", "datacenter", "influence_broker"):
-            if not can_act or not self.grey_operation_unlocked(player, asset_id):
+            candidates.append(Command(type="grey_operation", actor_id=actor_id, payload={"asset_id": asset_id}))
+        for asset_id in ("roof_break", "datacenter", "influence_broker"):
+            if not can_run_grey or not self.grey_operation_unlocked(player, asset_id):
                 continue
             for target in state.players:
                 if target.id == actor_id:
                     continue
-                candidates.extend(
+                # Both of these need something to take away: a roof to break, a role to leak. An
+                # offer that cannot change anything is noise in a panel of five.
+                if asset_id == "roof_break" and target.roofs < 1:
+                    continue
+                if asset_id == "influence_broker" and target.role is None:
+                    continue
+                candidates.append(
                     Command(
                         type="grey_operation",
                         actor_id=actor_id,
-                        payload={
-                            "asset_id": asset_id,
-                            "target_id": target.id,
-                            "protect_failure": protect,
-                        },
+                        payload={"asset_id": asset_id, "target_id": target.id},
                     )
-                    for protect in protect_options
                 )
         return candidates
 
@@ -505,12 +491,19 @@ class CityEngine:
             raise InvalidCommandError(f"{key} is required")
         return value
 
-    def _target_player(self, state: GameState, actor: PlayerState, target_id: str) -> PlayerState:
+    def _target_player(
+        self,
+        state: GameState,
+        actor: PlayerState,
+        target_id: str,
+        *,
+        allow_self: bool = False,
+    ) -> PlayerState:
         try:
             target = state.player_by_id(target_id)
         except KeyError as exc:
             raise InvalidCommandError(f"unknown target player: {target_id}") from exc
-        if target.id == actor.id:
+        if target.id == actor.id and not allow_self:
             raise IllegalActionError("the player cannot target themselves")
         return target
 
@@ -660,32 +653,22 @@ class CityEngine:
             raise InvalidCommandError(f"campaign spend must be one of: {allowed}")
         return spend
 
-    def initiatives_taken(self, player: PlayerState) -> int:
-        """How many repeatable initiatives this player already holds — the surcharge multiplier."""
-        return sum(1 for item in player.projects if self.project(item).repeatable)
-
     def project_cost(self, player: PlayerState, project: ProjectDefinition) -> tuple[int, int]:
         """What this project costs *this* player right now, as (influence, money).
 
-        Unique projects are priced by the catalog. Initiatives get dearer with every one already
-        taken, so the sink stays open forever without ever being the best button twice in a row.
-        Everything that prints or charges a price goes through here — the client must not
-        recompute it, for the same reason it no longer recomputes asset discounts.
+        Every price in the game goes through a method like this one — the client must not recompute
+        it, for the same reason it no longer recomputes asset discounts. The player argument stays
+        even though nothing reads it yet: per-player project discounts are the obvious next perk,
+        and every call site already passes it.
         """
-        if not project.repeatable:
-            return project.cost_influence, project.cost_money
-        taken = self.initiatives_taken(player)
-        return (
-            project.cost_influence + INITIATIVE_SURCHARGE_INFLUENCE * taken,
-            project.cost_money + INITIATIVE_SURCHARGE_MONEY * taken,
-        )
+        return project.cost_influence, project.cost_money
 
     def _city_project(self, state: GameState, command: Command) -> None:
         """Projects are a shared board: taking one denies it to everybody else for the whole game."""
         player = state.current_player
         project_id = self._payload_string(command, "project_id")
         project = self.project(project_id)
-        if not project.repeatable and project_id not in state.project_board:
+        if project_id not in state.project_board:
             raise IllegalActionError("this project is not on the city board")
         cost_influence, cost_money = self.project_cost(player, project)
         if player.influence < cost_influence or player.money < cost_money:
@@ -696,9 +679,8 @@ class CityEngine:
         player.influence -= cost_influence
         player.money -= cost_money
         player.projects.append(project_id)
-        if not project.repeatable:
-            state.project_board = [item for item in state.project_board if item != project_id]
-            self._refill_project_board(state)
+        state.project_board = [item for item in state.project_board if item != project_id]
+        self._refill_project_board(state)
         state.append_event(
             "city_project_taken",
             player.id,
@@ -925,47 +907,6 @@ class CityEngine:
     def _drop_asset(player: PlayerState, owned: OwnedAsset) -> None:
         player.assets = [asset for asset in player.assets if asset.uid != owned.uid]
 
-    def development_cost(self, player: PlayerState) -> int:
-        return max(0, 2 - self.effect_total(player, "developmentDiscount"))
-
-    def development_gain(self, state: GameState, player: PlayerState, district: str) -> int:
-        """What the next level of this district would add to the round income, in money.
-
-        The +25% rounds up at every level, so the answer is not a rate the client can print — it
-        depends on which objects are in the district and what they already earn. The engine runs
-        its own income function over a probe copy rather than reimplementing the arithmetic.
-        """
-        level = player.district_levels.get(district, 0)
-        if level >= 2 or self.district_count(player, district) < 2:
-            return 0
-        probe = PlayerState.from_dict(player.to_dict())
-        probe.district_levels[district] = level + 1
-        return self._round_income(state, probe) - self._round_income(state, player)
-
-    def _develop_district(self, state: GameState, command: Command) -> None:
-        player = state.current_player
-        district = self._payload_string(command, "district")
-        if district not in DISTRICT_IDS:
-            raise InvalidCommandError(f"unknown district: {district}")
-        if self.district_count(player, district) < 2:
-            raise IllegalActionError("district development requires two owned objects")
-        if player.district_levels[district] >= 2:
-            raise IllegalActionError("district is already fully developed")
-        cost = self.development_cost(player)
-        if player.money < cost:
-            raise IllegalActionError("not enough money for district development")
-        self._spend_action(state)
-        player.money -= cost
-        player.influence += 1
-        player.district_levels[district] += 1
-        state.append_event(
-            "district_developed",
-            player.id,
-            district=district,
-            level=player.district_levels[district],
-            cost=cost,
-        )
-
     def _crisis_pr(self, state: GameState, command: Command) -> None:
         """Cleaning a scandal is priced in influence, not money.
 
@@ -1061,7 +1002,12 @@ class CityEngine:
         card = self.action_card(held.card_id)
         target: PlayerState | None = None
         if card.targeted:
-            target = self._target_player(state, player, self._payload_string(command, "target_id"))
+            target = self._target_player(
+                state,
+                player,
+                self._payload_string(command, "target_id"),
+                allow_self=card.self_target,
+            )
             self._validate_card_target(card, target)
         self._validate_card_costs(state, player, card, command)
 
@@ -1069,12 +1015,20 @@ class CityEngine:
         self._mark_flag(state, "card_played")
         before = self._resource_snapshot(state)
         if card.targeted and target is not None:
-            self._apply_attacker_card_bonus(state, player, target, card)
-            if target.roofs > 0:
-                # Roof automatically absorbs the incoming effect — no player decision.
+            if target.id == player.id:
+                # Played on yourself. A Крыша does not answer — it never cancels a scandal its own
+                # owner chose, which is the rule add_scandal is built around — and the attacker's
+                # side of the card is skipped, because there is no attacker: paying the leader
+                # bonus or the theft to the player who is also the victim would mint resources.
+                self._apply_targeted_card_effect(state, player, target, card)
+            elif target.roofs > 0:
+                # Roof automatically absorbs the incoming effect — no player decision. The attacker's
+                # own side of the card is skipped with it: the loot, the influence and above all the
+                # self-scandal are the price of damage done, and a blocked card does none.
                 target.roofs -= 1
                 state.append_event("targeted_effect_blocked", target.id, card_id=card.id, by="roof")
             else:
+                self._apply_attacker_card_bonus(state, player, target, card)
                 self._apply_targeted_card_effect(state, player, target, card)
         else:
             self._apply_self_card_effect(state, player, card, command)
@@ -1091,8 +1045,6 @@ class CityEngine:
             raise IllegalActionError("role pressure requires a role holder")
         if card.kind == "freeze" and not target.assets:
             raise IllegalActionError("freeze requires a target asset")
-        if card.kind == "remove_development" and not any(target.district_levels.values()):
-            raise IllegalActionError("target has no developed district")
 
     def _validate_card_costs(
         self,
@@ -1115,22 +1067,19 @@ class CityEngine:
             raise IllegalActionError(f"this card requires {card.value * POINTS_CARD_RATE} money")
         if card.kind == "capacity" and player.capacity >= MAX_CAPACITY:
             raise IllegalActionError("the business is already at the slot limit")
-        if card.kind in {"district_cash", "zoning", "develop"}:
+        if card.kind in {"district_cash", "zoning"}:
             district = self._payload_string(command, "district")
             if district not in DISTRICT_IDS:
                 raise InvalidCommandError(f"unknown district: {district}")
-            count = self.district_count(player, district)
-            if card.kind in {"district_cash", "zoning"} and count < 1:
+            if self.district_count(player, district) < 1:
                 raise IllegalActionError("the selected district needs an owned object")
-            if card.kind == "develop" and (count < 2 or player.district_levels[district] >= 2):
-                raise IllegalActionError("the selected district cannot be developed")
         if card.kind == "market_discount" and (len(player.assets) >= player.capacity or not state.market):
             raise IllegalActionError("there is no available object purchase")
         if card.kind == "unblock" and not any(asset.blocked for asset in player.assets):
             raise IllegalActionError("there is no blocked asset")
         if card.kind == "project":
             project_id = self._payload_string(command, "project_id")
-            if self.project(project_id).repeatable or project_id not in state.project_board:
+            if project_id not in state.project_board:
                 raise IllegalActionError("this card takes a project from the city board")
             if not self.project_requirement_met(player, self.project(project_id)):
                 raise IllegalActionError("the project condition is not met")
@@ -1167,10 +1116,6 @@ class CityEngine:
             state.turn_flags["market_discount"] = card.value
         elif kind == "zoning":
             player.zoning_district = str(command.payload["district"])
-        elif kind == "develop":
-            district = str(command.payload["district"])
-            player.district_levels[district] += 1
-            player.influence += card.value
         elif kind == "buy_points":
             # The one sink that does not need a slot, which is why it exists at all.
             player.money -= card.value * POINTS_CARD_RATE
@@ -1215,20 +1160,6 @@ class CityEngine:
                 key=lambda asset: self.owned_definition(asset).income,
             )
             blocked.blocked = False
-        elif kind == "antitrust":
-            state.antitrust_active = True
-            # Halves income for every player holding 4+ objects in one district at settlement, the
-            # player who played it included. Nothing else would announce that.
-            state.append_event(
-                "antitrust_activated",
-                player.id,
-                round_number=state.round_number,
-                affected_player_ids=[
-                    other.id
-                    for other in state.players
-                    if any(self.district_count(other, district) >= 4 for district in DISTRICT_IDS)
-                ],
-            )
         else:
             raise InvalidCommandError(f"unsupported non-targeted card kind: {kind}")
 
@@ -1287,20 +1218,6 @@ class CityEngine:
             self._log_asset_state_change(state, target, frozen, change="blocked", source=card.id)
         elif kind == "expose":
             self.add_scandal(state, target, 1)
-        elif kind == "remove_development":
-            # The token is not destroyed — a single card must not switch off the whole engine for
-            # good. It stops working until the round is settled, like a blocked object.
-            # A demolition order takes a level, not the object: districts are the long game, and a
-            # card that erased one outright would be the strongest attack in the deck.
-            district = max(target.district_levels, key=lambda item: target.district_levels[item])
-            target.district_levels[district] -= 1
-            state.append_event(
-                "development_removed",
-                attacker.id,
-                target_id=target.id,
-                district=district,
-                level=target.district_levels[district],
-            )
         elif kind == "mixed_fine":
             target.money = max(0, target.money - self._round_scaled(state, 2))
             target.influence = max(0, target.influence - 1)
@@ -1343,14 +1260,16 @@ class CityEngine:
                 # actions plus both powers. The publication now costs a turn and hits twice as hard.
                 self._spend_action(state)
                 player.influence -= 3
-            else:
-                # The self-scandal is your own choice, so a roof never cancels it.
-                self.add_scandal(state, player, 1)
             # Every other targeted effect checks the roof; these two used to punch straight through.
             if target.roofs > 0:
                 target.roofs -= 1
                 state.append_event("targeted_effect_blocked", target.id, power=power, by="roof")
             else:
+                if power == "journalist_inflate":
+                    # Inflating a story splashes back on the journalist — but only if the story ran.
+                    # Paid before the roof check, the role bought its own way out of the seat at the
+                    # six-scandal limit for attacks that never landed.
+                    self.add_scandal(state, player, 1)
                 self.add_scandal(state, target, landed)
         elif power == "mafia_racket":
             self._mafia_racket(state, command)
@@ -1546,37 +1465,21 @@ class CityEngine:
     }
 
     GREY_OPERATION_DISTRICTS = {
-        "cash": ("shadows",),
-        "market": ("shadows",),
+        "smear": ("shadows",),
+        "roof_break": ("shadows",),
         "crypto": ("tech", "shadows"),
         "datacenter": ("tech", "shadows"),
         "influence_broker": ("shadows", "government"),
     }
     GREY_ASSET_IDS = tuple(GREY_OPERATION_DISTRICTS)
-    GREY_TARGETED_IDS = ("market", "datacenter", "influence_broker")
-    # Trimmed with the gate: both of these are now reachable from any Серый сектор object rather
-    # than from one card, and the two cheapest operations were the ones already being used.
-    # Every chance below is 15 points under what it used to be, because success now pays victory
-    # points on top of the loot — see GREY_OPERATION_POINTS. The two that cost two scandals are the
-    # two longest odds and carry the larger payout.
-    GREY_BASE_CHANCE = {
-        "cash": 0.65,
-        "market": 0.55,
-        "crypto": 0.45,
-        "datacenter": 0.40,
-        "influence_broker": COMPROMAT_CHANCE,
-    }
-    # A leak and a hack are two scandals; the rest are one.
-    GREY_SUCCESS_SCANDALS = {"datacenter": 2, "influence_broker": 2}
-    # The same two pay the higher score: they are the dangerous ones.
-    GREY_SUCCESS_POINTS = {
-        "datacenter": GREY_OPERATION_POINTS_HARD,
-        "influence_broker": GREY_OPERATION_POINTS_HARD,
-    }
+    # The smear and the pump reach every rival at once, so they ask for no target; the other three
+    # are pointed at one player.
+    GREY_TARGETED_IDS = ("roof_break", "datacenter", "influence_broker")
+    GREY_BASE_CHANCE = GREY_OPERATION_CHANCE
 
     def grey_operation_points(self, asset_id: str) -> int:
-        """Victory points a successful run of this operation scores."""
-        return self.GREY_SUCCESS_POINTS.get(asset_id, GREY_OPERATION_POINTS)
+        """Victory points a successful run of this operation scores, before any per-effect bonus."""
+        return GREY_OPERATION_POINTS[asset_id]
 
     def grey_operation_unlocked(self, player: PlayerState, operation_id: str) -> bool:
         """Does the player hold an active object of a district this operation runs out of?"""
@@ -1585,33 +1488,36 @@ class CityEngine:
             for district in self.GREY_OPERATION_DISTRICTS.get(operation_id, ())
         )
 
-    def laundering_cost(self, state: GameState) -> int:
-        """What laundering money into influence costs, growing with the round like the roof does."""
-        return LAUNDERING_BASE_COST + floor(state.round_number / 2)
+    def hack_influence_steal(self, state: GameState) -> int:
+        """How much influence a hack takes. Grows with the round — see HACK_INFLUENCE_BASE."""
+        return HACK_INFLUENCE_BASE + floor(state.round_number / 3)
 
-    def laundering_gain(self, state: GameState) -> int:
-        """How much influence a laundering run pays. Grows faster than the stake — see the constant."""
-        return LAUNDERING_BASE_GAIN + floor(state.round_number / 3)
+    def pump_drain(self, state: GameState) -> int:
+        """What the pump takes from each rival, growing with the round like every money figure."""
+        return PUMP_DRAIN_BASE + floor(state.round_number / 2)
 
     def _grey_operation(self, state: GameState, command: Command) -> None:
         player = state.current_player
         asset_id = self._payload_string(command, "asset_id")
         if asset_id not in self.GREY_ASSET_IDS:
             raise InvalidCommandError("unknown grey operation asset")
+        if self._flag(state, GREY_OPERATION_FLAG):
+            raise IllegalActionError("only one grey operation may be run per turn")
         if not self.grey_operation_unlocked(player, asset_id):
             raise IllegalActionError("the operation requires an active object of the right district")
         target: PlayerState | None = None
         if asset_id in self.GREY_TARGETED_IDS:
             target = self._target_player(state, player, self._payload_string(command, "target_id"))
-        if asset_id == "cash" and player.money < self.laundering_cost(state):
-            raise IllegalActionError(f"laundering requires {self.laundering_cost(state)} money")
-        if asset_id == "influence_broker":
-            self._validate_compromat(state, player, target)
+        if asset_id == "roof_break" and (target is None or target.roofs < 1):
+            raise IllegalActionError("breaking a roof requires a target who holds one")
+        if asset_id == "influence_broker" and (target is None or target.role is None):
+            raise IllegalActionError("a compromat leak requires a target who holds a role")
         self._spend_action(state)
+        # Marked before the roll: the turn's one attempt is the attempt, not the hit. Refunding a
+        # miss would let a player re-roll the same operation until it landed, which is the opposite
+        # of a cap — and it would make the long-odds operations the safest ones to open with.
+        self._mark_flag(state, GREY_OPERATION_FLAG)
         before = self._resource_snapshot(state)
-        if asset_id == "influence_broker":
-            # Spent whether or not the leak lands: a failed attempt still burns the round.
-            player.compromat_round = state.round_number
 
         place = next(index for index, ranked in enumerate(self.ranking(state), start=1) if ranked.id == player.id)
         # One flat number. The old bonus was "+20% for the role, +10% more for any Технокластер
@@ -1624,40 +1530,44 @@ class CityEngine:
         # and no influence at all. Kept deliberately small — 1◆ is worth 3.3 times a dollar.
         comeback = (place - 1) if self.has_role(player, "fraudster") else 0
         points = 0
+        blocked = False
         if success:
-            self._resolve_grey_success(state, player, target, asset_id, comeback)
-            # The point payout is the reason the odds came down; it is what makes the operation
-            # worth an action at all, since the loot alone is money and money is 10$ to the point.
-            points = self.grey_operation_points(asset_id)
-            player.bonus_points += points
-            operation_scandals = self.GREY_SUCCESS_SCANDALS.get(asset_id, 1)
-            self.add_scandal(
-                state,
-                player,
-                max(0, operation_scandals - self.effect_total(player, "greyScandalReduction")),
-            )
-            if self.has_role(player, "mafia"):
-                state.turn_flags["mafia_operation_bonus"] = 1
+            # A roll can succeed and still change nothing: a Крыша absorbs the whole effect. Every
+            # reward is priced against real damage, so all of it hangs on ``landed`` — a run that
+            # hits nothing but roofs pays no points, costs no scandal and grants no comeback.
+            landed, bonus_points = self._resolve_grey_success(state, player, target, asset_id, comeback)
+            blocked = not landed
+            if landed:
+                points = self.grey_operation_points(asset_id) + bonus_points
+                player.bonus_points += points
+                self._charge_grey_scandals(state, player, GREY_SUCCESS_SCANDALS)
+                if self.has_role(player, "mafia"):
+                    state.turn_flags["mafia_operation_bonus"] = 1
         else:
-            self._resolve_grey_failure(state, player, asset_id, bool(command.payload.get("protect_failure")))
+            # A miss does nothing at all — no stake lost, no object frozen, no roof burnt. The
+            # penalty is the extra scandal and the action, one rule for all five operations.
+            self._charge_grey_scandals(state, player, GREY_FAILURE_SCANDALS)
         state.append_event(
             "grey_operation_resolved",
             player.id,
             asset_id=asset_id,
             target_id=target.id if target else None,
             success=success,
+            # A successful roll that a roof swallowed. Distinct from ``success=False``: the analytics
+            # need to tell "the odds failed" apart from "the defence held".
+            blocked=blocked,
             chance=chance,
             points=points,
             deltas=self._resource_deltas(state, before),
         )
 
-    def _validate_compromat(self, state: GameState, player: PlayerState, target: PlayerState | None) -> None:
-        if target is None or target.role is None:
-            raise IllegalActionError("a compromat leak requires a target who holds a role")
-        if player.influence < COMPROMAT_INFLUENCE:
-            raise IllegalActionError(f"a compromat leak requires {COMPROMAT_INFLUENCE} influence")
-        if player.compromat_round == state.round_number:
-            raise IllegalActionError("a compromat leak may only be attempted once per round")
+    def _charge_grey_scandals(self, state: GameState, player: PlayerState, amount: int) -> None:
+        """One scandal for a hit, two for a miss, less with the perk that exists to soften both.
+
+        A Крыша never touches these: the scandal is the player's own doing, and add_scandal is the
+        line where that rule lives.
+        """
+        self.add_scandal(state, player, max(0, amount - self.effect_total(player, "greyScandalReduction")))
 
     def _resolve_grey_success(
         self,
@@ -1666,96 +1576,89 @@ class CityEngine:
         target: PlayerState | None,
         asset_id: str,
         comeback: int,
-    ) -> None:
-        if asset_id == "cash":
-            # Reversed: money buys influence. See LAUNDERING_BASE_GAIN for why both sides scale.
-            player.money -= self.laundering_cost(state)
-            player.influence += self.laundering_gain(state)
-            player.influence += comeback
-        elif asset_id == "market" and target is not None:
-            cap = 3 + floor(state.round_number / 2)
-            if target.roofs > 0:
-                target.roofs -= 1
+    ) -> tuple[bool, int]:
+        """Apply the effect. Returns whether anything landed, and any points the effect itself earned.
+
+        ``False`` means every rival the operation reached was behind a Крыша, so nothing happened —
+        no points, no scandal, no comeback. The two table-wide operations count as landed the moment
+        one rival takes the hit: rolling well and being blocked by all three at once is the same
+        empty result as a miss, but being blocked by one of three is not.
+        """
+        rivals = [other for other in state.players if other.id != player.id]
+        if asset_id == "smear":
+            # A scandal on every rival at once. Each roof answers for its own owner, so a single
+            # action can strip three of them — the only thing in the game that outpaces the
+            # defence, and the reason the odds sit below its neighbours'.
+            landed = False
+            for rival in rivals:
+                if rival.roofs > 0:
+                    rival.roofs -= 1
+                    state.append_event("targeted_effect_blocked", rival.id, asset_id=asset_id, by="roof")
+                    continue
+                self.add_scandal(state, rival, 1)
+                landed = True
+            if landed:
                 player.influence += comeback
-                state.append_event("targeted_effect_blocked", target.id, asset_id=asset_id, by="roof")
-            else:
-                stolen = min(cap, target.money)
-                target.money -= stolen
-                player.money += stolen
+            return landed, 0
+        if asset_id == "crypto":
+            # The pump drains the whole table into one wallet instead of paying its owner out of
+            # thin air and jabbing the leader on the side. It is the money operation, and it is the
+            # only one whose payout grows with the number of players.
+            drain = self.pump_drain(state)
+            landed = False
+            for rival in rivals:
+                if rival.roofs > 0:
+                    rival.roofs -= 1
+                    state.append_event("targeted_effect_blocked", rival.id, asset_id=asset_id, by="roof")
+                    continue
+                taken = min(drain, rival.money)
+                rival.money -= taken
+                player.money += taken
+                landed = True
+            if landed:
                 player.influence += comeback
-        elif asset_id == "crypto":
-            player.money += 6 + state.round_number
+            return landed, 0
+        if asset_id == "roof_break" and target is not None:
+            # The one attack a Крыша cannot answer, because the Крыша is what it is aimed at.
+            # Blocking it with the very token it removes would make the stack self-defending and
+            # the whole operation unreachable.
+            taken = target.roofs
+            target.roofs = 0
             player.influence += comeback
-            leader = self.ranking(state)[0]
-            if leader.id != player.id:
-                if leader.roofs > 0:
-                    leader.roofs -= 1
-                    state.append_event("targeted_effect_blocked", leader.id, asset_id=asset_id, by="roof")
-                else:
-                    leader.money = max(0, leader.money - (2 + floor(state.round_number / 2)))
-        elif asset_id == "datacenter" and target is not None:
-            # Straight influence theft. It used to block the target's best object for a round —
-            # worth about 4$ to somebody sitting on 264$, and used zero times in 24 games.
-            player.influence += comeback
+            state.append_event("roofs_broken", player.id, target_id=target.id, roofs=taken)
+            # A point per token: without it the operation is a pure set-up whose value is shared
+            # with everybody at the table, and nobody spends an action and a scandal on that.
+            return True, taken * ROOF_BREAK_POINT_PER_ROOF
+        if asset_id == "datacenter" and target is not None:
             if target.roofs > 0:
                 # A roof absorbs any incoming negative effect, hacking included.
                 target.roofs -= 1
                 state.append_event("targeted_effect_blocked", target.id, asset_id=asset_id, by="roof")
-            else:
-                stolen = min(HACK_INFLUENCE_STEAL, target.influence)
-                target.influence -= stolen
-                player.influence += stolen
-        elif asset_id == "influence_broker" and target is not None:
-            player.influence -= COMPROMAT_INFLUENCE
+                return False, 0
+            stolen = min(self.hack_influence_steal(state), target.influence)
+            target.influence -= stolen
+            player.influence += stolen
             player.influence += comeback
-            self._resolve_compromat(state, player, target)
+            return True, 0
+        if asset_id == "influence_broker" and target is not None:
+            if not self._resolve_compromat(state, player, target):
+                return False, 0
+            player.influence += comeback
+            return True, 0
+        return False, 0
 
-    def _resolve_compromat(self, state: GameState, player: PlayerState, target: PlayerState) -> None:
-        """Strip the target's role unless a Крыша takes the hit instead."""
+    def _resolve_compromat(self, state: GameState, player: PlayerState, target: PlayerState) -> bool:
+        """Strip the target's role unless a Крыша takes the hit instead. ``False`` if it was blocked."""
         if target.roofs > 0:
             target.roofs -= 1
             state.append_event("targeted_effect_blocked", target.id, asset_id="influence_broker", by="roof")
-            return
+            return False
         lost_role = target.role
         target.role = None
         # The seat opens at the free price: a stripped role is not held by anybody any more, so the
         # threefold takeover no longer applies and the leak has actually changed the board.
         state.append_event("role_stripped", player.id, target_id=target.id, role_id=lost_role)
-
-    def _resolve_grey_failure(
-        self,
-        state: GameState,
-        player: PlayerState,
-        asset_id: str,
-        protect_failure: bool,
-    ) -> None:
-        protected = protect_failure and player.roofs > 0
-        if protected:
-            player.roofs -= 1
-        elif asset_id == "cash":
-            # The launderer keeps the stake and delivers nothing.
-            player.money = max(0, player.money - self.laundering_cost(state))
-        elif asset_id == "market":
-            if player.roofs > 0:
-                player.roofs -= 1
-        elif asset_id == "crypto":
-            player.money = max(0, player.money - 5)
-        elif asset_id in {"datacenter", "influence_broker"}:
-            # A botched hack or leak costs influence, not a blocked object: the block was the
-            # mechanic this pass removed, and re-using it on failure would keep it alive.
-            player.influence = max(0, player.influence - 2)
-        failure_scandals = (
-            1
-            if self.has_role(player, "fraudster")
-            else 3
-            if asset_id in {"crypto", "datacenter", "influence_broker"}
-            else 2
-        )
-        self.add_scandal(
-            state,
-            player,
-            max(0, failure_scandals - self.effect_total(player, "greyScandalReduction")),
-        )
+        return True
 
     def scandal_limit(self, player: PlayerState) -> int:
         """At how many scandals the role is lost. Jail follows one step later.
@@ -1860,7 +1763,6 @@ class CityEngine:
         state.turns_taken_in_round = 0
         self._set_turn_order(state)
         state.turn_serial += 1
-        state.antitrust_active = False
         self._rotate_market(state)
         self._shuffle_action_deck(state)
         self._rotate_project_board(state)
@@ -2026,32 +1928,26 @@ class CityEngine:
         return {"money": money, "influence": influence}
 
     def _income_breakdown(self, state: GameState, player: PlayerState) -> dict[str, int]:
-        """Round money, itemised. ``objects`` is gross of antitrust so the row still sums right.
+        """Round money, itemised.
 
         No asset in the catalog carries ``passiveMoney`` — it is a project-perk key — so the
         ``projects`` row is exactly what the finished projects pay.
         """
         objects = 0
-        antitrust = 0
         for owned in player.assets:
             if owned.blocked:
                 continue
             asset = self.owned_definition(owned)
-            base = asset.income
-            # +25% per development level, each level rounded up on its own. A single floor over the
-            # whole product paid nothing for the first level on every 1-3$ object, and the early
-            # market is made of exactly those, so the step was dead by definition.
-            for _ in range(player.district_levels[asset.district]):
-                base = ceil(base * 1.25)
-            object_income = base + self.object_synergy_income(state, player, owned)
-            objects += object_income
-            if state.antitrust_active and self.district_count(player, asset.district) >= 4:
-                antitrust += object_income - floor(object_income / 2)
+            # The printed income, flat. District development used to multiply this by 1.25 per
+            # level, up to twice, for 2$ and one action — by far the cheapest exponent in the game
+            # and the thing that made building strictly better than anything else a turn could buy.
+            # Depth is still rewarded, but through synergy and influence, which no multiplier
+            # compounds. See object_synergy_income.
+            objects += asset.income + self.object_synergy_income(state, player, owned)
         return {
             "objects": objects,
             "projects": self.effect_total(player, "passiveMoney"),
             "residents_tax": self.residents_tax(state, player),
-            "antitrust": -antitrust,
         }
 
     def residents_tax(self, state: GameState, player: PlayerState) -> int:
@@ -2156,8 +2052,19 @@ class CityEngine:
             active_district = not bonus.get("district") or self.has_district_link(player, bonus["district"])
             if active_role and active_district:
                 object_effects += int(bonus["value"])
+        # The reward for building deep. Development used to be it, and it paid in money multiplied
+        # by itself; this pays a flat token in the currency projects are bought with, and only from
+        # round four or so, because the objects that carry it are the late ones. Deliberately an
+        # explicit effect rather than "epics behave differently": a rule the card prints beats a
+        # rule the player has to learn.
+        synergy = sum(
+            int(self.owned_definition(owned).effects.get("synergyInfluence", 0))
+            for owned in active
+            if self.district_count(player, self.owned_definition(owned).district) >= 4
+        )
         return {
             "objects": object_effects,
+            "synergy": synergy,
             "administrative": administrative,
             "industrial": industrial,
             "projects": self.effect_total(player, "passiveInfluence"),
