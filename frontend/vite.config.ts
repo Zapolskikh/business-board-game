@@ -1,5 +1,6 @@
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import { execSync } from "node:child_process";
 
 function git(command: string, fallback: string): string {
@@ -18,8 +19,12 @@ const gameVersion = `0.1.${revision}+${sha}${dirty}`;
 // The client talks to the FastAPI backend on :8000. In dev we proxy /api so the
 // browser sees a same-origin URL and there are no CORS surprises.
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   define: { __GAME_VERSION__: JSON.stringify(gameVersion) },
+  test: {
+    environment: "node",
+    include: ["src/**/*.test.{ts,tsx}"],
+  },
   server: {
     port: 5173,
     proxy: {

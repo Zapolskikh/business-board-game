@@ -43,6 +43,9 @@ export interface PlayerState {
   roofs: number;
   // Engine-derived: 2 by default, 3 for the Мафия, plus any object that raises the cap.
   roof_limit: number;
+  // Engine-derived too: 5 for everybody, 6 for the Журналист. The role is stripped on reaching
+  // it and the arrest follows one step later.
+  scandal_limit: number;
   role: string | null;
   jail_turns: number;
   assets: OwnedAsset[];
@@ -106,6 +109,9 @@ export interface GameState {
   // Every perk of the viewer's role: what it pays now, the ceiling, and the district that
   // unlocks the difference. Computed by the engine — the client only prints labels.
   role_perks?: { key: string; value: number; potential?: number; needs?: string | null }[];
+  // What a Крыша costs the viewer right now: the price grows with the round and the Мафия pays
+  // one less. Shipped rather than derived — the client's copy of the formula drifted once already.
+  roof_price?: number;
   // The viewer's own standing on every board condition, counted by the engine — never here.
   project_progress?: Record<string, { binary: boolean; met: boolean; have: number; needed: number }>;
   turn_flags: Record<string, unknown>;
@@ -188,6 +194,9 @@ export interface ScoringMeta {
   hack_influence_base: number;
   pump_drain_base: number;
   roof_break_point_per_roof: number;
+  // Price of the next city slot, keyed by the capacity the player has now (JSON string keys).
+  capacity_costs?: Record<string, number>;
+  max_capacity?: number;
 }
 
 export interface CityMeta {

@@ -102,9 +102,13 @@ def room_view(
             player["hand_count"] = len(player.pop("hand"))
     # The Крыша cap is engine-derived — the Мафия gets one more and two objects raise it — so the
     # board printed a bare "🛡 2" that told nobody whether another token could still be bought.
+    # Both limits are engine-derived — the Мафия gets one more Крыша, the Журналист one more
+    # scandal, and objects can raise the roof cap — so the board printed bare "🛡 2" and a
+    # hardcoded "/5" that was simply wrong for one role in six.
     for player_state in room.game.players:
         view = next(item for item in game["players"] if item["id"] == player_state.id)
         view["roof_limit"] = engine.roof_limit(player_state)
+        view["scandal_limit"] = engine.scandal_limit(player_state)
     # The viewer's own price for every market slot: discounts are per-player, so the client
     # must not recompute them (two implementations of asset_price already drifted apart once).
     viewer_for_role = next((player for player in room.game.players if player.id == viewer_id), None)
@@ -112,6 +116,10 @@ def room_view(
     # add. A perk that silently pays less is invisible, which is the bug we fixed on the board.
     if viewer_for_role is not None:
         game["role_perks"] = engine.role_perks(room.game, viewer_for_role)
+        # The Крыша price grows with the round and the Мафия pays one less. The client kept its
+        # own copy of that formula, comment and all, and the comment still described a mechanic
+        # deleted in 1.4.0 — so the price ships from the engine instead.
+        game["roof_price"] = engine.roof_price(room.game, viewer_for_role)
     # The viewer's own progress on every board condition. Only the viewer's: showing everybody's
     # was considered and dropped — it turns four cards into a table nobody reads.
     viewer = next((player for player in room.game.players if player.id == viewer_id), None)

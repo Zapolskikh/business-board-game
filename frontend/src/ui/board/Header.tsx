@@ -1,0 +1,200 @@
+import type { ReactNode } from "react";
+import type { CityMeta, GameState, PlayerState } from "../../online/types";
+import { CardPopover } from "../primitives/CardPopover";
+import { ActionsDetails, DefenceDetails, ScoreDetails } from "./headerPopovers";
+import { atScandalRisk, scandalLimit } from "../lib/board";
+
+function Res({ children, label }: { children: ReactNode; label: string }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      className="flex items-center gap-1 rounded-[14px] px-2 py-[3px] text-[13px] font-bold
+        whitespace-nowrap hover:bg-panel-3"
+    >
+      {children}
+    </button>
+  );
+}
+
+const Sep = () => <span className="h-4 w-px bg-line-2" />;
+
+/* Шапка: слева кто мы и где, по центру всё, на что смотрят перед кликом, справа выходы.
+ *
+ * Ресурсы кликабельны — каждый открывает поповер с тем, что раньше жило в атрибуте title.
+ */
+export function Header({
+  game,
+  me,
+  meta,
+  roomName,
+  unseenEvents,
+  onChronicle,
+  onRules,
+  onExit,
+}: {
+  game: GameState;
+  me: PlayerState;
+  meta: CityMeta;
+  roomName: string;
+  unseenEvents: number;
+  onChronicle: () => void;
+  onRules: () => void;
+  onExit: () => void;
+}) {
+  const score = game.score_breakdown?.[me.id]?.total ?? 0;
+  const risky = atScandalRisk(me);
+
+  return (
+    <header className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-panel
+      border border-line bg-panel px-2.5 py-1.5">
+      <div className="flex items-baseline gap-2.5">
+        <b className="text-base font-extrabold">Город влияния</b>
+        <span className="text-[11px] text-ink-muted">
+          Раунд {game.round_number} / {game.max_rounds}
+        </span>
+        <em className="text-3xs not-italic text-ink-dim">{roomName}</em>
+      </div>
+
+      <div className="flex items-center gap-1 justify-self-center rounded-[20px] border border-line
+        bg-panel-2 px-1.5 py-1">
+        <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
+          <Res label="Очки">🏆 {score}</Res>
+        </CardPopover>
+        <Sep />
+        <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
+          <Res label="Деньги">💰 {me.money}</Res>
+        </CardPopover>
+        <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
+          <Res label="Влияние">◆ {me.influence}</Res>
+        </CardPopover>
+        <Sep />
+        <CardPopover side="bottom" align="center" content={<DefenceDetails game={game} me={me} />}>
+          <Res label="Крыши">
+            🛡 {me.roofs}
+            <span className="text-2xs font-normal text-ink-dim">/{me.roof_limit}</span>
+          </Res>
+        </CardPopover>
+        <CardPopover side="bottom" align="center" content={<DefenceDetails game={game} me={me} />}>
+          <Res label="Скандалы">
+            <span className={risky ? "text-gold" : undefined}>
+              ⚠ {me.scandals}
+              <span className="text-2xs font-normal text-ink-dim">/{scandalLimit(me)}</span>
+            </span>
+          </Res>
+        </CardPopover>
+        <Sep />
+        <CardPopover side="bottom" align="center" content={<ActionsDetails game={game} />}>
+          <Res label="Действия">
+            Действия
+            <span className="ml-0.5 flex gap-[3px]">
+              {Array.from({ length: Math.max(3, game.actions_left) }).map((_, index) => (
+                <i
+                  key={index}
+                  className={`size-2 rounded-full ${
+                    index < game.actions_left ? "bg-good shadow-[0_0_6px_#39c47a66]" : "bg-line-2"
+                  }`}
+                />
+              ))}
+            </span>
+          </Res>
+        </CardPopover>
+      </div>
+
+      <div className="flex gap-1.5">
+        <button
+          type="button"
+          onClick={onChronicle}
+          className="relative rounded-md border border-line bg-panel-2 px-2.5 py-1.5 text-[11.5px]
+            whitespace-nowrap hover:border-accent"
+        >
+          📜 Хроника
+          {unseenEvents > 0 && (
+            <b className="absolute -right-1.5 -top-1.5 min-w-4 rounded-[9px] bg-bad px-1 text-center
+              text-3xs font-bold text-[#2a0a0a]">
+              {Math.min(unseenEvents, 99)}
+            </b>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={onRules}
+          className="rounded-md border border-line bg-panel-2 px-2.5 py-1.5 text-[11.5px]
+            whitespace-nowrap hover:border-accent"
+        >
+          📖 Правила
+        </button>
+        <button
+          type="button"
+          onClick={onExit}
+          className="rounded-md border border-line bg-panel-2 px-2.5 py-1.5 text-[11.5px]
+            whitespace-nowrap hover:border-accent"
+        >
+          ← Комнаты
+        </button>
+      </div>
+    </header>
+  );
+}
+
+/* Полоса статуса. Схлопывается, когда сказать нечего, — на доске это единственный элемент,
+ * который занимает высоту только по делу. */
+export function StatusBar({
+  game,
+  me,
+  busy,
+  error,
+}: {
+  game: GameState;
+  me: PlayerState;
+  busy: boolean;
+  error: string;
+}) {
+  const current = game.players[game.current_player_index];
+  const mine = current?.id === me.id;
+
+  if (error) {
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-[#7d3c45] bg-[#2a1519] px-2.5 py-1
+        text-[11.5px] text-[#ffb3b3]">
+        <span>⚠</span>
+        <span>{error}</span>
+      </div>
+    );
+  }
+  if (busy) {
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-[#34507a] bg-[#1a2740] px-2.5 py-1
+        text-[11.5px] text-[#bcd6f5]">
+        <span className="size-2.5 animate-spin rounded-full border-2 border-accent border-r-transparent" />
+        <span>Сервер выполняет команду и ходы ботов…</span>
+      </div>
+    );
+  }
+  if (game.status === "finished") {
+    return (
+      <div className="rounded-md border border-[#6b5518] bg-[#2a2411] px-2.5 py-1 text-[11.5px] text-gold">
+        🏁 Партия окончена
+      </div>
+    );
+  }
+  if (!mine) {
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-line bg-panel-2 px-2.5 py-1
+        text-[11.5px] text-ink-muted">
+        <span>⏳</span>
+        <span>
+          Ход игрока <b className="text-ink">{current?.name}</b>
+        </span>
+      </div>
+    );
+  }
+  if (me.jail_turns > 0) {
+    return (
+      <div className="rounded-md border border-[#7d3c45] bg-[#2a1519] px-2.5 py-1 text-[11.5px] text-[#ffb3b3]">
+        🚔 Тюрьма: пропускаете ходов {me.jail_turns}
+      </div>
+    );
+  }
+  return <div className="hidden" />;
+}

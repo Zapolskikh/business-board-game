@@ -1,0 +1,113 @@
+/* Тема нового интерфейса.
+ *
+ * Preflight намеренно не импортируется: старый UI (styles.css) живёт в этом же бандле,
+ * пока v2 не заменит его целиком, и глобальный ресет Tailwind ему всё сломает.
+ * Вместо него — тот же ресет, но ограниченный поддеревом .ui-v2 (см. @layer base ниже).
+ */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+@theme {
+  /* Шрифт тот же, что в styles.css: два интерфейса не должны отличаться начертанием,
+   * пока они живут рядом. */
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Палитра перенесена из styles.css один в один — цвета игры не меняются. */
+  --color-surface: #091019;
+  --color-panel: #111b27;
+  --color-panel-2: #172434;
+  --color-panel-3: #1e2f42;
+  --color-line: #2d3d50;
+  --color-line-2: #3a4d63;
+  --color-ink: #eef4fb;
+  --color-ink-muted: #95a7ba;
+  --color-ink-dim: #6d8098;
+  --color-accent: #55b5ff;
+  --color-good: #39c47a;
+  --color-bad: #ff6b6b;
+  --color-gold: #f2c14e;
+
+  /* Районы — из backend/city_engine/content/catalog.json. Единственный источник правды
+   * всё равно бэкенд: он присылает district.color в /meta. Здесь копия для статичных
+   * случаев (легенды, фикстуры), в рантайме цвет берётся из meta. */
+  --color-d-residential: #4fa3d1;
+  --color-d-business: #d7aa3d;
+  --color-d-industrial: #b56f42;
+  --color-d-tech: #9b6ee7;
+  --color-d-government: #5f78c8;
+  --color-d-shadows: #8a455e;
+
+  --color-rar-common: #6d8098;
+  --color-rar-uncommon: #4fa3d1;
+  --color-rar-rare: #9b6ee7;
+  --color-rar-epic: #e0803f;
+  --color-rar-legendary: #f2c14e;
+
+  /* Доска плотная: рабочий размер 12px, ниже него две ступени для подписей. */
+  --text-3xs: 0.5625rem;
+  --text-3xs--line-height: 1.2;
+  --text-2xs: 0.625rem;
+  --text-2xs--line-height: 1.25;
+
+  --radius-card: 7px;
+  --radius-panel: 8px;
+}
+
+@layer base {
+  /* Ресет вместо preflight, ограниченный новым интерфейсом.
+   * border-style: solid обязателен — утилита `border` задаёт только ширину,
+   * а стиль по умолчанию none, и рамка просто не рисуется. */
+  .ui-v2,
+  .ui-v2 *,
+  .ui-v2 *::before,
+  .ui-v2 *::after {
+    box-sizing: border-box;
+    border: 0 solid var(--color-line);
+    margin: 0;
+    padding: 0;
+  }
+
+  .ui-v2 button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .ui-v2 button:disabled {
+    cursor: not-allowed;
+  }
+
+  .ui-v2 ul {
+    list-style: none;
+  }
+
+  .ui-v2 h1,
+  .ui-v2 h2,
+  .ui-v2 h3,
+  .ui-v2 h4 {
+    font-size: inherit;
+    font-weight: inherit;
+  }
+
+  /* Появление поповера. Отдельной зависимости (tailwindcss-animate) ради двух кадров
+   * не нужно — Radix сам ставит data-state на контент, к нему и цепляемся. */
+  .ui-v2[data-state="open"] {
+    animation: v2-pop-in 120ms ease-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ui-v2[data-state="open"] {
+      animation: none;
+    }
+  }
+}
+
+@keyframes v2-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}

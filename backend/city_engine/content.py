@@ -12,6 +12,7 @@ from typing import Any
 from city_engine.constants import (
     ACTION_CARD_COST,
     CAMPAIGN_TIERS,
+    CAPACITY_COSTS,
     CARD_DISCARD_VALUE,
     CONTENT_VERSION,
     CRISIS_PR_INFLUENCE,
@@ -25,6 +26,7 @@ from city_engine.constants import (
     LOBBYING_INFLUENCE,
     LOBBYING_POINTS,
     MARKET_ROTATION_SIZE,
+    MAX_CAPACITY,
     MONEY_PER_POINT,
     PATRONAGE_MONEY,
     PATRONAGE_POINTS,
@@ -233,6 +235,11 @@ class ContentCatalog:
             "hack_influence_base": HACK_INFLUENCE_BASE,
             "pump_drain_base": PUMP_DRAIN_BASE,
             "roof_break_point_per_roof": ROOF_BREAK_POINT_PER_ROOF,
+            # What the next city slot costs, keyed by the capacity the player has now. The React
+            # client kept its own copy of this table and printed the wrong price the moment the
+            # ladder changed; the engine owns the ladder, so the engine ships it.
+            "capacity_costs": {str(capacity): cost for capacity, cost in sorted(CAPACITY_COSTS.items())},
+            "max_capacity": MAX_CAPACITY,
         }
         return raw
 
