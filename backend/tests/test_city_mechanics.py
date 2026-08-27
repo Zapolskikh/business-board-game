@@ -4,6 +4,7 @@ import pytest
 
 from city_engine.commands import Command
 from city_engine.constants import (
+    ACTION_DECK_COPIES,
     CAMPAIGN_TIERS,
     CASH_TO_INFLUENCE_MONEY,
     CRYPTO_SCAM_SCANDALS,
@@ -69,6 +70,32 @@ def give_card(state, player, card_id: str) -> HeldCard:
     held = HeldCard(uid=f"held:{player.id}:{card_id}", card_id=card_id)
     player.hand.append(held)
     return held
+
+
+def test_the_action_deck_holds_several_copies_of_every_card() -> None:
+    """One copy each ran the deck dry around round 9, which deleted the card layer exactly when
+    the late game has the fewest things left to spend an action on."""
+    catalog = load_catalog()
+    state = make_state()
+
+    assert len(state.action_deck) == len(catalog.action_cards) * ACTION_DECK_COPIES
+    assert all(state.action_deck.count(card_id) == ACTION_DECK_COPIES for card_id in catalog.action_cards)
+
+
+def test_two_copies_of_one_card_are_told_apart_in_hand() -> None:
+    """The uid used to be the card id, which was unique only while the deck was."""
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    state.action_deck = ["subsidy", "subsidy", "subsidy"]
+
+    first = engine._draw_action_card(state, player)
+    second = engine._draw_action_card(state, player)
+
+    assert first is not None and second is not None
+    assert first.card_id == second.card_id == "subsidy"
+    assert first.uid != second.uid
+    assert len({card.uid for card in player.hand}) == len(player.hand)
 
 
 def test_selling_an_object_refunds_half_its_price() -> None:
@@ -287,6 +314,44 @@ def test_deal_cards_apply_discounts_and_only_one_card_per_turn() -> None:
     assert engine.asset_price(state, state.current_player, state.market[0].card_id) == max(1, original_price - 4)
     legal = engine.legal_actions(state, state.current_player.id)
     assert not any(action["type"] == "play_action_card" for action in legal)
+
+
+def test_a_vote_of_no_confidence_that_takes_a_role_says_so() -> None:
+    """Losing a role is the loudest thing on the board, and this path used to do it in silence."""
+    engine = CityEngine()
+    state = make_state()
+    actor = state.current_player
+    target = rival_of(state, actor)
+    target.role = "capitalist"
+    target.influence = 2  # below the card's value, so the seat goes instead of the influence
+    held = give_card(state, actor, "vote")
+
+    state = run(engine, state, "play_action_card", {"card_uid": held.uid, "target_id": target.id})
+
+    hit = state.player_by_id(target.id)
+    assert (hit.role, hit.influence) == (None, 0)
+    stripped = next(event for event in state.event_log if event.type == "role_stripped")
+    assert (stripped.actor_id, stripped.data["target_id"], stripped.data["role_id"]) == (
+        actor.id,
+        target.id,
+        "capitalist",
+    )
+
+
+def test_a_vote_of_no_confidence_that_can_be_paid_leaves_the_role_alone() -> None:
+    engine = CityEngine()
+    state = make_state()
+    actor = state.current_player
+    target = rival_of(state, actor)
+    target.role = "capitalist"
+    target.influence = 9
+    held = give_card(state, actor, "vote")
+
+    state = run(engine, state, "play_action_card", {"card_uid": held.uid, "target_id": target.id})
+
+    hit = state.player_by_id(target.id)
+    assert (hit.role, hit.influence) == ("capitalist", 6)
+    assert not any(event.type == "role_stripped" for event in state.event_log)
 
 
 def test_sixth_scandal_jails_the_actor_and_burns_the_rest_of_the_turn() -> None:
@@ -860,7 +925,7 @@ def test_the_grey_cap_resets_on_the_next_turn() -> None:
     assert any(action["type"] == "grey_operation" for action in legal)
 
 
-def test_a_grey_operation_swallowed_by_a_roof_pays_the_attacker_nothing() -> None:
+def test_a_grey_operation_swallowed_by_a_roof_still_pays_for_the_roll() -> None:
     engine = CityEngine()
     state = make_state()
     actor = state.current_player
@@ -874,17 +939,23 @@ def test_a_grey_operation_swallowed_by_a_roof_pays_the_attacker_nothing() -> Non
 
     state = run(engine, state, "grey_operation", {"asset_id": "datacenter", "target_id": target.id})
 
-    # The roll succeeded and the roof ate it. Every reward is priced against damage done, so the
-    # points, the operation's scandal and the fraudster's comeback all stay unpaid.
+    # The roll is what the operation is paid for, and it burned a token off the defender — that is
+    # a real result, so it earns its points and costs its scandal. Only the fraudster's comeback
+    # is priced against damage, and there was none.
+    expected_points = engine.grey_operation_points("datacenter")
     actor = state.player_by_id(actor.id)
     target = state.player_by_id(target.id)
-    assert actor.bonus_points == 0
-    assert actor.scandals == 0
+    assert actor.bonus_points == expected_points
+    assert actor.scandals == GREY_SUCCESS_SCANDALS
     assert actor.influence == 2
     assert (target.influence, target.roofs) == (9, 0)
     resolved = next(event for event in reversed(state.event_log) if event.type == "grey_operation_resolved")
     # "The defence held" has to read differently from "the odds failed".
-    assert (resolved.data["success"], resolved.data["blocked"], resolved.data["points"]) == (True, True, 0)
+    assert (resolved.data["success"], resolved.data["blocked"], resolved.data["points"]) == (
+        True,
+        True,
+        expected_points,
+    )
 
 
 def test_a_grey_operation_that_lands_still_pays_points_and_the_comeback() -> None:
@@ -1130,9 +1201,10 @@ def test_compromat_leak_is_absorbed_by_a_roof() -> None:
     hit = state.player_by_id(target.id)
     assert hit.role == "capitalist"
     assert hit.roofs == 0
-    # The roof ate the whole effect, so the attacker scores nothing and takes no scandal either.
-    assert state.current_player.bonus_points == 0
-    assert state.current_player.scandals == 0
+    # The roof kept the role, but stripping the table of its defences is exactly what the leak is
+    # for: the roll still scores and still costs its scandal.
+    assert state.current_player.bonus_points == engine.grey_operation_points("influence_broker")
+    assert state.current_player.scandals == GREY_SUCCESS_SCANDALS
 
 
 @pytest.mark.parametrize("card_id", list(load_catalog().action_cards))
@@ -1618,7 +1690,8 @@ def test_one_token_answers_a_takeover_a_leak_and_a_scandal() -> None:
     state = run(engine, state, "use_role_power", {"power": "journalist_publish", "target_id": target.id})
     target = state.player_by_id(target.id)
     assert (target.scandals, target.roofs) == (0, 0)
-    assert state.event_log[-2].type == "targeted_effect_blocked"
+    # The deed leads, the fallout follows: «использует силу» and then «отражает атаку Крышей».
+    assert [event.type for event in state.event_log[-2:]] == ["role_power_used", "targeted_effect_blocked"]
 
     # A role takeover: the token goes, the attacker's influence comes back.
     state = make_state()

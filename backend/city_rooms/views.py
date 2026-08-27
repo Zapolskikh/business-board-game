@@ -100,6 +100,11 @@ def room_view(
     for player in game["players"]:
         if player["id"] != viewer_id:
             player["hand_count"] = len(player.pop("hand"))
+    # The Крыша cap is engine-derived — the Мафия gets one more and two objects raise it — so the
+    # board printed a bare "🛡 2" that told nobody whether another token could still be bought.
+    for player_state in room.game.players:
+        view = next(item for item in game["players"] if item["id"] == player_state.id)
+        view["roof_limit"] = engine.roof_limit(player_state)
     # The viewer's own price for every market slot: discounts are per-player, so the client
     # must not recompute them (two implementations of asset_price already drifted apart once).
     viewer_for_role = next((player for player in room.game.players if player.id == viewer_id), None)

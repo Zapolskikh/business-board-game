@@ -17,6 +17,7 @@ from city_engine.constants import (
     CAPACITY_COSTS,
     CARD_DISCARD_VALUE,
     CASH_TO_INFLUENCE_MONEY,
+    CONSEQUENCE_EVENTS,
     CRISIS_PR_INFLUENCE,
     CRYPTO_SCAM_SCANDALS,
     CRYPTO_SCAM_SHARE,
@@ -111,6 +112,7 @@ class CityEngine:
         event_start = len(next_state.event_log)
         handler(next_state, command)
         self._enforce_jail_interrupt(next_state, command)
+        self._order_command_events(next_state, event_start)
         next_state.command_log.append(command.to_dict())
         next_state.revision += 1
         if command.command_id:
@@ -118,6 +120,32 @@ class CityEngine:
             next_state.processed_command_ids = next_state.processed_command_ids[-100:]
         next_state.validate()
         return Transition(state=next_state, events=next_state.event_log[event_start:])
+
+    def _order_command_events(self, state: GameState, event_start: int) -> None:
+        """Print the deed before its fallout.
+
+        Handlers naturally emit in the wrong order: an attack has to resolve its damage first
+        (that is where the blocks, the stripped role and the arrest are decided) and only then
+        can it report itself, because the headline carries the resource deltas of the whole
+        play. The log therefore read backwards — «роль потеряна» on line 118 and the operation
+        that took it on line 119 — and players kept asking why an effect had no cause.
+
+        Rather than make every handler announce itself twice, the slice of events produced by
+        one command is stably partitioned here: consequences move behind the deed, everything
+        else keeps its order. Stable on both sides, so several blocks or several stripped roles
+        still read in the order they happened.
+        """
+        tail = state.event_log[event_start:]
+        if len(tail) < 2:
+            return
+        deeds = [event for event in tail if event.type not in CONSEQUENCE_EVENTS]
+        fallout = [event for event in tail if event.type in CONSEQUENCE_EVENTS]
+        if not deeds or not fallout:
+            return
+        reordered = deeds + fallout
+        for offset, event in enumerate(reordered):
+            event.seq = event_start + offset + 1
+        state.event_log[event_start:] = reordered
 
     def legal_actions(self, state: GameState, actor_id: str) -> list[dict[str, Any]]:
         return [action for action, _transition in self.legal_transitions(state, actor_id)]
@@ -935,7 +963,10 @@ class CityEngine:
         if len(player.hand) >= 3 or not state.action_deck:
             return None
         card_id = state.action_deck.pop(0)
-        held = HeldCard(uid=f"card:{card_id}", card_id=card_id)
+        # The deck holds duplicates, so the card id alone no longer identifies a card in hand — two
+        # copies would share a uid, and every lookup takes the first match while the client keys its
+        # hand by it. The deck only ever shrinks, so its remaining length is a free serial number.
+        held = HeldCard(uid=f"card:{card_id}:{len(state.action_deck)}", card_id=card_id)
         player.hand.append(held)
         return held
 
@@ -1195,8 +1226,15 @@ class CityEngine:
         target: PlayerState,
         card: ActionCardDefinition,
     ) -> None:
+        """Apply the victim's half of a targeted card.
+
+        Deliberately silent: ``action_card_played`` wraps this call and reports the deltas of the
+        whole play, the victim's side included. Announcing the sub-effect too printed every hit
+        twice — «−6$» on one line and «−6$» again on the next — and a player read it as −12$.
+        Effects that are not a resource change (a frozen object, a lost role, an arrest) still
+        announce themselves, because no delta can express them.
+        """
         kind = card.kind
-        before = self._resource_snapshot(state)
         if kind == "scandal":
             self.add_scandal(state, target, card.value)
         elif kind == "fine":
@@ -1215,8 +1253,14 @@ class CityEngine:
             if target.influence >= card.value:
                 target.influence -= card.value
             else:
+                # Losing a role is the loudest thing that can happen to a player, and this was the
+                # one path that did it in silence: the chronicle printed «−2◆» and nothing else,
+                # so neither side learned the seat had opened. The compromat leak has always
+                # announced itself; this now matches it.
+                lost_role = target.role
                 target.influence = 0
                 target.role = None
+                state.append_event("role_stripped", attacker.id, target_id=target.id, role_id=lost_role)
         elif kind == "double_scandal":
             self.add_scandal(state, target, card.value)
         elif kind == "blackmail":
@@ -1232,13 +1276,6 @@ class CityEngine:
             target.influence = max(0, target.influence - 1)
         else:
             raise InvalidCommandError(f"unsupported targeted card kind: {kind}")
-        state.append_event(
-            "targeted_card_resolved",
-            attacker.id,
-            card_id=card.id,
-            target_id=target.id,
-            deltas=self._resource_deltas(state, before),
-        )
 
     def _require_role(self, player: PlayerState, role_id: str) -> None:
         if not self.has_role(player, role_id):
@@ -1540,17 +1577,17 @@ class CityEngine:
         points = 0
         blocked = False
         if success:
-            # A roll can succeed and still change nothing: a Крыша absorbs the whole effect. Every
-            # reward is priced against real damage, so all of it hangs on ``landed`` — a run that
-            # hits nothing but roofs pays no points, costs no scandal and grants no comeback.
+            # The roll is what the operation is paid for and charged for, not the damage. A run
+            # that meets nothing but Крыши still burns one token off every defender it reached,
+            # and that is a real result — spending three of the table's tokens for free was the
+            # cheapest board-wide play in the game. So a successful roll always costs its scandal
+            # and always pays its points, blocked or not. The fraudster's comeback is the one
+            # reward still tied to damage: it lives inside the effect branches on purpose.
             landed, bonus_points = self._resolve_grey_success(state, player, target, asset_id, comeback)
             blocked = not landed
-            if landed:
-                points = self.grey_operation_points(asset_id) + bonus_points
-                player.bonus_points += points
-                self._charge_grey_scandals(state, player, GREY_SUCCESS_SCANDALS)
-                if self.has_role(player, "mafia"):
-                    state.turn_flags["mafia_operation_bonus"] = 1
+            points = self.grey_operation_points(asset_id) + bonus_points
+            player.bonus_points += points
+            self._charge_grey_scandals(state, player, GREY_SUCCESS_SCANDALS)
         else:
             # A miss does nothing at all — no stake lost, no object frozen, no roof burnt. The
             # penalty is the extra scandal and the action, one rule for all five operations.
@@ -1587,10 +1624,10 @@ class CityEngine:
     ) -> tuple[bool, int]:
         """Apply the effect. Returns whether anything landed, and any points the effect itself earned.
 
-        ``False`` means every rival the operation reached was behind a Крыша, so nothing happened —
-        no points, no scandal, no comeback. The two table-wide operations count as landed the moment
-        one rival takes the hit: rolling well and being blocked by all three at once is the same
-        empty result as a miss, but being blocked by one of three is not.
+        ``False`` means every rival the operation reached was behind a Крыша, so no damage was
+        done. It does **not** mean the run was free: the caller still charges the scandal and pays
+        the points, because the tokens those Крыши spent are the result. What ``False`` withholds
+        is the fraudster's comeback, which is the one reward priced against real damage.
         """
         rivals = [other for other in state.players if other.id != player.id]
         if asset_id == "smear":

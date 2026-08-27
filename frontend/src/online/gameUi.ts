@@ -206,22 +206,22 @@ export function cleanupOffer(power: string | undefined, meta: CityMeta): { label
     case "politician_cleanup":
       return {
         label: "🧯 Урегулировать скандал: 2◆ → −1⚠",
-        tooltip: `Способность Политика: 1 обычное действие и 2◆ за один скандал — на 1◆ дешевле, чем у остальных. ${base}`,
+        tooltip: `Способность Политика: 1 действие и 2◆ за один скандал — на 1◆ дешевле, чем у остальных. ${base}`,
       };
     case "fraudster_cleanup":
       return {
         label: "🧯 Замести следы: бесплатно → −1⚠",
-        tooltip: `Способность Афериста: 1 обычное действие и ничего больше за один скандал. У роли четыре действия за ход, так что чистка обходится дешевле всех в игре. ${base}`,
+        tooltip: `Способность Афериста: 1 действие и ничего больше за один скандал. У роли четыре действия за ход, так что чистка обходится дешевле всех в игре. ${base}`,
       };
     case "mafia_cleanup":
       return {
         label: "🧯 Замять дело: 3$ → −2⚠",
-        tooltip: `Способность Мафиози: 1 обычное действие и 3$ снимают сразу два скандала. Нужен активный объект Административного квартала — без него кнопка предлагает базовый вариант. ${base}`,
+        tooltip: `Способность Мафиози: 1 действие и 3$ снимают сразу два скандала. Нужен активный объект Административного квартала — без него кнопка предлагает базовый вариант. ${base}`,
       };
     default:
       return {
         label: `🧯 Антикризисный PR: ${crisisPrInfluence(meta)}◆ → −1⚠`,
-        tooltip: `Потратить 1 обычное действие и ${crisisPrInfluence(meta)}◆, чтобы снять 1 свой скандал. Цена в влиянии, а не в деньгах: деньги слишком дёшевы в очках, чтобы скандал что-то значил. Роли Политика, Афериста и Мафиози чистят скандалы дешевле — эта же кнопка подставит их цену.`,
+        tooltip: `Потратить 1 действие и ${crisisPrInfluence(meta)}◆, чтобы снять 1 свой скандал. Цена в влиянии, а не в деньгах: деньги слишком дёшевы в очках, чтобы скандал что-то значил. Роли Политика, Афериста и Мафиози чистят скандалы дешевле — эта же кнопка подставит их цену.`,
       };
   }
 }
@@ -633,8 +633,8 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       const value = numberValue(data.value) || 1;
       return lead(txt(` сбрасывает «${card ?? cardId}» → `), num(`+${value}${data.into === "money" ? "$" : "◆"}`, "good"));
     }
-    case "targeted_card_resolved":
-      return lead(txt(` эффект «${card ?? cardId}» на `), playerSeg(game, targetId), ...deltas);
+    // "targeted_card_resolved" was dropped in 1.9.0: action_card_played already carries the
+    // deltas of the whole play, so the sub-event printed every hit a second time.
     case "targeted_effect_blocked":
       // The actor of this event is the defender: one token now answers every kind of attack.
       return lead(txt(" отражает атаку Крышей"));
@@ -959,7 +959,7 @@ export function assetEffectLines(
   }
 
   const passive: [string, string][] = [];
-  if (numberValue(effects.extraActions)) passive.push([`+1 обычное действие в начале хода`, "true"]);
+  if (numberValue(effects.extraActions)) passive.push([`+1 действие в начале хода`, "true"]);
   if (numberValue(effects.extraInvestmentActions)) passive.push([`+1 инвестиционное действие в начале хода`, "true"]);
   if (numberValue(effects.turnRoof)) passive.push([`+1 Крыша в начале каждого хода`, "true"]);
   if (numberValue(effects.roofCapacity)) passive.push([`+${numberValue(effects.roofCapacity)} к пределу Крыш`, "true"]);
@@ -1028,7 +1028,7 @@ export function assetHints(
       title: `Серые операции (${unlocked.length})`,
       detail: unlocked.map(([operationId]) => greyOperationLabels[operationId] ?? operationId).join(", "),
       ready: active,
-      tooltip: `Любой активный объект этого района открывает ${unlocked.length} серых операций, роль для них не нужна, каждая стоит 1 обычное действие. ${unlocked.map(([operationId]) => operationLine(operationId)).join(" · ")}`,
+      tooltip: `Любой активный объект этого района открывает ${unlocked.length} серых операций, роль для них не нужна, каждая стоит 1 действие. ${unlocked.map(([operationId]) => operationLine(operationId)).join(" · ")}`,
     });
   } else {
     for (const [operationId, districts] of unlocked) {
@@ -1041,7 +1041,7 @@ export function assetHints(
         title: label,
         detail: `${effect} · шанс от ${grey.chance}%`,
         ready: active,
-        tooltip: `Серая операция «${label}» открыта любому владельцу активного объекта районов: ${districts.map(districtTitle).join(", ")}. Роль для неё не нужна. Стоит 1 обычное действие. Эффект при успехе: ${effect}. Базовый шанс ${grey.chance}%, у Афериста выше. ${grey.failure}`,
+        tooltip: `Серая операция «${label}» открыта любому владельцу активного объекта районов: ${districts.map(districtTitle).join(", ")}. Роль для неё не нужна. Стоит 1 действие. Эффект при успехе: ${effect}. Базовый шанс ${grey.chance}%, у Афериста выше. ${grey.failure}`,
       });
     }
   }

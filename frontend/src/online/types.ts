@@ -41,6 +41,8 @@ export interface PlayerState {
   influence: number;
   scandals: number;
   roofs: number;
+  // Engine-derived: 2 by default, 3 for the Мафия, plus any object that raises the cap.
+  roof_limit: number;
   role: string | null;
   jail_turns: number;
   assets: OwnedAsset[];

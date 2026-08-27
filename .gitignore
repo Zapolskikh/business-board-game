@@ -22,6 +22,12 @@ coverage.xml
 backend/out/
 SIMULATION_RESULTS_*.md
 
+# Exported playtest journals. Same reasoning as the simulation reports: they are a record of one
+# match under one set of rules, they land in the repo root every time a game is exported, and the
+# numbers in them stop matching the code the moment the balance moves.
+city-of-influence-*.md
+city-of-influence-*.json
+
 # Agent-play sessions, catalog cache and command journals (contain room passwords)
 .agent_play/
 .agent_play*/

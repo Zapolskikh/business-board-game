@@ -11,6 +11,8 @@ from city_bots.policy import (
     _fractional_score,
     _grey_operation_utility,
     _position_value,
+    _seat_exposure,
+    _strategic_action_bonus,
 )
 from city_engine.engine import CityEngine
 from city_engine.factory import GameSettings, PlayerSetup, create_game_from_catalog
@@ -192,3 +194,53 @@ def test_expert_prices_role_loss_and_jail_into_a_grey_attempt() -> None:
     utility = _grey_operation_utility(engine, state, player, {"asset_id": "smear"}, PROFILES["expert"])
 
     assert utility < -0.5  # ending the turn is better than certain role loss and possible jail
+
+
+def test_a_blocked_grey_run_is_no_longer_valued_at_nothing() -> None:
+    """Since 1.9.0 a blocked run still scores its points and still burns the defender's token, so
+    pricing it at zero made the bot refuse to touch a defended seat even to clear the token."""
+    engine = CityEngine()
+    state = bot_game()
+    player = state.current_player
+    player.difficulty = "expert"
+    player.assets.append(OwnedAsset(uid="owned:cash", card_id="cash"))
+    target = next(other for other in state.players if other.id != player.id)
+    target.role = "capitalist"
+    target.roofs = 1
+
+    payload = {"asset_id": "influence_broker", "target_id": target.id}
+    utility = _grey_operation_utility(engine, state, player, payload, PROFILES["expert"])
+
+    assert utility > 0
+
+
+def test_a_threatened_seat_makes_the_token_worth_buying() -> None:
+    """The table lost 9.3 roles a game and re-bought 15.2 of them while buying 6.2 tokens between
+    four players: nobody was pricing the counter that was on sale the whole time."""
+    engine = CityEngine()
+    state = bot_game()
+    state.round_number = 10
+    player = state.current_player
+    player.difficulty = "expert"
+    player.role = "capitalist"
+    rival = next(other for other in state.players if other.id != player.id)
+    rival.assets.append(OwnedAsset(uid="owned:cash", card_id="cash"))  # unlocks the compromat leak
+    action = {"type": "buy_roof", "payload": {}}
+
+    exposed = _strategic_action_bonus(engine, state, player, action, PROFILES["expert"])
+    player.roofs = 1  # already covered: the same threat no longer argues for a second token
+    covered = _strategic_action_bonus(engine, state, player, action, PROFILES["expert"])
+
+    assert _seat_exposure(engine, state, player) == 0.0
+    assert exposed > covered
+
+
+def test_a_seat_nobody_can_reach_is_not_exposed() -> None:
+    engine = CityEngine()
+    state = bot_game()
+    player = state.current_player
+    player.role = "capitalist"
+    for other in state.players:
+        other.assets.clear()
+
+    assert _seat_exposure(engine, state, player) == 0.0

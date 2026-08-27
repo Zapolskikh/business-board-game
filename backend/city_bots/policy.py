@@ -440,6 +440,9 @@ def _strategic_action_bonus(
             bonus += 12 * profile.role_focus
         elif preferred is not None:
             bonus -= 4 * profile.role_focus
+        # Discounting an exposed seat here was tried and measured out: with the token priced (see
+        # buy_roof) it moved nothing beyond noise. The answer to a threatened role is to defend it,
+        # not to decline it — the seat pays the same three points either way.
     elif action_type == "buy_asset":
         market = next(item for item in state.market if item.uid == payload["market_uid"])
         asset = engine.asset(market.card_id)
@@ -499,6 +502,14 @@ def _strategic_action_bonus(
             # an ordinary game never sets, so it never fired: across a measured 15-round game not
             # one player bought a Крыша while two roles changed hands by force.
             bonus += (3 if player.role == preferred else 1.5) * profile.defence
+            # The same face-up threat that makes a seat a bad buy makes a token a good one, and
+            # this is the side of it that actually answers the problem. Measured over 30 expert
+            # games the table lost 9.3 roles and re-bought 15.2 of them while buying 6.2 tokens
+            # between four players: the counter to a leak was on sale the whole time and nobody
+            # was pricing it. Weighted by the role at stake, because that is what is being bought.
+            exposure = _seat_exposure(engine, state, player)
+            if exposure > 0:
+                bonus += exposure * (2.0 + _role_utility(engine, state, player, player.role) * 0.15)
         # All three of the things a token stops are things that have not happened yet, so a
         # one-step utility sees only the money leaving. It is worth most near the scandal limit.
         headroom = engine.scandal_limit(player) - player.scandals
@@ -573,6 +584,44 @@ def _sell_asset_bonus(
     return upgrade * 1.5 - 1.0 + (1.0 if profile.planning else 0.0)
 
 
+def _seat_exposure(engine: CityEngine, state: GameState, player: PlayerState) -> float:
+    """How exposed a role would be in this player's hands, from face-up information only.
+
+    A Крыша answers the leak outright, so a covered player is not exposed at all. Otherwise the
+    danger is the number of rivals who could run the compromat leak right now — it needs an active
+    object of the Тень or Администрация district and nothing else — weighted by how close the game
+    is to its end, because a seat taken in the last rounds has the fewest turns to be defended and
+    the points are counted immediately after.
+    """
+    if player.roofs > 0:
+        return 0.0
+    threats = sum(
+        1
+        for rival in state.players
+        if rival.id != player.id and engine.grey_operation_unlocked(rival, "influence_broker")
+    )
+    if not threats:
+        return 0.0
+    # Late is worse: fewer turns to buy a token, and the seat is scored almost at once.
+    lateness = 1.0 if state.round_number * 2 >= state.max_rounds else 0.6
+    return min(3.0, threats * 1.2) * lateness
+
+
+def _token_burn_value(target: PlayerState, profile: PolicyProfile) -> float:
+    """What burning one Крыша off a defender is worth to the attacker.
+
+    Since 1.9.0 a run that meets nothing but tokens still scores its points and still costs its
+    scandal, so "blocked" is no longer a synonym for "wasted". The token is gone, and the seat
+    behind it is open to the next attack — which in a four-player game is usually somebody else's.
+    Hence a modest number scaled by aggression: it is the tempo half of the payout, and only a
+    profile that already values denial should pay much for it. A defender holding several tokens is
+    worth chipping at slightly less per token, because the seat stays covered either way.
+    """
+    if target.roofs <= 0:
+        return 0.0
+    return (1.5 if target.roofs == 1 else 0.8) * (1 + profile.aggression)
+
+
 def _grey_operation_utility(
     engine: CityEngine,
     state: GameState,
@@ -601,12 +650,15 @@ def _grey_operation_utility(
     success_value = float(GREY_OPERATION_POINTS[asset_id])
     if asset_id == "smear":
         # A scandal costs its owner an action and 3◆ to wash off, so value it near a whole action;
-        # a roof answers for its owner and eats the hit instead.
+        # a roof answers for its owner and eats the hit instead. Since 1.9.0 that is not nothing:
+        # the token is spent, and the next attack on that seat goes through.
         exposed = sum(1 for rival in rivals if rival.roofs == 0)
         success_value += exposed * 2.0 * (1 + profile.aggression)
+        success_value += sum(_token_burn_value(rival, profile) for rival in rivals if rival.roofs > 0)
     elif asset_id == "crypto":
         drain = engine.pump_drain(state)
         success_value += sum(min(drain, rival.money) for rival in rivals if rival.roofs == 0)
+        success_value += sum(_token_burn_value(rival, profile) for rival in rivals if rival.roofs > 0)
     elif asset_id == "roof_break":
         target = state.player_by_id(str(payload["target_id"]))
         # The points are the honest half of this one: the opening it makes is shared with the whole
@@ -616,7 +668,11 @@ def _grey_operation_utility(
     elif asset_id == "datacenter":
         target = state.player_by_id(str(payload["target_id"]))
         if target.roofs > 0:
-            success_value = 0.0
+            # Blocked runs stopped being free in 1.9.0: the roll still scores its points and still
+            # costs its scandal, and the token is burned off the defender. Zeroing the payout here
+            # meant the bot read the honest price of the attempt against none of its reward, and
+            # so refused to touch a defended seat even when clearing the token was the whole plan.
+            success_value += _token_burn_value(target, profile)
         else:
             stolen = min(engine.hack_influence_steal(state), target.influence)
             # Taken from a rival, so the aggression profile values the denial on top of the gain.
@@ -626,9 +682,9 @@ def _grey_operation_utility(
         if target.role is None:
             return -100.0
         # Stripping a role costs the target 3 points and the passive behind it; a face-up Крыша
-        # makes the attempt a knowingly wasted action, exactly like a blocked takeover.
+        # keeps the seat, but the token goes and the points are paid all the same.
         if target.roofs > 0:
-            success_value = 0.0
+            success_value += _token_burn_value(target, profile)
         else:
             denial = (3 + _role_utility(engine, state, target, target.role) * 0.3) * (1 + profile.aggression)
             # The seat also reopens at the free price instead of the threefold takeover, and that is

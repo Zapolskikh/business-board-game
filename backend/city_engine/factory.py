@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from city_engine.constants import (
+    ACTION_DECK_COPIES,
     BOT_DIFFICULTIES,
     MAX_PLAYERS,
     MAX_ROLE_PRICE,
@@ -74,7 +75,9 @@ def create_game(
     rng_state = RNGState.from_seed(seed)
     rng = GameRNG(rng_state)
     asset_deck = list(asset_ids)
-    action_deck = list(action_card_ids)
+    # Several copies of each card, shuffled together: the deck has to outlast fifteen rounds of a
+    # four-player table, and one copy of each ran dry around round 9. See ACTION_DECK_COPIES.
+    action_deck = list(action_card_ids) * ACTION_DECK_COPIES
     project_deck = list(project_ids)
     rng.shuffle(asset_deck)
     rng.shuffle(action_deck)

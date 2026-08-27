@@ -42,7 +42,7 @@ SCHEMA_VERSION = 1
 # one card; the asset market rotates its three oldest slots once a round; cards can buy points
 # outright. Snapshots taken under 1.3.x describe a game with different rules, so state validation
 # rejects them — old rooms will not open.
-RULES_VERSION = "city-1.8.0"
+RULES_VERSION = "city-1.9.0"
 # 1.8.0: the fraudster's crypto scam finally follows the rule printed on the role card: one
 # command takes 25% of every unprotected rival wallet and always creates five scandals.  The old
 # implementation exposed six flat amounts (1..6), which let a one-point reduction turn amount=1
@@ -224,6 +224,14 @@ CAMPAIGN_TIERS = {5: 3}
 PROJECT_REROLL_MONEY = 10
 # An action card is a blind draw that costs an action, so it competes with the basic actions.
 ACTION_CARD_COST = 3
+# How many copies of each card the deck holds. One copy meant a four-player table exhausted the
+# deck around round 9 — every draw is two cards, so the catalogue lasted about seventeen buys. From
+# there on the whole card layer was simply gone, and it went precisely when the late game needs
+# things to spend an action on: the board is capped at six slots, the projects want influence, and
+# the money channel collapses into repeating Патронаж. Two copies carry the deck to the final
+# round. Duplicates are fine by design — a card is a blind draw, not a collectible, and seeing the
+# same card twice in fifteen rounds reads as luck rather than repetition.
+ACTION_DECK_COPIES = 2
 # What a point costs when a card buys it outright: worse than an object (2$) and much better than a
 # hoarded point (10$), and it needs no slot — which is the whole point. Six slots cap the object
 # channel, so a full tableau had nowhere to put money: two measured matches ended with 248$ and 864$
@@ -238,6 +246,24 @@ CASH_TO_INFLUENCE_MONEY = 8
 # Scandal cleanup is priced in influence: at 10$ = 1 point money made it effectively free and the
 # whole attack layer stopped mattering.
 CRISIS_PR_INFLUENCE = 3
+
+# --- chronicle ordering ----------------------------------------------------------------------
+# Events that are the fallout of a deed rather than a deed of their own. A handler has to resolve
+# these first — the block, the stripped role, the arrest all have to be known before the headline
+# can report the resulting deltas — so without help the log prints the consequence above its
+# cause. The engine sorts them behind the deed of the same command; see
+# CityEngine._order_command_events.
+CONSEQUENCE_EVENTS = frozenset(
+    {
+        "targeted_effect_blocked",
+        "roofs_broken",
+        "role_stripped",
+        "asset_state_changed",
+        "free_action_card_drawn",
+        "scandal_limit_reached",
+        "player_jailed",
+    }
+)
 
 # --- grey operations -------------------------------------------------------------------------
 # The layer used to be five ways of asking the same question — "spend an action, get a resource" —
