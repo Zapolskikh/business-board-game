@@ -1,6 +1,9 @@
+import type { ReactNode } from "react";
 import { describeEventSegments } from "../../online/gameUi";
-import type { CityMeta, GameState } from "../../online/types";
+import { useGameLogExport } from "../../online/gameLogExport";
+import type { CityMeta, GameState, RoomView } from "../../online/types";
 import { Modal } from "../primitives/Modal";
+import { useRoom, useSession } from "../lib/session";
 
 /* Хроника. Единственное место, которому поповера мало: события идут списком и их много.
  *
@@ -22,6 +25,12 @@ export function Chronicle({
 
   return (
     <Modal open={open} onClose={onClose} title="📜 Хроника партии" subtitle={`${events.length} событий`}>
+      {/* Выгрузка доступна и по ходу партии, не только на финише: комнаты истекают
+        * вместе со всем, что в них произошло, и невыгруженная партия пропадает совсем.
+        *
+        * Панель вынесена отдельно не ради красоты: она ходит в сессию и кеш запросов,
+        * а хроника смонтирована всегда — так эти зависимости нужны только при открытом окне. */}
+      {open && <ExportBar game={game} meta={meta} />}
       <ol className="grid gap-1">
         {events.map(event => {
           const segments = describeEventSegments(event, game, meta);
@@ -64,5 +73,56 @@ export function Chronicle({
         {events.length === 0 && <li className="text-ink-dim">Пока ничего не произошло.</li>}
       </ol>
     </Modal>
+  );
+}
+
+function ExportBar({ game, meta }: { game: GameState; meta: CityMeta }) {
+  const { roomId, password, playerId } = useSession();
+  /* Хроника живёт внутри <GameGate>, где партия уже загружена; запасной вариант нужен типам. */
+  const room = (useRoom().data ?? { game, revision: game.revision }) as RoomView;
+  const { status, copy, download, downloadJournal } = useGameLogExport(room, meta);
+  /* Сид и список команд сервер отдаёт только после финиша — до него кнопки нет. */
+  const replayable = game.status === "finished";
+
+  return (
+    <div className="mb-2.5 flex flex-wrap items-center gap-1.5 border-b border-line pb-2.5">
+      <ExportButton onClick={() => void copy()} title="Скопировать журнал партии в буфер обмена">
+        📋 Копировать
+      </ExportButton>
+      <ExportButton onClick={download} title="Скачать читаемый журнал партии в формате Markdown">
+        💾 Скачать .md
+      </ExportButton>
+      {replayable && (
+        <ExportButton
+          onClick={() => void downloadJournal(roomId, password, playerId)}
+          title="Скачать полный журнал: сид, все команды и финальный снапшот — по нему партию можно точно воспроизвести"
+        >
+          🧾 Скачать .json
+        </ExportButton>
+      )}
+      {status && <small className="w-full text-3xs text-good">{status}</small>}
+    </div>
+  );
+}
+
+function ExportButton({
+  onClick,
+  title,
+  children,
+}: {
+  onClick: () => void;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className="rounded-md border border-line bg-panel-2 px-2 py-1 text-3xs font-semibold text-ink
+        hover:border-accent"
+    >
+      {children}
+    </button>
   );
 }

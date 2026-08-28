@@ -7,7 +7,6 @@ import {
   assetEffectLines,
   assetHints,
   assetPoints,
-  buildGameLogMarkdown,
   campaignTiers,
   patronage,
   capacityLabel,
@@ -38,6 +37,7 @@ import {
 } from "./gameUi";
 import type { AssetHint } from "./gameUi";
 import { buildRulesHtml } from "./rulesDocument";
+import { useGameLogExport } from "./gameLogExport";
 import { otherUiLabel, switchUi } from "./uiVersion";
 import type {
   ActionMeta,
@@ -715,35 +715,6 @@ function StaticAction({ action, label, tooltip, busy, onAction }: { action?: Leg
   return <button disabled={busy || !action} onClick={() => action && void onAction(action)} title={tooltip}>{label}</button>;
 }
 
-/** Copy/download the whole match. Rooms expire, so an unexported game is gone for good. */
-function useGameLogExport(room: RoomView, meta: CityMeta) {
-  const [status, setStatus] = useState("");
-  const text = useCallback(() => buildGameLogMarkdown(room, meta, __GAME_VERSION__), [room, meta]);
-  const save = useCallback((body: string, extension: string) => {
-    const blob = new Blob([body], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    link.download = `city-of-influence-${room.name.replace(/[^\w\-]+/g, "_")}-${stamp}.${extension}`;
-    link.click();
-    URL.revokeObjectURL(url);
-  }, [room.name]);
-  const copy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(text());
-      setStatus("Журнал скопирован в буфер");
-    } catch {
-      setStatus("Скопировать не удалось — скачайте файл");
-    }
-  }, [text]);
-  const download = useCallback(() => {
-    save(text(), "md");
-    setStatus("Журнал сохранён (.md)");
-  }, [save, text]);
-  return { status, copy, download, save, setStatus };
-}
-
 function LogExportButtons({ room, meta, roomId, password, playerId, replayable }: {
   room: RoomView;
   meta: CityMeta;
@@ -752,21 +723,12 @@ function LogExportButtons({ room, meta, roomId, password, playerId, replayable }
   playerId: string;
   replayable: boolean;
 }) {
-  const { status, copy, download, save, setStatus } = useGameLogExport(room, meta);
-  const downloadJournal = async () => {
-    try {
-      const journal = await cityApi.journal(roomId, password, playerId);
-      save(JSON.stringify(journal, null, 2), "json");
-      setStatus("Полный журнал сохранён (.json) — партию можно переиграть");
-    } catch (reason) {
-      setStatus(reason instanceof Error ? reason.message : "Журнал недоступен");
-    }
-  };
+  const { status, copy, download, downloadJournal } = useGameLogExport(room, meta);
   return <div className="log-export">
     <button onClick={() => void copy()} title="Скопировать читаемый журнал партии в буфер обмена: итоги, портфели и вся хроника от начала к концу.">📋 Копировать журнал</button>
     <button onClick={download} title="Скачать читаемый журнал партии в формате Markdown.">💾 Скачать .md</button>
     {/* The seed plus the command log is what makes a match replayable, not just readable. */}
-    {replayable && <button onClick={() => void downloadJournal()} title="Скачать полный журнал: сид, все команды и финальный снапшот. По нему партию можно точно воспроизвести и разобрать. Доступно только после завершения партии.">🧾 Скачать .json для разбора</button>}
+    {replayable && <button onClick={() => void downloadJournal(roomId, password, playerId)} title="Скачать полный журнал: сид, все команды и финальный снапшот. По нему партию можно точно воспроизвести и разобрать. Доступно только после завершения партии.">🧾 Скачать .json для разбора</button>}
     {status && <small className="log-export-status">{status}</small>}
   </div>;
 }

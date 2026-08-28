@@ -1,3 +1,4 @@
+import { forwardRef, type ForwardedRef } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { assetEffectLines, assetPoints, districtCount } from "../../online/gameUi";
 import type { AssetMeta, CityMeta, DistrictMeta, LegalAction, OwnedAsset } from "../../online/types";
@@ -48,8 +49,8 @@ export function CityPanel({
             return (
               <motion.div
                 key={owned.uid}
-                // Тот же layoutId, что у карточки на рынке: купленный объект приезжает
-                // сюда физически тем же узлом, а не появляется на пустом месте.
+                // Продажа сдвигает оставшиеся объекты по сетке — `layout` переводит этот
+                // скачок в движение, чтобы карточки не перескакивали мгновенно.
                 layout
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -141,8 +142,12 @@ export function CityPanel({
 
 /* Купленный объект выглядит ровно так же, как выглядел на рынке: те же зоны в том же
  * порядке. Иначе после покупки игрок заново ищет, где что написано. Отличий два —
- * вместо цены стоит цена продажи, а вместо причины отказа строка блокировки. */
-function OwnedSlot({
+ * цена наверху означает возврат при продаже, а внизу вместо причины отказа стоит
+ * либо цена продажи, либо отметка о блокировке.
+ *
+ * forwardRef обязателен: Radix с asChild цепляется к кнопке через ref, и без него
+ * поповер молча не открывается — а вместе с ним пропадает единственная кнопка продажи. */
+const OwnedSlot = forwardRef(function OwnedSlot({
   owned,
   asset,
   district,
@@ -155,9 +160,11 @@ function OwnedSlot({
   district: DistrictMeta | undefined;
   lines: ReturnType<typeof assetEffectLines>;
   owns: number;
-}) {
+}, ref: ForwardedRef<HTMLButtonElement>) {
+  const value = assetPoints(asset);
   return (
     <button
+      ref={ref}
       type="button"
       data-state={owned.blocked ? "blocked" : "active"}
       style={assetFaceStyle(district?.color, asset.rarity)}
@@ -173,27 +180,29 @@ function OwnedSlot({
          * что он давал бы. Красная строка внизу объясняет, почему. */
         income={owned.blocked ? 0 : asset.income}
         influence={0}
-        topLeft={
-          <span className="whitespace-nowrap text-[11px]">
-            <span className="text-3xs text-ink-muted">Продажа </span>
-            <b className="font-bold text-ink">{assetPoints(asset)}$</b>
-          </span>
-        }
+        /* Возврат при продаже равен очкам объекта — это одно и то же число. Печатать его
+         * ещё и слева сверху, где у рынка стоит цена, значит трижды повторить одно; строка
+         * продажи внизу и бейдж очков справа уже всё сказали. */
+        topLeft={null}
         topRight={
           <span className="rounded-[10px] border border-[#6b5518] bg-[#33290e] px-1.5 text-[11px]
             font-extrabold whitespace-nowrap text-gold">
-            {assetPoints(asset)} оч
+            {value} оч
           </span>
         }
         bottom={
           <span className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5">
+            {/* У карточки рынка здесь стоит причина отказа, у своего объекта — цена продажи.
+              * Место пустовало, а продажа — единственный способ освободить слот, когда все
+              * шесть заняты. Заблокированность важнее и вытесняет цену: такой объект в первую
+              * очередь балласт, и это надо сказать громче. */}
             <span
               className={`h-[13px] overflow-hidden text-ellipsis whitespace-nowrap rounded px-1
                 text-3xs font-semibold leading-[13px] ${
-                  owned.blocked ? "bg-[#4a2530] text-[#ffb0bd]" : "text-transparent"
+                  owned.blocked ? "bg-[#4a2530] text-[#ffb0bd]" : "text-good"
                 }`}
             >
-              {owned.blocked ? "🚫 заблокирован" : "—"}
+              {owned.blocked ? "🚫 заблокирован" : `Продать за ${value}$`}
             </span>
             <span
               className={`whitespace-nowrap text-[15px] font-extrabold leading-none tabular-nums ${
@@ -208,7 +217,7 @@ function OwnedSlot({
       />
     </button>
   );
-}
+});
 
 function OwnedDetails({
   owned,

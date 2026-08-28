@@ -82,7 +82,10 @@ const PlayerRow = ({
   return (
     <motion.button
       type="button"
-      layout
+      /* Без `layout`: четыре строки стоят в порядке хода и местами не меняются, так что
+       * анимировать тут нечего. Зато Motion на каждое обновление партии мерял все четыре
+       * карточки и гонял проекцию раскладки — ровно в тот момент, когда рядом идут
+       * настоящие анимации карт. */
       data-state={turn ? "turn" : isMe ? "me" : "idle"}
       className={`grid min-h-0 grid-cols-[minmax(0,1fr)_38px] grid-rows-[minmax(0,1fr)_auto]
         overflow-hidden rounded-lg border-2 text-left

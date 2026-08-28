@@ -27,7 +27,7 @@ interface SessionIdentity {
 
 const SessionContext = createContext<SessionIdentity | null>(null);
 
-function useSession(): SessionIdentity {
+export function useSession(): SessionIdentity {
   const session = useContext(SessionContext);
   if (!session) throw new Error("useSession вне <GameSession>");
   return session;

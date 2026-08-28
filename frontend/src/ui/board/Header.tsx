@@ -161,8 +161,16 @@ export function Header({
   );
 }
 
-/* Полоса статуса. Схлопывается, когда сказать нечего, — на доске это единственный элемент,
- * который занимает высоту только по делу. */
+/* Полоса статуса.
+ *
+ * Высота постоянная, и место под неё занято всегда, даже когда сказать нечего. Раньше
+ * полоса схлопывалась — и на каждое действие доска дёргалась: команда уходит на сервер,
+ * появляется «Сервер выполняет…», всё под ней съезжает вниз; приходит ответ, полоса
+ * исчезает, всё возвращается. Дважды за действие, и как раз в тот момент, когда Motion
+ * анимирует карточки, — из-за чего анимации ещё и сбивались.
+ *
+ * Пустая полоса вместо схлопнутой стоит одной строки высоты и снимает и то и другое.
+ */
 export function StatusBar({
   game,
   me,
@@ -176,20 +184,19 @@ export function StatusBar({
 }) {
   const current = game.players[game.current_player_index];
   const mine = current?.id === me.id;
+  const base = "flex h-[26px] items-center gap-2 rounded-md border px-2.5 text-[11.5px]";
 
   if (error) {
     return (
-      <div className="flex items-center gap-2 rounded-md border border-[#7d3c45] bg-[#2a1519] px-2.5 py-1
-        text-[11.5px] text-[#ffb3b3]">
+      <div className={`${base} border-[#7d3c45] bg-[#2a1519] text-[#ffb3b3]`}>
         <span>⚠</span>
-        <span>{error}</span>
+        <span className="overflow-hidden text-ellipsis whitespace-nowrap">{error}</span>
       </div>
     );
   }
   if (busy) {
     return (
-      <div className="flex items-center gap-2 rounded-md border border-[#34507a] bg-[#1a2740] px-2.5 py-1
-        text-[11.5px] text-[#bcd6f5]">
+      <div className={`${base} border-[#34507a] bg-[#1a2740] text-[#bcd6f5]`}>
         <span className="size-2.5 animate-spin rounded-full border-2 border-accent border-r-transparent" />
         <span>Сервер выполняет команду и ходы ботов…</span>
       </div>
@@ -197,15 +204,12 @@ export function StatusBar({
   }
   if (game.status === "finished") {
     return (
-      <div className="rounded-md border border-[#6b5518] bg-[#2a2411] px-2.5 py-1 text-[11.5px] text-gold">
-        🏁 Партия окончена
-      </div>
+      <div className={`${base} border-[#6b5518] bg-[#2a2411] text-gold`}>🏁 Партия окончена</div>
     );
   }
   if (!mine) {
     return (
-      <div className="flex items-center gap-2 rounded-md border border-line bg-panel-2 px-2.5 py-1
-        text-[11.5px] text-ink-muted">
+      <div className={`${base} border-line bg-panel-2 text-ink-muted`}>
         <span>⏳</span>
         <span>
           Ход игрока <b className="text-ink">{current?.name}</b>
@@ -215,10 +219,15 @@ export function StatusBar({
   }
   if (me.jail_turns > 0) {
     return (
-      <div className="rounded-md border border-[#7d3c45] bg-[#2a1519] px-2.5 py-1 text-[11.5px] text-[#ffb3b3]">
+      <div className={`${base} border-[#7d3c45] bg-[#2a1519] text-[#ffb3b3]`}>
         🚔 Тюрьма: пропускаете ходов {me.jail_turns}
       </div>
     );
   }
-  return <div className="hidden" />;
+  return (
+    <div className={`${base} border-transparent text-ink-dim`}>
+      <span>✓</span>
+      <span>Ваш ход</span>
+    </div>
+  );
 }
