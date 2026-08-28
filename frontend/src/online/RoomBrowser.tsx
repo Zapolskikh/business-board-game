@@ -50,7 +50,7 @@ export function RoomBrowser({ onOpen }: Props) {
       <div className="form-grid">
         <label>Название<input value={name} maxLength={48} onChange={event => setName(event.target.value)} /></label>
         <label>Пароль<input type="password" value={password} maxLength={128} onChange={event => setPassword(event.target.value)} /></label>
-        <label>Мест<select value={capacity} onChange={event => setCapacity(Number(event.target.value))}>{[2,3,4,5,6].map(value => <option key={value}>{value}</option>)}</select></label>
+        <label>Мест<select value={capacity} onChange={event => setCapacity(Number(event.target.value))}>{[2,3,4].map(value => <option key={value}>{value}</option>)}</select></label>
         <label>Раундов<input type="number" min={5} max={30} value={rounds} onChange={event => setRounds(Number(event.target.value))} /></label>
         <label>Цена роли<input type="number" min={2} max={10} value={rolePrice} onChange={event => setRolePrice(Number(event.target.value))} /></label>
         <button className="primary" disabled={busy || !name.trim() || password.length < 4} onClick={create}>Создать</button>

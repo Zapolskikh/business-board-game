@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Header, Query, Response, status
 from pydantic import BaseModel, Field
 
 from city_engine.commands import Command
+from city_engine.constants import MAX_PLAYERS, MIN_PLAYERS
 from city_engine.content import load_catalog
 from city_rooms.errors import RoomValidationError
 from city_rooms.models import RoomState
@@ -24,20 +25,20 @@ router = APIRouter(prefix="/api/city", tags=["city"])
 class CreateRoomRequest(BaseModel):
     name: str = Field(min_length=1, max_length=48)
     password: str = Field(min_length=4, max_length=128)
-    capacity: int = Field(default=4, ge=2, le=6)
+    capacity: int = Field(default=4, ge=MIN_PLAYERS, le=MAX_PLAYERS)
     max_rounds: int = Field(default=15, ge=5, le=30)
     role_price: int = Field(default=3, ge=2, le=10)
 
 
 class JoinRoomRequest(BaseModel):
     password: str = Field(min_length=4, max_length=128)
-    seat_index: int = Field(ge=0, le=5)
+    seat_index: int = Field(ge=0, le=MAX_PLAYERS - 1)
     player_name: str = Field(min_length=1, max_length=32)
 
 
 class SeatRequest(BaseModel):
     password: str = Field(min_length=4, max_length=128)
-    seat_index: int = Field(ge=0, le=5)
+    seat_index: int = Field(ge=0, le=MAX_PLAYERS - 1)
     kind: Literal["bot", "empty"]
     difficulty: Literal["easy", "medium", "hard", "expert"] = "medium"
     preferred_role: str | None = None

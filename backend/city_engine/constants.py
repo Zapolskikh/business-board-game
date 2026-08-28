@@ -93,7 +93,9 @@ ROLE_IDS = (
 BOT_DIFFICULTIES = ("easy", "medium", "hard", "expert")
 
 MIN_PLAYERS = 2
-MAX_PLAYERS = 6
+# Четверо — предел стола. Шестеро растягивали круг настолько, что между своими ходами
+# успевала смениться половина рынка и цели атак, а панель игроков уходила в скролл.
+MAX_PLAYERS = 4
 MIN_ROUNDS = 5
 MAX_ROUNDS = 30
 MIN_ROLE_PRICE = 2

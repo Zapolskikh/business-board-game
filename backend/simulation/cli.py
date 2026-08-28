@@ -48,7 +48,7 @@ def parser() -> argparse.ArgumentParser:
     )
     result.add_argument("--games", type=int, default=100, help="number of complete games")
     result.add_argument("--rounds", type=int, default=15, help="rounds in each game (5-30)")
-    result.add_argument("--players", type=int, default=4, help="number of bot seats (2-6)")
+    result.add_argument("--players", type=int, default=4, help="number of bot seats (2-4)")
     result.add_argument("--role-price", type=int, default=3, help="role claim price (2-10)")
     result.add_argument(
         "--bots",
