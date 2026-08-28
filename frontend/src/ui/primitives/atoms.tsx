@@ -1,14 +1,49 @@
-import { forwardRef, type ReactNode } from "react";
+import { forwardRef, type CSSProperties, type ReactNode } from "react";
 import type { Availability } from "../lib/actions";
 
 /* Общие атомы доски. Держим их в одном файле, чтобы плотная сетка была
  * единообразной: одинаковые отступы, одинаковые размеры подписей.
  */
 
-export function Panel({ children, className = "", rows }: { children: ReactNode; className?: string; rows?: boolean }) {
+/* Функциональные зоны доски. Каждая получает свой оттенок подложки и свой цвет линии под
+ * заголовком — см. --color-zone-* в theme.css.
+ *
+ * Через CSS-переменные, а не через готовые классы на каждую зону: линию рисует SectionHead,
+ * который живёт внутри панели и о зоне ничего не знает. Переменная каскадом доходит до него
+ * сама, поэтому зона задаётся в одном месте — на панели.
+ */
+export type Zone = "players" | "projects" | "market" | "city" | "actions" | "chronicle";
+
+export function zoneStyle(zone?: Zone): CSSProperties | undefined {
+  if (!zone) return undefined;
+  return {
+    "--zone-bg": `var(--color-zone-${zone})`,
+    "--zone-accent": `var(--color-zone-${zone}-accent)`,
+  } as CSSProperties;
+}
+
+/** Линия под заголовком зоны. Три пикселя: тоньше не читается на плотной доске.
+ *
+ * Отступ под заголовком урезан с 5px до 2px ровно на её толщину, поэтому линия ничего не стоит
+ * по высоте. Доска плотная: панели рынка и города отдают всю свободную высоту карточкам, и
+ * четыре добавленных пикселя переполняли таблицу свойств внутри них. */
+export const zoneRule = "border-b-[3px] border-b-[var(--zone-accent,transparent)]";
+
+export function Panel({
+  children,
+  className = "",
+  rows,
+  zone,
+}: {
+  children: ReactNode;
+  className?: string;
+  rows?: boolean;
+  zone?: Zone;
+}) {
   return (
     <section
-      className={`rounded-panel border border-line bg-panel px-2 py-[7px] ${
+      style={zoneStyle(zone)}
+      className={`rounded-panel border border-line bg-[var(--zone-bg,var(--color-panel))] px-2 py-[7px] ${
         rows ? "grid min-h-0 grid-rows-[auto_minmax(0,1fr)]" : ""
       } ${className}`}
     >
@@ -19,7 +54,7 @@ export function Panel({ children, className = "", rows }: { children: ReactNode;
 
 export function SectionHead({ title, meta, extra }: { title: string; meta?: ReactNode; extra?: ReactNode }) {
   return (
-    <div className="flex items-baseline gap-2 px-0.5 pb-[5px]">
+    <div className={`flex items-baseline gap-2 px-0.5 pb-[2px] ${zoneRule}`}>
       <h2 className="text-[10.5px] font-bold uppercase tracking-[0.09em] text-ink-muted">{title}</h2>
       {extra}
       {meta && <span className="ml-auto whitespace-nowrap text-[10.5px] text-ink-dim">{meta}</span>}

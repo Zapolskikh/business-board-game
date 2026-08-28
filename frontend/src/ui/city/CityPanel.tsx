@@ -31,10 +31,16 @@ export function CityPanel({
   const capacity = resolve(context, "buy_capacity");
 
   return (
-    <Panel rows>
+    <Panel rows zone="city">
       <SectionHead
         title="Мой город"
-        meta={`${me.assets.length} / ${me.capacity} занято · всего слотов ${total} · продажа бесплатна`}
+        /* «Продажа бесплатна» читалось как «отдаёте объект даром»: два игрока подряд решили,
+         * что возврата нет вовсе. Бесплатным было действие, а не сделка — теперь так и написано,
+         * и цена возврата стоит рядом, потому что это половина, а не полная цена. */
+        meta={
+          `${me.assets.length} / ${me.capacity} занято · всего слотов ${total}` +
+          ` · продажа не требует действия, возврат — половина цены`
+        }
       />
       {/* Панель сразу в полный рост: все шесть слотов занимают своё место с первого раунда,
         * хотя три из них ещё закрыты. Иначе покупка объекта или слота двигала бы всю доску.
@@ -63,7 +69,6 @@ export function CityPanel({
                   label={`${asset.title} — подробности`}
                   content={
                     <OwnedDetails
-                      owned={owned}
                       asset={asset}
                       districtTitle={district?.title}
                       districtIcon={district?.icon}
@@ -166,27 +171,23 @@ const OwnedSlot = forwardRef(function OwnedSlot({
     <button
       ref={ref}
       type="button"
-      data-state={owned.blocked ? "blocked" : "active"}
       style={assetFaceStyle(district?.color, asset.rarity)}
-      className={`${assetFaceGrid} hover:border-accent hover:border-l-[var(--dc)]
-        data-[state=blocked]:border-[#5c3340] data-[state=blocked]:bg-[#1c1418]`}
+      className={assetFaceGrid}
       {...rest}
     >
       <AssetFace
         asset={asset}
         district={district}
         lines={lines}
-        /* Заблокированный объект не приносит ничего: показываем нули, а не то,
-         * что он давал бы. Красная строка внизу объясняет, почему. */
-        income={owned.blocked ? 0 : asset.income}
+        income={asset.income}
         influence={0}
         /* Возврат при продаже равен очкам объекта — это одно и то же число. Печатать его
          * ещё и слева сверху, где у рынка стоит цена, значит трижды повторить одно; строка
          * продажи внизу и бейдж очков справа уже всё сказали. */
         topLeft={null}
         topRight={
-          <span className="rounded-[10px] border border-[#6b5518] bg-[#33290e] px-1.5 text-[11px]
-            font-extrabold whitespace-nowrap text-gold">
+          <span className="rounded-[10px] border border-line-2 bg-panel-3 px-1.5 text-[11px]
+            font-extrabold whitespace-nowrap text-[var(--color-badge)]">
             {value} оч
           </span>
         }
@@ -194,15 +195,12 @@ const OwnedSlot = forwardRef(function OwnedSlot({
           <span className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5">
             {/* У карточки рынка здесь стоит причина отказа, у своего объекта — цена продажи.
               * Место пустовало, а продажа — единственный способ освободить слот, когда все
-              * шесть заняты. Заблокированность важнее и вытесняет цену: такой объект в первую
-              * очередь балласт, и это надо сказать громче. */}
+              * шесть заняты. */}
             <span
-              className={`h-[13px] overflow-hidden text-ellipsis whitespace-nowrap rounded px-1
-                text-3xs font-semibold leading-[13px] ${
-                  owned.blocked ? "bg-[#4a2530] text-[#ffb0bd]" : "text-good"
-                }`}
+              className="h-[13px] overflow-hidden text-ellipsis whitespace-nowrap rounded px-1
+                text-3xs font-semibold leading-[13px] text-good"
             >
-              {owned.blocked ? "🚫 заблокирован" : `Продать за ${value}$`}
+              {`Продать за ${value}$`}
             </span>
             <span
               className={`whitespace-nowrap text-[15px] font-extrabold leading-none tabular-nums ${
@@ -220,7 +218,6 @@ const OwnedSlot = forwardRef(function OwnedSlot({
 });
 
 function OwnedDetails({
-  owned,
   asset,
   districtTitle,
   districtIcon,
@@ -230,7 +227,6 @@ function OwnedDetails({
   sellState,
   onSell,
 }: {
-  owned: OwnedAsset;
   asset: AssetMeta;
   districtTitle?: string;
   districtIcon?: string;
@@ -248,27 +244,12 @@ function OwnedDetails({
     <>
       <PopoverHeader title={asset.title} subtitle={districtTitle} />
       <PopoverBody>
-        {owned.blocked && (
-          <p className="mb-2 rounded-md border border-[#5c3340] bg-[#2a1519] px-2 py-1.5 text-[#ffb3b3]">
-            <strong>🚫 Объект заблокирован.</strong> Дохода не даёт и не открывает серых операций.
-            Снимается только картой разблокировки — отдельного действия для этого в игре нет.
-          </p>
-        )}
         <KeyValue
           rows={[
             ["Район", `${districtIcon ?? ""} ${districtTitle ?? asset.district} · у вас ${owns} из 4`],
-            [
-              "Доход",
-              owned.blocked ? (
-                <span className="text-bad">
-                  0$ вместо +{asset.income}$
-                </span>
-              ) : (
-                `+${asset.income}$ за раунд`
-              ),
-            ],
+            ["Доход", `+${asset.income}$ за раунд`],
             ["В счёт", `${value} очков`],
-            ["Продажа", `${value}$ · бесплатно, без действия`],
+            ["Продажа", `${value}$ — половина цены · не требует действия`],
           ]}
         />
         <EffectList lines={lines} />

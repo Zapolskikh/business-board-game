@@ -19,7 +19,6 @@ from city_engine.constants import (
     GREY_OPERATION_POINTS,
     GREY_SUCCESS_SCANDALS,
     INFLUENCE_PER_POINT,
-    JOURNALIST_RATING_BASE,
     LOBBYING_INFLUENCE,
     MAX_CAPACITY,
     MONEY_PER_POINT,
@@ -28,7 +27,7 @@ from city_engine.constants import (
     ROOF_BREAK_POINT_PER_ROOF,
 )
 from city_engine.engine import CityEngine
-from city_engine.models import GameState, PlayerState
+from city_engine.models import GameState, PlayerState, Transition
 
 ROLE_DISTRICT = {
     "capitalist": "business",
@@ -139,11 +138,24 @@ class BotDecision:
     alternatives: tuple[tuple[str, float], ...]
 
 
-def choose_bot_command(engine: CityEngine, state: GameState, player_id: str) -> BotDecision:
+def choose_bot_command(
+    engine: CityEngine,
+    state: GameState,
+    player_id: str,
+    legal: list[tuple[dict[str, Any], Transition]] | None = None,
+) -> BotDecision:
+    """Pick a command. ``legal`` lets a caller that already enumerated the options hand them over.
+
+    Enumerating them is by far the most expensive thing here — every candidate is applied against a
+    full state clone — so a caller that needs the same list for its own purposes would otherwise pay
+    for it twice. The balance harness does exactly that, and it halves its runtime. Passing a list
+    changes nothing about the choice: it must be the same ``legal_transitions`` output for the same
+    state and player, and the default still computes it.
+    """
     player = state.player_by_id(player_id)
     if not player.is_bot:
         raise ValueError("bot policy can only control a bot seat")
-    legal = engine.legal_transitions(state, player_id)
+    legal = engine.legal_transitions(state, player_id) if legal is None else legal
     if not legal:
         raise RuntimeError(f"no legal action for bot {player_id}")
     profile = PROFILES[player.difficulty]
@@ -241,7 +253,7 @@ def _position_value(
     # that pays influence look like a weak income card: across 48 measured player-games not one bot
     # ever owned the compromat trader or the illegal datacentre, so two of the five grey operations
     # were unreachable rather than mispriced.
-    recurring = engine._round_income(state, player) + engine.passive_influence(player) * profile.influence_weight
+    recurring = engine._round_income(state, player) + engine.passive_influence(state, player) * profile.influence_weight
     # One or two scandals are ordinary score loss, already present in the engine score.  The extra
     # risk term is only for the danger zone near role loss.  Squaring the whole counter made an
     # expert spend 19 actions and scarce influence cleaning from 2 -> 1 in one measured game,
@@ -318,9 +330,8 @@ def _role_utility(engine: CityEngine, state: GameState, player: PlayerState, rol
         # The residents tax is charged on every residential object *on the table*, including the
         # rivals' — see ``CityEngine.residents_tax``. Counting only its own was the old power.
         city_residential = sum(engine.district_count(other, "residential") for other in state.players)
-        return (
-            city_residential + engine.district_count(player, "government") * 4 + engine.passive_influence(player) * 1.5
-        )
+        passive = engine.passive_influence(state, player)
+        return city_residential + engine.district_count(player, "government") * 4 + passive * 1.5
     if role_id == "journalist":
         return enemy_scandals * 2 + sum(other.role is not None for other in state.players if other.id != player.id)
     if role_id == "fraudster":
@@ -469,11 +480,11 @@ def _strategic_action_bonus(
         target_id = payload.get("target_id")
         if target_id == player.id:
             # Aimed at itself. Only the journalist has a reason to buy a scandal — the rating pays
-            # for one — and even then only while the ceiling is above the counter and the role is
-            # not one scandal from falling. For anybody else this is a point thrown away.
-            ceiling = JOURNALIST_RATING_BASE + engine.district_count(player, "residential")
+            # 1◆ a round for every one of them, uncapped — and even then only while the role is not
+            # one scandal from falling. For anybody else this is a point thrown away.
+            reads = engine.owned_district_count(player, "residential") > 0
             headroom = engine.scandal_limit(player) - player.scandals
-            if engine.has_role(player, "journalist") and player.scandals < ceiling and headroom > card.value + 1:
+            if engine.has_role(player, "journalist") and reads and headroom > card.value + 1:
                 bonus += card.value * 1.5
             else:
                 bonus -= 5.0

@@ -16,15 +16,28 @@ import type { AssetMeta, DistrictMeta } from "../../online/types";
  *   5. нижняя строка
  */
 
+/* Один источник правды на редкость — токены темы, а не копия хексов здесь. Копия уже
+ * разъезжалась с theme.css: карточка красилась одним набором, легенда в галерее другим. */
 const rarityColor: Record<string, string> = {
-  common: "#9fb3c8",
-  uncommon: "#5ec8f0",
-  rare: "#b98cff",
-  epic: "#ff9a4d",
-  legendary: "#ffd45e",
+  common: "var(--color-rar-common)",
+  uncommon: "var(--color-rar-uncommon)",
+  rare: "var(--color-rar-rare)",
+  epic: "var(--color-rar-epic)",
+  legendary: "var(--color-rar-legendary)",
 };
 
 export const assetRarityColor = (rarity: string): string => rarityColor[rarity] ?? rarityColor.common;
+
+/** Толщина рамки редкости. Внутренняя тень, а не бордер: не участвует в раскладке. */
+const rarityRing = "inset 0 0 0 2px var(--rc)";
+
+/* Легендарная получает мягкое свечение, эпическая — послабее, остальные только рамку и бейдж.
+ * Ступенька в оформлении, а не только в цвете: две верхние редкости должны быть видны с другого
+ * конца доски, не считываясь как «просто ещё один оттенок». */
+const rarityGlow: Record<string, string> = {
+  epic: "0 0 10px -2px color-mix(in srgb, var(--rc), transparent 55%)",
+  legendary: "0 0 14px -2px color-mix(in srgb, var(--rc), transparent 40%)",
+};
 
 export function AssetFace({
   asset,
@@ -65,8 +78,11 @@ export function AssetFace({
 
       {/* 3 — теги на лице карточки потому, что по ним считаются требования проектов */}
       <span className="flex min-w-0 items-center gap-1.5 overflow-hidden text-3xs">
+        {/* Бейдж, а не просто цветное слово: третий носитель редкости после рамки и
+          * градиента. Цветное слово в общем ряду с тегами читалось как ещё один тег. */}
         <span
-          className="shrink-0 font-bold uppercase text-[var(--rc)]"
+          className="shrink-0 rounded border px-1 font-bold uppercase tracking-wide
+            border-[var(--rc)] bg-[color-mix(in_srgb,var(--rc),transparent_82%)] text-[var(--rc)]"
           title={`Редкость: ${rarityLabels[asset.rarity] ?? asset.rarity}`}
         >
           {rarityLabels[asset.rarity] ?? asset.rarity}
@@ -127,16 +143,37 @@ export function AssetFace({
 /** Общая обвязка: сетка зон, цвета района и редкости. */
 export function assetFaceStyle(districtColor: string | undefined, rarity: string): CSSProperties {
   return {
-    "--dc": districtColor ?? "#3a4d63",
+    "--dc": districtColor ?? "var(--color-line)",
     "--rc": assetRarityColor(rarity),
     /* Редкость — свечением от краёв к центру, а не точкой в углу: цвет читается
      * боковым зрением, точку же надо было искать и сверять с легендой. */
     backgroundImage:
       "radial-gradient(115% 80% at 50% 50%, transparent 28%, color-mix(in srgb, var(--rc), transparent 58%) 100%)",
+    /* Толщина рамки — внутренней тенью поверх 1px бордера, а не самим бордером.
+     *
+     * Тень не участвует в раскладке, поэтому редкость читается тремя пикселями, а карточка
+     * внутри остаётся ровно того же размера, что и до перекраски. Настоящий `border-[3px]`
+     * забирал по 2px сверху и снизу, и таблица свойств — четыре фиксированные строки на
+     * `minmax(0,1fr)` — переставала помещаться: строки наезжали друг на друга.
+     */
+    boxShadow: [rarityRing, rarityGlow[rarity]].filter(Boolean).join(", "),
   } as CSSProperties;
 }
 
+/* Внешняя рамка принадлежит редкости целиком, и только ей.
+ *
+ * Раньше левый край в 3px красился районом, а редкость жила в градиенте и маленькой
+ * подписи — то есть цвет по краю карточки означал то одно, то другое, и система была
+ * неоднозначной. Район никуда не делся: он стоит иконкой и названием в первой строке
+ * карточки, где его и читают. Наведение поднимает подложку на ступень (--color-panel-3),
+ * а не перекрашивает рамку — иначе оно стирало бы редкость ровно в тот момент, когда
+ * игрок разглядывает карточку.
+ */
+/* Рамка редкости рисуется внутренней тенью, а не толстой рамкой — см. `rarityRing` в
+ * `assetFaceStyle`. Здесь остаётся ровно 1px, как было до перекраски: `border-[3px]` по всему
+ * периметру забирал у карточки 4px высоты, а таблица свойств стоит на `minmax(0,1fr)` и четырёх
+ * фиксированных строках — эти 4px её и переполняли, строки наезжали друг на друга. */
 export const assetFaceGrid = `grid h-full w-full min-h-0 min-w-0
   grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] gap-1
-  rounded-card border border-line border-l-[3px] border-l-[var(--dc)] bg-panel-2
-  px-2 py-1.5 text-left`;
+  rounded-card border border-[var(--rc)] bg-panel-2
+  px-2 py-1.5 text-left transition-colors hover:bg-panel-3`;

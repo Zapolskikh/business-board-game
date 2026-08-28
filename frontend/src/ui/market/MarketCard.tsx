@@ -1,6 +1,13 @@
 import { motion } from "motion/react";
 import { assetEffectLines, assetPoints, districtCount } from "../../online/gameUi";
-import type { AssetMeta, CityMeta, DistrictMeta, MarketAsset, PlayerState } from "../../online/types";
+import type {
+  AssetMeta,
+  CityMeta,
+  DistrictMeta,
+  LegalAction,
+  MarketAsset,
+  PlayerState,
+} from "../../online/types";
 import { AssetFace, assetFaceGrid, assetFaceStyle } from "../primitives/AssetFace";
 import { CardPopover } from "../primitives/CardPopover";
 import { MarketCardDetails } from "./MarketCardDetails";
@@ -24,6 +31,8 @@ export function MarketCard({
   assets,
   state,
   onBuy,
+  mark,
+  onMark,
 }: {
   item: MarketAsset;
   asset: AssetMeta;
@@ -33,8 +42,16 @@ export function MarketCard({
   assets: Map<string, AssetMeta>;
   state: MarketCardState;
   onBuy: () => void;
+  /** Метка роли на этот слот, если движок её сейчас разрешает: капиталист или мафиози. */
+  mark?: LegalAction;
+  onMark: (action: LegalAction) => void;
 }) {
   const owned = district ? districtCount(me, district.id, assets) : 0;
+  // Обе метки публичны по правилам, поэтому рисуются на лице карточки, а не в поповере:
+  // они меняют решение «покупать ли», и решение принимают, глядя на сетку рынка.
+  const claimedByMe = item.claimed_by === me.id;
+  const claimed = Boolean(item.claimed_by);
+  const locked = Boolean(item.locked_by) && item.locked_by !== me.id;
   const blocked = state.kind !== "buyable" && state.kind !== "buying";
   const short = me.money < state.price;
   // Синергии — то же, что в поповере: клиент нигде не считает правило заново.
@@ -53,6 +70,8 @@ export function MarketCard({
           assets={assets}
           state={state}
           onBuy={onBuy}
+          mark={mark}
+          onMark={onMark}
         />
       }
     >
@@ -71,8 +90,7 @@ export function MarketCard({
         animate={{ opacity: state.kind === "buying" ? 0.55 : 1 }}
         whileHover={state.kind === "buyable" ? { y: -2 } : undefined}
         transition={{ duration: 0.18 }}
-        className={`${assetFaceGrid} hover:border-accent hover:border-l-[var(--dc)]
-          data-[state=buying]:animate-pulse`}
+        className={`${assetFaceGrid} data-[state=buying]:animate-pulse`}
       >
         <AssetFace
           asset={asset}
@@ -88,13 +106,26 @@ export function MarketCard({
           }
           topRight={
             <span className="flex items-center gap-1">
+              {claimed && (
+                <span
+                  className="text-3xs"
+                  title={claimedByMe ? "Ваша метка: карта работает на вас" : "Метка капиталиста"}
+                >
+                  {claimedByMe ? "🏷️" : "🏷"}
+                </span>
+              )}
+              {item.locked_by && (
+                <span className="text-3xs" title="Серая метка мафиози: слот закрыт до конца раунда">
+                  🔒
+                </span>
+              )}
               {item.leaving && (
-                <span className="text-3xs text-gold" title="Слот уходит в конце раунда">
+                <span className="text-3xs text-[var(--color-warning)]" title="Слот уходит в конце раунда">
                   ⏳
                 </span>
               )}
-              <span className="rounded-[10px] border border-[#6b5518] bg-[#33290e] px-1.5 text-[11px]
-                font-extrabold whitespace-nowrap text-gold">
+              <span className="rounded-[10px] border border-line-2 bg-panel-3 px-1.5 text-[11px]
+                font-extrabold whitespace-nowrap text-[var(--color-badge)]">
                 {assetPoints(asset)} оч
               </span>
             </span>
@@ -107,10 +138,20 @@ export function MarketCard({
               <span
                 className={`h-[13px] overflow-hidden text-ellipsis whitespace-nowrap rounded px-1
                   text-3xs font-semibold leading-[13px] ${
-                    blocked ? "bg-[#4a2530] text-[#ffb0bd]" : "text-transparent"
+                    claimedByMe && !locked
+                      ? "bg-[#1d3b2a] text-[#7fdaa6]"
+                      : blocked
+                        ? "bg-[#4a2530] text-[#ffb0bd]"
+                        : "text-transparent"
                   }`}
               >
-                {blocked ? marketCardReason(state) : "—"}
+                {locked
+                  ? "🔒 закрыт серой меткой"
+                  : claimedByMe
+                    ? "🏷️ ваша метка — карта уже работает"
+                    : blocked
+                      ? marketCardReason(state)
+                      : "—"}
               </span>
               <span
                 className={`whitespace-nowrap text-[15px] font-extrabold leading-none tabular-nums ${

@@ -38,7 +38,7 @@ export const roles: RoleMeta[] = [
   { id: "journalist", title: "Журналист", icon: "📰", color: "#32a86a", passive: "Рейтинг 2 плюс один за жилой объект.", power: "Раздуть скандал и Публикация.", districts: [] },
   { id: "fraudster", title: "Аферист", icon: "🎭", color: "#aa68ee", passive: "+30% к шансу серых операций.", power: "Криптоскам: 25% кошельков соперников.", districts: ["shadows"] },
   { id: "mafia", title: "Мафиози", icon: "🔪", color: "#b84343", passive: "Предел Крыш 3 вместо 2.", power: "Рэкет.", districts: ["shadows"] },
-  { id: "military", title: "Силовик", icon: "⚖️", color: "#70848b", passive: "Читает счётчик скандалов цели.", power: "Санкция.", districts: ["government"] },
+  { id: "military", title: "Силовик", icon: "⚖️", color: "#70848b", passive: "Читает счётчик скандалов цели.", power: "Санкция и массовая зачистка крыш.", districts: ["government"] },
 ];
 
 export const assets: AssetMeta[] = [
@@ -129,13 +129,13 @@ export const ME = "p-me";
 
 const basePlayers: PlayerState[] = [
   player({ id: "p-bot4", name: "Bot 4", difficulty: "expert", role: "politician", money: 8, influence: 3, scandals: 2, turns: 6, assets: [
-    { uid: "o-1", card_id: "city_ecosystem", blocked: false },
-    { uid: "o-2", card_id: "media_net", blocked: false },
-    { uid: "o-3", card_id: "insurance", blocked: false },
+    { uid: "o-1", card_id: "city_ecosystem" },
+    { uid: "o-2", card_id: "media_net" },
+    { uid: "o-3", card_id: "insurance" },
   ], projects: ["metro"] }),
   player({ id: "p-bot2", name: "Bot 2", role: "fraudster", money: 6, influence: 5, scandals: 4, turns: 6, assets: [
-    { uid: "o-4", card_id: "pawnshops", blocked: false },
-    { uid: "o-5", card_id: "coworking", blocked: false },
+    { uid: "o-4", card_id: "pawnshops" },
+    { uid: "o-5", card_id: "coworking" },
   ] }),
   player({
     id: ME,
@@ -155,14 +155,14 @@ const basePlayers: PlayerState[] = [
       { uid: "h-2", card_id: "urgent_credit" },
     ],
     assets: [
-      { uid: "o-6", card_id: "flex_offices", blocked: false },
-      { uid: "o-7", card_id: "insurance", blocked: false },
-      { uid: "o-8", card_id: "coworking", blocked: true },
+      { uid: "o-6", card_id: "flex_offices" },
+      { uid: "o-7", card_id: "insurance" },
+      { uid: "o-8", card_id: "coworking" },
     ],
     projects: ["archive", "social_housing"],
   }),
   player({ id: "p-bot3", name: "Bot 3", difficulty: "easy", money: 11, influence: 4, roofs: 2, jail_turns: 2, turns: 5, assets: [
-    { uid: "o-9", card_id: "auto_warehouse", blocked: false },
+    { uid: "o-9", card_id: "auto_warehouse" },
   ] }),
 ];
 

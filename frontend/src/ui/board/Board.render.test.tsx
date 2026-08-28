@@ -96,7 +96,7 @@ describe("BoardView", () => {
     const room = scenarios["Богатый ход"];
     const game = room.game as GameState;
     const me = game.players.find(player => player.id === ME) as PlayerState;
-    const broken: PlayerState = { ...me, assets: [{ uid: "x", card_id: "нет-такого", blocked: false }] };
+    const broken: PlayerState = { ...me, assets: [{ uid: "x", card_id: "нет-такого" }] };
     const context: ActionContext = { game, me: broken, legal: [] };
     expect(() =>
       renderToString(

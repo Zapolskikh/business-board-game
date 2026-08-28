@@ -34,8 +34,14 @@ export const powerLabels: Record<string, string> = {
   mafia_racket: "Рэкет",
   mafia_cleanup: "Замять дело",
   military_sanction: "Санкции",
+  military_inspection: "Прийти с проверкой",
+  military_roof_seize: "Отобрать Крышу",
   fraudster_cleanup: "Снять скандал",
   fraudster_crypto_scam: "Криптоскам",
+  capitalist_claim: "Поставить метку",
+  mafia_lock: "Серая метка",
+  politician_deal: "Договоримся",
+  politician_veto: "Право вето",
 };
 
 export const greyOperationLabels: Record<string, string> = {
@@ -395,6 +401,11 @@ const eventVerbs: Record<string, string> = {
   roof_bought: "покупает Крышу",
   crisis_pr: "проводит антикризисный PR",
   military_sanction: "вводит санкции",
+  military_inspection: "приходит с проверкой",
+  roof_seized: "отбирает Крышу",
+  market_claimed: "ставит метку на карту рынка",
+  market_locked: "закрывает слот серой меткой",
+  project_vetoed: "накладывает право вето",
   capacity_bought: "расширяет бизнес",
   asset_bought: "покупает объект",
   asset_sold: "продаёт объект",
@@ -597,6 +608,35 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       if (roleTitle) tail.push(txt(` и роль «${roleTitle}» снята`));
       return lead(...tail);
     }
+    case "military_inspection": {
+      // Two sets, and the difference between them is the whole story: who the inspection reached
+      // and who actually took the scandal. Printing only the first reads as four scandals when a
+      // Крыша ate three of them.
+      const reached = Array.isArray(data.target_ids) ? data.target_ids.map(stringValue) : [];
+      const hit = new Set(Array.isArray(data.scandalised_ids) ? data.scandalised_ids.map(stringValue) : []);
+      const tail: LogSegment[] = [txt(" приходит с проверкой в Серый сектор: ")];
+      reached.forEach((targetId, index) => {
+        if (index > 0) tail.push(txt(", "));
+        tail.push(playerSeg(game, targetId));
+        tail.push(hit.has(targetId) ? num(" +1⚠", "bad") : txt(" (Крыша)"));
+      });
+      return lead(...tail);
+    }
+    case "roof_seized":
+      return lead(
+        txt(" отбирает Крышу у "),
+        playerSeg(game, stringValue(data.target_id)),
+        txt("; теперь у него "),
+        num(`${numberValue(data.roofs)} Крыш`, "good"),
+      );
+    case "market_claimed":
+      return lead(txt(` ставит метку на «${asset ?? assetId}»: карта работает на него, но остаётся в продаже`));
+    case "market_locked":
+      return lead(txt(` закрывает «${asset ?? assetId}» серой меткой: до конца раунда её не купит никто другой`));
+    case "project_vetoed": {
+      const vetoed = meta.projects.find(item => item.id === stringValue(data.project_id));
+      return lead(txt(` накладывает вето на «${vetoed?.title ?? stringValue(data.project_id)}»`));
+    }
     case "crisis_pr":
       return lead(txt(" антикризисный PR ("), signed(-numberValue(data.cost), "◆"), txt(", "), num("−1⚠", "good"), txt(`, осталось ${numberValue(data.scandals)}⚠)`));
     case "asset_bought":
@@ -656,14 +696,6 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       }
       return lead(...tail);
     }
-    case "asset_state_changed": {
-      const changes: Record<string, string> = {
-        blocked: "заблокирован на раунд",
-      };
-      const sourceCard = meta.action_cards.find(item => item.id === stringValue(data.source))?.title;
-      const via = sourceCard ? ` (карта «${sourceCard}»)` : ` (${greyOperationLabels[stringValue(data.source)] ?? stringValue(data.source)})`;
-      return lead(txt(`: «${asset ?? assetId}» ${changes[stringValue(data.change)] ?? stringValue(data.change)}${via}`));
-    }
     case "player_jailed":
       // The arrest itself is reported by scandal_limit_reached, which knows the real limit —
       // it is 6 for everybody but the journalist, who survives one scandal longer.
@@ -713,8 +745,7 @@ export function describeEvent(event: DomainEvent, game: GameState, meta: CityMet
 const forecastLabels: Record<string, string> = {
   objects: "🏢 Объекты",
   projects: "🏗️ Проекты",
-  administrative: "🏛️ Административный ресурс",
-  residents_tax: "🏘️ Налог с жителей",
+  residents: "🏘️ Влияние с жителей",
   journalist: "📰 Публикации",
   debt: "🏦 Кредит",
   rating: "⭐ Рейтинг",
@@ -736,15 +767,10 @@ const rolePerkLabels: Record<string, { label: string; unit: string; hint: string
     unit: "◆/раунд",
     hint: "+1◆ за каждый ваш объект Промзоны — купите объект Промзоны, чтобы включить",
   },
-  politician_residents_tax: {
-    label: "Налог с жителей",
-    unit: "$/раунд",
-    hint: "+1$ за каждый жилой объект на столе, включая чужие",
-  },
-  politician_administrative: {
-    label: "Административный ресурс",
+  politician_residents: {
+    label: "Влияние с жителей",
     unit: "◆/раунд",
-    hint: "+2◆ за каждый ваш объект Административного квартала",
+    hint: "+1◆ за каждый жилой объект на столе, включая чужие",
   },
   journalist_money: {
     label: "Деньги за чужие скандалы",
@@ -754,18 +780,13 @@ const rolePerkLabels: Record<string, { label: string; unit: string; hint: string
   journalist_rating: {
     label: "Влияние за свои скандалы",
     unit: "◆/раунд",
-    hint: "Потолок 2 плюс 1 за каждый ваш объект Спального района",
+    hint: "+1◆ за каждый ваш скандал, без потолка — нужен хотя бы один объект Спального района",
   },
   fraudster_actions: { label: "Четыре действия за ход", unit: "", hint: "Больше, чем у любой другой роли" },
   fraudster_chance: {
     label: "Бонус к шансу серых операций",
     unit: "%",
     hint: "+30% к любой серой операции, без условий",
-  },
-  fraudster_comeback: {
-    label: "Камбэк за отставание",
-    unit: "◆ за операцию",
-    hint: "1◆ за каждую позицию отставания в рейтинге при успешной серой операции",
   },
   mafia_racket_money: {
     label: "Деньги рэкета",
@@ -777,11 +798,21 @@ const rolePerkLabels: Record<string, { label: string; unit: string; hint: string
     unit: "◆",
     hint: "1◆ за каждый ваш объект Административного квартала",
   },
-  mafia_roofs: { label: "Предел Крыш", unit: "", hint: "3 вместо 2, и каждая на 1$ дешевле" },
+  mafia_roofs: { label: "Предел Крыш", unit: "", hint: "2 вместо 1, и каждая на 1$ дешевле" },
   military_sanction_targets: {
     label: "Цели для санкции",
     unit: "",
     hint: "Соперники с 2+ скандалами: 2 — деньги, 3 — деньги и влияние, 4 — ещё и роль",
+  },
+  military_inspection_targets: {
+    label: "Проверка достанет",
+    unit: "соперников",
+    hint: "Соперники с объектом Серого сектора получат по скандалу; за Крышей — гасится",
+  },
+  military_seize_targets: {
+    label: "Крыши под перехват",
+    unit: "",
+    hint: "У кого есть Крыша: 3◆ и действие — забрать одну себе, Крыша не защищает",
   },
   role_district_income: {
     label: "Профильный район",

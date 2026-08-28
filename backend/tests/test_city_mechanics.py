@@ -5,6 +5,7 @@ import pytest
 from city_engine.commands import Command
 from city_engine.constants import (
     ACTION_DECK_COPIES,
+    BASE_SCANDAL_LIMIT,
     CAMPAIGN_TIERS,
     CASH_TO_INFLUENCE_MONEY,
     CRYPTO_SCAM_SCANDALS,
@@ -17,6 +18,7 @@ from city_engine.constants import (
     LOBBYING_INFLUENCE,
     LOBBYING_POINTS,
     MARKET_ROTATION_SIZE,
+    MILITARY_SEIZE_INFLUENCE,
     MONEY_PER_POINT,
     PATRONAGE_MONEY,
     PATRONAGE_POINTS,
@@ -455,16 +457,16 @@ def test_depth_pays_influence_from_the_fourth_object() -> None:
     owned = give_asset(state, player, deep.id)
 
     # One object of the district: the effect is printed but pays nothing yet.
-    assert engine.passive_influence_breakdown(player)["synergy"] == 0
+    assert engine.passive_influence_breakdown(state, player)["synergy"] == 0
 
     for _ in range(3):
         give_asset(state, player, "housing")
     assert engine.district_count(player, "residential") == 4
-    assert engine.passive_influence_breakdown(player)["synergy"] == deep.effects["synergyInfluence"]
+    assert engine.passive_influence_breakdown(state, player)["synergy"] == deep.effects["synergyInfluence"]
 
-    # Blocked objects pay nothing, like every other passive.
-    owned.blocked = True
-    assert engine.passive_influence_breakdown(player)["synergy"] == 0
+    # The payout lives on the object: lose it and the district drops back below four.
+    player.assets.remove(owned)
+    assert engine.passive_influence_breakdown(state, player)["synergy"] == 0
 
 
 def test_every_cleanup_costs_an_action_and_nothing_else_limits_it() -> None:
@@ -506,18 +508,21 @@ def test_the_mafia_buries_a_case_for_money_and_needs_the_city_hall() -> None:
     assert (player.scandals, player.money, player.roofs) == (1, 7, 2)
 
 
-def test_the_politician_taxes_every_residential_object_on_the_table() -> None:
+def test_the_politician_is_paid_influence_for_every_residential_object_on_the_table() -> None:
     engine = CityEngine()
     state = make_state()
     player = state.current_player
     give_asset(state, player, "delivery")  # residential
     give_asset(state, state.players[1], "media")  # residential, opponent's
 
-    assert engine.residents_tax(state, player) == 0  # no role, no tax
+    assert engine.residents_influence(state, player) == 0  # no role, no line
     player.role = "politician"
     # Both objects pay, including the opponent's: the passive scales with how built-up the city is.
-    assert engine.residents_tax(state, player) == 2
-    assert engine._income_breakdown(state, player)["residents_tax"] == 2
+    # It pays influence, not money — the administrative quarter is the role's own district now and
+    # pays the dollar an object, so this line moved to the currency the role is actually short of.
+    assert engine.residents_influence(state, player) == 2
+    assert engine.passive_influence_breakdown(state, player)["residents"] == 2
+    assert "residents_tax" not in engine._income_breakdown(state, player)
 
 
 def test_the_capitalist_earns_a_dollar_from_every_object() -> None:
@@ -647,31 +652,89 @@ def test_sanction_blocked_by_roof_does_not_clean_the_target() -> None:
     assert any(event.type == "targeted_effect_blocked" for event in state.event_log)
 
 
-def test_an_upgrade_loss_is_logged_even_though_no_resource_moves() -> None:
+def test_military_inspection_scandalises_everyone_in_the_grey_sector() -> None:
+    """Aimed at a district, not at a player, so it cannot be dodged by being quiet.
+
+    The role's other line reads the target's own scandal counter and needs somebody already dirty.
+    This is what creates that state — and it is the only power in the game whose target set is
+    computed, which is why the engine exposes `inspection_targets` for the clients to print.
+    """
+    engine = CityEngine()
+    state = create_game_from_catalog(
+        "military-inspection",
+        [PlayerSetup(f"p{seat}", f"Player {seat}") for seat in range(1, 5)],
+        seed=42,
+    )
+    military = state.current_player
+    military.role = "military"
+    rivals = [player for player in state.players if player.id != military.id]
+    give_asset(state, rivals[0], "cash")  # shadows
+    give_asset(state, rivals[1], "cash")  # shadows, and behind a roof
+    rivals[1].roofs = 1
+    give_asset(state, rivals[2], "housing")  # residential — untouched
+
+    assert engine.inspection_targets(state, military) == [rivals[0].id, rivals[1].id]
+
+    state = run(engine, state, "use_role_power", {"power": "military_inspection"})
+
+    hit = [state.player_by_id(rival.id) for rival in rivals]
+    assert hit[0].scandals == 1
+    assert (hit[1].scandals, hit[1].roofs) == (0, 0)  # the roof answered instead
+    assert hit[2].scandals == 0
+    assert state.actions_left == 2
+    event = next(item for item in state.event_log if item.type == "military_inspection")
+    assert event.data["scandalised_ids"] == [rivals[0].id]
+
+
+def test_military_inspection_is_not_offered_against_a_clean_city() -> None:
     engine = CityEngine()
     state = make_state()
-    player = state.current_player
-    owned = give_asset(state, player, "delivery")
+    state.current_player.role = "military"
 
-    engine._log_asset_state_change(state, player, owned, change="blocked", source="test")
+    powers = {
+        action["payload"].get("power")
+        for action in engine.legal_actions(state, state.current_player.id)
+        if action["type"] == "use_role_power"
+    }
+    assert "military_inspection" not in powers
+    with pytest.raises(IllegalActionError, match="shadows object"):
+        run(engine, state, "use_role_power", {"power": "military_inspection"})
 
-    logged = next(event for event in state.event_log if event.type == "asset_state_changed")
-    assert (logged.data["asset_id"], logged.data["change"]) == (owned.card_id, "blocked")
 
+def test_military_seizes_a_roof_through_the_roof_it_takes() -> None:
+    """The token cannot defend itself, exactly like «Пробить крышу».
 
-def test_freeze_card_reports_which_object_it_blocked() -> None:
+    If it could, the power would be unreachable: the only players worth aiming it at are the ones
+    holding the thing that would block it.
+    """
     engine = CityEngine()
     state = make_state()
-    attacker = state.current_player
-    target = next(player for player in state.players if player.id != attacker.id)
+    military = state.current_player
+    military.role = "military"
+    military.influence = MILITARY_SEIZE_INFLUENCE
+    target = rival_of(state, military)
+    target.roofs = 1
+
+    state = run(engine, state, "use_role_power", {"power": "military_roof_seize", "target_id": target.id})
+
+    assert state.current_player.roofs == 1
+    assert state.player_by_id(target.id).roofs == 0
+    assert state.current_player.influence == 0
+    assert state.actions_left == 2
+    assert any(event.type == "roof_seized" for event in state.event_log)
+
+
+def test_seizing_a_roof_needs_a_target_holding_one() -> None:
+    engine = CityEngine()
+    state = make_state()
+    military = state.current_player
+    military.role = "military"
+    military.influence = MILITARY_SEIZE_INFLUENCE
+    target = rival_of(state, military)
     target.roofs = 0
-    owned = give_asset(state, target, "delivery")
-    held = give_card(state, attacker, "asset_freeze")  # kind=freeze, blocks the best object
 
-    state = run(engine, state, "play_action_card", {"card_uid": held.uid, "target_id": target.id})
-
-    blocked = next(event for event in state.event_log if event.type == "asset_state_changed")
-    assert (blocked.data["asset_uid"], blocked.data["change"]) == (owned.uid, "blocked")
+    with pytest.raises(IllegalActionError, match="holds no roof"):
+        run(engine, state, "use_role_power", {"power": "military_roof_seize", "target_id": target.id})
 
 
 def test_settlement_reports_where_influence_came_from() -> None:
@@ -679,7 +742,7 @@ def test_settlement_reports_where_influence_came_from() -> None:
     state = make_state()
     politician = state.current_player
     politician.role = "politician"
-    give_asset(state, politician, "delivery")  # Спальный район: money through the residents tax
+    give_asset(state, politician, "delivery")  # Спальный район: two of them, so the residents line pays 2
     give_asset(state, politician, "housing")
     influence_before = politician.influence
 
@@ -690,12 +753,12 @@ def test_settlement_reports_where_influence_came_from() -> None:
     breakdown = settled.data["influence_sources"][politician.id]
     # Itemised by source: a project perk paying +1◆ a round used to be indistinguishable from one
     # paying nothing, because the whole passive arrived as a single unlabelled number.
-    # Two administrative objects would pay 4◆; one housing object pays nothing in influence any
-    # more, because the housing tie of the politician is the residents tax, and that is money.
+    # The residents line pays 1◆ per residential object anywhere in the city; the politician's two
+    # are the only ones on this table. It used to be money, and the row was called the residents tax.
     assert breakdown == {
         "objects": 0,
         "synergy": 0,
-        "administrative": 0,
+        "residents": 2,
         "industrial": 0,
         "projects": 0,
         "rating": 0,
@@ -958,7 +1021,7 @@ def test_a_grey_operation_swallowed_by_a_roof_still_pays_for_the_roll() -> None:
     )
 
 
-def test_a_grey_operation_that_lands_still_pays_points_and_the_comeback() -> None:
+def test_a_grey_operation_that_lands_pays_its_points_and_its_loot() -> None:
     engine = CityEngine()
     state = make_state()
     actor = state.current_player
@@ -976,7 +1039,8 @@ def test_a_grey_operation_that_lands_still_pays_points_and_the_comeback() -> Non
     actor = state.player_by_id(actor.id)
     assert actor.bonus_points == GREY_OPERATION_POINTS["datacenter"]
     assert actor.scandals == GREY_SUCCESS_SCANDALS  # a hit costs one, a miss two
-    assert actor.influence == 2 + stolen + 1  # loot plus one place of comeback
+    # The loot and nothing else: the comeback that paid the fraudster for being behind is gone.
+    assert actor.influence == 2 + stolen
     assert state.player_by_id(target.id).influence == 9 - stolen
     resolved = next(event for event in reversed(state.event_log) if event.type == "grey_operation_resolved")
     assert (resolved.data["success"], resolved.data["blocked"]) == (True, False)
@@ -1156,8 +1220,8 @@ def test_hacking_takes_influence_instead_of_blocking_an_object() -> None:
     hit = state.player_by_id(target.id)
     assert hit.influence == 10 - stolen
     assert state.current_player.influence == 2 + stolen
-    # The block mechanic left this operation entirely: it was worth ~4$ against a 264$ wallet.
-    assert not any(asset.blocked for asset in hit.assets)
+    # The hack takes influence and nothing else: the target keeps every object it owns.
+    assert [asset.card_id for asset in hit.assets] == ["robotics"]
 
 
 def test_compromat_leak_strips_a_role() -> None:
@@ -1224,8 +1288,6 @@ def test_every_action_card_has_a_working_engine_path(card_id: str) -> None:
         payload["target_id"] = target.id
         if card.kind == "role_pressure":
             target.role = "mafia"
-        if card.kind == "freeze":
-            give_asset(state, target, "delivery")
         if card.kind == "remove_development":
             target.district_levels["residential"] = 1
     elif card.kind in {"district_cash", "zoning", "develop"}:
@@ -1240,8 +1302,6 @@ def test_every_action_card_has_a_working_engine_path(card_id: str) -> None:
         state.project_board = ["art_museum", *state.project_board[:-1]]
         state.project_deck = [item for item in state.project_deck if item not in state.project_board]
         payload["project_id"] = "art_museum"
-    elif card.kind == "unblock":
-        give_asset(state, player, "delivery").blocked = True
 
     next_state = run(engine, state, "play_action_card", payload)
     assert held.uid not in {item.uid for item in next_state.current_player.hand}
@@ -1391,13 +1451,13 @@ def test_project_perk_pays_every_round() -> None:
     state = make_state()
     player = state.current_player
     before_income = engine._round_income(state, player)
-    before_influence = engine.passive_influence(player)
+    before_influence = engine.passive_influence(state, player)
 
     player.projects.append("metro_line")  # perk: +2$ per round
     player.projects.append("courthouse")  # perk: +2◆ per round
 
     assert engine._round_income(state, player) == before_income + 2
-    assert engine.passive_influence(player) == before_influence + 2
+    assert engine.passive_influence(state, player) == before_influence + 2
 
 
 def test_project_board_rotates_so_it_cannot_jam() -> None:
@@ -1638,11 +1698,117 @@ def test_journalist_keeps_the_role_one_scandal_longer() -> None:
     # their best line permanently one point from collapse.
     engine.add_scandal(state, reporter, 5)
     assert (reporter.scandals, reporter.role) == (5, "journalist")
+
+    # The sixth costs the seat — and the ceiling goes with it. Left at six, the journalist would
+    # sit one point of score below every other role for the identical event, in a state the
+    # `scandals <= scandal_limit` invariant says cannot exist.
     engine.add_scandal(state, reporter, 1)
-    assert (reporter.scandals, reporter.role, reporter.jail_turns) == (6, None, 0)
+    assert (reporter.scandals, reporter.role, reporter.jail_turns) == (5, None, 0)
+    assert reporter.scandals <= engine.scandal_limit(reporter)
 
     engine.add_scandal(state, other, 5)
     assert (other.scandals, other.role) == (5, None)
+
+
+def test_a_role_swap_clamps_the_ceilings_the_old_seat_raised() -> None:
+    """`scandal_limit` and `roof_limit` both hang off the role, and nothing re-checked them.
+
+    A mafia holds two Крыши because the role allows an extra one. Claiming a different seat used to
+    leave both in place under a limit of one — a token the player could not have bought
+    where they now sit. The journalist's six scandals are the same bug in the other currency.
+    """
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.role = "mafia"
+    player.roofs = 2
+    player.influence = 99
+    assert engine.roof_limit(player) == 2
+
+    state = run(engine, state, "claim_role", {"role_id": "capitalist"})
+
+    moved = state.player_by_id(player.id)
+    assert moved.role == "capitalist"
+    assert engine.roof_limit(moved) == 1
+    assert moved.roofs == 1
+
+
+def test_losing_a_seat_to_the_scandal_limit_clamps_the_ceilings_too() -> None:
+    """Not only the voluntary swap: the mafia can also be scandalled out of its own seat.
+
+    The hostile paths all stop at the Крыша — a leak, a sanction or a vote spends the token and
+    leaves the seat alone — so the only way to reach the extra token *and* an empty seat is to
+    walk into the scandal limit while holding it. That is exactly where the clamp has to live.
+    """
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.role = "mafia"
+    player.roofs = 2
+    player.scandals = BASE_SCANDAL_LIMIT - 1
+
+    engine.add_scandal(state, player, 1)
+
+    assert player.role is None
+    assert engine.roof_limit(player) == 1
+    assert player.roofs == 1
+
+
+def test_the_journalist_ceiling_cannot_be_laundered_into_another_seat() -> None:
+    """Buying a role is gated on BASE_SCANDAL_LIMIT for everybody.
+
+    Gated on the claimant's own ceiling instead, a journalist on five scandals could take any
+    other seat and land on `scandals == limit` — holding a role at the exact value at which
+    every other rule in the engine says the role is already lost, and one scandal from jail
+    rather than from a plain loss.
+    """
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.role = "journalist"
+    player.scandals = BASE_SCANDAL_LIMIT
+    player.influence = 99
+    # Still inside their own ceiling: the seat they hold is not in danger.
+    assert player.scandals < engine.scandal_limit(player)
+
+    with pytest.raises(IllegalActionError):
+        run(engine, state, "claim_role", {"role_id": "mafia"})
+
+    assert not any(action["type"] == "claim_role" for action in engine.legal_actions(state, player.id))
+
+
+def test_a_hostile_takeover_moves_money_instead_of_burning_it() -> None:
+    """Both halves scale from the card's own value, so the table total does not move.
+
+    The attacker's side used to be a hardcoded 2 against a card printed at 3, so every play
+    destroyed a dollar — invisible in either player's own delta, visible only in the sum.
+    """
+    engine = CityEngine()
+    state = make_state()
+    attacker = state.current_player
+    target = rival_of(state, attacker)
+    target.roofs = 0
+    target.money = 99
+    held = give_card(state, attacker, "hostile")
+    before = sum(player.money for player in state.players)
+
+    state = run(engine, state, "play_action_card", {"card_uid": held.uid, "target_id": target.id})
+
+    assert sum(player.money for player in state.players) == before
+    taken = 99 - state.player_by_id(target.id).money
+    assert taken == load_catalog().action_cards["hostile"].value + state.round_number
+
+
+def test_objects_have_no_state_that_can_switch_their_effects_off() -> None:
+    """Blocking is gone, and with it the flag half the engine honoured and half ignored.
+
+    `district_count` never checked it, so a frozen object still opened grey operations, still
+    paid its neighbours' district synergy and still satisfied project conditions, while the two
+    income functions did check it. One flag with two readings is a bug surface, not a mechanic.
+    """
+    catalog = load_catalog()
+    assert not [card for card in catalog.action_cards.values() if card.kind in {"freeze", "unblock"}]
+    assert not hasattr(OwnedAsset("u", "cash"), "blocked")
 
 
 def test_reaching_the_scandal_limit_announces_the_lost_role() -> None:
@@ -1723,10 +1889,10 @@ def test_a_defence_never_cancels_the_consequences_of_your_own_move() -> None:
     engine = CityEngine()
     state = make_state()
     player = state.current_player
-    player.roofs = 2
+    player.roofs = 1
 
     engine.add_scandal(state, player, 1)
-    assert (player.scandals, player.roofs) == (1, 2)
+    assert (player.scandals, player.roofs) == (1, 1)
 
     # The journalist's own scandal is the same rule, and it is the one the comment in the engine
     # has always pointed at.
@@ -1735,16 +1901,16 @@ def test_a_defence_never_cancels_the_consequences_of_your_own_move() -> None:
     rival = rival_of(state, player)
     state = run(engine, state, "use_role_power", {"power": "journalist_inflate", "target_id": rival.id})
     player = state.current_player
-    assert (player.scandals, player.roofs) == (2, 2)
+    assert (player.scandals, player.roofs) == (2, 1)
 
 
-def test_two_tokens_is_the_ceiling_and_a_perk_refills_one_a_turn() -> None:
+def test_one_token_is_the_ceiling_and_mafia_keeps_one_extra() -> None:
     engine = CityEngine()
     state = make_state()
     player = state.current_player
-    assert engine.roof_limit(player) == 2
+    assert engine.roof_limit(player) == 1
     player.role = "mafia"
-    assert engine.roof_limit(player) == 3
+    assert engine.roof_limit(player) == 2
 
 
 def test_roof_blocks_a_journalist_scandal_like_any_other_attack() -> None:

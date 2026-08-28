@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "content_version": "city-content-2026-08-26b",
+  "content_version": "city-content-2026-08-28b",
   "districts": [
     {
       "id": "residential",
@@ -93,7 +93,7 @@
       "title": "Мафиози",
       "icon": "🔪",
       "color": "#b84343",
-      "passive": "Серый сектор +1$; Крыша на 1$ дешевле и предел хранения 3 вместо 2.",
+      "passive": "Серый сектор +1$; Крыша на 1$ дешевле и предел хранения 2 вместо 1.",
       "power": "Рэкет (нужен объект Серого сектора): 2$ + 2$ за каждый свой объект Серого сектора (+5$ если цель лидер) и 1◆ за каждый свой объект Административного квартала. Замять дело: 3$ и административный объект → −2 своих скандала.",
       "districts": [
         "shadows"
@@ -105,7 +105,7 @@
       "icon": "⚖️",
       "color": "#70848b",
       "passive": "Промзона +1$; санкция читает счётчик скандалов соперника.",
-      "power": "Санкции по числу скандалов цели: 2 — деньги, 3 — деньги и влияние, 4 — деньги, влияние и снятие роли. Крыша цели отменяет санкцию целиком.",
+      "power": "Санкции по числу скандалов цели: 2 — деньги, 3 — деньги и влияние, 4 — деньги, влияние и снятие роли. Крыша цели отменяет санкцию целиком. Массовая зачистка за 1 действие снимает по 1 Крыше у каждого соперника и даёт по 1 очку за каждую снятую Крышу.",
       "districts": [
         "industrial"
       ]
@@ -1584,15 +1584,6 @@
       "targeted": true
     },
     {
-      "id": "asset_freeze",
-      "title": "Заморозка активов",
-      "tone": "attack",
-      "text": "Самый доходный объект цели блокируется до выплаты.",
-      "kind": "freeze",
-      "value": 1,
-      "targeted": true
-    },
-    {
       "id": "leader_expose",
       "title": "Разоблачение лидера",
       "tone": "attack",
@@ -1784,14 +1775,6 @@
       "value": 3
     },
     {
-      "id": "emergency_management",
-      "title": "Аварийное управление",
-      "tone": "defence",
-      "text": "Разблокируйте свой самый доходный заблокированный объект.",
-      "kind": "unblock",
-      "value": 1
-    },
-    {
       "id": "scholarship",
       "title": "Стипендиальная программа",
       "tone": "deal",
@@ -1868,7 +1851,7 @@
       "text": "Парк в жилой застройке гасит недовольство.",
       "cost_influence": 5,
       "cost_money": 6,
-      "points": 3,
+      "points": 1,
       "requirement": {
         "type": "district_objects",
         "district": "residential",
@@ -1964,7 +1947,7 @@
       "text": "Легализация ночной жизни серого сектора.",
       "cost_influence": 3,
       "cost_money": 4,
-      "points": 5,
+      "points": 3,
       "requirement": {
         "type": "district_objects",
         "district": "shadows",
@@ -2044,7 +2027,7 @@
       "text": "Штаб охраны порядка; нужен объект с охраной; поднимает предел Крыш.",
       "cost_influence": 5,
       "cost_money": 6,
-      "points": 5,
+      "points": 3,
       "requirement": {
         "type": "tag_objects",
         "tag": "security",
@@ -2240,7 +2223,7 @@
       "text": "Два охранных объекта — и город доверяет вам подряд; поднимает предел Крыш.",
       "cost_influence": 5,
       "cost_money": 7,
-      "points": 5,
+      "points": 3,
       "requirement": {
         "type": "tag_objects",
         "tag": "security",
@@ -2257,7 +2240,7 @@
       "text": "Две сервисные точки разворачиваются в сеть.",
       "cost_influence": 4,
       "cost_money": 6,
-      "points": 4,
+      "points": 2,
       "requirement": {
         "type": "tag_objects",
         "tag": "service",
@@ -2353,7 +2336,7 @@
       "text": "Три объекта Серого сектора выходят из тени.",
       "cost_influence": 4,
       "cost_money": 4,
-      "points": 6,
+      "points": 4,
       "requirement": {
         "type": "district_objects",
         "district": "shadows",

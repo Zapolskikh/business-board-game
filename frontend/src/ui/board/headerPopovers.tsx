@@ -113,7 +113,7 @@ export function ActionsDetails({ game }: { game: GameState }) {
           сброс карты.
         </p>
         <p>
-          <strong className="text-gold">Раз в ход:</strong> патронаж, лоббирование, пересборка проектов,
+          <strong className="text-[var(--color-warning)]">Раз в ход:</strong> патронаж, лоббирование, пересборка проектов,
           одна серая операция, каждая способность роли, один розыгрыш и один сброс карты.
         </p>
       </PopoverBody>

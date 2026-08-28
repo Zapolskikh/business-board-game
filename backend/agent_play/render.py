@@ -16,6 +16,7 @@ POWER_LABELS = {
     "mafia_racket": "рэкет",
     "mafia_cleanup": "замять дело",
     "military_sanction": "санкции",
+    "military_roof_sweep": "массовая зачистка крыш",
     "fraudster_cleanup": "очистка следов",
     "fraudster_crypto_scam": "криптоскам",
 }
@@ -428,14 +429,11 @@ def _player_line(player: dict[str, Any], game: dict[str, Any], catalog: Catalog,
 
 def _owned_line(owned: dict[str, Any], me: dict[str, Any], game: dict[str, Any], catalog: Catalog) -> str:
     asset = catalog.assets.get(owned["card_id"], {})
-    marks = []
-    if owned["blocked"]:
-        marks.append("🔒заблокирован")
     return (
         f"    {owned['uid']:<28} {catalog.asset_title(owned['card_id']):<26} "
         f"{catalog.district_title(str(asset.get('district', ''))):<18} доход {asset.get('income', '?')}$ "
         f"{asset.get('points', '?')}очк "
-        f"[{','.join(asset.get('tags', [])) or '—'}] " + " ".join(marks)
+        f"[{','.join(asset.get('tags', [])) or '—'}]"
     )
 
 
@@ -461,7 +459,7 @@ ROLE_POWERS = {
     "politician": ("politician_cleanup",),
     "journalist": ("journalist_inflate", "journalist_publish"),
     "mafia": ("mafia_racket", "mafia_cleanup"),
-    "military": ("military_sanction",),
+    "military": ("military_sanction", "military_roof_sweep"),
     "fraudster": ("fraudster_cleanup", "fraudster_crypto_scam"),
 }
 

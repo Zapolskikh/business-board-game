@@ -85,7 +85,7 @@ export function RolePowersDetails({
                   key={power}
                   icon="⚡"
                   title={powerLabels[power] ?? power}
-                  hint={ready ? "тратит действие · раз в ход" : "сейчас недоступна"}
+                  hint={ready ? powerCost[power] ?? "тратит действие · раз в ход" : "сейчас недоступна"}
                   right={ready ? "применить" : "—"}
                   disabled={!ready || options.length > 1}
                   onClick={() => options.length === 1 && onAction(options[0])}
@@ -93,8 +93,8 @@ export function RolePowersDetails({
               );
             })}
             <p className="text-2xs text-ink-dim">
-              Способности с выбором цели применяются кнопкой в правой панели: там виден список
-              игроков и их Крыши.
+              Способности с выбором цели применяются там, где эта цель нарисована: по игрокам —
+              кнопкой в правой панели, по картам рынка и проектам — прямо на самой карточке.
             </p>
           </div>
         ) : (
@@ -105,6 +105,18 @@ export function RolePowersDetails({
   );
 }
 
+/* Цена каждой способности одной строкой. Не все они стоят действие, и это ровно та разница,
+ * которую игрок должен видеть до нажатия: у мафиози метка стоит Крышу, у политика сделка —
+ * влияние и скандал, но ни та, ни другая не съедают ход. */
+const powerCost: Record<string, string> = {
+  capitalist_claim: "действие + скандал · метка одна",
+  mafia_lock: "Крыша, без действия · раз в ход",
+  politician_deal: "3◆ + скандал, без действия · раз в ход",
+  politician_veto: "действие + 3◆ · вето одно",
+  military_inspection: "действие · всем в Сером секторе по скандалу",
+  military_roof_seize: "действие + 3◆ · Крыша не защищает",
+};
+
 /* Каталог способностей по ролям. Дублирует движок, поэтому используется только для того,
  * чтобы показать недоступную сейчас способность серой строкой, — применить её всё равно
  * можно лишь через legal_actions. Расхождение здесь не сломает правила, максимум покажет
@@ -112,13 +124,15 @@ export function RolePowersDetails({
 function rolePowerIds(role: string): string[] {
   switch (role) {
     case "politician":
-      return ["politician_cleanup"];
+      return ["politician_cleanup", "politician_deal", "politician_veto"];
     case "journalist":
       return ["journalist_inflate", "journalist_publish"];
     case "mafia":
-      return ["mafia_racket", "mafia_cleanup"];
+      return ["mafia_racket", "mafia_cleanup", "mafia_lock"];
     case "military":
-      return ["military_sanction"];
+      return ["military_sanction", "military_inspection", "military_roof_seize"];
+    case "capitalist":
+      return ["capitalist_claim"];
     case "fraudster":
       return ["fraudster_cleanup", "fraudster_crypto_scam"];
     default:

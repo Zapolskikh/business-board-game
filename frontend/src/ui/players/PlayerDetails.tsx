@@ -66,7 +66,7 @@ export function PlayerDetails({
             ["Ресурсы", `💰${player.money} ◆${player.influence}`],
             [
               "Скандалы",
-              <span className={player.scandals >= scandalLimit(player) - 1 ? "text-gold" : undefined}>
+              <span className={player.scandals >= scandalLimit(player) - 1 ? "text-[var(--color-warning)]" : undefined}>
                 {player.scandals} / {scandalLimit(player)}
                 {player.role && player.scandals >= scandalLimit(player) - 1 && " — ещё один, и роль потеряна"}
               </span>,
@@ -96,7 +96,7 @@ export function PlayerDetails({
             return (
               <li key={owned.uid} className="flex items-baseline gap-1.5">
                 <span style={{ color: district?.color }}>{district?.icon}</span>
-                <span className={owned.blocked ? "text-ink-dim line-through" : "text-ink"}>{asset.title}</span>
+                <span className="text-ink">{asset.title}</span>
                 <span className="ml-auto whitespace-nowrap text-ink-dim">
                   +{asset.income}$/р · {assetPoints(asset)} очк
                 </span>

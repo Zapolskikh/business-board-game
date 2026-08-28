@@ -21,6 +21,10 @@ coverage.xml
 # numbers measured against whatever rules happened to be checked out.
 backend/out/
 SIMULATION_RESULTS_*.md
+# Same for the per-item balance reports from `python -m simulation.balance`: one measurement of one
+# ruleset, regenerated on every run. The plan that interprets them is BALANCE_TESTING_PLAN.md, which
+# is tracked; the numbers are not.
+balance-runs/
 
 # Exported playtest journals. Same reasoning as the simulation reports: they are a record of one
 # match under one set of rules, they land in the repo root every time a game is exported, and the

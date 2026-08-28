@@ -3,7 +3,7 @@ import { forwardRef } from "react";
 import { projectPerkText, projectRequirementText, projectRerollMoney } from "../../online/gameUi";
 import type { CityMeta, GameState, LegalAction, ProjectMeta } from "../../online/types";
 import { CardPopover, PopoverBody, PopoverFooter, PopoverHeader } from "../primitives/CardPopover";
-import { KeyValue, Panel } from "../primitives/atoms";
+import { KeyValue, Panel, zoneRule } from "../primitives/atoms";
 import { resolve, usedThisTurn, type ActionContext } from "../lib/actions";
 import type { Indexes } from "../lib/board";
 
@@ -30,9 +30,18 @@ export function Projects({
     .filter((project): project is ProjectMeta => Boolean(project));
   const minePoints = mine.reduce((sum, project) => sum + project.points, 0);
 
+  /* Чьё вето стоит на проекте с точки зрения зрителя. Правило считает движок — вето просто
+   * не появится в legal_actions, — но карточка обязана сказать почему, иначе проект выглядит
+   * недоступным без причины. */
+  function vetoOf(state: GameState, viewerId: string, projectId: string): "mine" | "theirs" | undefined {
+    const owner = state.project_veto?.[projectId];
+    if (!owner) return undefined;
+    return owner === viewerId ? "mine" : "theirs";
+  }
+
   return (
-    <Panel>
-      <div className="flex items-baseline gap-2 px-0.5 pb-[5px]">
+    <Panel zone="projects">
+      <div className={`flex items-baseline gap-2 px-0.5 pb-[2px] ${zoneRule}`}>
         <h2 className="text-[10.5px] font-bold uppercase tracking-[0.09em] text-ink-muted">
           Городские проекты
         </h2>
@@ -111,6 +120,13 @@ export function Projects({
                       leaving={leaving}
                       state={take}
                       onTake={() => take.kind === "ready" && onAction(take.action)}
+                      veto={context.legal.find(
+                        action =>
+                          action.type === "use_role_power" &&
+                          action.payload.power === "politician_veto" &&
+                          action.payload.project_id === project.id,
+                      )}
+                      onVeto={onAction}
                     />
                   }
                 >
@@ -123,6 +139,7 @@ export function Projects({
                     pending={take.kind === "pending"}
                     shortInfluence={context.me.influence < project.cost_influence}
                     shortMoney={context.me.money < project.cost_money}
+                    veto={vetoOf(game, context.me.id, project.id)}
                   />
                 </CardPopover>
               </motion.div>
@@ -158,14 +175,16 @@ const ProjectCard = forwardRef<
     pending: boolean;
     shortInfluence: boolean;
     shortMoney: boolean;
+    /** Вето политика: "mine" — наложено вами, "theirs" — чужое, проект недоступен. */
+    veto?: "mine" | "theirs";
   }
 >(function ProjectCard(
-  { project, meta, standing, leaving, ready, pending, shortInfluence, shortMoney, ...rest },
+  { project, meta, standing, leaving, ready, pending, shortInfluence, shortMoney, veto, ...rest },
   ref,
 ) {
   const met = standing?.met ?? false;
-  const ratio = standing && standing.needed > 0 ? Math.min(1, standing.have / standing.needed) : met ? 1 : 0;
   const counted = standing && !standing.binary;
+  const perk = projectPerkText(project);
 
   return (
     <button
@@ -182,12 +201,29 @@ const ProjectCard = forwardRef<
         <b className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[12.5px] font-semibold">
           {project.title}
         </b>
-        <span className="rounded-[10px] border border-[#6b5518] bg-[#33290e] px-1.5 text-[11px]
-          font-extrabold whitespace-nowrap text-gold">
+        <span className="rounded-[10px] border border-line-2 bg-panel-3 px-1.5 text-[11px]
+          font-extrabold whitespace-nowrap text-[var(--color-badge)]">
           {project.points} оч
         </span>
+        {veto && (
+          <span
+            className={`rounded px-1 text-3xs ${
+              veto === "mine" ? "bg-[#1d3b2a] text-[#7fdaa6]" : "bg-[#4a2530] text-[#ffb0bd]"
+            }`}
+            title={
+              veto === "mine"
+                ? "Ваше вето: проект закрыт для всех остальных"
+                : "Вето политика: этот проект можете взять не вы"
+            }
+          >
+            ⛔
+          </span>
+        )}
         {leaving && (
-          <span className="rounded bg-[#3a2d12] px-1 text-3xs text-gold" title="Уходит в конце раунда">
+          <span
+            className="rounded bg-[#3a2d12] px-1 text-3xs text-[var(--color-warning)]"
+            title="Уходит в конце раунда"
+          >
             ⏳
           </span>
         )}
@@ -226,8 +262,18 @@ const ProjectCard = forwardRef<
         {met ? "✓ " : ""}
         {projectRequirementText(project, meta)}
       </span>
-      <span className="h-[3px] overflow-hidden rounded-sm bg-panel-3">
-        <i className={`block h-full ${met ? "bg-good" : "bg-accent"}`} style={{ width: `${ratio * 100}%` }} />
+      {/* Постоянный бонус проекта — на лице карточки, а не только в поповере при покупке.
+        *
+        * Здесь была полоска прогресса, и она дублировала плашку «0/3» справа: то же самое число,
+        * той же длины, только без цифр. А единственное, чего на карточке не было вовсе, — то,
+        * ради чего половину проектов и берут: перк платит каждый раунд до конца партии, и
+        * сравнить два проекта, не видя его, нельзя. */}
+      <span
+        title={perk}
+        className="overflow-hidden text-ellipsis whitespace-nowrap text-2xs leading-none
+          text-[var(--color-badge)]"
+      >
+        {perk === "без постоянного бонуса" ? "только очки" : `⚙ ${perk}`}
       </span>
     </button>
   );
@@ -240,6 +286,8 @@ function ProjectDetails({
   leaving,
   state,
   onTake,
+  veto,
+  onVeto,
 }: {
   project: ProjectMeta;
   meta: CityMeta;
@@ -247,6 +295,9 @@ function ProjectDetails({
   leaving: boolean;
   state: ReturnType<typeof resolve>;
   onTake: () => void;
+  /** Вето политика на этот проект, если движок его сейчас разрешает. */
+  veto?: LegalAction;
+  onVeto: (action: LegalAction) => void;
 }) {
   return (
     <>
@@ -283,6 +334,18 @@ function ProjectDetails({
         {leaving && <p className="text-gold">⏳ Уходит в конце раунда — уйдёт в низ колоды.</p>}
       </PopoverBody>
       <PopoverFooter>
+        {/* Вето жмут на самом проекте: список из четырёх строк «Цель» в правой панели не сказал
+          * бы, на какой именно проект оно ложится. */}
+        {veto && (
+          <button
+            type="button"
+            onClick={() => onVeto(veto)}
+            className="mb-1 rounded-md border border-line bg-panel-2 px-2 py-2 text-center text-xs
+              font-semibold hover:border-accent"
+          >
+            ⛔ Право вето — закрыть проект всем остальным (действие + 3◆)
+          </button>
+        )}
         <button
           type="button"
           disabled={state.kind !== "ready"}

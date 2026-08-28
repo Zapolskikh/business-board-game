@@ -26,44 +26,62 @@ from city_engine.rng import RNGState
 
 @dataclass(slots=True)
 class OwnedAsset:
-    """An object in a portfolio. Automation is no longer a property of the object.
+    """An object in a portfolio: a uid and the catalog card it points at, nothing else.
 
-    Per-object upgrades were a ritual: three or four identical purchases per player, and they
-    welded value into objects that then could never be replaced. Automation is now a single
-    the market or a player's tableau.
+    Per-object state keeps failing here. Automation was a ritual — three or four identical
+    purchases per player, welding value into objects that could then never be replaced. Blocking
+    was worse: one flag, one card that set it, one card that cleared it, and half the rules that
+    read a portfolio quietly ignored it (see the 1.10.0 note in constants). An object is either
+    owned or it is not.
     """
 
     uid: str
     card_id: str
-    blocked: bool = False
 
     def to_dict(self) -> dict[str, Any]:
-        return {"uid": self.uid, "card_id": self.card_id, "blocked": self.blocked}
+        return {"uid": self.uid, "card_id": self.card_id}
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> OwnedAsset:
-        return cls(
-            uid=str(data["uid"]),
-            card_id=str(data["card_id"]),
-            blocked=bool(data.get("blocked", False)),
-        )
+        return cls(uid=str(data["uid"]), card_id=str(data["card_id"]))
 
 
 @dataclass(slots=True)
 class MarketAsset:
+    """A slot on the shared market, and the two role marks that can sit on it.
+
+    Both marks are public by design — a hidden claim on a shared board is a rule nobody can play
+    around. They live on the market slot rather than on the player because the slot is what they
+    describe, and because a slot that rotates out takes its marks with it for free.
+    """
+
     uid: str
     card_id: str
-    # The round this slot rotates out at, not a turn counter: players plan in rounds, and a
-    # per-turn deadline expired before the reader's next turn at any table above two seats.
+    # The capitalist's claim: the card pays them as if it were in their portfolio, while staying
+    # on sale to everybody else at the ordinary price. The player id, so the board can say whose.
+    claimed_by: str | None = None
+    # The mafia's grey mark: nobody but its owner may buy this slot until `locked_round` is behind
+    # us. Cannot be lifted — the round is the only thing that clears it.
+    locked_by: str | None = None
+    locked_round: int = 0
 
     def to_dict(self) -> dict[str, Any]:
-        return {"uid": self.uid, "card_id": self.card_id}
+        return {
+            "uid": self.uid,
+            "card_id": self.card_id,
+            "claimed_by": self.claimed_by,
+            "locked_by": self.locked_by,
+            "locked_round": self.locked_round,
+        }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> MarketAsset:
         return cls(
             uid=str(data["uid"]),
             card_id=str(data["card_id"]),
+            claimed_by=data.get("claimed_by"),
+            locked_by=data.get("locked_by"),
+            locked_round=int(data.get("locked_round", 0)),
         )
 
 
@@ -103,6 +121,13 @@ class PlayerState:
     scandal_gained_this_round: int = 0
     debt: int = 0
     zoning_district: str | None = None
+    # The card the capitalist has marked on the market, mirrored from MarketAsset.claimed_by.
+    # Mirrored on purpose: `district_count` is called from fifteen rules that have a player and no
+    # state, and threading the whole game through all of them to look up one market slot would be
+    # a far bigger change than keeping the card id where the rules already are. The market slot
+    # stays the public half; the two are cleared together whenever the card leaves the market.
+    marked_card_id: str | None = None
+    marked_market_uid: str | None = None
     turns: int = 0
     banked_actions: int = 0
 
@@ -127,6 +152,8 @@ class PlayerState:
             "scandal_gained_this_round": self.scandal_gained_this_round,
             "debt": self.debt,
             "zoning_district": self.zoning_district,
+            "marked_card_id": self.marked_card_id,
+            "marked_market_uid": self.marked_market_uid,
             "turns": self.turns,
             "banked_actions": self.banked_actions,
         }
@@ -153,6 +180,8 @@ class PlayerState:
             scandal_gained_this_round=int(data.get("scandal_gained_this_round", 0)),
             debt=int(data.get("debt", 0)),
             zoning_district=data.get("zoning_district"),
+            marked_card_id=data.get("marked_card_id"),
+            marked_market_uid=data.get("marked_market_uid"),
             turns=int(data.get("turns", 0)),
             banked_actions=int(data.get("banked_actions", 0)),
         )
@@ -204,6 +233,9 @@ class GameState:
     action_deck: list[str] = field(default_factory=list)
     project_board: list[str] = field(default_factory=list)
     project_deck: list[str] = field(default_factory=list)
+    # Politician vetoes: project id -> the player who may still take it. One per politician, and
+    # it dies with the project it sits on — a vetoed project that rotates out takes the veto away.
+    project_veto: dict[str, str] = field(default_factory=dict)
     turn_flags: dict[str, Any] = field(default_factory=dict)
     final_scores: dict[str, int] = field(default_factory=dict)
     processed_command_ids: list[str] = field(default_factory=list)
@@ -231,6 +263,7 @@ class GameState:
         cloned.action_deck = list(self.action_deck)
         cloned.project_board = list(self.project_board)
         cloned.project_deck = list(self.project_deck)
+        cloned.project_veto = dict(self.project_veto)
         cloned.turn_order = list(self.turn_order)
         cloned.turn_flags = deepcopy(self.turn_flags)
         cloned.final_scores = dict(self.final_scores)
@@ -331,6 +364,7 @@ class GameState:
             "action_deck": list(self.action_deck),
             "project_board": list(self.project_board),
             "project_deck": list(self.project_deck),
+            "project_veto": dict(self.project_veto),
             "turn_flags": deepcopy(self.turn_flags),
             "final_scores": dict(self.final_scores),
             "processed_command_ids": list(self.processed_command_ids),
@@ -363,6 +397,7 @@ class GameState:
             action_deck=[str(item) for item in data.get("action_deck", [])],
             project_board=[str(item) for item in data.get("project_board", [])],
             project_deck=[str(item) for item in data.get("project_deck", [])],
+            project_veto={str(k): str(v) for k, v in (data.get("project_veto") or {}).items()},
             turn_flags=dict(data.get("turn_flags") or {}),
             final_scores={str(key): int(value) for key, value in (data.get("final_scores") or {}).items()},
             processed_command_ids=[str(item) for item in data.get("processed_command_ids", [])],

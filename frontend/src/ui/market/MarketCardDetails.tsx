@@ -1,5 +1,12 @@
 import { assetEffectLines, assetPoints, districtCount, moneyPerPoint } from "../../online/gameUi";
-import type { AssetMeta, CityMeta, DistrictMeta, MarketAsset, PlayerState } from "../../online/types";
+import type {
+  AssetMeta,
+  CityMeta,
+  DistrictMeta,
+  LegalAction,
+  MarketAsset,
+  PlayerState,
+} from "../../online/types";
 import { PopoverBody, PopoverFooter, PopoverHeader } from "../primitives/CardPopover";
 import { marketCardReason, type MarketCardState } from "./marketCardState";
 
@@ -20,6 +27,8 @@ export function MarketCardDetails({
   assets,
   state,
   onBuy,
+  mark,
+  onMark,
 }: {
   item: MarketAsset;
   asset: AssetMeta;
@@ -29,6 +38,8 @@ export function MarketCardDetails({
   assets: Map<string, AssetMeta>;
   state: MarketCardState;
   onBuy: () => void;
+  mark?: LegalAction;
+  onMark: (action: LegalAction) => void;
 }) {
   const owned = district ? districtCount(me, district.id, assets) : 0;
   const points = assetPoints(asset);
@@ -87,11 +98,24 @@ export function MarketCardDetails({
         </p>
 
         {item.leaving && (
-          <p className="text-gold">⏳ Слот уходит в конце раунда: карта вернётся в низ колоды.</p>
+          <p className="text-[var(--color-warning)]">⏳ Слот уходит в конце раунда: карта вернётся в низ колоды.</p>
         )}
       </PopoverBody>
 
       <PopoverFooter>
+        {/* Метка ставится там, где нарисована её цель. Кнопка появляется только когда движок
+          * действительно разрешает ход, поэтому она же и есть ответ на вопрос «а могу ли я». */}
+        {mark && (
+          <button
+            onClick={() => onMark(mark)}
+            className="mb-1 rounded-md border border-line bg-panel-2 px-2 py-2 text-center text-xs
+              font-semibold hover:border-accent"
+          >
+            {mark.payload.power === "mafia_lock"
+              ? "🔒 Серая метка — закрыть слот всем, кроме себя (Крыша)"
+              : "🏷️ Метка — карта работает на вас (действие + скандал)"}
+          </button>
+        )}
         <button
           disabled={state.kind !== "buyable"}
           onClick={onBuy}

@@ -26,7 +26,7 @@ export function ChronicleRail({
   const events = [...game.event_log].reverse();
 
   return (
-    <Panel rows>
+    <Panel rows zone="chronicle">
       <SectionHead
         title="Хроника"
         meta={unseen > 0 ? `${unseen} новых · открыть` : `${events.length} событий · открыть`}

@@ -45,7 +45,6 @@ import type {
   CityMeta,
   GameState,
   LegalAction,
-  OwnedAsset,
   PlayerState,
   ProjectMeta,
   RoomView,
@@ -70,7 +69,7 @@ const rolePowers: Record<string, string[]> = {
   politician: [],
   journalist: ["journalist_inflate", "journalist_publish"],
   mafia: ["mafia_racket"],
-  military: ["military_sanction"],
+  military: ["military_sanction", "military_roof_sweep"],
   fraudster: ["fraudster_crypto_scam"],
 };
 
@@ -81,6 +80,7 @@ const powerDescriptions: Record<string, string> = {
   mafia_racket: "Один раз за ход и за 1 действие: нужен активный объект Серого сектора. Базово отбирает до 2$, сумма растёт от раунда, ваших объектов и лидерства цели; её Крыша отменяет рэкет.",
   mafia_cleanup: "За 1 действие: 3$ и активный административный объект — снять до 2 своих скандалов.",
   military_sanction: "Один раз за ход и за 1 действие: цель должна иметь минимум 2 скандала. На 2⚠ забирает деньги, на 3⚠ ещё и влияние, на 4⚠ также снимает роль. Скандалы цели не очищает; Крыша принимает весь удар.",
+  military_roof_sweep: "За 1 действие: снять по 1 Крыше у каждого соперника. Получить по 1 очку за каждую фактически снятую Крышу. Можно применять снова, пока у соперников остаются Крыши.",
   fraudster_cleanup: "За 1 действие снять 1 свой скандал.",
   fraudster_crypto_scam: "Один раз за ход и за 1 действие: нужна активная Городская криптобиржа. Забрать 25% денег у каждого соперника без Крыши и получить 5 скандалов. Все собранные эффекты снижения скандалов складываются. Без такой подготовки Аферист сразу теряет роль.",
 };
@@ -479,12 +479,12 @@ function BusinessBoard({ viewed, me, game, meta, assets, legal, viewingOther, bu
       const assetMeta = assets.get(owned.card_id);
       const districtInfo = meta.districts.find(d => d.id === assetMeta?.district);
       const effectLines = assetMeta ? assetEffectLines(assetMeta, viewed, meta, assets, { includeSynergy: true }) : [];
-      // A blocked object opens nothing: every gate in the engine checks `not asset.blocked`.
+      // Owned is active: an object in a portfolio has no state that could switch its effects off.
       const hints = assetMeta
-        ? assetHints(assetMeta, viewed, game, meta, assets, { active: !owned.blocked })
+        ? assetHints(assetMeta, viewed, game, meta, assets, { active: true })
         : { special: false, hints: [] };
       return <OwnedAssetCard
-        key={owned.uid} owned={owned} index={index} owner={viewed} asset={assetMeta} districtInfo={districtInfo}
+        key={owned.uid} index={index} owner={viewed} asset={assetMeta} districtInfo={districtInfo}
         effectLines={effectLines} hints={hints} viewingOther={viewingOther} busy={busy}
         sell={actionFor("sell_asset", owned.uid)}
         onAction={onAction}
@@ -494,8 +494,7 @@ function BusinessBoard({ viewed, me, game, meta, assets, legal, viewingOther, bu
   </section>;
 }
 
-function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines, hints, viewingOther, busy, sell, onAction }: {
-  owned: OwnedAsset;
+function OwnedAssetCard({ index, owner, asset, districtInfo, effectLines, hints, viewingOther, busy, sell, onAction }: {
   index: number;
   owner: PlayerState;
   asset?: AssetMeta;
@@ -511,12 +510,10 @@ function OwnedAssetCard({ owned, index, owner, asset, districtInfo, effectLines,
   const managed = index < owner.capacity;
   // One number, two meanings: the refund in money equals the points the object is carrying.
   const sellValue = assetPoints(asset);
-  const status = owned.blocked ? "🔒 заблокирован" : "работает";
-  return <article className={`owned-asset rarity-${asset.rarity} ${owned.blocked ? "blocked" : ""} ${!managed ? "unmanaged" : ""} ${hints.special ? "special" : ""}`}>
+  return <article className={`owned-asset rarity-${asset.rarity} ${!managed ? "unmanaged" : ""} ${hints.special ? "special" : ""}`}>
     <header>
       <span className="rarity-badge">{rarityLabels[asset.rarity]}</span>
       {districtInfo && <span className="asset-district" style={{ color: districtInfo.color }}>{districtInfo.icon} {districtInfo.title}</span>}
-      <span>{status}</span>
     </header>
     <h3>{asset.title}</h3>
     {asset.tags.length > 0 && <span className="asset-tags">{asset.tags.map(tag => <i key={tag}>{tag}</i>)}</span>}
@@ -638,7 +635,7 @@ function DecisionPanel({ game, me, meta, roles, districts, assets, legal, busy, 
     {/* The powers stay outside the fold: they are used every turn, unlike claiming a role. */}
     {displayRoleId && <div className="action-group g-roles"><div className="role-powers" style={{ borderColor: roles.get(displayRoleId)?.color }}><strong>{roles.get(displayRoleId)?.icon} Способности: {roles.get(displayRoleId)?.title}</strong><small>{roles.get(displayRoleId)?.power}</small>{powers.map(power => {
         const variants = all("use_role_power", action => action.payload.power === power);
-        return <button className={power.includes("racket") || power.includes("sanction") || power.includes("scam") ? "danger" : ""} disabled={busy || variants.length === 0} onClick={() => onOffer(powerLabels[power] ?? power, variants)} title={powerDescriptions[power]} key={power}>{powerLabels[power] ?? power}{variants.length > 1 ? " → выбрать" : ""}</button>;
+        return <button className={power.includes("racket") || power.includes("sanction") || power.includes("scam") || power.includes("roof_sweep") ? "danger" : ""} disabled={busy || variants.length === 0} onClick={() => onOffer(powerLabels[power] ?? power, variants)} title={powerDescriptions[power]} key={power}>{powerLabels[power] ?? power}{variants.length > 1 ? " → выбрать" : ""}</button>;
       })}</div></div>}
 
     {/* Five lines of which four were locked all game. Open when at least one is actually
@@ -653,7 +650,7 @@ function DecisionPanel({ game, me, meta, roles, districts, assets, legal, busy, 
       return <button className="described-action" disabled={busy || variants.length === 0} onClick={() => onOffer(label, variants)} title={`Открывает любой активный объект районов: ${(greyOperationDistricts[assetId] ?? []).map(id => districts.get(id)?.title ?? id).join(", ")}. При успехе (базовый шанс ${info.chance}%, у Афериста выше): ${effect}, плюс ${points} очка в финальный счёт и ${successScandals} скандал себе. При провале не происходит ничего, а скандалов ${failureScandals}. Действие тратится в обоих случаях, и за ход доступна только одна операция. Свои скандалы Крыша не гасит. ${info.failure}`} key={assetId}><strong>{label}</strong><small>{variants.length ? `${effect} · +${points} очк · шанс ${info.chance}%` : greyRequirement(assetId)}</small></button>;
     })}</details>
 
-    <div className="action-group g-defence"><h3 className="group-title">🛡️ Защита и репутация</h3><StaticAction action={cleanupAction} label={cleanup.label} tooltip={cleanup.tooltip} busy={busy} onAction={onAction} /><StaticAction action={find("buy_roof")} label={`🛡️ Купить Крышу (${roofCost(me, game)}$)`} tooltip={`Потратить 1 действие и ${roofCost(me, game)}$. Цена растёт на 1$ каждые два раунда. Крыша — единственная защита в игре: она гасит направленный на вас эффект другого игрока (карту, рэкет, санкцию, взлом), попытку отобрать роль и любое начисление скандалов целиком. Последствия ваших собственных решений, включая провал серой операции, она не отменяет. Лимит 2, у Мафиози 3.`} busy={busy} onAction={onAction} /></div>
+    <div className="action-group g-defence"><h3 className="group-title">🛡️ Защита и репутация</h3><StaticAction action={cleanupAction} label={cleanup.label} tooltip={cleanup.tooltip} busy={busy} onAction={onAction} /><StaticAction action={find("buy_roof")} label={`🛡️ Купить Крышу (${roofCost(me, game)}$)`} tooltip={`Потратить 1 действие и ${roofCost(me, game)}$. Цена растёт на 1$ каждые два раунда. Крыша — единственная защита в игре: она гасит направленный на вас эффект другого игрока (карту, рэкет, санкцию, взлом), попытку отобрать роль и любое начисление скандалов целиком. Последствия ваших собственных решений, включая провал серой операции, она не отменяет. Лимит 1, у Мафиози 2.`} busy={busy} onAction={onAction} /></div>
     <button className="end-turn" disabled={busy || !endTurn} onClick={() => endTurn && void onAction(endTurn)} title="Завершить текущий ход. Неиспользованные действия пропадут, кроме разрешённого переносимого действия; затем сервер выполнит ходы ботов.">✅ Завершить ход</button>
   </aside>;
 }

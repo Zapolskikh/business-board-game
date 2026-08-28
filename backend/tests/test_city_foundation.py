@@ -95,7 +95,7 @@ def test_backend_catalog_is_complete_and_can_create_a_game() -> None:
     assert len(catalog.districts) == 6
     assert len(catalog.roles) == 6
     assert len(catalog.assets) == 71
-    assert len(catalog.action_cards) == 34
+    assert len(catalog.action_cards) == 32
     # Every project is unique and every one is in the deck: the two repeatable initiatives that
     # used to live outside it are gone, and so is the district development the two cards drove.
     assert len(catalog.projects) == 40
@@ -128,3 +128,17 @@ def test_public_meta_ships_the_points_every_object_scores() -> None:
         # A sale pays back exactly the points it removes: the reason selling only makes sense as
         # half of a swap, and the reason the button has to say both numbers.
         assert row["points"] == engine.asset_refund(OwnedAsset(uid=f"asset:{row['id']}", card_id=row["id"]))
+
+
+def test_non_resource_perk_projects_score_two_fewer_points() -> None:
+    engine = CityEngine()
+    expected = {
+        "city_park": 1,
+        "night_quarter": 3,
+        "security_hub": 3,
+        "defence_order": 3,
+        "city_clinics": 2,
+        "shadow_market": 4,
+    }
+
+    assert {project_id: engine.project(project_id).points for project_id in expected} == expected

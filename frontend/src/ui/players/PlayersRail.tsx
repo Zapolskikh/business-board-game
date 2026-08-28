@@ -27,7 +27,7 @@ export function PlayersRail({
   onAction: (action: LegalAction) => void;
 }) {
   return (
-    <Panel rows>
+    <Panel rows zone="players">
       <SectionHead title="Игроки" meta={`${game.players.length} в партии`} />
       <div className="grid min-h-0 grid-rows-4 gap-1 p-px">
         {game.players.map(player => (
@@ -143,8 +143,8 @@ const PlayerRow = ({
         <span title="Влияние">
           <span className="text-ink-dim">◆</span> {player.influence}
         </span>
-        <span title="Скандалы" className={risky ? "text-gold" : undefined}>
-          <span className={risky ? "text-gold" : "text-ink-dim"}>⚠</span> {player.scandals}/
+        <span title="Скандалы" className={risky ? "text-[var(--color-warning)]" : undefined}>
+          <span className={risky ? "text-[var(--color-warning)]" : "text-ink-dim"}>⚠</span> {player.scandals}/
           {scandalLimit(player)}
         </span>
       </span>
@@ -168,7 +168,7 @@ const PlayerRow = ({
       )}
       {player.jail_turns === 0 && risky && (
         <span className="col-span-full truncate border-t-2 border-line bg-[#3a2d12] px-1.5 py-0.5
-          text-3xs text-gold">
+          text-3xs text-[var(--color-warning)]">
           ещё 1 скандал — и роль потеряна
         </span>
       )}

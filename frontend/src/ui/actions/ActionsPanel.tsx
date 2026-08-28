@@ -11,7 +11,7 @@ import {
 import type { CityMeta, GameState, LegalAction } from "../../online/types";
 import { CardPopover, PopoverBody, PopoverHeader } from "../primitives/CardPopover";
 import { DetailsModal } from "../primitives/Modal";
-import { ActionButton, DrawerRow, ListItem, Panel } from "../primitives/atoms";
+import { ActionButton, DrawerRow, ListItem, Panel, zoneRule, zoneStyle } from "../primitives/atoms";
 import { findActions, resolve, resolveMany, usedThisTurn, type ActionContext } from "../lib/actions";
 import { roofPrice, type Indexes } from "../lib/board";
 import { RolesDetails } from "./RolesDetails";
@@ -72,12 +72,16 @@ export function ActionsPanel({
     : resolve(context, "crisis_pr");
   const cleanupLabel = cleanupPower ? cleanupOffer(cleanupPower, meta).label : "Антикризис";
 
-  // Активные способности роли, кроме чисток — они уже на кнопке выше.
+  // Активные способности роли, кроме чисток — они уже на кнопке выше — и кроме тех, чья цель
+  // нарисована в другом месте доски. Метку на карту рынка и вето на проект жмут на самой
+  // карточке: список из шести одинаковых строк «Цель» в правой панели не сказал бы, на что
+  // именно ставится метка, а карточка говорит это сама.
+  const onCardPowers = new Set(["capitalist_claim", "mafia_lock", "politician_veto"]);
   const powers = [
     ...new Set(
       findActions(context, "use_role_power")
         .map(action => String(action.payload.power))
-        .filter(power => !cleanupPowers.has(power)),
+        .filter(power => !cleanupPowers.has(power) && !onCardPowers.has(power)),
     ),
   ];
   const role = me.role ? index.roles.get(me.role) : undefined;
@@ -87,9 +91,15 @@ export function ActionsPanel({
   const freeRoles = meta.roles.filter(item => !game.players.some(player => player.role === item.id)).length;
 
   return (
-    <div className="grid min-h-0 grid-rows-[auto_auto_auto_minmax(0,1fr)_auto_auto] gap-1.5">
+    /* Зона задаётся на обёртке, а не на каждой из четырёх панелей внутри: --zone-bg
+     * каскадом доходит до всех, и правая колонка остаётся одной зоной, даже если панелей
+     * в ней станет больше. */
+    <div
+      style={zoneStyle("actions")}
+      className="grid min-h-0 grid-rows-[auto_auto_auto_minmax(0,1fr)_auto_auto] gap-1.5"
+    >
       <Panel className="pb-2">
-        <div className="flex items-center gap-2 px-0.5 pt-px">
+        <div className={`flex items-center gap-2 px-0.5 pt-px pb-[2px] ${zoneRule}`}>
           <h2 className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">Действия</h2>
           <span className="ml-auto flex gap-1">
             {Array.from({ length: Math.max(3, game.actions_left) }).map((_, position) => (
@@ -191,6 +201,7 @@ export function ActionsPanel({
                 key={power}
                 power={power}
                 game={game}
+                districts={meta.districts}
                 context={context}
                 onAction={onAction}
               />
@@ -271,18 +282,21 @@ export function ActionsPanel({
 function PowerButton({
   power,
   game,
+  districts,
   context,
   onAction,
 }: {
   power: string;
   game: GameState;
+  districts: CityMeta["districts"];
   context: ActionContext;
   onAction: (action: LegalAction) => void;
 }) {
   const { options, blocked, pending } = resolveMany(context, "use_role_power", { power });
   const label = powerLabels[power] ?? power;
-  const single = options.length === 1 && options[0].payload.target_id === undefined;
-  const danger = /racket|sanction|scam|inflate|publish/.test(power);
+  const byDistrict = options.length > 0 && options[0].payload.district !== undefined;
+  const single = options.length === 1 && options[0].payload.target_id === undefined && !byDistrict;
+  const danger = /racket|sanction|scam|inflate|publish|inspection|seize|lock/.test(power);
 
   if (single || options.length === 0) {
     const state = options[0]
@@ -298,6 +312,46 @@ function PowerButton({
         state={state}
         onClick={() => state.kind === "ready" && onAction(state.action)}
       />
+    );
+  }
+
+  if (byDistrict) {
+    return (
+      <CardPopover
+        side="left"
+        content={
+          <>
+            <PopoverHeader title={label} subtitle="выберите район" />
+            <PopoverBody>
+              <p className="mb-2">
+                Район считается вашим до конца раунда: открывает проекты и серые операции этого
+                квартала и входит в синергию. Стоит влияние и скандал, но не действие.
+              </p>
+              <div className="grid gap-1">
+                {options.map((action, position) => {
+                  const district = districts.find(item => item.id === action.payload.district);
+                  return (
+                    <ListItem
+                      key={position}
+                      icon={district?.icon ?? "🏙"}
+                      title={district?.title ?? String(action.payload.district)}
+                      onClick={() => onAction(action)}
+                    />
+                  );
+                })}
+              </div>
+            </PopoverBody>
+          </>
+        }
+      >
+        <ActionButton
+          label={label}
+          cost="3◆ + скандал, без действия"
+          tone="plain"
+          state={{ kind: "ready", action: options[0] }}
+          onClick={() => undefined}
+        />
+      </CardPopover>
     );
   }
 

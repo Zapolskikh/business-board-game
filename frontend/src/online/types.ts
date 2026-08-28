@@ -24,16 +24,27 @@ export interface RoomSeat {
 export interface OwnedAsset {
   uid: string;
   card_id: string;
-  blocked: boolean;
 }
 
 export interface HeldCard { uid: string; card_id: string }
 // `price` is the viewer's own price, computed by the engine (discounts are per-player).
-export interface MarketAsset { uid: string; card_id: string; leaving?: boolean; price?: number }
+export interface MarketAsset {
+  uid: string;
+  card_id: string;
+  leaving?: boolean;
+  price?: number;
+  /** Метка капиталиста: карта работает на него, но остаётся в продаже для всех. */
+  claimed_by?: string | null;
+  /** Серая метка мафиози: до конца locked_round слот закрыт для всех, кроме него. */
+  locked_by?: string | null;
+  locked_round?: number;
+}
 
 export interface PlayerState {
   id: string;
   name: string;
+  /** Карта рынка, помеченная капиталистом: работает на него, но остаётся в продаже. */
+  marked_card_id?: string | null;
   is_bot: boolean;
   difficulty: Difficulty;
   preferred_role: string | null;
@@ -105,6 +116,8 @@ export interface GameState {
   actions_left: number;
   players: PlayerState[];
   market: MarketAsset[];
+  /** Вето политика: id проекта → id игрока, который единственный может его взять. */
+  project_veto?: Record<string, string>;
   project_board: string[];
   // Every perk of the viewer's role: what it pays now, the ceiling, and the district that
   // unlocks the difference. Computed by the engine — the client only prints labels.

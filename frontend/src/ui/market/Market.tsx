@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo } from "react";
 import type { AssetMeta, CityMeta, GameState, LegalAction, PlayerState } from "../../online/types";
+import { Panel, SectionHead } from "../primitives/atoms";
 import { useCommand, useGame, useLegalActions, useMe, useMeta } from "../lib/session";
 import { MarketCard } from "./MarketCard";
 import { marketCardState } from "./marketCardState";
@@ -38,14 +39,11 @@ export function MarketGrid({
   const rotation = meta.scoring?.market_rotation_size ?? 3;
 
   return (
-    <section className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] rounded-panel border border-line
-      bg-panel px-2 py-[7px]">
-      <div className="flex items-baseline gap-2 px-0.5 pb-[5px]">
-        <h2 className="text-[10.5px] font-bold uppercase tracking-[0.09em] text-ink-muted">Рынок</h2>
-        <span className="ml-auto whitespace-nowrap text-[10.5px] text-ink-dim">
-          {rotation} из {game.market.length} слотов уйдут в конце раунда · в колоде {game.market_deck_count}
-        </span>
-      </div>
+    <Panel rows zone="market">
+      <SectionHead
+        title="Рынок"
+        meta={`${rotation} из ${game.market.length} слотов уйдут в конце раунда · в колоде ${game.market_deck_count}`}
+      />
 
       {/* Шесть равных долей: слотов на рынке ровно столько. Два ряда делят высоту секции
         * поровну, и такая же разбивка у города — карточка одинакова до и после покупки. */}
@@ -75,13 +73,17 @@ export function MarketGrid({
                   assets={assets}
                   state={state}
                   onBuy={() => state.kind === "buyable" && onBuy(state.action)}
+                  mark={legal.find(
+                    action => action.type === "use_role_power" && action.payload.market_uid === item.uid,
+                  )}
+                  onMark={onBuy}
                 />
               </motion.div>
             );
           })}
         </AnimatePresence>
       </div>
-    </section>
+    </Panel>
   );
 }
 

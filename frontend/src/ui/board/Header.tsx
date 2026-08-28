@@ -49,8 +49,10 @@ export function Header({
   const risky = atScandalRisk(me);
 
   return (
+    /* Своя ступень светлоты, между подложкой и панелями: шапка не входит ни в одну из
+     * функциональных зон, и на общем `bg-panel` она читалась как ещё одна панель. */
     <header className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-panel
-      border border-line bg-panel px-2.5 py-1.5">
+      border border-line bg-topbar px-2.5 py-1.5">
       <div className="flex items-baseline gap-2.5">
         <b className="text-base font-extrabold">Город влияния</b>
         <span className="text-[11px] text-ink-muted">
@@ -80,7 +82,7 @@ export function Header({
         </CardPopover>
         <CardPopover side="bottom" align="center" content={<DefenceDetails game={game} me={me} />}>
           <Res label="Скандалы">
-            <span className={risky ? "text-gold" : undefined}>
+            <span className={risky ? "text-[var(--color-warning)]" : undefined}>
               ⚠ {me.scandals}
               <span className="text-2xs font-normal text-ink-dim">/{scandalLimit(me)}</span>
             </span>
