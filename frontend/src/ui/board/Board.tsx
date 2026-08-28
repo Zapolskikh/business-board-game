@@ -14,6 +14,7 @@ import { indexMaps } from "../lib/board";
 import { useCommand, useGame, useLegalActions, useMe, useMeta, useRoom } from "../lib/session";
 import { Chronicle } from "./Chronicle";
 import { ChronicleRail } from "./ChronicleRail";
+import { BoardScaler } from "./BoardScaler";
 import { Header, StatusBar } from "./Header";
 import { ScoreDetails } from "./headerPopovers";
 
@@ -61,7 +62,8 @@ export function BoardView({
   );
 
   return (
-    <div className="ui-v2 grid h-dvh grid-rows-[auto_auto_minmax(0,1fr)] gap-1.5 bg-surface p-2 font-sans text-ink">
+    <BoardScaler>
+      <div className="grid h-full w-full grid-rows-[auto_auto_minmax(0,1fr)] gap-1.5 p-2 font-sans text-ink">
       <Header
         game={game}
         me={context.me}
@@ -157,7 +159,8 @@ export function BoardView({
           ))}
         </ol>
       </Modal>
-    </div>
+      </div>
+    </BoardScaler>
   );
 }
 
