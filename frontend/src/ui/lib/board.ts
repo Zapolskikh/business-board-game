@@ -40,6 +40,18 @@ export function turnPosition(game: GameState, playerId: string): number {
 export const atScandalRisk = (player: PlayerState): boolean =>
   player.role !== null && player.scandals >= scandalLimit(player) - 1;
 
+/* Цвет игрока. Роль меняется по ходу партии и может быть отобрана, поэтому опознавать
+ * игрока по цвету роли нельзя — цвет привязан к месту в порядке хода, которое неизменно.
+ * Порядок берём из turn_order, как и всё остальное: движок — единственный источник.
+ * Оттенки не пересекаются с золотым (очки), зелёным (свой ход) и акцентным (я).
+ */
+const PLAYER_COLORS = ["#64b5ff", "#ff8f9c", "#6fdc9b", "#c79bff"];
+
+export function playerColor(game: GameState, playerId: string): string {
+  const position = turnPosition(game, playerId);
+  return PLAYER_COLORS[(position >= 0 ? position : 0) % PLAYER_COLORS.length];
+}
+
 export function indexMaps(meta: CityMeta) {
   return {
     assets: new Map(meta.assets.map(asset => [asset.id, asset])),

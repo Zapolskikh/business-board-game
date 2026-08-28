@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
+import { forwardRef } from "react";
 import { projectPerkText, projectRequirementText, projectRerollMoney } from "../../online/gameUi";
 import type { CityMeta, GameState, LegalAction, ProjectMeta } from "../../online/types";
 import { CardPopover, PopoverBody, PopoverFooter, PopoverHeader } from "../primitives/CardPopover";
@@ -59,6 +60,8 @@ export function Projects({
         </span>
       </div>
 
+      {/* 90% ширины: проектов всегда четыре, и на всю колонку карточки растягивались
+        * шире, чем требует их содержимое. */}
       <div className="grid grid-cols-4 gap-[5px]">
         <AnimatePresence mode="popLayout" initial={false}>
           {game.project_board.map((projectId, position) => {
@@ -72,14 +75,30 @@ export function Projects({
             const leaving = position === 0;
 
             return (
+              /* Стол общий, и проект чаще забирает чужой ход, чем твой. Без ухода
+               * карточка просто подменялась другой, и событие проходило незамеченным.
+               * Полсекунды подсветки — чтобы глаз успел вернуться к доске, потом вылет вверх.
+               * popLayout вынимает уходящую из потока, поэтому новая карта встаёт сразу,
+               * не дожидаясь конца анимации. */
               <motion.div
                 key={projectId}
                 layout
-                initial={{ rotateY: -90, opacity: 0 }}
-                animate={{ rotateY: 0, opacity: 1 }}
-                exit={{ rotateY: 90, opacity: 0, transition: { duration: 0.22, delay: 0.4 } }}
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{
+                  opacity: [1, 1, 1, 0],
+                  y: [0, -3, -3, -70],
+                  scale: [1, 1.04, 1.04, 0.92],
+                  filter: [
+                    "brightness(1)",
+                    "brightness(1.5)",
+                    "brightness(1.5)",
+                    "brightness(1.5)",
+                  ],
+                  transition: { duration: 0.78, times: [0, 0.1, 0.64, 1], ease: "easeIn" },
+                }}
                 transition={{ duration: 0.28, ease: "easeOut" }}
-                className="min-w-0 [transform-style:preserve-3d]"
+                className="min-w-0"
               >
                 <CardPopover
                   side="bottom"
@@ -102,6 +121,8 @@ export function Projects({
                     leaving={leaving}
                     ready={take.kind === "ready"}
                     pending={take.kind === "pending"}
+                    shortInfluence={context.me.influence < project.cost_influence}
+                    shortMoney={context.me.money < project.cost_money}
                   />
                 </CardPopover>
               </motion.div>
@@ -120,27 +141,35 @@ export function Projects({
 
 type Standing = { binary: boolean; met: boolean; have: number; needed: number } | undefined;
 
-function ProjectCard({
-  project,
-  meta,
-  standing,
-  leaving,
-  ready,
-  pending,
-  ...rest
-}: {
-  project: ProjectMeta;
-  meta: CityMeta;
-  standing: Standing;
-  leaving: boolean;
-  ready: boolean;
-  pending: boolean;
-}) {
+/* forwardRef обязателен: Popover.Trigger рендерится через asChild и вешает на потомка
+ * не только обработчики, но и ref — им он держит якорь и управляет открытием. Обычная
+ * функция ref не принимает, и карточка просто переставала откликаться на клик.
+ * Соседи (MarketCard, PlayerRow) не ломались лишь потому, что там motion.button,
+ * а он forwardRef изнутри.
+ */
+const ProjectCard = forwardRef<
+  HTMLButtonElement,
+  {
+    project: ProjectMeta;
+    meta: CityMeta;
+    standing: Standing;
+    leaving: boolean;
+    ready: boolean;
+    pending: boolean;
+    shortInfluence: boolean;
+    shortMoney: boolean;
+  }
+>(function ProjectCard(
+  { project, meta, standing, leaving, ready, pending, shortInfluence, shortMoney, ...rest },
+  ref,
+) {
   const met = standing?.met ?? false;
   const ratio = standing && standing.needed > 0 ? Math.min(1, standing.have / standing.needed) : met ? 1 : 0;
+  const counted = standing && !standing.binary;
 
   return (
     <button
+      ref={ref}
       type="button"
       data-state={pending ? "pending" : ready ? "ready" : met ? "met" : "locked"}
       className="grid w-full gap-[3px] rounded-card border border-line bg-panel-2 px-[7px] py-1.5
@@ -163,9 +192,32 @@ function ProjectCard({
           </span>
         )}
       </span>
-      <span className="text-[11.5px] font-semibold">
-        {project.cost_influence}◆ + {project.cost_money}$
+
+      {/* Цена слева, прогресс — отдельной плашкой под очками, в правой колонке.
+        * Раньше «0/3» дописывалось хвостом к тексту требования и сливалось с ним:
+        * единственное число, которое меняется по ходу партии, читалось хуже всего.
+        *
+        * Красным горит именно та цифра, которой не хватает, — независимо от условия.
+        * «✓ готово» рядом с недоступной кнопкой сбивало с толку: выполнено требование,
+        * а не покупка, и второй половины ответа на карточке не было. */}
+      <span className="flex items-center gap-1.5">
+        <span className="flex-1 text-[11.5px] font-semibold">
+          <span className={shortInfluence ? "text-bad" : undefined}>{project.cost_influence}◆</span>
+          {" + "}
+          <span className={shortMoney ? "text-bad" : undefined}>{project.cost_money}$</span>
+        </span>
+        {(counted || standing) && (
+          <span
+            data-met={met || undefined}
+            className="rounded-[10px] border border-line bg-panel-3 px-1.5 text-[11px] font-extrabold
+              tabular-nums whitespace-nowrap text-ink-muted
+              data-[met]:border-[#2f7a4d] data-[met]:bg-[#13291d] data-[met]:text-good"
+          >
+            {counted ? `${standing.have}/${standing.needed}` : met ? "✓ готово" : "не готово"}
+          </span>
+        )}
       </span>
+
       <span
         className={`overflow-hidden text-ellipsis whitespace-nowrap text-2xs ${
           met ? "text-good" : "text-ink-muted"
@@ -173,14 +225,13 @@ function ProjectCard({
       >
         {met ? "✓ " : ""}
         {projectRequirementText(project, meta)}
-        {standing && !standing.binary && ` ${standing.have}/${standing.needed}`}
       </span>
       <span className="h-[3px] overflow-hidden rounded-sm bg-panel-3">
         <i className={`block h-full ${met ? "bg-good" : "bg-accent"}`} style={{ width: `${ratio * 100}%` }} />
       </span>
     </button>
   );
-}
+});
 
 function ProjectDetails({
   project,

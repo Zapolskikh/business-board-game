@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { CityMeta, GameState, PlayerState } from "../../online/types";
+import { otherUiLabel, switchUi } from "../../online/uiVersion";
 import { CardPopover } from "../primitives/CardPopover";
 import { ActionsDetails, DefenceDetails, ScoreDetails } from "./headerPopovers";
 import { atScandalRisk, scandalLimit } from "../lib/board";
@@ -30,6 +31,7 @@ export function Header({
   roomName,
   unseenEvents,
   onChronicle,
+  onScore,
   onRules,
   onExit,
 }: {
@@ -39,6 +41,7 @@ export function Header({
   roomName: string;
   unseenEvents: number;
   onChronicle: () => void;
+  onScore: () => void;
   onRules: () => void;
   onExit: () => void;
 }) {
@@ -102,6 +105,16 @@ export function Header({
       </div>
 
       <div className="flex gap-1.5">
+        {/* Счёт и доход — в шапке, рядом с остальными моими числами, а не в панели
+          * действий: справа должно остаться то, что можно нажать в свой ход. */}
+        <button
+          type="button"
+          onClick={onScore}
+          className="rounded-md border border-line bg-panel-2 px-2.5 py-1.5 text-[11.5px]
+            whitespace-nowrap hover:border-accent"
+        >
+          🏆 Счёт и доход
+        </button>
         <button
           type="button"
           onClick={onChronicle}
@@ -123,6 +136,17 @@ export function Header({
             whitespace-nowrap hover:border-accent"
         >
           📖 Правила
+        </button>
+        {/* Переключение на старый экран и обратно. Партия живёт на сервере, поэтому
+          * перезагрузка ничего не теряет — можно сравнивать интерфейсы прямо по ходу игры. */}
+        <button
+          type="button"
+          onClick={switchUi}
+          title="Переключиться на другой интерфейс — партия на сервере не прервётся"
+          className="rounded-md border border-line bg-panel-2 px-2.5 py-1.5 text-[11.5px]
+            whitespace-nowrap text-ink-muted hover:border-accent hover:text-ink"
+        >
+          ⇆ {otherUiLabel}
         </button>
         <button
           type="button"

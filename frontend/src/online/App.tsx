@@ -4,15 +4,9 @@ import { Game } from "./Game";
 import { Lobby } from "./Lobby";
 import { RoomBrowser } from "./RoomBrowser";
 import type { CityMeta } from "./types";
+import { useLegacyUi } from "./uiVersion";
 // Ленивая загрузка: браузер комнат и лобби не должны тянуть Motion, Radix и Query.
 const GameScreen = lazy(() => import("../ui/GameScreen").then(module => ({ default: module.GameScreen })));
-
-// Старый экран остаётся точкой входа, новый открывается по ?ui=v2. Обратный порядок
-// («новый по умолчанию, ?ui=old возвращает прежний») писался под ветку ui-v2, но коммит
-// ушёл прямо в main, а Vercel деплоит main в production — и v2 уехал живым игрокам.
-// Пока v2 не заменит старый экран целиком, умолчание принадлежит тому, на чём играют:
-// то же самое сказано в main.tsx, где выбирается точка входа.
-const useLegacyUi = new URLSearchParams(location.search).get("ui") !== "v2";
 
 interface Session { password: string; playerId: string }
 

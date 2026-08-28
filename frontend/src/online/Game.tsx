@@ -38,6 +38,7 @@ import {
 } from "./gameUi";
 import type { AssetHint } from "./gameUi";
 import { buildRulesHtml } from "./rulesDocument";
+import { otherUiLabel, switchUi } from "./uiVersion";
 import type {
   ActionMeta,
   AssetMeta,
@@ -204,7 +205,7 @@ export function Game({ roomId, password, playerId, meta, onExit }: Props) {
         <h1>Город влияния <small>online release</small> <span className="game-version">v{__GAME_VERSION__}</span></h1>
         <p>{room.name} · Раунд {game.round_number}/{game.max_rounds} · Ход: <b>{current.name}</b> · Действий: <b>{game.actions_left}</b></p>
       </div>
-      <div className="city-head-buttons"><button onClick={() => setShowRules(true)}>📖 Правила</button><button onClick={onExit}>← Комнаты</button></div>
+      <div className="city-head-buttons"><button onClick={switchUi} title="Переключиться на другой интерфейс — партия на сервере не прервётся">⇆ {otherUiLabel}</button><button onClick={() => setShowRules(true)}>📖 Правила</button><button onClick={onExit}>← Комнаты</button></div>
     </header>
 
     {error && <p className="game-error">{error}</p>}

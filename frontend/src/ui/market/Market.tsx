@@ -38,7 +38,8 @@ export function MarketGrid({
   const rotation = meta.scoring?.market_rotation_size ?? 3;
 
   return (
-    <section className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] rounded-panel border border-line bg-panel px-2 py-[7px]">
+    <section className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] rounded-panel border border-line
+      bg-panel px-2 py-[7px]">
       <div className="flex items-baseline gap-2 px-0.5 pb-[5px]">
         <h2 className="text-[10.5px] font-bold uppercase tracking-[0.09em] text-ink-muted">Рынок</h2>
         <span className="ml-auto whitespace-nowrap text-[10.5px] text-ink-dim">
@@ -46,6 +47,8 @@ export function MarketGrid({
         </span>
       </div>
 
+      {/* Шесть равных долей: слотов на рынке ровно столько. Два ряда делят высоту секции
+        * поровну, и такая же разбивка у города — карточка одинакова до и после покупки. */}
       <div className="grid min-h-0 grid-cols-3 grid-rows-2 gap-[5px] [perspective:1200px]">
         <AnimatePresence mode="popLayout" initial={false}>
           {game.market.map(item => {

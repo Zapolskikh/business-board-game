@@ -7,14 +7,15 @@ import { CityPanel } from "../city/CityPanel";
 import { Hand } from "../hand/Hand";
 import { MarketGrid } from "../market/Market";
 import { PlayersRail } from "../players/PlayersRail";
-import { TurnState } from "../players/TurnState";
 import { Projects } from "../projects/Projects";
-import { Modal } from "../primitives/Modal";
+import { Modal, DetailsModal } from "../primitives/Modal";
 import type { ActionContext } from "../lib/actions";
 import { indexMaps } from "../lib/board";
 import { useCommand, useGame, useLegalActions, useMe, useMeta, useRoom } from "../lib/session";
 import { Chronicle } from "./Chronicle";
+import { ChronicleRail } from "./ChronicleRail";
 import { Header, StatusBar } from "./Header";
+import { ScoreDetails } from "./headerPopovers";
 
 /* Сборка доски.
  *
@@ -43,6 +44,7 @@ export function BoardView({
 }) {
   const index = useMemo(() => indexMaps(meta), [meta]);
   const [chronicle, setChronicle] = useState(false);
+  const [score, setScore] = useState(false);
   const [rules, setRules] = useState(false);
   const [seen, setSeen] = useState<number | null>(null);
   const [finishOpen, setFinishOpen] = useState(true);
@@ -67,6 +69,7 @@ export function BoardView({
         roomName={roomName}
         unseenEvents={unseen}
         onChronicle={() => setChronicle(true)}
+        onScore={() => setScore(true)}
         onRules={() => setRules(true)}
         onExit={onExit}
       />
@@ -75,10 +78,14 @@ export function BoardView({
       <div className="grid min-h-0 grid-cols-[238px_minmax(0,1fr)_274px] gap-1.5">
         <div className="grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_auto] gap-1.5">
           <PlayersRail game={game} meta={meta} index={index} context={context} onAction={onAction} />
-          <TurnState game={game} meta={meta} index={index} context={context} onAction={onAction} />
+          <ChronicleRail game={game} meta={meta} unseen={unseen} onOpen={() => setChronicle(true)} />
         </div>
 
-        <div className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(280px,1fr)_auto] gap-1.5 overflow-y-auto">
+        {/* Рынок и город делят остаток экрана поровну — у обоих по два ряда карточек, и так
+          * один и тот же объект до и после покупки остаётся одного размера. Доли равные
+          * и постоянные: содержимое панелей на высоту не влияет, поэтому покупка ничего
+          * не перекраивает. */}
+        <div className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_minmax(0,1fr)] gap-1.5">
           <Projects game={game} meta={meta} index={index} context={context} onAction={onAction} />
           <MarketGrid
             game={game}
@@ -88,16 +95,26 @@ export function BoardView({
             pending={context.pending}
             onBuy={onAction}
           />
-          <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_232px] gap-1.5">
-            <CityPanel meta={meta} index={index} context={context} onAction={onAction} />
-            <Hand game={game} meta={meta} index={index} context={context} onAction={onAction} />
-          </div>
+          <CityPanel meta={meta} index={index} context={context} onAction={onAction} />
         </div>
 
-        <ActionsPanel game={game} meta={meta} index={index} context={context} onAction={onAction} />
+        <ActionsPanel
+          game={game}
+          meta={meta}
+          index={index}
+          context={context}
+          onAction={onAction}
+          beforeEndTurn={
+            <Hand game={game} meta={meta} index={index} context={context} onAction={onAction} />
+          }
+        />
       </div>
 
       <Chronicle open={chronicle} onClose={() => setChronicle(false)} game={game} meta={meta} />
+
+      <DetailsModal open={score} onClose={() => setScore(false)} label="Счёт и доход">
+        <ScoreDetails game={game} me={context.me} meta={meta} />
+      </DetailsModal>
 
       <Modal open={rules} onClose={() => setRules(false)} title="📖 Правила" width={720}>
         <div

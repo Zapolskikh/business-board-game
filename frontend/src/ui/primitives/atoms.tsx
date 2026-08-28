@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { forwardRef, type ReactNode } from "react";
 import type { Availability } from "../lib/actions";
 
 /* Общие атомы доски. Держим их в одном файле, чтобы плотная сетка была
@@ -65,32 +65,44 @@ export function ActionButton({
       }`}>
         {label}
       </b>
-      <small className={`text-3xs ${spent ? "text-[#c78e8e]" : "text-ink-muted"}`}>
-        {spent ? "уже в этом ходу" : state.kind === "blocked" ? state.reason : cost}
+      <small className={`overflow-hidden text-ellipsis whitespace-nowrap text-3xs ${
+        spent ? "text-[#c78e8e]" : "text-ink-muted"
+      }`}>
+        {/* Всегда цена действия, а не причина отказа. Правила учат по тому, что делает
+          * кнопка, а не по «Сейчас недоступно»: половина панели недоступна почти всегда,
+          * и справка пропадала именно тогда, когда она нужна. Недоступность видна по
+          * затемнению, нехватка ресурса — по красному числу в самой цене, точная причина —
+          * в подсказке при наведении. */}
+        {spent ? "уже в этом ходу" : cost}
       </small>
     </button>
   );
 }
 
-/** Строка-ящик в правой панели: открывает поповер со списком. */
-export function DrawerRow({
-  icon,
-  title,
-  hint,
-  badge,
-  badgeOn,
-}: {
-  icon: string;
-  title: string;
-  hint: string;
-  badge?: ReactNode;
-  badgeOn?: boolean;
-}) {
+/* Строка-ящик в правой панели: открывает большое окно со справочником.
+ *
+ * forwardRef обязателен: без него Radix с asChild не может прицепиться к кнопке, и она
+ * молча перестаёт работать — именно поэтому не открывались «Роли» и «Серые операции».
+ */
+export const DrawerRow = forwardRef<
+  HTMLButtonElement,
+  {
+    icon: string;
+    title: string;
+    hint: ReactNode;
+    badge?: ReactNode;
+    badgeOn?: boolean;
+    onClick?: () => void;
+  }
+>(function DrawerRow({ icon, title, hint, badge, badgeOn, onClick, ...rest }, ref) {
   return (
     <button
+      ref={ref}
       type="button"
+      onClick={onClick}
       className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[7px]
         rounded-md border border-line bg-panel-2 px-2 py-[7px] hover:border-accent"
+      {...rest}
     >
       <span>{icon}</span>
       <span className="min-w-0">
@@ -112,7 +124,7 @@ export function DrawerRow({
       )}
     </button>
   );
-}
+});
 
 /** Пункт списка внутри поповера — цель атаки, роль, серая операция. */
 export function ListItem({

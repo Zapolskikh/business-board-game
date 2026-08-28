@@ -49,8 +49,14 @@ export function Hand({
             enabled:hover:border-good disabled:border-line disabled:bg-panel-2 disabled:opacity-45"
         >
           <b className="text-[11.5px] text-[#8ee0ae]">+ Вытянуть 2 карты</b>
+          {/* Цена всегда на кнопке, а не вместо неё причина отказа: без цены нельзя
+            * решить, копить ли на карты или на объект. Красным — тот ресурс, которого не хватает. */}
           <small className="text-3xs text-ink-muted">
-            {draw.kind === "blocked" ? draw.reason : `${actionCardCost(meta)}$ + 1◆ + ⚡`}
+            <b className={me.money < actionCardCost(meta) ? "font-bold text-bad" : "font-normal"}>
+              {actionCardCost(meta)}$
+            </b>{" "}
+            + <b className={me.influence < 1 ? "font-bold text-bad" : "font-normal"}>1◆</b> +{" "}
+            <b className={game.actions_left < 1 ? "font-bold text-bad" : "font-normal"}>⚡</b>
           </small>
         </button>
 

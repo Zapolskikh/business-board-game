@@ -13,20 +13,22 @@
    * пока они живут рядом. */
   --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  /* Палитра перенесена из styles.css один в один — цвета игры не меняются. */
-  --color-surface: #091019;
-  --color-panel: #111b27;
-  --color-panel-2: #172434;
-  --color-panel-3: #1e2f42;
-  --color-line: #2d3d50;
-  --color-line-2: #3a4d63;
+  /* Палитра v2 разошлась со styles.css: панели на две ступени светлее, потому что
+   * доска плотная и на почти чёрном фоне карточки сливались друг с другом и с подложкой.
+   * Разница между panel и panel-2 теперь читается без рамки. */
+  --color-surface: #0d1725;
+  --color-panel: #17222f;
+  --color-panel-2: #1f2f42;
+  --color-panel-3: #2a3d53;
+  --color-line: #3a4d63;
+  --color-line-2: #5a7290;
   --color-ink: #eef4fb;
-  --color-ink-muted: #95a7ba;
-  --color-ink-dim: #6d8098;
+  --color-ink-muted: #adbdcf;
+  --color-ink-dim: #8598ad;
   --color-accent: #55b5ff;
-  --color-good: #39c47a;
-  --color-bad: #ff6b6b;
-  --color-gold: #f2c14e;
+  --color-good: #4ade8a;
+  --color-bad: #ff7b7b;
+  --color-gold: #ffcc5c;
 
   /* Районы — из backend/city_engine/content/catalog.json. Единственный источник правды
    * всё равно бэкенд: он присылает district.color в /meta. Здесь копия для статичных
@@ -38,11 +40,13 @@
   --color-d-government: #5f78c8;
   --color-d-shadows: #8a455e;
 
-  --color-rar-common: #6d8098;
-  --color-rar-uncommon: #4fa3d1;
-  --color-rar-rare: #9b6ee7;
-  --color-rar-epic: #e0803f;
-  --color-rar-legendary: #f2c14e;
+  /* Редкости — на две ступени ярче каталожных: на тёмной панели исходные
+   * оттенки читаются как один и тот же серо-синий, а редкость различают боковым зрением. */
+  --color-rar-common: #9fb3c8;
+  --color-rar-uncommon: #5ec8f0;
+  --color-rar-rare: #b98cff;
+  --color-rar-epic: #ff9a4d;
+  --color-rar-legendary: #ffd45e;
 
   /* Доска плотная: рабочий размер 12px, ниже него две ступени для подписей. */
   --text-3xs: 0.5625rem;

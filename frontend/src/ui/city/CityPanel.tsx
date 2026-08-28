@@ -1,12 +1,11 @@
 import { AnimatePresence, motion } from "motion/react";
-import type { CSSProperties } from "react";
 import { assetEffectLines, assetPoints, districtCount } from "../../online/gameUi";
-import type { AssetMeta, CityMeta, LegalAction, OwnedAsset } from "../../online/types";
+import type { AssetMeta, CityMeta, DistrictMeta, LegalAction, OwnedAsset } from "../../online/types";
+import { AssetFace, assetFaceGrid, assetFaceStyle } from "../primitives/AssetFace";
 import { CardPopover, PopoverBody, PopoverFooter, PopoverHeader } from "../primitives/CardPopover";
 import { EffectList, KeyValue, Panel, SectionHead } from "../primitives/atoms";
 import { resolve, type ActionContext } from "../lib/actions";
 import { maxCapacity, type Indexes } from "../lib/board";
-import { SlotsDetails } from "./SlotsDetails";
 
 /* Мой город: занятые слоты, свободные и закрытые.
  *
@@ -28,6 +27,7 @@ export function CityPanel({
   const total = maxCapacity(meta);
   const free = Math.max(0, me.capacity - me.assets.length);
   const locked = Math.max(0, total - me.capacity);
+  const capacity = resolve(context, "buy_capacity");
 
   return (
     <Panel rows>
@@ -35,6 +35,9 @@ export function CityPanel({
         title="Мой город"
         meta={`${me.assets.length} / ${me.capacity} занято · всего слотов ${total} · продажа бесплатна`}
       />
+      {/* Панель сразу в полный рост: все шесть слотов занимают своё место с первого раунда,
+        * хотя три из них ещё закрыты. Иначе покупка объекта или слота двигала бы всю доску.
+        * Разбивка та же, что на рынке. */}
       <div className="grid min-h-0 grid-cols-3 grid-rows-2 gap-[5px]">
         <AnimatePresence mode="popLayout" initial={false}>
           {me.assets.map(owned => {
@@ -74,9 +77,10 @@ export function CityPanel({
                   <OwnedSlot
                     owned={owned}
                     asset={asset}
-                    color={district?.color}
-                    icon={district?.icon}
-                    title={district?.title}
+                    district={district}
+                    lines={assetEffectLines(asset, me, meta, index.assets, {
+                      includeSynergy: true,
+                    })}
                     owns={district ? districtCount(me, district.id, index.assets) : 0}
                   />
                 </CardPopover>
@@ -96,70 +100,112 @@ export function CityPanel({
           </div>
         ))}
 
-        {Array.from({ length: locked }).map((_, position) => (
-          <CardPopover
-            key={`locked-${position}`}
-            side="top"
-            content={<SlotsDetails meta={meta} context={context} onAction={onAction} />}
-          >
+        {/* Закрытый слот покупается прямо здесь: раньше для этого была отдельная кнопка
+          * в панели действий, и связь между ней и замком на доске приходилось угадывать.
+          * Открыть можно только ближайший — движок присылает ровно одно действие, поэтому
+          * остальные замки показывают цену, но не нажимаются. */}
+        {Array.from({ length: locked }).map((_, position) => {
+          const slot = me.capacity + position;
+          const price = meta.scoring?.capacity_costs?.[String(slot)];
+          const next = position === 0;
+          const ready = next && capacity.kind === "ready";
+          const short = price !== undefined && me.money < price;
+          return (
             <button
+              key={`locked-${position}`}
               type="button"
+              disabled={!ready}
+              onClick={() => capacity.kind === "ready" && onAction(capacity.action)}
+              title={
+                next && capacity.kind === "blocked"
+                  ? capacity.reason
+                  : next
+                    ? "Открыть слот"
+                    : "Сначала откройте предыдущий слот"
+              }
               className="grid place-content-center justify-items-center gap-[3px] rounded-card
-                border border-dashed border-[#3d3050] bg-[#141019] px-[7px] py-1.5 hover:border-accent"
+                border border-dashed border-[#3d3050] bg-[#141019] px-[7px] py-1.5
+                enabled:hover:border-accent disabled:opacity-60"
             >
-              <b className="text-[11.5px] text-ink-muted">🔒 Слот {me.capacity + position + 1}</b>
+              <b className="text-[11.5px] text-ink-muted">🔒 Слот {slot + 1}</b>
               <span className="rounded border border-[#52407a] bg-[#2a2140] px-2 py-0.5 text-2xs text-[#c9b3ef]">
-                Открыть · {meta.scoring?.capacity_costs?.[String(me.capacity + position)] ?? "?"}$
+                Открыть · <b className={short ? "font-bold text-bad" : ""}>{price ?? "?"}$</b>
               </span>
             </button>
-          </CardPopover>
-        ))}
+          );
+        })}
       </div>
     </Panel>
   );
 }
 
+/* Купленный объект выглядит ровно так же, как выглядел на рынке: те же зоны в том же
+ * порядке. Иначе после покупки игрок заново ищет, где что написано. Отличий два —
+ * вместо цены стоит цена продажи, а вместо причины отказа строка блокировки. */
 function OwnedSlot({
   owned,
   asset,
-  color,
-  icon,
-  title,
+  district,
+  lines,
   owns,
   ...rest
 }: {
   owned: OwnedAsset;
   asset: AssetMeta;
-  color?: string;
-  icon?: string;
-  title?: string;
+  district: DistrictMeta | undefined;
+  lines: ReturnType<typeof assetEffectLines>;
   owns: number;
 }) {
   return (
     <button
       type="button"
       data-state={owned.blocked ? "blocked" : "active"}
-      style={{ "--dc": color ?? "#2d3d50" } as CSSProperties}
-      className="grid h-full w-full content-start gap-0.5 rounded-card border border-line
-        border-l-[3px] border-l-[var(--dc)] bg-panel-2 px-[7px] py-1.5 text-left
-        hover:border-accent hover:border-l-[var(--dc)]
-        data-[state=blocked]:border-[#5c3340] data-[state=blocked]:bg-[#1c1418]"
+      style={assetFaceStyle(district?.color, asset.rarity)}
+      className={`${assetFaceGrid} hover:border-accent hover:border-l-[var(--dc)]
+        data-[state=blocked]:border-[#5c3340] data-[state=blocked]:bg-[#1c1418]`}
       {...rest}
     >
-      <span className="overflow-hidden text-ellipsis whitespace-nowrap text-3xs uppercase tracking-wide text-[var(--dc)]">
-        {icon} {title} · {owns}/4
-      </span>
-      <h4 className="overflow-hidden text-ellipsis whitespace-nowrap text-xs font-semibold text-ink">
-        {asset.title}
-      </h4>
-      <span className="flex flex-wrap gap-1.5 text-2xs">
-        {owned.blocked ? (
-          <b className="text-bad">🚫 заблокирован</b>
-        ) : (
-          <b className="text-good">+{asset.income}$/р</b>
-        )}
-        <b className="text-gold">{assetPoints(asset)} очк</b>
-      </span>
+      <AssetFace
+        asset={asset}
+        district={district}
+        lines={lines}
+        /* Заблокированный объект не приносит ничего: показываем нули, а не то,
+         * что он давал бы. Красная строка внизу объясняет, почему. */
+        income={owned.blocked ? 0 : asset.income}
+        influence={0}
+        topLeft={
+          <span className="whitespace-nowrap text-[11px]">
+            <span className="text-3xs text-ink-muted">Продажа </span>
+            <b className="font-bold text-ink">{assetPoints(asset)}$</b>
+          </span>
+        }
+        topRight={
+          <span className="rounded-[10px] border border-[#6b5518] bg-[#33290e] px-1.5 text-[11px]
+            font-extrabold whitespace-nowrap text-gold">
+            {assetPoints(asset)} оч
+          </span>
+        }
+        bottom={
+          <span className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5">
+            <span
+              className={`h-[13px] overflow-hidden text-ellipsis whitespace-nowrap rounded px-1
+                text-3xs font-semibold leading-[13px] ${
+                  owned.blocked ? "bg-[#4a2530] text-[#ffb0bd]" : "text-transparent"
+                }`}
+            >
+              {owned.blocked ? "🚫 заблокирован" : "—"}
+            </span>
+            <span
+              className={`whitespace-nowrap text-[15px] font-extrabold leading-none tabular-nums ${
+                owns >= 2 ? "text-good" : "text-ink"
+              }`}
+              title="Ваши объекты этого района. Синергия включается на 2 и на 4."
+            >
+              {owns}/4
+            </span>
+          </span>
+        }
+      />
     </button>
   );
 }

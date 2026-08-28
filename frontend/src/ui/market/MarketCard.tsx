@@ -1,24 +1,19 @@
 import { motion } from "motion/react";
-import type { CSSProperties } from "react";
-import { assetPoints, districtCount } from "../../online/gameUi";
+import { assetEffectLines, assetPoints, districtCount } from "../../online/gameUi";
 import type { AssetMeta, CityMeta, DistrictMeta, MarketAsset, PlayerState } from "../../online/types";
+import { AssetFace, assetFaceGrid, assetFaceStyle } from "../primitives/AssetFace";
 import { CardPopover } from "../primitives/CardPopover";
 import { MarketCardDetails } from "./MarketCardDetails";
 import { marketCardReason, type MarketCardState } from "./marketCardState";
 
-const rarityDot: Record<string, string> = {
-  common: "bg-rar-common",
-  uncommon: "bg-rar-uncommon",
-  rare: "bg-rar-rare",
-  epic: "bg-rar-epic",
-  legendary: "bg-rar-legendary",
-};
-
 /* Лицевая сторона карточки рынка.
  *
- * На доске остаются только цифры, которые сканируют глазами. Всё, что надо читать —
- * в поповере. Состояние выражено через data-state, а не через набор булевых пропсов:
- * так его видно в devtools и в тестах, и варианты Tailwind цепляются к одному атрибуту.
+ * Карточка держит всё, что нужно для решения: цена, очки, доход, синергии и то, что
+ * объект уходит в конце раунда. В поповер уходят только пояснения — почему это выгодно
+ * и что означают эффекты; сами числа дублировать туда не нужно.
+ *
+ * Состояние выражено через data-state, а не набором булевых пропсов: так его видно
+ * в devtools и в тестах, и варианты Tailwind цепляются к одному атрибуту.
  */
 export function MarketCard({
   item,
@@ -41,6 +36,9 @@ export function MarketCard({
 }) {
   const owned = district ? districtCount(me, district.id, assets) : 0;
   const blocked = state.kind !== "buyable" && state.kind !== "buying";
+  const short = me.money < state.price;
+  // Синергии — то же, что в поповере: клиент нигде не считает правило заново.
+  const lines = assetEffectLines(asset, me, meta, assets, { includeSynergy: true });
 
   return (
     <CardPopover
@@ -65,54 +63,65 @@ export function MarketCard({
         layoutId={`asset-${item.uid}`}
         data-state={state.kind}
         data-uid={item.uid}
-        style={{ "--dc": district?.color ?? "#2d3d50" } as CSSProperties}
-        animate={{ opacity: state.kind === "buying" ? 0.55 : blocked ? 0.5 : 1 }}
+        style={assetFaceStyle(district?.color, asset.rarity)}
+        /* Прозрачностью гасим только момент покупки. За «нельзя купить» отвечают
+         * красная цена и строка внизу; притушение всей карты делало поле нечитаемым —
+         * недоступными бывают сразу все шесть слотов, и рынок целиком уходил в муть. */
+        animate={{ opacity: state.kind === "buying" ? 0.55 : 1 }}
         whileHover={state.kind === "buyable" ? { y: -2 } : undefined}
         transition={{ duration: 0.18 }}
-        className="grid min-h-0 min-w-0 grid-rows-[auto_auto_auto_minmax(0,1fr)] gap-[3px]
-          rounded-card border border-line border-l-[3px] border-l-[var(--dc)] bg-panel-2
-          px-[7px] py-1.5 text-left
-          hover:border-accent hover:border-l-[var(--dc)]
-          data-[state=buying]:animate-pulse"
+        className={`${assetFaceGrid} hover:border-accent hover:border-l-[var(--dc)]
+          data-[state=buying]:animate-pulse`}
       >
-        <span className="flex min-w-0 items-center gap-1.5">
-          <span className="flex items-center gap-1 overflow-hidden whitespace-nowrap text-3xs uppercase tracking-wide text-[var(--dc)]">
-            {district?.icon} {district?.title}
-          </span>
-          <span
-            className={`rounded px-1 text-3xs ${
-              owned >= 2 ? "bg-[#1d3b2a] text-[#7fdaa6]" : "bg-panel-3 text-ink-muted"
-            }`}
-            title="Ваши объекты этого района. Синергия включается на 2 и на 4."
-          >
-            {owned}/4
-          </span>
-          <span className={`ml-auto size-[7px] shrink-0 rounded-full ${rarityDot[asset.rarity] ?? "bg-rar-common"}`} />
-          {item.leaving && (
-            <span className="rounded bg-[#3a2d12] px-1 text-3xs text-gold" title="Слот уходит в конце раунда">
-              ⏳
+        <AssetFace
+          asset={asset}
+          district={district}
+          lines={lines}
+          income={asset.income}
+          influence={asset.influence}
+          topLeft={
+            <span className="whitespace-nowrap text-[11px]">
+              <span className="text-3xs text-ink-muted">Цена </span>
+              <b className={`font-bold ${short ? "text-bad" : "text-ink"}`}>{state.price}$</b>
             </span>
-          )}
-        </span>
-
-        <h3 className="overflow-hidden text-ellipsis whitespace-nowrap text-[12.5px] font-semibold text-ink">
-          {asset.title}
-        </h3>
-
-        <span className="flex flex-wrap gap-1.5 text-[11px]">
-          <b className="font-bold text-ink">{state.price}$</b>
-          <b className="font-bold text-gold">{assetPoints(asset)} очк</b>
-          {asset.income > 0 && <b className="font-bold text-good">+{asset.income}$/р</b>}
-          {asset.influence > 0 && <b className="font-bold text-rar-rare">+{asset.influence}◆</b>}
-        </span>
-
-        {blocked ? (
-          <span className="self-end rounded bg-[#33202a] px-1.5 text-3xs text-[#e59aa9]">
-            {marketCardReason(state)}
-          </span>
-        ) : (
-          <p className="line-clamp-2 overflow-hidden text-2xs leading-tight text-ink-muted">{asset.text}</p>
-        )}
+          }
+          topRight={
+            <span className="flex items-center gap-1">
+              {item.leaving && (
+                <span className="text-3xs text-gold" title="Слот уходит в конце раунда">
+                  ⏳
+                </span>
+              )}
+              <span className="rounded-[10px] border border-[#6b5518] bg-[#33290e] px-1.5 text-[11px]
+                font-extrabold whitespace-nowrap text-gold">
+                {assetPoints(asset)} оч
+              </span>
+            </span>
+          }
+          /* Причина отказа и мои объекты района. Счётчик крупный: синергия включается
+           * на 2 и на 4, и это число решает, брать ли объект вообще. Строка держит
+           * высоту всегда, иначе появление «Не хватает» дёргало бы зоны выше. */
+          bottom={
+            <span className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5">
+              <span
+                className={`h-[13px] overflow-hidden text-ellipsis whitespace-nowrap rounded px-1
+                  text-3xs font-semibold leading-[13px] ${
+                    blocked ? "bg-[#4a2530] text-[#ffb0bd]" : "text-transparent"
+                  }`}
+              >
+                {blocked ? marketCardReason(state) : "—"}
+              </span>
+              <span
+                className={`whitespace-nowrap text-[15px] font-extrabold leading-none tabular-nums ${
+                  owned >= 2 ? "text-good" : "text-ink"
+                }`}
+                title="Ваши объекты этого района. Синергия включается на 2 и на 4."
+              >
+                {owned}/4
+              </span>
+            </span>
+          }
+        />
       </motion.button>
     </CardPopover>
   );

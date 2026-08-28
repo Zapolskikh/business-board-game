@@ -1,3 +1,4 @@
+import { useState, type ReactNode } from "react";
 import {
   campaignTiers,
   cleanupOffer,
@@ -9,16 +10,25 @@ import {
 } from "../../online/gameUi";
 import type { CityMeta, GameState, LegalAction } from "../../online/types";
 import { CardPopover, PopoverBody, PopoverHeader } from "../primitives/CardPopover";
+import { DetailsModal } from "../primitives/Modal";
 import { ActionButton, DrawerRow, ListItem, Panel } from "../primitives/atoms";
 import { findActions, resolve, resolveMany, usedThisTurn, type ActionContext } from "../lib/actions";
-import { nextSlotPrice, roofPrice, type Indexes } from "../lib/board";
+import { roofPrice, type Indexes } from "../lib/board";
 import { RolesDetails } from "./RolesDetails";
+import { RolePowersDetails } from "./RolePowersDetails";
 import { GreyDetails } from "./GreyDetails";
-import { ScoreDetails } from "../board/headerPopovers";
 
-/* Правая панель. Восемь базовых действий видны всегда, справочное и многовариантное —
- * за ящиками. Способности роли НЕ в ящике: это активные кнопки хода, а не справка.
+/* Правая панель. Шесть базовых действий видны всегда, справочники — в больших окнах.
+ * Способности роли НЕ в ящике: это активные кнопки хода, а не справка.
  */
+
+/* Цена действия с красным числом того ресурса, которого не хватает, — та же практика,
+ * что в городских проектах. Красное число говорит не только «нельзя», но и чего именно
+ * не хватает, а значит — что делать следующим ходом. */
+function Need({ short, children }: { short: boolean; children: ReactNode }) {
+  return <b className={short ? "font-bold text-bad" : "font-normal"}>{children}</b>;
+}
+
 
 /** Чистки роли живут на одной кнопке «Антикризис»: у каждой роли своя цена, действие одно. */
 const cleanupPowers = new Set(["politician_cleanup", "mafia_cleanup", "fraudster_cleanup"]);
@@ -29,24 +39,30 @@ export function ActionsPanel({
   index,
   context,
   onAction,
+  beforeEndTurn,
 }: {
   game: GameState;
   meta: CityMeta;
   index: Indexes;
   context: ActionContext;
   onAction: (action: LegalAction) => void;
+  /* Что показать над кнопкой завершения хода. Сюда уехала рука: карты разыгрываются
+   * в свой ход, и её место — рядом с остальными действиями, а не внизу доски рядом с городом.
+   * Пропом, а не импортом — чтобы панель действий не знала про руку. */
+  beforeEndTurn?: ReactNode;
 }) {
   const me = context.me;
   const tiers = campaignTiers(meta);
   const patron = patronage(meta);
   const lobby = lobbying(meta);
-  const slotPrice = nextSlotPrice(meta, me);
+  /* Какой справочник открыт. Одно поле вместо трёх флагов: окно всё равно может
+   * быть только одно, и состояние «открыты два» просто не выразимо. */
+  const [drawer, setDrawer] = useState<"roles" | "powers" | "grey" | null>(null);
 
   const work = resolve(context, "basic_action", { kind: "work" });
   const patronAction = resolve(context, "basic_action", { kind: "patronage" });
   const lobbyAction = resolve(context, "basic_action", { kind: "lobbying" });
   const roof = resolve(context, "buy_roof");
-  const capacity = resolve(context, "buy_capacity");
   const endTurn = resolve(context, "end_turn");
 
   // Антикризис: если у роли есть своя чистка — она дешевле, движок пришлёт именно её.
@@ -69,10 +85,9 @@ export function ActionsPanel({
   const greyAvailable = findActions(context, "grey_operation").length;
   const greySpent = usedThisTurn(game, "grey_operation_used");
   const freeRoles = meta.roles.filter(item => !game.players.some(player => player.role === item.id)).length;
-  const score = game.score_breakdown?.[me.id];
 
   return (
-    <div className="grid min-h-0 grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] gap-1.5">
+    <div className="grid min-h-0 grid-rows-[auto_auto_auto_minmax(0,1fr)_auto_auto] gap-1.5">
       <Panel className="pb-2">
         <div className="flex items-center gap-2 px-0.5 pt-px">
           <h2 className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">Действия</h2>
@@ -92,14 +107,18 @@ export function ActionsPanel({
       <Panel>
         <div className="px-0.5 text-3xs uppercase tracking-[0.08em] text-ink-dim">Базовые</div>
         <div className="mt-1.5 grid grid-cols-2 gap-1">
-          <ActionButton label="Заказ" cost="+2$" state={work} onClick={() => act(work)} />
+          <ActionButton label="Заказ" cost="+2$ в кошелёк" state={work} onClick={() => act(work)} />
           {tiers.map(tier => {
             const campaign = resolve(context, "basic_action", { kind: "campaign", spend: tier.spend });
             return (
               <ActionButton
                 key={tier.spend}
                 label="Обмен"
-                cost={`${tier.spend}$ → ${tier.gain}◆`}
+                cost={
+                  <>
+                    <Need short={me.money < tier.spend}>{tier.spend}$</Need> → {tier.gain}◆
+                  </>
+                }
                 state={campaign}
                 onClick={() => act(campaign)}
               />
@@ -107,35 +126,56 @@ export function ActionsPanel({
           })}
           <ActionButton
             label="Патронаж"
-            cost={`${patron.money}$ → ${patron.points} оч`}
+            cost={
+              <>
+                <Need short={me.money < patron.money}>{patron.money}$</Need> → {patron.points} оч
+              </>
+            }
             state={patronAction}
             spent={usedThisTurn(game, "patronage")}
             onClick={() => act(patronAction)}
           />
           <ActionButton
             label="Лоббирование"
-            cost={`${lobby.influence}◆ → ${lobby.points} оч`}
+            cost={
+              <>
+                <Need short={me.influence < lobby.influence}>{lobby.influence}◆</Need> →{" "}
+                {lobby.points} оч
+              </>
+            }
             state={lobbyAction}
             spent={usedThisTurn(game, "lobbying")}
             onClick={() => act(lobbyAction)}
           />
+          {/* «Антикризис» ничего не говорил о том, что делает кнопка. У ролевой чистки
+            * своё название из каталога — оно точнее, его и оставляем. */}
           <ActionButton
-            label={cleanupLabel}
-            cost={cleanupPower ? "снять скандал" : `${crisisPrInfluence(meta)}◆ → −1 ⚠`}
+            label={cleanupPower ? cleanupLabel : "Чистка"}
+            cost={
+              cleanupPower ? (
+                "−1 ⚠ скандал"
+              ) : (
+                <>
+                  <Need short={me.influence < crisisPrInfluence(meta)}>
+                    {crisisPrInfluence(meta)}◆
+                  </Need>{" "}
+                  → −1 ⚠ скандал
+                </>
+              )
+            }
             state={cleanup}
             onClick={() => act(cleanup)}
           />
           <ActionButton
             label="Крыша"
-            cost={`${roofPrice(game)}$ · ${me.roofs} из ${me.roof_limit}`}
+            cost={
+              <>
+                <Need short={me.money < roofPrice(game)}>{roofPrice(game)}$</Need> · есть {me.roofs}{" "}
+                из {me.roof_limit}
+              </>
+            }
             state={roof}
             onClick={() => act(roof)}
-          />
-          <ActionButton
-            label="Открыть слот"
-            cost={slotPrice !== undefined ? `${slotPrice}$ → ${me.capacity + 1}-й` : "максимум"}
-            state={capacity}
-            onClick={() => act(capacity)}
           />
         </div>
       </Panel>
@@ -159,54 +199,55 @@ export function ActionsPanel({
         </Panel>
       )}
 
+      {/* Справочники. Заголовка у секции нет: три строки со стрелками и так читаются как
+        * «нажми, чтобы открыть», а подпись занимала строку и ничего не добавляла.
+        *
+        * Открываются окнами по центру, а не поповерами сбоку: в них таблицы на всю ширину
+        * — в узкой колонке они не помещались. Содержимое то же самое, компоненты общие. */}
       <Panel rows>
-        <div className="px-0.5 pb-1.5 text-3xs uppercase tracking-[0.08em] text-ink-dim">Открыть</div>
         <div className="grid content-start gap-1 overflow-auto p-px">
-          <CardPopover
-            side="left"
-            content={<RolesDetails game={game} meta={meta} index={index} context={context} onAction={onAction} />}
-          >
-            <DrawerRow
-              icon="🏷️"
-              title="Роли"
-              hint={role ? `ваша: ${role.title} · свободно ${freeRoles}` : `у вас нет роли · ${game.role_price}◆`}
-            />
-          </CardPopover>
+          <DrawerRow
+            icon="🏷️"
+            title="Роли"
+            hint={role ? `ваша: ${role.title} · свободно ${freeRoles}` : `у вас нет роли · ${game.role_price}◆`}
+            onClick={() => setDrawer("roles")}
+          />
 
-          <CardPopover
-            side="left"
-            content={<GreyDetails game={game} meta={meta} index={index} context={context} onAction={onAction} />}
-          >
-            <DrawerRow
-              icon="🌒"
-              title="Серые операции"
-              hint={
-                greySpent
-                  ? "в этом ходу уже проведена"
-                  : greyAvailable > 0
-                    ? "выберите операцию и цель"
-                    : "нужен активный объект нужного района"
-              }
-              badge={greySpent ? "✗" : `${greyAvailable} из 5`}
-              badgeOn={!greySpent && greyAvailable > 0}
-            />
-          </CardPopover>
+          <DrawerRow
+            icon="⚡"
+            title="Возможности роли"
+            hint={role ? "пассивные перки и активные способности" : "нужна роль"}
+            onClick={() => setDrawer("powers")}
+          />
 
-          <CardPopover side="left" content={<ScoreDetails game={game} me={me} meta={meta} />}>
-            <DrawerRow
-              icon="🏆"
-              title="Счёт и доход"
-              hint={
-                score
-                  ? `объекты ${score.assets} · проекты ${score.projects} · скандалы ${score.scandals}`
-                  : "разбивка счёта"
-              }
-              badge={score?.total ?? 0}
-              badgeOn
-            />
-          </CardPopover>
+          <DrawerRow
+            icon="🌒"
+            title="Серые операции"
+            hint={
+              greySpent
+                ? "в этом ходу уже проведена"
+                : greyAvailable > 0
+                  ? "выберите операцию и цель"
+                  : "нужен активный объект нужного района"
+            }
+            badge={greySpent ? "✗" : `${greyAvailable} из 5`}
+            badgeOn={!greySpent && greyAvailable > 0}
+            onClick={() => setDrawer("grey")}
+          />
         </div>
       </Panel>
+
+      <DetailsModal open={drawer === "roles"} onClose={() => setDrawer(null)} label="Роли">
+        <RolesDetails game={game} meta={meta} index={index} context={context} onAction={onAction} />
+      </DetailsModal>
+      <DetailsModal open={drawer === "powers"} onClose={() => setDrawer(null)} label="Возможности роли">
+        <RolePowersDetails game={game} meta={meta} index={index} context={context} onAction={onAction} />
+      </DetailsModal>
+      <DetailsModal open={drawer === "grey"} onClose={() => setDrawer(null)} label="Серые операции">
+        <GreyDetails game={game} meta={meta} index={index} context={context} onAction={onAction} />
+      </DetailsModal>
+
+      {beforeEndTurn}
 
       <button
         type="button"
