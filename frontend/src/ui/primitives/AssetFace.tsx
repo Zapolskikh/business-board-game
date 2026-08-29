@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { rarityLabels, type AssetEffectLine } from "../../online/gameUi";
+import { useIsPortrait } from "../lib/layout";
 import type { AssetMeta, DistrictMeta } from "../../online/types";
 
 /* Общая форма карточки объекта: и на рынке, и в своём городе.
@@ -59,6 +60,11 @@ export function AssetFace({
   income: number;
   influence: number;
 }) {
+  /* Вертикально карточка вдвое уже, и два столбца свойств превращаются в два многоточия.
+   * Один столбец на те же четыре строки: видно вчетверо меньше строк, зато каждая целиком,
+   * а остальные — в поповере по нажатию, куда на телефоне и так приходится ходить. */
+  const portrait = useIsPortrait();
+
   return (
     <>
       {/* 1 */}
@@ -112,10 +118,13 @@ export function AssetFace({
         *
         * Разделители рисуют сами ячейки, а не фон-подложка: подложка красила бы и пустые
         * клетки сетки. */}
-      <span className="grid min-h-0 min-w-0 grid-flow-col grid-cols-2 grid-rows-4
-        content-start overflow-hidden text-3xs leading-tight
-        [&>*]:min-w-0 [&>*]:overflow-hidden [&>*]:text-ellipsis [&>*]:whitespace-nowrap
-        [&>*]:border-b [&>*]:border-r [&>*]:border-line/70 [&>*]:px-1 [&>*]:py-px">
+      <span
+        className={`grid min-h-0 min-w-0 grid-rows-4 content-start overflow-hidden text-3xs
+          leading-tight
+          [&>*]:min-w-0 [&>*]:overflow-hidden [&>*]:text-ellipsis [&>*]:whitespace-nowrap
+          [&>*]:border-b [&>*]:border-r [&>*]:border-line/70 [&>*]:px-1 [&>*]:py-px
+          ${portrait ? "grid-cols-1" : "grid-flow-col grid-cols-2"}`}
+      >
         {income > 0 && <b className="whitespace-nowrap font-bold text-good">+{income}$/раунд</b>}
         {influence > 0 && (
           <b className="whitespace-nowrap font-bold text-[#c9a2ff]">+{influence}◆ разово</b>

@@ -4,6 +4,7 @@ import { assetEffectLines, assetPoints, districtCount } from "../../online/gameU
 import type { AssetMeta, CityMeta, DistrictMeta, LegalAction, OwnedAsset } from "../../online/types";
 import { AssetFace, assetFaceGrid, assetFaceStyle } from "../primitives/AssetFace";
 import { CardPopover, PopoverBody, PopoverFooter, PopoverHeader } from "../primitives/CardPopover";
+import { useIsPortrait } from "../lib/layout";
 import { EffectList, KeyValue, Panel, SectionHead } from "../primitives/atoms";
 import { resolve, type ActionContext } from "../lib/actions";
 import { maxCapacity, type Indexes } from "../lib/board";
@@ -29,6 +30,7 @@ export function CityPanel({
   const free = Math.max(0, me.capacity - me.assets.length);
   const locked = Math.max(0, total - me.capacity);
   const capacity = resolve(context, "buy_capacity");
+  const portrait = useIsPortrait();
 
   return (
     <Panel rows zone="city">
@@ -44,8 +46,14 @@ export function CityPanel({
       />
       {/* Панель сразу в полный рост: все шесть слотов занимают своё место с первого раунда,
         * хотя три из них ещё закрыты. Иначе покупка объекта или слота двигала бы всю доску.
-        * Разбивка та же, что на рынке. */}
-      <div className="grid min-h-0 min-w-0 grid-cols-3 grid-rows-2 gap-[5px]">
+        * Разбивка та же, что на рынке, включая вертикальную: 2×3 с фиксированной высотой ряда. */}
+      <div
+        className={
+          portrait
+            ? "grid min-w-0 auto-rows-[152px] grid-cols-2 gap-[5px]"
+            : "grid min-h-0 min-w-0 grid-cols-3 grid-rows-2 gap-[5px]"
+        }
+      >
         <AnimatePresence mode="popLayout" initial={false}>
           {me.assets.map(owned => {
             const asset = index.assets.get(owned.card_id);

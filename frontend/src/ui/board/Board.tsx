@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { scoreOf } from "../../online/gameUi";
 import { buildRulesHtml } from "../../online/rulesDocument";
 import type { CityMeta, GameState, LegalAction } from "../../online/types";
@@ -15,8 +15,10 @@ import { useCommand, useGame, useLegalActions, useMe, useMeta, useRoom } from ".
 import { Chronicle } from "./Chronicle";
 import { ChronicleRail } from "./ChronicleRail";
 import { BoardScaler } from "./BoardScaler";
+import { MobileFrame } from "./MobileFrame";
 import { Header, StatusBar } from "./Header";
 import { ScoreDetails } from "./headerPopovers";
+import { BoardLayoutProvider, usePortraitViewport, type BoardLayout } from "../lib/layout";
 
 /* Сборка доски.
  *
@@ -33,6 +35,7 @@ export function BoardView({
   busy,
   error,
   onExit,
+  layout,
 }: {
   game: GameState;
   meta: CityMeta;
@@ -42,6 +45,8 @@ export function BoardView({
   busy: boolean;
   error: string;
   onExit: () => void;
+  /** Раскладка принудительно — для галереи и тестов. Без неё решает ширина вьюпорта. */
+  layout?: BoardLayout;
 }) {
   const index = useMemo(() => indexMaps(meta), [meta]);
   const [chronicle, setChronicle] = useState(false);
@@ -61,15 +66,82 @@ export function BoardView({
     [game],
   );
 
+  /* Раскладка одна на всё дерево: её спрашивают рынок, город и проекты, чтобы построить
+   * сетку карточек 3×2 или 2×N. Ширину меряем здесь, а не в каждом из них. */
+  const narrow = usePortraitViewport();
+  const portrait = layout ? layout === "portrait" : narrow;
+
+  /* Три колонки собираются одинаково для обеих раскладок и различаются только тем, куда их
+   * ставят: рядом или в шторки. Иначе это были бы две копии доски, расходящиеся при первой же
+   * правке — ровно то, чем закончилась предыдущая попытка сделать мобильную версию. */
+  const players = (
+    <div className="grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_auto] gap-1.5">
+      <PlayersRail game={game} meta={meta} index={index} context={context} onAction={onAction} />
+      <ChronicleRail game={game} meta={meta} unseen={unseen} onOpen={() => setChronicle(true)} />
+    </div>
+  );
+
+  /* Рынок и город делят остаток экрана поровну — у обоих по два ряда карточек, и так
+    * один и тот же объект до и после покупки остаётся одного размера. Доли равные
+    * и постоянные: содержимое панелей на высоту не влияет, поэтому покупка ничего
+    * не перекраивает.
+    *
+    * Вертикально эти доли не работают: экран телефона короче трёх панелей, и растягивать
+    * их по нему — значит показать по одному ряду карточек от каждой. Поэтому в `portrait`
+    * панели идут своей высотой, а колонка прокручивается. */
+  const city = (
+    <div
+      className={
+        portrait
+          ? "grid min-w-0 gap-1.5"
+          : "grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_minmax(0,1fr)] gap-1.5"
+      }
+    >
+      <Projects game={game} meta={meta} index={index} context={context} onAction={onAction} />
+      <MarketGrid
+        game={game}
+        me={context.me}
+        meta={meta}
+        legal={context.legal}
+        pending={context.pending}
+        onBuy={onAction}
+      />
+      <CityPanel meta={meta} index={index} context={context} onAction={onAction} />
+    </div>
+  );
+
+  const actions = (
+    <ActionsPanel
+      game={game}
+      meta={meta}
+      index={index}
+      context={context}
+      onAction={onAction}
+      beforeEndTurn={
+        <Hand game={game} meta={meta} index={index} context={context} onAction={onAction} />
+      }
+    />
+  );
+
+  const Frame = portrait ? MobileShell : BoardScaler;
+
   return (
-    <BoardScaler>
-      <div className="grid h-full w-full grid-rows-[auto_auto_minmax(0,1fr)] gap-1.5 p-2 font-sans text-ink">
+    <BoardLayoutProvider layout={portrait ? "portrait" : "wide"}>
+    <Frame>
+      {/* Поля и зазоры на телефоне вдвое меньше: каждые четыре точки по краю — это две точки
+        * ширины карточки, а их всего около полутора сотен. */}
+      <div
+        className={`grid h-full w-full grid-rows-[auto_auto_minmax(0,1fr)] font-sans text-ink ${
+          portrait ? "gap-1 p-1" : "gap-1.5 p-2"
+        }`}
+      >
       <Header
         game={game}
         me={context.me}
         meta={meta}
         roomName={roomName}
         unseenEvents={unseen}
+        compact={portrait}
         onChronicle={() => setChronicle(true)}
         onScore={() => setScore(true)}
         onRules={() => setRules(true)}
@@ -77,40 +149,15 @@ export function BoardView({
       />
       <StatusBar game={game} me={context.me} busy={busy} error={error} />
 
-      <div className="grid min-h-0 grid-cols-[238px_minmax(0,1fr)_274px] gap-1.5">
-        <div className="grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_auto] gap-1.5">
-          <PlayersRail game={game} meta={meta} index={index} context={context} onAction={onAction} />
-          <ChronicleRail game={game} meta={meta} unseen={unseen} onOpen={() => setChronicle(true)} />
+      {portrait ? (
+        <MobileFrame center={city} left={players} right={actions} />
+      ) : (
+        <div className="grid min-h-0 grid-cols-[238px_minmax(0,1fr)_274px] gap-1.5">
+          {players}
+          {city}
+          {actions}
         </div>
-
-        {/* Рынок и город делят остаток экрана поровну — у обоих по два ряда карточек, и так
-          * один и тот же объект до и после покупки остаётся одного размера. Доли равные
-          * и постоянные: содержимое панелей на высоту не влияет, поэтому покупка ничего
-          * не перекраивает. */}
-        <div className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_minmax(0,1fr)] gap-1.5">
-          <Projects game={game} meta={meta} index={index} context={context} onAction={onAction} />
-          <MarketGrid
-            game={game}
-            me={context.me}
-            meta={meta}
-            legal={context.legal}
-            pending={context.pending}
-            onBuy={onAction}
-          />
-          <CityPanel meta={meta} index={index} context={context} onAction={onAction} />
-        </div>
-
-        <ActionsPanel
-          game={game}
-          meta={meta}
-          index={index}
-          context={context}
-          onAction={onAction}
-          beforeEndTurn={
-            <Hand game={game} meta={meta} index={index} context={context} onAction={onAction} />
-          }
-        />
-      </div>
+      )}
 
       <Chronicle open={chronicle} onClose={() => setChronicle(false)} game={game} meta={meta} />
 
@@ -160,8 +207,16 @@ export function BoardView({
         </ol>
       </Modal>
       </div>
-    </BoardScaler>
+    </Frame>
+    </BoardLayoutProvider>
   );
+}
+
+/* Обёртка вертикальной раскладки. Того же назначения, что BoardScaler, но без множителя:
+ * на телефоне стол не сжимают, а перестраивают, поэтому размеры здесь настоящие — 12px
+ * подписи остаются 12px. Класс `ui-v2` обязателен: на нём висит весь ресет темы. */
+function MobileShell({ children }: { children: ReactNode }) {
+  return <div className="ui-v2 h-dvh w-dvw overflow-hidden bg-surface">{children}</div>;
 }
 
 /** Подключённая версия: всё то же самое, но из живой партии. */

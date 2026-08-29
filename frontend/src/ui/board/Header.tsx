@@ -30,6 +30,7 @@ export function Header({
   meta,
   roomName,
   unseenEvents,
+  compact = false,
   onChronicle,
   onScore,
   onRules,
@@ -40,6 +41,8 @@ export function Header({
   meta: CityMeta;
   roomName: string;
   unseenEvents: number;
+  /** Вертикальная раскладка: два яруса вместо трёх колонок, у кнопок только значки. */
+  compact?: boolean;
   onChronicle: () => void;
   onScore: () => void;
   onRules: () => void;
@@ -47,6 +50,26 @@ export function Header({
 }) {
   const score = game.score_breakdown?.[me.id]?.total ?? 0;
   const risky = atScandalRisk(me);
+  /* Подпись у кнопки есть всегда — на узком экране она уезжает в aria-label, а не пропадает.
+   * Кнопки те же самые: разница только в том, показывать ли слово рядом со значком. */
+  const caption = (text: string) => (compact ? "" : ` ${text}`);
+
+  if (compact) {
+    return (
+      <header className="grid gap-1 rounded-panel border border-line bg-topbar px-2 py-1.5">
+        <div className="flex items-center gap-2">
+          <b className="text-[13px] font-extrabold">Город влияния</b>
+          <span className="text-3xs text-ink-muted">
+            Раунд {game.round_number}/{game.max_rounds}
+          </span>
+          <span className="ml-auto flex gap-1">{buttons()}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-1 rounded-[14px] border border-line bg-panel-2 px-1.5 py-1">
+          {chips()}
+        </div>
+      </header>
+    );
+  }
 
   return (
     /* Своя ступень светлоты, между подложкой и панелями: шапка не входит ни в одну из
@@ -63,6 +86,19 @@ export function Header({
 
       <div className="flex items-center gap-1 justify-self-center rounded-[20px] border border-line
         bg-panel-2 px-1.5 py-1">
+        {chips()}
+      </div>
+
+      <div className="flex gap-1.5">{buttons()}</div>
+    </header>
+  );
+
+  /* Ресурсы и кнопки — один и тот же список для обеих раскладок; различается только обёртка.
+   * Объявлены функциями после `return`: подъём объявлений позволяет держать их внизу файла,
+   * рядом друг с другом, а не разрывать разметку шапки на две части. */
+  function chips() {
+    return (
+      <>
         <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
           <Res label="Очки">🏆 {score}</Res>
         </CardPopover>
@@ -104,26 +140,27 @@ export function Header({
             </span>
           </Res>
         </CardPopover>
-      </div>
+      </>
+    );
+  }
 
-      <div className="flex gap-1.5">
+  function buttons() {
+    const shape = `rounded-md border border-line bg-panel-2 text-[11.5px] whitespace-nowrap
+      hover:border-accent ${compact ? "px-2 py-1" : "px-2.5 py-1.5"}`;
+    return (
+      <>
         {/* Счёт и доход — в шапке, рядом с остальными моими числами, а не в панели
           * действий: справа должно остаться то, что можно нажать в свой ход. */}
-        <button
-          type="button"
-          onClick={onScore}
-          className="rounded-md border border-line bg-panel-2 px-2.5 py-1.5 text-[11.5px]
-            whitespace-nowrap hover:border-accent"
-        >
-          🏆 Счёт и доход
+        <button type="button" onClick={onScore} aria-label="Счёт и доход" className={shape}>
+          🏆{caption("Счёт и доход")}
         </button>
         <button
           type="button"
           onClick={onChronicle}
-          className="relative rounded-md border border-line bg-panel-2 px-2.5 py-1.5 text-[11.5px]
-            whitespace-nowrap hover:border-accent"
+          aria-label="Хроника"
+          className={`relative ${shape}`}
         >
-          📜 Хроника
+          📜{caption("Хроника")}
           {unseenEvents > 0 && (
             <b className="absolute -right-1.5 -top-1.5 min-w-4 rounded-[9px] bg-bad px-1 text-center
               text-3xs font-bold text-[#2a0a0a]">
@@ -131,13 +168,8 @@ export function Header({
             </b>
           )}
         </button>
-        <button
-          type="button"
-          onClick={onRules}
-          className="rounded-md border border-line bg-panel-2 px-2.5 py-1.5 text-[11.5px]
-            whitespace-nowrap hover:border-accent"
-        >
-          📖 Правила
+        <button type="button" onClick={onRules} aria-label="Правила" className={shape}>
+          📖{caption("Правила")}
         </button>
         {/* Переключение на старый экран и обратно. Партия живёт на сервере, поэтому
           * перезагрузка ничего не теряет — можно сравнивать интерфейсы прямо по ходу игры. */}
@@ -145,22 +177,17 @@ export function Header({
           type="button"
           onClick={switchUi}
           title="Переключиться на другой интерфейс — партия на сервере не прервётся"
-          className="rounded-md border border-line bg-panel-2 px-2.5 py-1.5 text-[11.5px]
-            whitespace-nowrap text-ink-muted hover:border-accent hover:text-ink"
+          aria-label={`Переключиться на ${otherUiLabel}`}
+          className={`${shape} text-ink-muted hover:text-ink`}
         >
-          ⇆ {otherUiLabel}
+          ⇆{caption(otherUiLabel)}
         </button>
-        <button
-          type="button"
-          onClick={onExit}
-          className="rounded-md border border-line bg-panel-2 px-2.5 py-1.5 text-[11.5px]
-            whitespace-nowrap hover:border-accent"
-        >
-          ← Комнаты
+        <button type="button" onClick={onExit} aria-label="Вернуться в комнаты" className={shape}>
+          ←{caption("Комнаты")}
         </button>
-      </div>
-    </header>
-  );
+      </>
+    );
+  }
 }
 
 /* Полоса статуса.

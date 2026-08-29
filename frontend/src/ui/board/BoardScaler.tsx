@@ -1,5 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
+/* На сервере (и в тестах, которые рендерят доску строкой) layout-эффектов нет вовсе, и React
+ * предупреждает об этом на каждый рендер. Меряем мы в браузере, так что подмена честная. */
+const useMeasureEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
 /* Доска фиксированного размера, вписанная в экран масштабированием.
  *
  * Проблема: вёрстка доски держится на жёстких пропорциях — 238px левая колонка, 274px
@@ -44,7 +48,7 @@ export function BoardScaler({ children }: { children: ReactNode }) {
   const frame = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState<{ width: number; height: number } | null>(null);
 
-  useLayoutEffect(() => {
+  useMeasureEffect(() => {
     const node = frame.current;
     if (!node) return;
     const measure = () => setBox({ width: node.clientWidth, height: node.clientHeight });

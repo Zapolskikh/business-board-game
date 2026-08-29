@@ -4,6 +4,7 @@ import type { GameState, PlayerState } from "../../online/types";
 import { BoardView } from "./Board";
 import type { ActionContext } from "../lib/actions";
 import { ME, meta, scenarios, type ScenarioName } from "../dev/fixtures";
+import type { BoardLayout } from "../lib/layout";
 
 /* Дымовой тест раскладки: каждая позиция из фикстур должна отрендериться без исключения.
  *
@@ -19,7 +20,7 @@ const names = Object.keys(scenarios) as ScenarioName[];
 // (split/join, а не replaceAll: проект таргетит ES2020)
 const text = (html: string) => html.split("<!-- -->").join("");
 
-function render(name: ScenarioName, overrides: Partial<ActionContext> = {}) {
+function render(name: ScenarioName, overrides: Partial<ActionContext> = {}, layout?: BoardLayout) {
   const room = scenarios[name];
   const game = room.game as GameState;
   const me = game.players.find(player => player.id === ME) as PlayerState;
@@ -35,6 +36,7 @@ function render(name: ScenarioName, overrides: Partial<ActionContext> = {}) {
         busy={false}
         error=""
         onExit={() => {}}
+        layout={layout}
       />,
     ),
   );
@@ -90,6 +92,35 @@ describe("BoardView", () => {
         />,
       ),
     ).not.toThrow();
+  });
+
+  /* Вертикальная раскладка — вторая полноценная доска, а не «то же самое поуже»: три колонки
+   * превращаются в одну и две шторки. Проверяем то, что отличает её от широкой, и то, ради
+   * чего она вообще нужна: центр на экране, бока по кнопке, карточки в два столбца. */
+  it.each(names)("рендерится вертикально: %s", name => {
+    expect(() => render(name, {}, "portrait")).not.toThrow();
+  });
+
+  it("вертикально: центр на месте, бока за язычками", () => {
+    const html = render("Богатый ход", {}, "portrait");
+
+    expect(html).toContain("Рынок");
+    expect(html).toContain("Мой город");
+    expect(html).toContain("aria-label=\"Игроки и хроника\"");
+    expect(html).toContain("aria-label=\"Действия и рука\"");
+    // Трёхколоночная сетка стола не должна остаться ни в каком виде.
+    expect(html).not.toContain("238px");
+    // Шторки закрыты, поэтому панели игроков и действий в разметке ещё нет.
+    expect(html).not.toContain("Способности ·");
+  });
+
+  it("вертикально: карточки идут в два столбца, а не в три", () => {
+    const portrait = render("Богатый ход", {}, "portrait");
+    const wide = render("Богатый ход", {}, "wide");
+
+    expect(portrait).toContain("grid-cols-2");
+    expect(portrait).not.toContain("grid-cols-3");
+    expect(wide).toContain("grid-cols-3");
   });
 
   it("переживает объект, которого нет в каталоге", () => {

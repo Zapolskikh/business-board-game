@@ -6,6 +6,7 @@ import { CardPopover, PopoverBody, PopoverFooter, PopoverHeader } from "../primi
 import { KeyValue, Panel, zoneRule } from "../primitives/atoms";
 import { resolve, usedThisTurn, type ActionContext } from "../lib/actions";
 import type { Indexes } from "../lib/board";
+import { useIsPortrait } from "../lib/layout";
 
 /* Доска проектов. Общая для всех: кто взял — тот и забрал, остальным проект недоступен.
  * Поэтому карточка на доске показывает только цену и прогресс, а «почему» — в поповере.
@@ -23,6 +24,7 @@ export function Projects({
   context: ActionContext;
   onAction: (action: LegalAction) => void;
 }) {
+  const portrait = useIsPortrait();
   const reroll = resolve(context, "reroll_projects");
   const rerolled = usedThisTurn(game, "projects_rerolled");
   const mine = context.me.projects
@@ -70,8 +72,9 @@ export function Projects({
       </div>
 
       {/* 90% ширины: проектов всегда четыре, и на всю колонку карточки растягивались
-        * шире, чем требует их содержимое. */}
-      <div className="grid grid-cols-4 gap-[5px]">
+        * шире, чем требует их содержимое. Вертикально — два на два: вчетверо уже экрана
+        * телефона от карточки остаётся одна цена. */}
+      <div className={`grid gap-[5px] ${portrait ? "grid-cols-2" : "grid-cols-4"}`}>
         <AnimatePresence mode="popLayout" initial={false}>
           {game.project_board.map((projectId, position) => {
             const project = index.projects.get(projectId);

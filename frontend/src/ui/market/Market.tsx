@@ -5,6 +5,7 @@ import { Panel, SectionHead } from "../primitives/atoms";
 import { useCommand, useGame, useLegalActions, useMe, useMeta } from "../lib/session";
 import { MarketCard } from "./MarketCard";
 import { marketCardState } from "./marketCardState";
+import { useIsPortrait } from "../lib/layout";
 
 /* Секция рынка.
  *
@@ -37,6 +38,7 @@ export function MarketGrid({
     [meta.districts],
   );
   const rotation = meta.scoring?.market_rotation_size ?? 3;
+  const portrait = useIsPortrait();
 
   return (
     <Panel rows zone="market">
@@ -46,8 +48,19 @@ export function MarketGrid({
       />
 
       {/* Шесть равных долей: слотов на рынке ровно столько. Два ряда делят высоту секции
-        * поровну, и такая же разбивка у города — карточка одинакова до и после покупки. */}
-      <div className="grid min-h-0 min-w-0 grid-cols-3 grid-rows-2 gap-[5px] [perspective:1200px]">
+        * поровну, и такая же разбивка у города — карточка одинакова до и после покупки.
+        *
+        * Вертикально — 2×3 и фиксированная высота ряда. Высота обязательна: в широкой
+        * раскладке ряды тянет `minmax(0,1fr)` от высоты колонки, а в прокручиваемой колонке
+        * такой высоты нет, ряд схлопывается по содержимому и таблица свойств карточки
+        * (единственная строка на `minmax(0,1fr)`) исчезает совсем. */}
+      <div
+        className={
+          portrait
+            ? "grid min-w-0 auto-rows-[172px] grid-cols-2 gap-[5px] [perspective:1200px]"
+            : "grid min-h-0 min-w-0 grid-cols-3 grid-rows-2 gap-[5px] [perspective:1200px]"
+        }
+      >
         <AnimatePresence mode="popLayout" initial={false}>
           {game.market.map(item => {
             const asset = assets.get(item.card_id);
