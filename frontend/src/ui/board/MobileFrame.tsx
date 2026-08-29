@@ -32,9 +32,10 @@ export function MobileFrame({
     <div className="grid min-h-0 grid-cols-[24px_minmax(0,1fr)_24px] gap-1">
       <EdgeTab side="left" label="Игроки и хроника" glyph="👥" onOpen={() => setOpen("left")} />
 
-      {/* Прокручивается только центр: шапка и полоса статуса остаются на месте, иначе после
-        * каждого действия пришлось бы возвращаться взглядом наверх. */}
-      <div className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pb-2">{center}</div>
+      {/* Центр никуда не едет: он ровно между язычками и ровно по высоте экрана. `overflow-hidden`
+        * здесь страховка, а не прокрутка — если содержимое всё же окажется шире, оно обрежется,
+        * а не начнёт ездить по горизонтали вместе со всей доской. */}
+      <div className="min-h-0 min-w-0 overflow-hidden">{center}</div>
 
       <EdgeTab side="right" label="Действия и рука" glyph="⚡" onOpen={() => setOpen("right")} />
 

@@ -60,10 +60,43 @@ export function AssetFace({
   income: number;
   influence: number;
 }) {
-  /* Вертикально карточка вдвое уже, и два столбца свойств превращаются в два многоточия.
-   * Один столбец на те же четыре строки: видно вчетверо меньше строк, зато каждая целиком,
-   * а остальные — в поповере по нажатию, куда на телефоне и так приходится ходить. */
+  /* Вертикально карточка та же по сетке, но краткая по содержанию: на телефоне все шесть
+   * слотов рынка и все шесть слотов города должны быть видны сразу, без прокрутки — иначе
+   * решение «купить или подождать» принимается по половине доски. Поэтому от карточки
+   * остаётся то, по чему выбирают: цена, очки, название и доход. Редкость несёт рамка, а
+   * теги, синергии и условия — поповер по нажатию. */
   const portrait = useIsPortrait();
+
+  if (portrait) {
+    return (
+      <>
+        <span className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1">
+          {topLeft}
+          <span className="overflow-hidden text-center text-ellipsis whitespace-nowrap text-3xs
+            font-bold text-[var(--dc)]">
+            {district?.icon}
+          </span>
+          {topRight}
+        </span>
+
+        <h3 className="overflow-hidden text-[11px] leading-[1.15] font-semibold text-ink">
+          {asset.title}
+        </h3>
+
+        <span className="flex items-center gap-1.5 overflow-hidden text-3xs whitespace-nowrap">
+          {income > 0 && <b className="font-bold text-good">+{income}$</b>}
+          {influence > 0 && <b className="font-bold text-[#c9a2ff]">+{influence}◆</b>}
+          {lines.length > 0 && (
+            <span className="overflow-hidden text-ellipsis text-ink-dim" title={lines[0].text}>
+              {lines[0].short}
+            </span>
+          )}
+        </span>
+
+        {bottom}
+      </>
+    );
+  }
 
   return (
     <>
@@ -192,3 +225,9 @@ export const assetFaceGrid = `grid h-full w-full min-h-0 min-w-0
   grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] gap-1
   rounded-card border border-[var(--rc)] bg-panel-2
   px-2 py-1.5 text-left transition-colors hover:bg-panel-3`;
+
+/** Та же карточка вертикально: четыре зоны вместо пяти, поля вдвое уже. */
+export const assetFaceGridPortrait = `grid h-full w-full min-h-0 min-w-0
+  grid-rows-[auto_minmax(0,1fr)_auto_auto] gap-0.5
+  rounded-card border border-[var(--rc)] bg-panel-2
+  px-1 py-1 text-left transition-colors hover:bg-panel-3`;

@@ -114,13 +114,19 @@ describe("BoardView", () => {
     expect(html).not.toContain("Способности ·");
   });
 
-  it("вертикально: карточки идут в два столбца, а не в три", () => {
+  it("вертикально: карточка краткая, а сетка та же", () => {
     const portrait = render("Богатый ход", {}, "portrait");
     const wide = render("Богатый ход", {}, "wide");
 
+    // Шесть слотов рынка и шесть слотов города видны сразу в обеих раскладках.
+    expect(portrait).toContain("grid-cols-3");
+    // Проекты вчетвером в ряд помещаются только на широком столе.
     expect(portrait).toContain("grid-cols-2");
-    expect(portrait).not.toContain("grid-cols-3");
-    expect(wide).toContain("grid-cols-3");
+    expect(wide).toContain("grid-cols-4");
+    // Редкость словом, теги и таблица свойств — только на широкой карточке; вертикально
+    // они уезжают в поповер, иначе шесть карточек в высоту экрана не встают.
+    expect(wide).toContain("Обычный");
+    expect(portrait).not.toContain("Обычный");
   });
 
   it("переживает объект, которого нет в каталоге", () => {

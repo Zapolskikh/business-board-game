@@ -8,7 +8,8 @@ import type {
   MarketAsset,
   PlayerState,
 } from "../../online/types";
-import { AssetFace, assetFaceGrid, assetFaceStyle } from "../primitives/AssetFace";
+import { AssetFace, assetFaceGrid, assetFaceGridPortrait, assetFaceStyle } from "../primitives/AssetFace";
+import { useIsPortrait } from "../lib/layout";
 import { CardPopover } from "../primitives/CardPopover";
 import { MarketCardDetails } from "./MarketCardDetails";
 import { marketCardReason, type MarketCardState } from "./marketCardState";
@@ -59,6 +60,7 @@ export function MarketCard({
   const short = me.money < state.price;
   // Синергии — то же, что в поповере: клиент нигде не считает правило заново.
   const lines = assetEffectLines(asset, me, meta, assets, { includeSynergy: true });
+  const portrait = useIsPortrait();
 
   return (
     <CardPopover
@@ -94,7 +96,7 @@ export function MarketCard({
         animate={{ opacity: state.kind === "buying" ? 0.55 : 1 }}
         whileHover={state.kind === "buyable" ? { y: -2 } : undefined}
         transition={{ duration: 0.18 }}
-        className={`${assetFaceGrid} data-[state=buying]:animate-pulse`}
+        className={`${portrait ? assetFaceGridPortrait : assetFaceGrid} data-[state=buying]:animate-pulse`}
       >
         <AssetFace
           asset={asset}
@@ -103,8 +105,8 @@ export function MarketCard({
           income={asset.income}
           influence={asset.influence}
           topLeft={
-            <span className="whitespace-nowrap text-[11px]">
-              <span className="text-3xs text-ink-muted">Цена </span>
+            <span className={`whitespace-nowrap ${portrait ? "text-3xs" : "text-[11px]"}`}>
+              {!portrait && <span className="text-3xs text-ink-muted">Цена </span>}
               <b className={`font-bold ${short ? "text-bad" : "text-ink"}`}>{state.price}$</b>
             </span>
           }
@@ -128,8 +130,12 @@ export function MarketCard({
                   ⏳
                 </span>
               )}
-              <span className="rounded-[10px] border border-line-2 bg-panel-3 px-1.5 text-[11px]
-                font-extrabold whitespace-nowrap text-[var(--color-badge)]">
+              <span
+                className={`rounded-[10px] border border-line-2 bg-panel-3 font-extrabold
+                  whitespace-nowrap text-[var(--color-badge)] ${
+                    portrait ? "px-1 text-3xs" : "px-1.5 text-[11px]"
+                  }`}
+              >
                 {assetPoints(asset)} оч
               </span>
             </span>

@@ -56,15 +56,21 @@ export function Header({
 
   if (compact) {
     return (
-      <header className="grid gap-1 rounded-panel border border-line bg-topbar px-2 py-1.5">
-        <div className="flex items-center gap-2">
-          <b className="text-[13px] font-extrabold">Город влияния</b>
-          <span className="text-3xs text-ink-muted">
-            Раунд {game.round_number}/{game.max_rounds}
+      <header className="grid gap-1 rounded-panel border border-line bg-topbar px-1.5 py-1">
+        <div className="flex items-center gap-1.5">
+          <b className="text-[12px] font-extrabold">Город влияния</b>
+          <span className="text-3xs whitespace-nowrap text-ink-muted">
+            {game.round_number}/{game.max_rounds}
           </span>
           <span className="ml-auto flex gap-1">{buttons()}</span>
         </div>
-        <div className="flex flex-wrap items-center gap-x-1 rounded-[14px] border border-line bg-panel-2 px-1.5 py-1">
+        {/* Ресурсы одной строкой и мельче: шапка на телефоне — это высота, которой не будет
+          * у рынка. Размер задаётся обёрткой, чтобы не тащить флаг через шесть вызовов. */}
+        <div
+          className="flex items-center gap-x-0.5 overflow-hidden rounded-[12px] border border-line
+            bg-panel-2 px-1 py-0.5 [&_button]:gap-0.5 [&_button]:px-1 [&_button]:py-0
+            [&_button]:text-[11px]"
+        >
           {chips()}
         </div>
       </header>
@@ -127,7 +133,7 @@ export function Header({
         <Sep />
         <CardPopover side="bottom" align="center" content={<ActionsDetails game={game} />}>
           <Res label="Действия">
-            Действия
+            {!compact && "Действия"}
             <span className="ml-0.5 flex gap-[3px]">
               {Array.from({ length: Math.max(3, game.actions_left) }).map((_, index) => (
                 <i

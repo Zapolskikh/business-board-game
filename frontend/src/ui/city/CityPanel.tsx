@@ -2,7 +2,7 @@ import { forwardRef, type ForwardedRef } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { assetEffectLines, assetPoints, districtCount } from "../../online/gameUi";
 import type { AssetMeta, CityMeta, DistrictMeta, LegalAction, OwnedAsset } from "../../online/types";
-import { AssetFace, assetFaceGrid, assetFaceStyle } from "../primitives/AssetFace";
+import { AssetFace, assetFaceGrid, assetFaceGridPortrait, assetFaceStyle } from "../primitives/AssetFace";
 import { CardPopover, PopoverBody, PopoverFooter, PopoverHeader } from "../primitives/CardPopover";
 import { useIsPortrait } from "../lib/layout";
 import { EffectList, KeyValue, Panel, SectionHead } from "../primitives/atoms";
@@ -40,20 +40,16 @@ export function CityPanel({
          * что возврата нет вовсе. Бесплатным было действие, а не сделка — теперь так и написано,
          * и цена возврата стоит рядом, потому что это половина, а не полная цена. */
         meta={
-          `${me.assets.length} / ${me.capacity} занято · всего слотов ${total}` +
-          ` · продажа не требует действия, возврат — половина цены`
+          portrait
+            ? `${me.assets.length}/${me.capacity} · всего ${total}`
+            : `${me.assets.length} / ${me.capacity} занято · всего слотов ${total}` +
+              ` · продажа не требует действия, возврат — половина цены`
         }
       />
       {/* Панель сразу в полный рост: все шесть слотов занимают своё место с первого раунда,
         * хотя три из них ещё закрыты. Иначе покупка объекта или слота двигала бы всю доску.
-        * Разбивка та же, что на рынке, включая вертикальную: 2×3 с фиксированной высотой ряда. */}
-      <div
-        className={
-          portrait
-            ? "grid min-w-0 auto-rows-[152px] grid-cols-2 gap-[5px]"
-            : "grid min-h-0 min-w-0 grid-cols-3 grid-rows-2 gap-[5px]"
-        }
-      >
+        * Разбивка та же, что на рынке, и та же в обеих раскладках. */}
+      <div className="grid min-h-0 min-w-0 grid-cols-3 grid-rows-2 gap-[5px]">
         <AnimatePresence mode="popLayout" initial={false}>
           {me.assets.map(owned => {
             const asset = index.assets.get(owned.card_id);
@@ -175,12 +171,13 @@ const OwnedSlot = forwardRef(function OwnedSlot({
   owns: number;
 }, ref: ForwardedRef<HTMLButtonElement>) {
   const value = assetPoints(asset);
+  const portrait = useIsPortrait();
   return (
     <button
       ref={ref}
       type="button"
       style={assetFaceStyle(district?.color, asset.rarity)}
-      className={assetFaceGrid}
+      className={portrait ? assetFaceGridPortrait : assetFaceGrid}
       {...rest}
     >
       <AssetFace
@@ -194,8 +191,12 @@ const OwnedSlot = forwardRef(function OwnedSlot({
          * продажи внизу и бейдж очков справа уже всё сказали. */
         topLeft={null}
         topRight={
-          <span className="rounded-[10px] border border-line-2 bg-panel-3 px-1.5 text-[11px]
-            font-extrabold whitespace-nowrap text-[var(--color-badge)]">
+          <span
+            className={`rounded-[10px] border border-line-2 bg-panel-3 font-extrabold
+              whitespace-nowrap text-[var(--color-badge)] ${
+                portrait ? "px-1 text-3xs" : "px-1.5 text-[11px]"
+              }`}
+          >
             {value} оч
           </span>
         }
@@ -208,7 +209,7 @@ const OwnedSlot = forwardRef(function OwnedSlot({
               className="h-[13px] overflow-hidden text-ellipsis whitespace-nowrap rounded px-1
                 text-3xs font-semibold leading-[13px] text-good"
             >
-              {`Продать за ${value}$`}
+              {portrait ? `${value}$` : `Продать за ${value}$`}
             </span>
             <span
               className={`whitespace-nowrap text-[15px] font-extrabold leading-none tabular-nums ${

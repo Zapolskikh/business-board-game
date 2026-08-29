@@ -44,23 +44,18 @@ export function MarketGrid({
     <Panel rows zone="market">
       <SectionHead
         title="Рынок"
-        meta={`${rotation} из ${game.market.length} слотов уйдут в конце раунда · в колоде ${game.market_deck_count}`}
+        meta={
+          portrait
+            ? `${rotation} из ${game.market.length} уйдут · колода ${game.market_deck_count}`
+            : `${rotation} из ${game.market.length} слотов уйдут в конце раунда · в колоде ${game.market_deck_count}`
+        }
       />
 
       {/* Шесть равных долей: слотов на рынке ровно столько. Два ряда делят высоту секции
         * поровну, и такая же разбивка у города — карточка одинакова до и после покупки.
-        *
-        * Вертикально — 2×3 и фиксированная высота ряда. Высота обязательна: в широкой
-        * раскладке ряды тянет `minmax(0,1fr)` от высоты колонки, а в прокручиваемой колонке
-        * такой высоты нет, ряд схлопывается по содержимому и таблица свойств карточки
-        * (единственная строка на `minmax(0,1fr)`) исчезает совсем. */}
-      <div
-        className={
-          portrait
-            ? "grid min-w-0 auto-rows-[172px] grid-cols-2 gap-[5px] [perspective:1200px]"
-            : "grid min-h-0 min-w-0 grid-cols-3 grid-rows-2 gap-[5px] [perspective:1200px]"
-        }
-      >
+        * Разбивка одна на обе раскладки: вертикально меняется не сетка, а сама карточка —
+        * она становится краткой, см. AssetFace. */}
+      <div className="grid min-h-0 min-w-0 grid-cols-3 grid-rows-2 gap-[5px] [perspective:1200px]">
         <AnimatePresence mode="popLayout" initial={false}>
           {game.market.map(item => {
             const asset = assets.get(item.card_id);

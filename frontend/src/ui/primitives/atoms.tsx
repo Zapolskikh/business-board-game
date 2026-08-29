@@ -61,7 +61,14 @@ export function SectionHead({ title, meta, extra }: { title: string; meta?: Reac
     <div className={`flex items-baseline gap-2 px-0.5 pb-[2px] ${zoneRule}`}>
       <h2 className="text-[10.5px] font-bold uppercase tracking-[0.09em] text-ink-muted">{title}</h2>
       {extra}
-      {meta && <span className="ml-auto whitespace-nowrap text-[10.5px] text-ink-dim">{meta}</span>}
+      {/* Подпись обрезается, а не распирает панель. `whitespace-nowrap` без `overflow-hidden`
+        * растил её на всю длину текста, панель уезжала за свою колонку, и вся центральная
+        * часть начинала ездить по горизонтали — на телефоне это было видно сразу. */}
+      {meta && (
+        <span className="ml-auto min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[10.5px] text-ink-dim">
+          {meta}
+        </span>
+      )}
     </div>
   );
 }

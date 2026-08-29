@@ -43,11 +43,13 @@ export function Projects({
 
   return (
     <Panel zone="projects">
-      <div className={`flex items-baseline gap-2 px-0.5 pb-[2px] ${zoneRule}`}>
-        <h2 className="text-[10.5px] font-bold uppercase tracking-[0.09em] text-ink-muted">
-          Городские проекты
+      {/* Вертикально в строку помещается заголовок, счётчик своих проектов и кнопка. Всё
+        * остальное — размер колоды, длинная подпись кнопки — уходит: это справка, а не решение. */}
+      <div className={`flex items-baseline gap-2 overflow-hidden px-0.5 pb-[2px] ${zoneRule}`}>
+        <h2 className="whitespace-nowrap text-[10.5px] font-bold uppercase tracking-[0.09em] text-ink-muted">
+          {portrait ? "Проекты" : "Городские проекты"}
         </h2>
-        <span className="text-[10.5px] text-ink-dim">
+        <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[10.5px] text-ink-dim">
           {mine.length ? `ваши: ${mine.length} · ${minePoints} очков` : "у вас пока ни одного"}
         </span>
         <button
@@ -61,14 +63,17 @@ export function Projects({
                 ? reroll.reason
                 : "Все четыре проекта уходят в колоду и раздаются заново. Доска общая — меняется у всех."
           }
-          className="ml-auto rounded-[10px] border border-line bg-panel-2 px-1.5 py-0.5 text-3xs
-            text-ink-muted enabled:hover:border-accent disabled:opacity-45"
+          className="ml-auto shrink-0 rounded-[10px] border border-line bg-panel-2 px-1.5 py-0.5
+            text-3xs whitespace-nowrap text-ink-muted enabled:hover:border-accent disabled:opacity-45"
         >
-          🔄 Пересобрать · {projectRerollMoney(meta)}$ + ⚡
+          🔄 {portrait ? "" : "Пересобрать · "}
+          {projectRerollMoney(meta)}$ + ⚡
         </button>
-        <span className="whitespace-nowrap text-[10.5px] text-ink-dim">
-          в колоде {game.project_deck_count}
-        </span>
+        {!portrait && (
+          <span className="whitespace-nowrap text-[10.5px] text-ink-dim">
+            в колоде {game.project_deck_count}
+          </span>
+        )}
       </div>
 
       {/* 90% ширины: проектов всегда четыре, и на всю колонку карточки растягивались
@@ -188,6 +193,10 @@ const ProjectCard = forwardRef<
   const met = standing?.met ?? false;
   const counted = standing && !standing.binary;
   const perk = projectPerkText(project);
+  /* Вертикально на карточке остаются только те две строки, по которым выбирают: название с
+   * очками и цена с прогрессом. Текст условия и постоянный бонус уезжают в поповер — иначе
+   * четыре проекта съедают треть экрана, которой не хватает рынку. */
+  const portrait = useIsPortrait();
 
   return (
     <button
@@ -201,7 +210,11 @@ const ProjectCard = forwardRef<
       {...rest}
     >
       <span className="flex items-baseline gap-1.5">
-        <b className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[12.5px] font-semibold">
+        <b
+          className={`flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-semibold ${
+            portrait ? "text-[11px]" : "text-[12.5px]"
+          }`}
+        >
           {project.title}
         </b>
         <span className="rounded-[10px] border border-line-2 bg-panel-3 px-1.5 text-[11px]
@@ -257,27 +270,31 @@ const ProjectCard = forwardRef<
         )}
       </span>
 
-      <span
-        className={`overflow-hidden text-ellipsis whitespace-nowrap text-2xs ${
-          met ? "text-good" : "text-ink-muted"
-        }`}
-      >
-        {met ? "✓ " : ""}
-        {projectRequirementText(project, meta)}
-      </span>
+      {!portrait && (
+        <span
+          className={`overflow-hidden text-ellipsis whitespace-nowrap text-2xs ${
+            met ? "text-good" : "text-ink-muted"
+          }`}
+        >
+          {met ? "✓ " : ""}
+          {projectRequirementText(project, meta)}
+        </span>
+      )}
       {/* Постоянный бонус проекта — на лице карточки, а не только в поповере при покупке.
         *
         * Здесь была полоска прогресса, и она дублировала плашку «0/3» справа: то же самое число,
         * той же длины, только без цифр. А единственное, чего на карточке не было вовсе, — то,
         * ради чего половину проектов и берут: перк платит каждый раунд до конца партии, и
         * сравнить два проекта, не видя его, нельзя. */}
-      <span
-        title={perk}
-        className="overflow-hidden text-ellipsis whitespace-nowrap text-2xs leading-none
-          text-[var(--color-badge)]"
-      >
-        {perk === "без постоянного бонуса" ? "только очки" : `⚙ ${perk}`}
-      </span>
+      {!portrait && (
+        <span
+          title={perk}
+          className="overflow-hidden text-ellipsis whitespace-nowrap text-2xs leading-none
+            text-[var(--color-badge)]"
+        >
+          {perk === "без постоянного бонуса" ? "только очки" : `⚙ ${perk}`}
+        </span>
+      )}
     </button>
   );
 });
