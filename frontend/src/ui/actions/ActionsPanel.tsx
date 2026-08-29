@@ -97,7 +97,7 @@ export function ActionsPanel({
      * в ней станет больше. */
     <div
       style={zoneStyle("actions")}
-      className="grid min-h-0 grid-rows-[auto_auto_auto_minmax(0,1fr)_auto_auto] gap-1.5"
+      className="grid min-h-0 min-w-0 grid-rows-[auto_auto_auto_minmax(0,1fr)_auto_auto] gap-1.5"
     >
       <Panel className="pb-2">
         <div className={`flex items-center gap-2 px-0.5 pt-px pb-[2px] ${zoneRule}`}>

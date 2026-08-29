@@ -917,11 +917,6 @@ const forecastLabels: Record<string, string> = {
 // less is the same invisibility bug we fixed on the project board.
 const rolePerkLabels: Record<string, { label: string; unit: string; hint: string }> = {
   capitalist_objects: { label: "Доход с каждого объекта", unit: "$/раунд", hint: "+1$ за каждый ваш активный объект" },
-  capitalist_business_charter: {
-    label: "Условия на Деловой центр",
-    unit: "",
-    hint: "Любое условие проекта, где назван Деловой центр, считается выполненным",
-  },
   capitalist_industrial_influence: {
     label: "Влияние с Промзоны",
     unit: "◆/раунд",

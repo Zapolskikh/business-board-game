@@ -2172,6 +2172,47 @@ def test_the_engine_says_which_powers_are_free_and_which_the_roof_stops() -> Non
     assert set(engine.POWER_BLOCKED_BY_ROOF) <= powers
 
 
+# One word that has to appear in a role's printed ability text for each power it holds. A text is
+# not testable, but "the card does not mention this power at all" is: every drift found in the
+# 1.12.0 role pass was of exactly that shape — a power gained or deleted and the card never touched.
+# Adding a power to ROLE_POWERS fails this test until both the mapping and the text are updated.
+ROLE_POWER_KEYWORDS = {
+    "capitalist_claim": "етк",  # «Поставить метку» / «метка»
+    "politician_cleanup": "Урегулировать",
+    "politician_deal": "Договоримся",
+    "politician_veto": "вето",
+    "journalist_inflate": "Раздуть",
+    "journalist_publish": "Публикация",
+    "fraudster_cleanup": "Очистка следов",
+    "fraudster_crypto_scam": "Криптоскам",
+    "mafia_racket": "Рэкет",
+    "mafia_cleanup": "Замять дело",
+    "mafia_lock": "Серая метка",
+    "military_sanction": "Санкц",
+    "military_inspection": "Проверка",
+    "military_roof_seize": "Отобрать Крышу",
+}
+
+
+def test_every_role_power_is_named_on_the_role_card() -> None:
+    """The card a player reads must list the powers the engine actually gives them.
+
+    Before the 1.12.0 role pass was finished, the Капиталист's card said «активных способностей
+    нет» while `capitalist_claim` existed, the Силовик's still described the mass roof sweep that
+    had been deleted, and the Мафиози's never mentioned `mafia_lock`.
+    """
+    engine = CityEngine()
+    catalog = load_catalog()
+    every_power = {power for group in engine.ROLE_POWERS.values() for power in group}
+
+    assert set(ROLE_POWER_KEYWORDS) == every_power
+
+    for role_id, powers in engine.ROLE_POWERS.items():
+        text = catalog.roles[role_id].power
+        for power in powers:
+            assert ROLE_POWER_KEYWORDS[power] in text, f"{role_id}: карточка не упоминает {power}"
+
+
 def test_the_engine_owns_the_list_of_role_powers() -> None:
     """The clients used to keep their own copy, and it still listed a power deleted in 1.12.0."""
     engine = CityEngine()

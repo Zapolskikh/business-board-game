@@ -47,7 +47,7 @@ export function MarketGrid({
 
       {/* Шесть равных долей: слотов на рынке ровно столько. Два ряда делят высоту секции
         * поровну, и такая же разбивка у города — карточка одинакова до и после покупки. */}
-      <div className="grid min-h-0 grid-cols-3 grid-rows-2 gap-[5px] [perspective:1200px]">
+      <div className="grid min-h-0 min-w-0 grid-cols-3 grid-rows-2 gap-[5px] [perspective:1200px]">
         <AnimatePresence mode="popLayout" initial={false}>
           {game.market.map(item => {
             const asset = assets.get(item.card_id);

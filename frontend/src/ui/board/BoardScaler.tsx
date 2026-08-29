@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 /* Доска фиксированного размера, вписанная в экран масштабированием.
  *
@@ -28,36 +28,54 @@ export const BOARD_HEIGHT = 860;
  * размера плаката: шрифт в 30px и половина экрана под шестью карточками. */
 const MAX_SCALE = 1.35;
 
-function fit(): number {
-  /* Тесты доски рендерятся без окна. Единица — честный ответ: масштаб есть, он просто
-   * никого не сжимает, и раскладка в тестах совпадает с базовой. */
-  if (typeof window === "undefined") return 1;
-  const byWidth = window.innerWidth / BOARD_WIDTH;
-  const byHeight = window.innerHeight / BOARD_HEIGHT;
-  return Math.min(byWidth, byHeight, MAX_SCALE);
-}
-
 export function BoardScaler({ children }: { children: ReactNode }) {
-  const [scale, setScale] = useState(fit);
+  /* Меряем сам контейнер, а не окно.
+   *
+   * Здесь стояло `window.innerWidth / innerHeight`, и на телефоне это другое число:
+   * контейнер живёт в `100dvh`, который учитывает панель вкладок и адресную строку, а
+   * `innerHeight` — нет. Разница выходила около полусотни точек, доска масштабировалась
+   * под несуществующую высоту, и нижний ряд слотов уезжал за край экрана.
+   *
+   * ResizeObserver вдобавок ловит всё, о чём окно не сообщает вовсе: показ и скрытие
+   * панелей Safari при прокрутке, безопасные зоны, смену ориентации до того, как
+   * `resize` отдаст новые размеры. Обратной связи нет — наблюдаемый блок занимает вьюпорт
+   * и от масштаба ребёнка не зависит.
+   */
+  const frame = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState<{ width: number; height: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const node = frame.current;
+    if (!node) return;
+    const measure = () => setBox({ width: node.clientWidth, height: node.clientHeight });
+    measure();
+    /* Тесты доски рендерятся в jsdom без ResizeObserver. Масштаб останется единицей —
+     * честный ответ: он есть, он просто никого не сжимает, и раскладка в тестах совпадает
+     * с базовой. */
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const update = () => setScale(fit());
-    window.addEventListener("resize", update);
-    /* Поворот телефона меняет размеры не сразу: на момент события `resize` браузер
-     * ещё может отдавать старую ориентацию. Отдельная подписка на смену ориентации
-     * с пересчётом после кадра закрывает этот случай. */
+    /* Поворот телефона меняет размеры не сразу: на момент события браузер ещё может
+     * отдавать старую ориентацию, а ResizeObserver в этот момент уже отработал. */
+    const node = frame.current;
+    const onRotate = () =>
+      requestAnimationFrame(() => node && setBox({ width: node.clientWidth, height: node.clientHeight }));
     const orientation = window.screen?.orientation;
-    const onRotate = () => requestAnimationFrame(update);
     orientation?.addEventListener?.("change", onRotate);
-    return () => {
-      window.removeEventListener("resize", update);
-      orientation?.removeEventListener?.("change", onRotate);
-    };
+    return () => orientation?.removeEventListener?.("change", onRotate);
   }, []);
 
+  const scale = box
+    ? Math.min(box.width / BOARD_WIDTH, box.height / BOARD_HEIGHT, MAX_SCALE)
+    : 1;
+
   return (
-    <div className="ui-v2 grid h-dvh w-dvw place-content-center overflow-hidden bg-surface">
+    <div ref={frame} className="ui-v2 grid h-dvh w-dvw place-content-center overflow-hidden bg-surface">
       <div
         style={{
           width: BOARD_WIDTH,
@@ -73,6 +91,10 @@ export function BoardScaler({ children }: { children: ReactNode }) {
            * getBoundingClientRect; под transform эти координаты не совпадают с теми, в
            * которых он считает раскладку, и на каждый кадр уходит лишняя работа с
            * поправками. При zoom измерения совпадают с реальностью.
+           *
+           * Плата за это — мобильный Safari: он раздувает шрифты в широких блоках, а
+           * `zoom` от этого не спасает. Лечится не здесь, а запретом автоувеличения на
+           * `.ui-v2` в theme.css.
            *
            * Поддержка: свойство нестандартное, но работает во всех актуальных браузерах,
            * включая Firefox с 126-й версии. */

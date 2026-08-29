@@ -33,12 +33,12 @@ export const districts: DistrictMeta[] = [
 ];
 
 export const roles: RoleMeta[] = [
-  { id: "capitalist", title: "Капиталист", icon: "💼", color: "#d4af37", passive: "+1◆ за свой объект Промзоны.", power: "Нет активной способности.", districts: ["business"] },
-  { id: "politician", title: "Политик", icon: "🏛️", color: "#4f7de0", passive: "2◆ за каждый административный объект.", power: "Нет активной способности.", districts: ["government"] },
+  { id: "capitalist", title: "Капиталист", icon: "💼", color: "#d4af37", passive: "+1$ за каждый свой объект, +1◆ за объект Промзоны.", power: "Метка на карту рынка.", districts: ["business"] },
+  { id: "politician", title: "Политик", icon: "🏛️", color: "#4f7de0", passive: "+1◆ за каждый жилой объект на столе.", power: "Чистка, Договоримся, Право вето.", districts: ["government"] },
   { id: "journalist", title: "Журналист", icon: "📰", color: "#32a86a", passive: "Рейтинг: +1◆ за свой скандал при жилом объекте.", power: "Раздуть скандал и Публикация.", districts: [] },
-  { id: "fraudster", title: "Аферист", icon: "🎭", color: "#aa68ee", passive: "+30% к шансу серых операций.", power: "Криптоскам: 25% кошельков соперников.", districts: ["shadows"] },
-  { id: "mafia", title: "Мафиози", icon: "🔪", color: "#b84343", passive: "Предел Крыш 3 вместо 2.", power: "Рэкет.", districts: ["shadows"] },
-  { id: "military", title: "Силовик", icon: "⚖️", color: "#70848b", passive: "Читает счётчик скандалов цели.", power: "Санкция и массовая зачистка крыш.", districts: ["government"] },
+  { id: "fraudster", title: "Аферист", icon: "🎭", color: "#aa68ee", passive: "4 действия, +30% к шансу серых операций.", power: "Криптоскам: 25% кошельков соперников.", districts: ["tech"] },
+  { id: "mafia", title: "Мафиози", icon: "🔪", color: "#b84343", passive: "Предел Крыш 2 вместо 1, Крыша дешевле.", power: "Рэкет, Замять дело, Серая метка.", districts: ["shadows"] },
+  { id: "military", title: "Силовик", icon: "⚖️", color: "#70848b", passive: "Читает счётчик скандалов цели.", power: "Санкция, Проверка, Отобрать Крышу.", districts: ["industrial"] },
 ];
 
 export const assets: AssetMeta[] = [

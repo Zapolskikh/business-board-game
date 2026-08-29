@@ -2746,7 +2746,9 @@ class CityEngine:
         rows: list[dict[str, Any]] = []
         if player.role == "capitalist":
             rows.append({"key": "capitalist_objects", "value": len(player.assets), "needs": None})
-            rows.append({"key": "capitalist_business_charter", "value": 1, "needs": None})
+            # Строки чартера здесь больше нет: сам чартер удалён в 1.12.0 вместе с виртуальной
+            # связью с Деловым центром, а перк пережил его и печатал в панели бонус, которого
+            # движок не даёт. Вместо него у роли теперь есть `capitalist_claim`.
             rows.append({"key": "capitalist_industrial_influence", "value": count("industrial"), "needs": "industrial"})
         elif player.role == "politician":
             rows.append(

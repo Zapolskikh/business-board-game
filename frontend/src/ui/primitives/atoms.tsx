@@ -43,7 +43,11 @@ export function Panel({
   return (
     <section
       style={zoneStyle(zone)}
-      className={`rounded-panel border border-line bg-[var(--zone-bg,var(--color-panel))] px-2 py-[7px] ${
+      /* min-w-0 обязателен: панель — элемент сетки, а у элемента сетки минимальная ширина по
+       * умолчанию равна min-content. Стоит одной подписи внутри отказаться сжиматься, и панель
+       * распирает свою колонку и наезжает на соседнюю — ровно это и происходило на телефоне,
+       * когда Safari раздувал шрифты. Теперь распирать нечего: лишнее обрежется многоточием. */
+      className={`min-w-0 rounded-panel border border-line bg-[var(--zone-bg,var(--color-panel))] px-2 py-[7px] ${
         rows ? "grid min-h-0 grid-rows-[auto_minmax(0,1fr)]" : ""
       } ${className}`}
     >

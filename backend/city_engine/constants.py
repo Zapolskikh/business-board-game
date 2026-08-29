@@ -127,7 +127,13 @@ RULES_VERSION = "city-1.13.0"
 # «деньги → очки» family and «Предписание о демонтаже» (takes a development level); the two defence
 # cards now hand out the same Крыша as the third; the two projects that required automation ask for
 # tagged objects instead. The events array is gone from the catalog entirely.
-CONTENT_VERSION = "city-content-2026-08-29b"
+CONTENT_VERSION = "city-content-2026-08-29c"
+# 2026-08-29c: the same pass over the five remaining roles. The Капиталист's card said it had no
+# active ability while `capitalist_claim` existed and still promised the charter deleted in 1.12.0;
+# the Политик's described the housing tax as money and the Спальный as its own quarter, when the
+# role has paid influence off the whole city and owned the Администрация since that same pass; the
+# Аферист's advertised the grey comeback; the Мафиози's never mentioned `mafia_lock`; the Силовик's
+# still described the mass roof sweep, replaced by the inspection and the seizure. No number moved.
 # 2026-08-29b: the journalist's role text finally describes the role. It still promised a rating
 # capped at "2 plus one per housing object" — the ceiling 1.12.0 deleted — and said nothing about
 # the Крыша cancelling «Раздуть историю» outright, which is the single most common thing that

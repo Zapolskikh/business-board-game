@@ -45,7 +45,7 @@ export function CityPanel({
       {/* Панель сразу в полный рост: все шесть слотов занимают своё место с первого раунда,
         * хотя три из них ещё закрыты. Иначе покупка объекта или слота двигала бы всю доску.
         * Разбивка та же, что на рынке. */}
-      <div className="grid min-h-0 grid-cols-3 grid-rows-2 gap-[5px]">
+      <div className="grid min-h-0 min-w-0 grid-cols-3 grid-rows-2 gap-[5px]">
         <AnimatePresence mode="popLayout" initial={false}>
           {me.assets.map(owned => {
             const asset = index.assets.get(owned.card_id);
