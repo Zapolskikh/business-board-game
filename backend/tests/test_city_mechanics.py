@@ -2038,3 +2038,48 @@ def test_project_reroll_is_illegal_without_the_money() -> None:
     assert not any(action["type"] == "reroll_projects" for action in engine.legal_actions(state, player.id))
     with pytest.raises(IllegalActionError):
         run(engine, state, "reroll_projects")
+
+
+def test_every_power_gate_agrees_with_whether_the_power_is_legal() -> None:
+    """`available` is the truth, `gates` is the explanation — this keeps them the same truth.
+
+    `available` runs the power's own candidate commands through the engine, so it cannot be wrong.
+    `gates` restates the requirements in a form a panel can print, and a restatement drifts: the
+    handler gains a condition, the gate does not, and the player is told they can press a button
+    that fails. Every combination below is checked in both directions — an unavailable power must
+    name at least one unmet gate, and an available one must have none.
+    """
+    engine = CityEngine()
+    for role in load_catalog().roles:
+        for scandals, money, influence, roofs, assets in (
+            (0, 0, 0, 0, []),
+            (1, 3, 3, 1, ["cash"]),
+            (2, 30, 20, 1, ["cash", "passport_office", "crypto"]),
+        ):
+            state = make_state(seed=7)
+            player = state.current_player
+            player.role = role
+            player.scandals, player.money, player.influence = scandals, money, influence
+            player.roofs = min(roofs, engine.roof_limit(player))
+            player.capacity = 6
+            for card_id in assets:
+                give_asset(state, player, card_id)
+            rival = rival_of(state, player)
+            rival.scandals = scandals
+            rival.roofs = roofs
+
+            for row in engine.role_power_status(state, player):
+                unmet = [gate for gate in row["gates"] if not gate["met"]]
+                where = f"{role}/{row['power']} scandals={scandals} money={money} inf={influence}"
+                if row["available"]:
+                    assert not unmet, f"{where}: usable but gates say {unmet}"
+                else:
+                    assert unmet, f"{where}: unusable but every gate is met"
+
+
+def test_the_engine_owns_the_list_of_role_powers() -> None:
+    """The clients used to keep their own copy, and it still listed a power deleted in 1.12.0."""
+    engine = CityEngine()
+    assert set(engine.ROLE_POWERS) == set(load_catalog().roles)
+    handled = set(engine.ROLE_POWERS["military"])
+    assert "military_roof_sweep" not in handled

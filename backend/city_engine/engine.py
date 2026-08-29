@@ -2441,6 +2441,141 @@ class CityEngine:
             "projects": self.effect_total(player, "passiveInfluence"),
         }
 
+    # Every active power of every role, in the order the panel should list them. The clients used
+    # to keep their own copy of this list to grey out a power that is not available right now; a
+    # copy of a rule in another language is a copy that drifts, and this one already had the
+    # deleted `military_roof_sweep` in it.
+    ROLE_POWERS = {
+        "capitalist": ("capitalist_claim",),
+        "politician": ("politician_cleanup", "politician_deal", "politician_veto"),
+        "journalist": ("journalist_inflate", "journalist_publish"),
+        "fraudster": ("fraudster_cleanup", "fraudster_crypto_scam"),
+        "mafia": ("mafia_racket", "mafia_cleanup", "mafia_lock"),
+        "military": ("military_sanction", "military_inspection", "military_roof_seize"),
+    }
+
+    # Powers the engine caps at one press a turn, via `_once_per_turn`. Listed so the panel can
+    # say "уже в этом ходу" instead of a blank "недоступна".
+    ONCE_PER_TURN = frozenset(
+        {
+            "journalist_inflate",
+            "journalist_publish",
+            "politician_deal",
+            "mafia_racket",
+            "mafia_lock",
+            "military_sanction",
+            "fraudster_crypto_scam",
+        }
+    )
+
+    # Whether a power consumes one of the turn's actions. Three of them do not, and that is the
+    # whole point of those three, so it cannot be left to a client-side guess.
+    POWER_SPENDS_ACTION = {
+        "journalist_inflate": False,
+        "politician_deal": False,
+        "mafia_lock": False,
+    }
+
+    def role_power_status(self, state: GameState, player: PlayerState) -> list[dict[str, Any]]:
+        """Every power of the player's role: can it be used now, and if not, what is missing.
+
+        Two halves, and they are computed differently on purpose.
+
+        ``available`` is the truth, taken from the engine itself: the power's own candidate
+        commands are run through ``apply`` exactly as ``legal_transitions`` does, so a power is
+        reported usable if and only if it really is. No rule is restated to produce it.
+
+        ``gates`` is the *explanation*, and that part does restate the requirements — there is no
+        way to turn a raised exception into "you need one more object of the Серый сектор" without
+        naming the requirement somewhere. The two are cross-checked by a test: an unavailable power
+        must have at least one unmet gate and an available one must have none, so a gate that
+        drifts away from its handler fails the suite rather than lying to a player.
+
+        Keys, not sentences, like every other engine-to-client vocabulary here.
+        """
+        role = player.role
+        if role is None:
+            return []
+        legal = {
+            self._power_of(command)
+            for action, _ in self.legal_transitions(state, player.id)
+            if action["type"] == "use_role_power"
+            for command in [action["payload"]]
+        }
+        return [
+            {
+                "power": power,
+                "available": power in legal,
+                "spends_action": self.POWER_SPENDS_ACTION.get(power, True),
+                "gates": self._power_gates(state, player, power),
+            }
+            for power in self.ROLE_POWERS.get(role, ())
+        ]
+
+    @staticmethod
+    def _power_of(payload: dict[str, Any]) -> str:
+        return str(payload.get("power", ""))
+
+    def _power_gates(self, state: GameState, player: PlayerState, power: str) -> list[dict[str, Any]]:
+        """The requirements of one power, each with what the player has and what it needs."""
+        rivals = [other for other in state.players if other.id != player.id]
+        gates: list[dict[str, Any]] = []
+
+        def gate(key: str, have: int, needed: int, **extra: Any) -> None:
+            gates.append({"key": key, "have": have, "needed": needed, "met": have >= needed, **extra})
+
+        if self.POWER_SPENDS_ACTION.get(power, True):
+            gate("action", state.actions_left, 1)
+        if power in self.ONCE_PER_TURN:
+            gate("once_per_turn", 0 if self._flag(state, f"used:{power}") else 1, 1)
+
+        if power == "capitalist_claim":
+            gate("market_slot", sum(1 for item in state.market if item.claimed_by != player.id), 1)
+            gate("scandal_room", self.scandal_limit(player) - player.scandals, 1)
+        elif power == "politician_cleanup":
+            gate("influence", player.influence, 2)
+            gate("own_scandal", player.scandals, 1)
+        elif power == "politician_deal":
+            gate("influence", player.influence, POLITICIAN_DEAL_INFLUENCE)
+            gate("district", self.owned_district_count(player, "shadows"), 1, district="shadows")
+            gate("scandal_room", self.scandal_limit(player) - player.scandals, 1)
+        elif power == "politician_veto":
+            gate("influence", player.influence, POLITICIAN_VETO_INFLUENCE)
+            gate(
+                "project_slot",
+                sum(1 for pid in state.project_board if state.project_veto.get(pid) != player.id),
+                1,
+            )
+        elif power == "journalist_inflate":
+            gate("rival", len(rivals), 1)
+            gate("scandal_room", self.scandal_limit(player) - player.scandals, 1)
+        elif power == "journalist_publish":
+            gate("influence", player.influence, 3)
+            gate("rival", len(rivals), 1)
+        elif power == "fraudster_cleanup":
+            gate("own_scandal", player.scandals, 1)
+        elif power == "fraudster_crypto_scam":
+            gate("own_asset", sum(1 for a in player.assets if a.card_id == "crypto"), 1, asset_id="crypto")
+        elif power == "mafia_racket":
+            gate("district", self.owned_district_count(player, "shadows"), 1, district="shadows")
+            gate("rival", len(rivals), 1)
+        elif power == "mafia_cleanup":
+            gate("own_scandal", player.scandals, 1)
+            gate("money", player.money, 3)
+            gate("district", self.district_count(player, "government"), 1, district="government")
+        elif power == "mafia_lock":
+            gate("roof", player.roofs, 1)
+            gate("market_slot", sum(1 for item in state.market if item.locked_by != player.id), 1)
+        elif power == "military_sanction":
+            gate("dirty_rival", sum(1 for other in rivals if other.scandals >= SANCTION_MONEY_TIER), 1)
+        elif power == "military_inspection":
+            gate("grey_rival", len(self.inspection_targets(state, player)), 1)
+        elif power == "military_roof_seize":
+            gate("influence", player.influence, MILITARY_SEIZE_INFLUENCE)
+            gate("roofed_rival", sum(1 for other in rivals if other.roofs > 0), 1)
+            gate("roof_room", self.roof_limit(player) - player.roofs, 1)
+        return gates
+
     def role_perks(self, state: GameState, player: PlayerState) -> list[dict[str, Any]]:
         """What the viewer's role pays right now, and what it would pay with the missing district.
 

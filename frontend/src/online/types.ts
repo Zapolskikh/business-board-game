@@ -26,6 +26,22 @@ export interface OwnedAsset {
   card_id: string;
 }
 
+export interface PowerGate {
+  key: string;
+  have: number;
+  needed: number;
+  met: boolean;
+  district?: string;
+  asset_id?: string;
+}
+
+export interface PowerStatus {
+  power: string;
+  available: boolean;
+  spends_action: boolean;
+  gates: PowerGate[];
+}
+
 export interface HeldCard { uid: string; card_id: string }
 // `price` is the viewer's own price, computed by the engine (discounts are per-player).
 export interface MarketAsset {
@@ -118,6 +134,8 @@ export interface GameState {
   market: MarketAsset[];
   /** Вето политика: id проекта → id игрока, который единственный может его взять. */
   project_veto?: Record<string, string>;
+  /** Статус активных способностей своей роли: доступна ли и чего не хватает. Считает движок. */
+  role_powers?: PowerStatus[];
   project_board: string[];
   // Every perk of the viewer's role: what it pays now, the ceiling, and the district that
   // unlocks the difference. Computed by the engine — the client only prints labels.

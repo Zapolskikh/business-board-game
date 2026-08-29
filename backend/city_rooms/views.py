@@ -116,6 +116,10 @@ def room_view(
     # add. A perk that silently pays less is invisible, which is the bug we fixed on the board.
     if viewer_for_role is not None:
         game["role_perks"] = engine.role_perks(room.game, viewer_for_role)
+        # What each active power needs and what the viewer is missing. The client used to keep its
+        # own list of powers per role — a copy of a rule in another language, which had already
+        # drifted — and it could only print "сейчас недоступна" with no reason attached.
+        game["role_powers"] = engine.role_power_status(room.game, viewer_for_role)
         # The Крыша price grows with the round and the Мафия pays one less. The client kept its
         # own copy of that formula, comment and all, and the comment still described a mechanic
         # deleted in 1.4.0 — so the price ships from the engine instead.

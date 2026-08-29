@@ -1,7 +1,7 @@
-import { powerLabels, rolePerkRows } from "../../online/gameUi";
+import { powerDescriptions, powerGateText, powerLabels, rolePerkRows } from "../../online/gameUi";
 import type { CityMeta, GameState, LegalAction } from "../../online/types";
 import { PopoverBody, PopoverHeader } from "../primitives/CardPopover";
-import { EffectList, ListItem } from "../primitives/atoms";
+import { EffectList } from "../primitives/atoms";
 import { findActions, type ActionContext } from "../lib/actions";
 import type { Indexes } from "../lib/board";
 
@@ -31,10 +31,9 @@ export function RolePowersDetails({
   const perks = rolePerkRows(game, meta);
   // Активные способности: движок присылает те, что доступны сейчас; каталог роли —
   // те, что есть у неё вообще. Показываем всё, доступность — по наличию действия.
-  const available = new Set(
-    findActions(context, "use_role_power").map(action => String(action.payload.power)),
-  );
-  const all = [...new Set([...available, ...(role ? rolePowerIds(role.id) : [])])];
+  /* Список способностей, их цена и то, чего не хватает, приходят из движка: клиент держал
+   * собственную копию каталога ролей, и в ней всё ещё числилась способность, удалённая в 1.12.0. */
+  const statuses = game.role_powers ?? [];
 
   if (!role) {
     return (
@@ -75,21 +74,70 @@ export function RolePowersDetails({
         )}
 
         <p className="mb-1 font-medium text-ink">Активные способности</p>
-        {all.length > 0 ? (
-          <div className="mb-2 grid gap-1">
-            {all.map(power => {
-              const options = findActions(context, "use_role_power", { power });
-              const ready = options.length > 0;
+        {statuses.length > 0 ? (
+          <div className="mb-2 grid gap-1.5">
+            {statuses.map(status => {
+              const options = findActions(context, "use_role_power", { power: status.power });
+              const description = powerDescriptions[status.power];
+              const unmet = status.gates.filter(gate => !gate.met);
+              /* Одна кнопка — сразу применяем; несколько (выбор цели, района, карты) — только
+               * рассказываем, где её нажимают: цель нарисована на своей карточке, и дублировать
+               * её список ещё и здесь значит поддерживать два списка одного и того же. */
+              const single = status.available && options.length === 1;
               return (
-                <ListItem
-                  key={power}
-                  icon="⚡"
-                  title={powerLabels[power] ?? power}
-                  hint={ready ? powerCost[power] ?? "тратит действие · раз в ход" : "сейчас недоступна"}
-                  right={ready ? "применить" : "—"}
-                  disabled={!ready || options.length > 1}
-                  onClick={() => options.length === 1 && onAction(options[0])}
-                />
+                <div
+                  key={status.power}
+                  data-on={status.available || undefined}
+                  className="rounded-md border border-line bg-panel-2 px-2 py-1.5
+                    data-[on]:border-[#2f7a4d]"
+                >
+                  <div className="flex items-baseline gap-1.5">
+                    <b className="flex-1 text-xs font-semibold text-ink">
+                      {powerLabels[status.power] ?? status.power}
+                    </b>
+                    <span
+                      className={`rounded px-1 text-3xs font-semibold ${
+                        status.spends_action
+                          ? "bg-panel-3 text-ink-muted"
+                          : "bg-[#1d3b2a] text-[#7fdaa6]"
+                      }`}
+                    >
+                      {status.spends_action ? "⚡ действие" : "без действия"}
+                    </span>
+                  </div>
+
+                  {description && (
+                    <>
+                      <p className="mt-0.5 text-2xs leading-snug text-ink-muted">{description.what}</p>
+                      <p className="mt-0.5 text-2xs text-[var(--color-badge)]">Цена: {description.cost}</p>
+                    </>
+                  )}
+
+                  {/* Почему нельзя — списком, а не одним «недоступна»: причин обычно несколько,
+                    * и игрок должен видеть все, иначе чинит одну и упирается в следующую. */}
+                  {!status.available && unmet.length > 0 && (
+                    <ul className="mt-1 grid gap-0.5">
+                      {unmet.map(gate => (
+                        <li key={gate.key} className="text-2xs text-bad">
+                          ✕ {powerGateText(gate, meta)}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {status.available && (
+                    <button
+                      type="button"
+                      disabled={!single}
+                      onClick={() => single && onAction(options[0])}
+                      className="mt-1 w-full rounded border border-line bg-panel-3 px-2 py-1
+                        text-2xs font-semibold text-ink enabled:hover:border-accent
+                        disabled:cursor-default disabled:text-ink-muted"
+                    >
+                      {single ? "Применить" : `Доступна · выбор цели: ${options.length}`}
+                    </button>
+                  )}
+                </div>
               );
             })}
             <p className="text-2xs text-ink-dim">
@@ -105,37 +153,3 @@ export function RolePowersDetails({
   );
 }
 
-/* Цена каждой способности одной строкой. Не все они стоят действие, и это ровно та разница,
- * которую игрок должен видеть до нажатия: у мафиози метка стоит Крышу, у политика сделка —
- * влияние и скандал, но ни та, ни другая не съедают ход. */
-const powerCost: Record<string, string> = {
-  capitalist_claim: "действие + скандал · метка одна",
-  mafia_lock: "Крыша, без действия · раз в ход",
-  politician_deal: "3◆ + скандал, без действия · раз в ход",
-  politician_veto: "действие + 3◆ · вето одно",
-  military_inspection: "действие · всем в Сером секторе по скандалу",
-  military_roof_seize: "действие + 3◆ · Крыша не защищает",
-};
-
-/* Каталог способностей по ролям. Дублирует движок, поэтому используется только для того,
- * чтобы показать недоступную сейчас способность серой строкой, — применить её всё равно
- * можно лишь через legal_actions. Расхождение здесь не сломает правила, максимум покажет
- * лишний пункт в справке. */
-function rolePowerIds(role: string): string[] {
-  switch (role) {
-    case "politician":
-      return ["politician_cleanup", "politician_deal", "politician_veto"];
-    case "journalist":
-      return ["journalist_inflate", "journalist_publish"];
-    case "mafia":
-      return ["mafia_racket", "mafia_cleanup", "mafia_lock"];
-    case "military":
-      return ["military_sanction", "military_inspection", "military_roof_seize"];
-    case "capitalist":
-      return ["capitalist_claim"];
-    case "fraudster":
-      return ["fraudster_cleanup", "fraudster_crypto_scam"];
-    default:
-      return [];
-  }
-}
