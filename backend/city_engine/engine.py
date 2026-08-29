@@ -2307,6 +2307,16 @@ class CityEngine:
         """Cards are a blind draw, so the only thing to maintain is a shuffled deck."""
         GameRNG(state.rng).shuffle(state.action_deck)
 
+    def round_pays_out(self, state: GameState) -> bool:
+        """Does the settlement that closes the current round hand anybody anything?
+
+        Everything but the last one does. A settlement is what a player carries *into the next
+        round*, and after the final round there is no next round: see ``settlement_preview`` for
+        why the payout is dropped rather than scored. One definition, read by the preview and by
+        the object attribution that has to agree with it.
+        """
+        return state.round_number < state.max_rounds
+
     def _settle_round(self, state: GameState) -> None:
         incomes, income_sources, influence_sources = self.settlement_preview(state)
         # Keep the exact per-object split used by the settlement. Analytics used to reconstruct
@@ -2314,6 +2324,8 @@ class CityEngine:
         # role or triggers an arrest and the arrest closes the round: object synergy is then paid
         # from the post-command board. Emitting the source rows here makes the settlement event the
         # single source of truth, just like ``income_sources`` already is for the player totals.
+        # Empty on the final round, where nothing is paid: these rows must add back up to the
+        # ``objects`` line of the settlement, and the balance harness fails the run when they do not.
         object_income_sources = {
             player.id: {
                 owned.uid: {
@@ -2323,6 +2335,8 @@ class CityEngine:
                 }
                 for owned in self.effective_assets(player)
             }
+            if self.round_pays_out(state)
+            else {}
             for player in state.players
         }
         for player in state.players:
@@ -2352,6 +2366,8 @@ class CityEngine:
         figure on a player's screen cannot drift from the one that lands in their wallet. Returns
         ``(incomes, income_sources, influence_sources)``; every ``*_sources`` row sums to the change
         that row's player will see, which is what the chronicle relies on.
+
+        On the final round every row but the debt is zero — see the block at the end.
         """
         breakdowns = {player.id: self._income_breakdown(state, player) for player in state.players}
         incomes = {player_id: sum(item.values()) for player_id, item in breakdowns.items()}
@@ -2383,6 +2399,29 @@ class CityEngine:
                 **self.passive_influence_breakdown(state, player),
                 "rating": rating,
             }
+        if not self.round_pays_out(state):
+            # The last round pays nothing. A settlement is the money and influence a player takes
+            # *into the next round*, and after the fifteenth there is no next round: the payout
+            # could only ever be spent through the passive rate (10$ and 3◆ a point), which handed
+            # everybody 3-10 points that no decision at that table could still influence. Measured
+            # across six exported matches it moved every player by 4-7 points and turned a
+            # one-point finish into a tie — a coin toss decided by the size of an engine the score
+            # already pays for through objects and projects.
+            #
+            # The debt row survives on purpose: «Мостовой кредит» takes 10$ now against 4$ at the
+            # end of the round, and dropping the whole settlement would make the last round the one
+            # where the loan is free. What the round owes is still collected; what it would have
+            # earned is not.
+            #
+            # Zeroed here rather than in ``_settle_round`` so that ``round_forecast`` — which is
+            # this same function — shows the player a payout of zero for the whole of the final
+            # round, instead of promising one that will not arrive.
+            incomes = dict.fromkeys(incomes, 0)
+            income_sources = {
+                player_id: {key: (value if key == "debt" else 0) for key, value in row.items()}
+                for player_id, row in income_sources.items()
+            }
+            influence_sources = {player_id: dict.fromkeys(row, 0) for player_id, row in influence_sources.items()}
         return incomes, income_sources, influence_sources
 
     def round_forecast(self, state: GameState, player: PlayerState) -> dict[str, dict[str, int]]:
@@ -2579,6 +2618,14 @@ class CityEngine:
         "mafia_lock": False,
     }
 
+    # Whether the target's Крыша answers for them. Every targeted power is stopped by the token
+    # except the one whose whole job is to take it — a defence that answers the attack on itself
+    # would make that line unreachable. The client used to print "Крыша погасит" next to every
+    # target of every power, including that one, directly under the sentence saying it will not.
+    POWER_BLOCKED_BY_ROOF = {
+        "military_roof_seize": False,
+    }
+
     def role_power_status(self, state: GameState, player: PlayerState) -> list[dict[str, Any]]:
         """Every power of the player's role: can it be used now, and if not, what is missing.
 
@@ -2610,6 +2657,7 @@ class CityEngine:
                 "power": power,
                 "available": power in legal,
                 "spends_action": self.POWER_SPENDS_ACTION.get(power, True),
+                "blocked_by_roof": self.POWER_BLOCKED_BY_ROOF.get(power, True),
                 "gates": self._power_gates(state, player, power),
             }
             for power in self.ROLE_POWERS.get(role, ())

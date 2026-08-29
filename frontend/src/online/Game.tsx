@@ -75,7 +75,7 @@ const rolePowers: Record<string, string[]> = {
 
 const powerDescriptions: Record<string, string> = {
   politician_cleanup: "За 1 действие: потратить 2◆ и снять 1 свой скандал. Ограничения по числу применений нет — только действия.",
-  journalist_inflate: "Действие не расходуется, один раз за ход: вы и выбранный соперник получаете по 1 скандалу. У Журналиста порог сдвинут: роль теряется на 6 скандалах, тюрьма на 7 — у всех остальных на 5 и 6.",
+  journalist_inflate: "Действие не расходуется, один раз за ход: вы и выбранный соперник получаете по 1 скандалу. Крыша цели гасит эффект целиком и тратится — тогда и вашего скандала не будет. У Журналиста порог сдвинут: роль теряется на 6 скандалах, тюрьма на 7 — у всех остальных на 5 и 6.",
   journalist_publish: "Один раз за ход и за 1 действие: потратить 3◆ и дать выбранному сопернику 2 скандала. Крыша цели поглощает публикацию.",
   mafia_racket: "Один раз за ход и за 1 действие: нужен активный объект Серого сектора. Базово отбирает до 2$, сумма растёт от раунда, ваших объектов и лидерства цели; её Крыша отменяет рэкет.",
   mafia_cleanup: "За 1 действие: 3$ и активный административный объект — снять до 2 своих скандалов.",
@@ -444,7 +444,7 @@ function CardDesk({ game, me, cards, legal, buyCard, busy, onAction, onOffer, la
         the campaign action. The draw is blind and costs an action; the discard cushions it. */}
     {/* `card-rule-market` describes the purchase button above it, and the portrait layout hides both
         on the tab that shows only the hand. */}
-    <p className="dim card-rule card-rule-market">За одно действие вы тянете <b>две</b> случайные карты. Розыгрыш бесплатный — одна карта за ход; сброс тоже бесплатный и тоже один за ход. Рука {me.hand?.length ?? 0}/3.</p>
+    <p className="dim card-rule card-rule-market">За одно действие вы тянете <b>две</b> случайные карты, <b>одна покупка за ход</b>. Розыгрыш и сброс бесплатны, не тратят действие и не ограничены. Рука {me.hand?.length ?? 0}/3.</p>
     <div className="action-market"><button className="action-card market-action tone-deal" disabled={busy || !buyCard} onClick={() => buyCard && void onAction(buyCard)} title="Потратить 1 действие, 3$ и 1◆ и вытянуть две случайные карты из колоды (в руке максимум 3)."><strong>Вытянуть 2 карты<em>3$ + 1◆ + действие</em></strong><small>Случайные из колоды ({game.action_deck_count} осталось)</small></button></div>
     <div className="hand-grid">{me.hand?.map(held => {
       const card = cards.get(held.card_id);
@@ -452,7 +452,7 @@ function CardDesk({ game, me, cards, legal, buyCard, busy, onAction, onOffer, la
       const money = convertFor(held.uid, "money");
       const influence = convertFor(held.uid, "influence");
       return <article className={`hand-card tone-${card?.tone}`} key={held.uid}>
-        <button className="action-card" disabled={busy || variants.length === 0} onClick={() => onOffer(`«${card?.title}» — выберите вариант`, variants)} title={`Разыграть бесплатно; разрешена одна карта за ход. ${card?.text ?? ""}`}><strong>{card?.title}<em>{variants.length > 1 ? "выбрать" : "сыграть"}</em></strong><small>{card?.text}</small></button>
+        <button className="action-card" disabled={busy || variants.length === 0} onClick={() => onOffer(`«${card?.title}» — выберите вариант`, variants)} title={`Разыграть бесплатно: действие не тратится, число розыгрышей за ход не ограничено. ${card?.text ?? ""}`}><strong>{card?.title}<em>{variants.length > 1 ? "выбрать" : "сыграть"}</em></strong><small>{card?.text}</small></button>
         <div><button disabled={busy || !money} onClick={() => money && void onAction(money)} title="Удалить карту из руки и сразу получить 2$. Действие не расходуется, но сбросить можно только одну карту за ход.">Продать +2$</button><button disabled={busy || !influence} onClick={() => influence && void onAction(influence)} title="Удалить карту из руки и сразу получить 2◆. Действие не расходуется, но сбросить можно только одну карту за ход.">Сбросить +2◆</button></div>
         {variants.length > 1 && <small className="variant-preview">{variants.slice(0, 2).map(action => actionLabel(action, labelContext)).join(" · ")}</small>}
       </article>;
@@ -699,8 +699,11 @@ function IncomePanel({ game }: { game: GameState }) {
     </li>)}</ul>
     <small className="dim">{hint}</small>
   </div>;
+  // Последний раунд ничего не платит — выплата это то, с чем игрок входит в следующий раунд, а его
+  // нет. Движок отдаёт нули, панель говорит, почему они нули.
+  const lastRound = game.round_number >= game.max_rounds;
   return <div className="income-panel">
-    <h3 className="group-title">📈 Доход за раунд <span className="group-hint">начисляется в конце раунда</span></h3>
+    <h3 className="group-title">📈 Доход за раунд <span className="group-hint">{lastRound ? "последний раунд: выплаты не будет" : "начисляется в конце раунда"}</span></h3>
     <div className="income-columns">
       {column("Деньги", "$", forecast.money, "Постоянные бонусы проектов входят в строку «Проекты».")}
       {column("Влияние", "◆", forecast.influence, "Влияние почти не растёт само: его дают объекты с +◆, проекты и роль Политика.")}

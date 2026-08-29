@@ -42,7 +42,17 @@ SCHEMA_VERSION = 1
 # one card; the asset market rotates its three oldest slots once a round; cards can buy points
 # outright. Snapshots taken under 1.3.x describe a game with different rules, so state validation
 # rejects them — old rooms will not open.
-RULES_VERSION = "city-1.12.0"
+RULES_VERSION = "city-1.13.0"
+# 1.13.0: the settlement that closed the last round is deleted, and one action card may be bought
+# per turn (the cap that used to sit on playing and discarding one).
+#
+# A settlement is what a player carries into the *next* round; after the final round there is none,
+# so the payout could only ever be scored at the passive rate — 3 to 10 points a seat that no
+# decision at that table could still influence, on top of the objects and projects the score
+# already pays for. Six exported matches moved every player by 4-7 points and one one-point finish
+# became a tie. The debt row survives the cut on purpose: «Мостовой кредит» is 10$ now against 4$
+# at the end of the round, and dropping the whole settlement would make the last round the one
+# where the loan is free.
 # 1.12.0: the role pass. Every charter that worked by fiat is replaced by something the table can
 # see and answer, and the two roles that only had passives get a line to press.
 #
@@ -117,7 +127,11 @@ RULES_VERSION = "city-1.12.0"
 # «деньги → очки» family and «Предписание о демонтаже» (takes a development level); the two defence
 # cards now hand out the same Крыша as the third; the two projects that required automation ask for
 # tagged objects instead. The events array is gone from the catalog entirely.
-CONTENT_VERSION = "city-content-2026-08-29a"
+CONTENT_VERSION = "city-content-2026-08-29b"
+# 2026-08-29b: the journalist's role text finally describes the role. It still promised a rating
+# capped at "2 plus one per housing object" — the ceiling 1.12.0 deleted — and said nothing about
+# the Крыша cancelling «Раздуть историю» outright, which is the single most common thing that
+# happens when the power is pressed. No card, price or effect moved.
 # 2026-08-29a: the legendary pass. Four of the eight printed a number and nothing else, so they
 # were replaced by cards that reach a lever no object could touch before: «Маркет-мейкер» re-deals
 # a market slot, «Агломерация» counts a built quarter twice, «Градостроительная хартия» waives one

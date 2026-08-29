@@ -272,9 +272,20 @@ export function numberValue(value: unknown): number {
   return typeof value === "number" ? value : Number(value ?? 0);
 }
 
+/* Присутствие игрока в районе — ровно то, что считает движок (`district_count`): построенные
+ * объекты, район, арендованный «Зонированием» на раунд, и карта рынка, помеченная Капиталистом.
+ * Плюс «Агломерация»: объект с `districtDouble` считает каждый ваш объект своего района за два —
+ * умножается только построенное, аренда и метка не удваиваются.
+ *
+ * Здесь стояли только объекты и зонирование, поэтому карточка печатала «2/4» там, где движок
+ * видел 4/4, и синергия на ней выглядела невключённой ровно тогда, когда она платила. */
 export function districtCount(player: PlayerState, district: string, assets: Map<string, AssetMeta>): number {
-  return player.assets.filter(item => assets.get(item.card_id)?.district === district).length
-    + Number(player.zoning_district === district);
+  const owned = player.assets.filter(item => assets.get(item.card_id)?.district === district).length;
+  const doubles = player.assets.filter(
+    item => assets.get(item.card_id)?.effects?.districtDouble === district,
+  ).length;
+  const marked = player.marked_card_id ? assets.get(player.marked_card_id)?.district === district : false;
+  return owned * (1 + doubles) + Number(player.zoning_district === district) + Number(marked);
 }
 
 // The engine ships the itemised score in `/state` (`score_breakdown`); it is never recomputed
@@ -666,6 +677,11 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       const gained = (playerId: string): number => (influence[playerId]
         ? Object.values(influence[playerId]).reduce<number>((sum, value) => sum + numberValue(value), 0)
         : 0);
+      // После последнего раунда выплаты нет: движок присылает нули, и строка из четырёх «+0$»
+      // читалась бы как сбой, а не как правило.
+      if (numberValue(data.round_number) >= game.max_rounds && ids.every(id => paid(id) === 0 && gained(id) === 0)) {
+        return [txt(`💰 Раунд ${numberValue(data.round_number)} — последний: выплаты за него нет`)];
+      }
       const segments: LogSegment[] = [txt(`💰 Выплаты за раунд ${numberValue(data.round_number)}: `)];
       ids.forEach((playerId, index) => {
         if (index > 0) segments.push(txt(", "));
@@ -1047,20 +1063,47 @@ export function buildGameLogMarkdown(room: RoomView, meta: CityMeta, version: st
 
 // A single bonus line for an object card. `active` → condition met for the owner right now
 // (rendered green).
-export interface AssetEffectLine { text: string; active: boolean; boosted: boolean }
+/* Строка таблицы свойств объекта.
+ *
+ * Две записи одного и того же, потому что мест для него два и они разного размера. `text` —
+ * фраза для поповера, где ширина есть. `short` — ярлык для таблицы свойств на самой карточке:
+ * четыре строки в два столбца, ячейка не переносится и обрезается многоточием, так что «+1$
+ * пока вы „Мафиози“ (синергия сектора)» доезжало на ней до «+1$ пока вы „Ма…». Ярлык — то же
+ * самое в форме «Мафиози +1$»: сначала условие, потом число, без служебных слов.
+ *
+ * Один построитель на обе формы, а не два списка: разъезжаются именно копии. */
+export interface AssetEffectLine { text: string; short: string; active: boolean; boosted: boolean }
 
+/* Профильный район каждой роли: за объект своего района роль доплачивает +1$.
+ *
+ * Совпадает с `supported` в `object_synergy_income`. У Политика это Административный квартал,
+ * а не Спальный — район переехал в 1.12.0 вместе с тем, что жильё теперь платит ему влиянием со
+ * всего города. Здесь оставался старый Спальный, и карточки жилья обещали политику доллар,
+ * которого движок не платил, а на административных объектах строки не было вовсе. */
 const roleDistrictMap: Record<string, string> = {
   capitalist: "business",
-  politician: "residential",
+  politician: "government",
   fraudster: "tech",
   mafia: "shadows",
   military: "industrial",
 };
 
 // Reverse lookup: which role gains the flat +1$ synergy from an object of a given district.
+// Спальный район в этой таблице отсутствует: профильной роли у него нет.
 const districtRoleMap: Record<string, string> = Object.fromEntries(
   Object.entries(roleDistrictMap).map(([role, district]) => [district, role]),
 );
+
+/* Короткие имена районов для ярлыков. Полные названия («Административный квартал») занимают
+ * ячейку целиком и не оставляют места числу, ради которого строка и существует. */
+const districtShort: Record<string, string> = {
+  residential: "Спальный",
+  business: "Деловой",
+  industrial: "Промзона",
+  tech: "Технокластер",
+  government: "Администрация",
+  shadows: "Серый сектор",
+};
 
 /** Build the full, numeric breakdown of an object's bonuses for its card. */
 export function assetEffectLines(
@@ -1074,25 +1117,50 @@ export function assetEffectLines(
   const effects = (asset.effects ?? {}) as Record<string, unknown>;
   const lines: AssetEffectLine[] = [];
   const districtTitle = (id: string): string => meta.districts.find(item => item.id === id)?.title ?? id;
+  const short = (id: string): string => districtShort[id] ?? districtTitle(id);
   const roleTitle = (id: string): string => meta.roles.find(item => item.id === id)?.title ?? id;
   const hasRole = (role: string): boolean => owner.role === role;
-  const hasLink = (district: string): boolean =>
-    districtCount(owner, district, assets) > 0
-    || (district === "business" && hasRole("capitalist"))
-    || (district === "government" && hasRole("politician"));
+  /* Ровно `has_district_link` движка: район засчитывается тому, у кого он есть — построен,
+   * арендован «Зонированием» или помечен меткой Капиталиста. Виртуальные связи Капиталиста с
+   * Деловым центром и Политика с Администрацией удалены в 1.12.0 вместе с чартерами, а здесь
+   * дожили и рисовали галочку у условия, которого движок не засчитывает. */
+  const hasLink = (district: string): boolean => districtCount(owner, district, assets) > 0;
+  const push = (text: string, label: string, active: boolean): void => {
+    lines.push({ text, short: label, active, boosted: false });
+  };
 
   // Generic district + role synergy (only for owned cards, where it is not shown elsewhere).
   if (includeSynergy) {
     const count = districtCount(owner, asset.district, assets);
     const synergy = count >= 4 ? 2 : count >= 2 ? 1 : 0;
     if (synergy > 0) {
-      lines.push({ text: `+${synergy}$ синергия района «${districtTitle(asset.district)}» (${count}/4)`, active: true, boosted: false });
+      push(
+        `+${synergy}$ синергия района «${districtTitle(asset.district)}» (${count}/4)`,
+        `Район ${count}/4: +${synergy}$`,
+        true,
+      );
     }
     // The district's matching role always grants +1$ — shown for every object of that district,
     // active only while you actually hold the role (this is the "sector → role" bonus).
     const synergyRole = districtRoleMap[asset.district];
     if (synergyRole) {
-      lines.push({ text: `+1$ пока вы «${roleTitle(synergyRole)}» (синергия сектора)`, active: hasRole(synergyRole), boosted: false });
+      /* «Мафиози: район +1$», а не «Мафиози +1$»: у двенадцати объектов есть ещё и своя
+       * доплата той же роли, и два одинаковых ярлыка в таблице читались бы как задвоение. */
+      push(
+        `+1$ пока вы «${roleTitle(synergyRole)}» (синергия сектора)`,
+        `${roleTitle(synergyRole)}: район +1$`,
+        hasRole(synergyRole),
+      );
+    }
+    /* Награда за глубину: эпик и легендарка полностью собранного района платят ещё и влиянием.
+     * Справочник обещает, что она «написана на самой карточке» — а на карточке её не было. */
+    const synergyInfluence = numberValue(effects.synergyInfluence);
+    if (synergyInfluence) {
+      push(
+        `+${synergyInfluence}◆/раунд, когда район собран полностью (${count}/4)`,
+        `+${synergyInfluence}◆ при 4/4`,
+        count >= 4,
+      );
     }
   }
 
@@ -1104,7 +1172,15 @@ export function assetEffectLines(
       influenceBonus.district ? `объект «${districtTitle(influenceBonus.district)}»` : "",
       influenceBonus.role ? `роль «${roleTitle(influenceBonus.role)}»` : "",
     ].filter(Boolean).join(" и ");
-    lines.push({ text: `+${influenceBonus.value}◆/раунд${cond ? ` при наличии ${cond}` : ""}`, active: roleOk && districtOk, boosted: false });
+    const label = [
+      influenceBonus.district ? short(influenceBonus.district) : "",
+      influenceBonus.role ? roleTitle(influenceBonus.role) : "",
+    ].filter(Boolean).join(" + ");
+    push(
+      `+${influenceBonus.value}◆/раунд${cond ? ` при наличии ${cond}` : ""}`,
+      label ? `${label}: +${influenceBonus.value}◆` : `+${influenceBonus.value}◆/раунд`,
+      roleOk && districtOk,
+    );
   }
 
   const districtBonus = effects.districtBonus as
@@ -1116,38 +1192,82 @@ export function assetEffectLines(
       const virtual = districtBonus.virtualRole && hasRole(districtBonus.virtualRole) ? 1 : 0;
       const count = Math.max(0, districtCount(owner, districtBonus.district, assets) - adjust + virtual);
       const per = districtBonus.value;
-      lines.push({ text: `+${per}$ за каждый объект «${districtTitle(districtBonus.district)}» · сейчас ${count} → +${per * count}$`, active: count > 0, boosted: false });
+      push(
+        `+${per}$ за каждый объект «${districtTitle(districtBonus.district)}» · сейчас ${count} → +${per * count}$`,
+        `${short(districtBonus.district)} ×${count}: +${per * count}$`,
+        count > 0,
+      );
     } else {
-      lines.push({ text: `+${districtBonus.value}$ при наличии объекта «${districtTitle(districtBonus.district)}»`, active: hasLink(districtBonus.district), boosted: false });
+      push(
+        `+${districtBonus.value}$ при наличии объекта «${districtTitle(districtBonus.district)}»`,
+        `${short(districtBonus.district)} +${districtBonus.value}$`,
+        hasLink(districtBonus.district),
+      );
     }
   }
 
   const roleBonus = effects.roleBonus as { role: string; value: number } | undefined;
   if (roleBonus) {
-    lines.push({ text: `+${roleBonus.value}$ пока вы «${roleTitle(roleBonus.role)}»`, active: hasRole(roleBonus.role), boosted: false });
+    push(
+      `+${roleBonus.value}$ пока вы «${roleTitle(roleBonus.role)}»`,
+      `${roleTitle(roleBonus.role)} +${roleBonus.value}$`,
+      hasRole(roleBonus.role),
+    );
   }
   for (const bonus of (effects.roleBonuses as { role: string; value: number }[] | undefined) ?? []) {
-    lines.push({ text: `+${bonus.value}$ пока вы «${roleTitle(bonus.role)}»`, active: hasRole(bonus.role), boosted: false });
+    push(
+      `+${bonus.value}$ пока вы «${roleTitle(bonus.role)}»`,
+      `${roleTitle(bonus.role)} +${bonus.value}$`,
+      hasRole(bonus.role),
+    );
   }
   for (const link of (effects.districtLinks as { district: string; value: number }[] | undefined) ?? []) {
-    lines.push({ text: `+${link.value}$ при наличии «${districtTitle(link.district)}»`, active: hasLink(link.district), boosted: false });
+    push(
+      `+${link.value}$ при наличии «${districtTitle(link.district)}»`,
+      `${short(link.district)} +${link.value}$`,
+      hasLink(link.district),
+    );
   }
 
+  /* Постоянные способности: полная фраза для поповера, ярлык для ячейки карточки. */
   const passive: [string, string][] = [];
-  if (numberValue(effects.extraActions)) passive.push([`+1 действие в начале хода`, "true"]);
-  if (numberValue(effects.extraInvestmentActions)) passive.push([`+1 инвестиционное действие в начале хода`, "true"]);
-  if (numberValue(effects.turnRoof)) passive.push([`+1 Крыша в начале каждого хода`, "true"]);
-  if (numberValue(effects.roofCapacity)) passive.push([`+${numberValue(effects.roofCapacity)} к пределу Крыш`, "true"]);
-  if (numberValue(effects.scandalReduction)) passive.push([`−${numberValue(effects.scandalReduction)} скандал в начале хода`, "true"]);
-  if (numberValue(effects.greyScandalReduction)) passive.push([`−${numberValue(effects.greyScandalReduction)} скандала от серых операций`, "true"]);
-  if (numberValue(effects.carryAction)) passive.push([`Переносит 1 неистраченное действие на следующий ход`, "true"]);
-  if (numberValue(effects.turnCard)) passive.push([`+1 карта действий в начале хода`, "true"]);
-  if (numberValue(effects.marketRefresh)) passive.push([`Раз в раунд без действия: пересдать карту рынка`, "true"]);
-  if (numberValue(effects.projectWaiver)) passive.push([`Раз за партию: проект без выполнения условия`, "true"]);
+  if (numberValue(effects.extraActions)) passive.push([`+1 действие в начале хода`, `+1 действие/ход`]);
+  if (numberValue(effects.extraInvestmentActions))
+    passive.push([`+1 инвестиционное действие в начале хода`, `+1 инвест. действие`]);
+  if (numberValue(effects.turnRoof)) passive.push([`+1 Крыша в начале каждого хода`, `+1 Крыша/ход`]);
+  if (numberValue(effects.roofCapacity))
+    passive.push([
+      `+${numberValue(effects.roofCapacity)} к пределу Крыш`,
+      `+${numberValue(effects.roofCapacity)} к пределу Крыш`,
+    ]);
+  if (numberValue(effects.scandalReduction))
+    passive.push([
+      `−${numberValue(effects.scandalReduction)} скандал в начале хода`,
+      `−${numberValue(effects.scandalReduction)} скандал/ход`,
+    ]);
+  if (numberValue(effects.greyScandalReduction))
+    passive.push([
+      `−${numberValue(effects.greyScandalReduction)} скандала от серых операций`,
+      `−${numberValue(effects.greyScandalReduction)}⚠ от серых`,
+    ]);
+  if (numberValue(effects.carryAction))
+    passive.push([`Переносит 1 неистраченное действие на следующий ход`, `Перенос действия`]);
+  if (numberValue(effects.turnCard)) passive.push([`+1 карта действий в начале хода`, `+1 карта/ход`]);
+  if (numberValue(effects.marketRefresh))
+    passive.push([`Раз в раунд без действия: пересдать карту рынка`, `Пересдача рынка`]);
+  if (numberValue(effects.projectWaiver))
+    passive.push([`Раз за партию: проект без выполнения условия`, `Проект без условия`]);
   if (typeof effects.districtDouble === "string")
-    passive.push([`Каждый ваш объект «${districtTitle(effects.districtDouble)}» считается за два`, "true"]);
-  if (numberValue(effects.takeoverCompensation)) passive.push([`+${numberValue(effects.takeoverCompensation)}◆, если у вас перехватят роль`, "true"]);
-  for (const [text] of passive) lines.push({ text, active: true, boosted: false });
+    passive.push([
+      `Каждый ваш объект «${districtTitle(effects.districtDouble)}» считается за два`,
+      `${short(effects.districtDouble)} ×2`,
+    ]);
+  if (numberValue(effects.takeoverCompensation))
+    passive.push([
+      `+${numberValue(effects.takeoverCompensation)}◆, если у вас перехватят роль`,
+      `+${numberValue(effects.takeoverCompensation)}◆ за перехват`,
+    ]);
+  for (const [text, label] of passive) push(text, label, true);
 
   const purchase = effects.purchase as
     | { money?: number; influence?: number; roofs?: number; card?: boolean; scandals?: number }
@@ -1159,7 +1279,9 @@ export function assetEffectLines(
     if (purchase.roofs) parts.push(`+${purchase.roofs} Крыша`);
     if (purchase.card) parts.push(`карта действия`);
     if (purchase.scandals) parts.push(`+${purchase.scandals} скандал`);
-    if (parts.length) lines.push({ text: `При покупке: ${parts.join(", ")}`, active: false, boosted: false });
+    // Ярлык без слова «действия»: в ячейке от него остаётся многоточие, а смысл несёт число.
+    const brief = parts.map(part => part.replace(" Крыша", "🛡").replace("карта действия", "карта"));
+    if (parts.length) push(`При покупке: ${parts.join(", ")}`, `Покупка: ${brief.join(", ")}`, false);
   }
 
   return lines;

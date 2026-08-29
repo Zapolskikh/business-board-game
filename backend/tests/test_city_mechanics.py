@@ -423,6 +423,62 @@ def test_journalist_money_doubles_with_a_business_object() -> None:
     assert last.data["income_sources"][journalist.id]["journalist"] == 6
 
 
+def test_the_final_round_pays_no_income_and_no_influence() -> None:
+    """A settlement is what a player carries into the *next* round, and after the last one there is
+    none: the payout could only ever be scored at the passive rate (10$ and 3◆ a point), which
+    handed everybody points that no decision at that table could still change. Across six exported
+    matches it moved every player by 4-7 points and turned a one-point finish into a tie.
+    """
+    engine = CityEngine()
+    state = make_state()
+    for player in state.players:
+        give_asset(state, player, "delivery")
+        player.money = 0
+        player.influence = 0
+
+    incomes, _, _ = engine.settlement_preview(state)
+    assert all(value > 0 for value in incomes.values())  # an ordinary round pays
+
+    state.round_number = state.max_rounds
+    incomes, income_sources, influence_sources = engine.settlement_preview(state)
+    assert incomes == dict.fromkeys(incomes, 0)
+    assert all(sum(row.values()) == 0 for row in income_sources.values())
+    assert all(sum(row.values()) == 0 for row in influence_sources.values())
+    # The forecast is this same function, so the panel promises nothing either.
+    forecast = engine.round_forecast(state, state.current_player)
+    assert forecast["money"]["total"] == 0
+    assert forecast["influence"]["total"] == 0
+
+    for _ in state.players:
+        state = run(engine, state, "end_turn")
+
+    assert state.status == "finished"
+    assert all(player.money == 0 and player.influence == 0 for player in state.players)
+    settled = [event for event in state.event_log if event.type == "round_settled"][-1]
+    # The per-object rows have to add back up to the ``objects`` line, or every income figure the
+    # balance harness prints is fiction.
+    assert settled.data["object_income_sources"] == {player.id: {} for player in state.players}
+
+
+def test_the_final_round_still_collects_the_debt() -> None:
+    """Dropping the whole settlement would make «Мостовой кредит» free money on the last round:
+    10$ now against 4$ that never come due. What the round owes is still collected."""
+    engine = CityEngine()
+    state = make_state()
+    state.round_number = state.max_rounds
+    borrower = state.current_player
+    borrower.money = 10
+    borrower.debt = 4
+
+    for _ in state.players:
+        state = run(engine, state, "end_turn")
+
+    assert state.status == "finished"
+    settled = state.player_by_id(borrower.id)
+    assert settled.money == 6
+    assert settled.debt == 0
+
+
 def test_the_engine_counts_a_project_condition_for_the_player() -> None:
     """Have/needed comes from the engine: 16 tag projects went unused because nobody counted."""
     engine = CityEngine()
@@ -2088,6 +2144,32 @@ def test_every_power_gate_agrees_with_whether_the_power_is_legal() -> None:
                     assert not unmet, f"{where}: usable but gates say {unmet}"
                 else:
                     assert unmet, f"{where}: unusable but every gate is met"
+
+
+def test_the_engine_says_which_powers_are_free_and_which_the_roof_stops() -> None:
+    """Both flags were client-side guesses, and both guessed wrong on the same panel: it printed
+    «тратит действие» over «Раздуть историю», whose only advantage is that it does not, and
+    «Крыша погасит» over «Отобрать Крышу», one line under the sentence saying the roof will not.
+    """
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+
+    player.role = "journalist"
+    rows = {row["power"]: row for row in engine.role_power_status(state, player)}
+    assert rows["journalist_inflate"]["spends_action"] is False
+    assert rows["journalist_publish"]["spends_action"] is True
+    assert rows["journalist_inflate"]["blocked_by_roof"] is True
+
+    player.role = "military"
+    rows = {row["power"]: row for row in engine.role_power_status(state, player)}
+    assert rows["military_roof_seize"]["blocked_by_roof"] is False
+    assert rows["military_sanction"]["blocked_by_roof"] is True
+
+    # Nothing may claim a flag for a power that no longer exists.
+    powers = {power for group in engine.ROLE_POWERS.values() for power in group}
+    assert set(engine.POWER_SPENDS_ACTION) <= powers
+    assert set(engine.POWER_BLOCKED_BY_ROOF) <= powers
 
 
 def test_the_engine_owns_the_list_of_role_powers() -> None:

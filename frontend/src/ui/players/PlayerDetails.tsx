@@ -34,10 +34,16 @@ export function PlayerDetails({
   const targeted: { action: LegalAction; label: string; hint: string }[] = mine
     ? []
     : [
+        /* Тратит ли способность действие, знает движок: у Журналиста «Раздуть историю» не
+         * тратит, и это её единственное преимущество перед «Публикацией». Обе строки печатали
+         * «тратит действие». */
         ...findActions(context, "use_role_power", { target_id: player.id }).map(action => ({
           action,
           label: powerLabels[String(action.payload.power)] ?? String(action.payload.power),
-          hint: "Способность роли · тратит действие",
+          hint: (game.role_powers ?? []).find(item => item.power === action.payload.power)
+            ?.spends_action === false
+            ? "Способность роли · без действия"
+            : "Способность роли · тратит действие",
         })),
         ...findActions(context, "grey_operation", { target_id: player.id }).map(action => ({
           action,
@@ -49,7 +55,8 @@ export function PlayerDetails({
           label: index.cards.get(
             context.me.hand?.find(card => card.uid === action.payload.card_uid)?.card_id ?? "",
           )?.title ?? "Карта",
-          hint: "Карта · бесплатно, одна за ход",
+          // Лимит переехал на покупку в 1.13.0: разыгрывать руку можно как угодно быстро.
+          hint: "Карта · бесплатно, без лимита за ход",
         })),
       ];
 

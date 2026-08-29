@@ -5,6 +5,7 @@ import {
   cleanupPowerFor,
   lobbying,
   patronage,
+  powerDescriptions,
   powerLabels,
   crisisPrInfluence,
 } from "../../online/gameUi";
@@ -297,6 +298,16 @@ function PowerButton({
   const byDistrict = options.length > 0 && options[0].payload.district !== undefined;
   const single = options.length === 1 && options[0].payload.target_id === undefined && !byDistrict;
   const danger = /racket|sanction|scam|inflate|publish|inspection|seize|lock/.test(power);
+  /* Тратит ли способность действие — говорит движок (`spends_action`), а описание и цена лежат
+   * в одном словаре на все панели. Здесь стояли две зашитые строки на всех подряд: «тратит
+   * действие» и «Раз в ход, тратит действие. Крыша цели гасит эффект целиком», из-за чего
+   * бесплатное «Раздуть историю» выглядело так же дорого, как оплачиваемая «Публикация»,
+   * а «Отобрать Крышу», которую Крыша как раз не гасит, обещала обратное. */
+  const status = (game.role_powers ?? []).find(item => item.power === power);
+  const spendsAction = status?.spends_action ?? true;
+  const description = powerDescriptions[power];
+  const costLabel = description?.cost ?? (spendsAction ? "тратит действие" : "без действия");
+  const blockedByRoof = status?.blocked_by_roof ?? true;
 
   if (single || options.length === 0) {
     const state = options[0]
@@ -307,7 +318,7 @@ function PowerButton({
     return (
       <ActionButton
         label={label}
-        cost="тратит действие"
+        cost={spendsAction ? "тратит действие" : "без действия"}
         tone={danger ? "danger" : "plain"}
         state={state}
         onClick={() => state.kind === "ready" && onAction(state.action)}
@@ -363,8 +374,9 @@ function PowerButton({
           <PopoverHeader title={label} subtitle="выберите цель" />
           <PopoverBody>
             <p className="mb-2">
-              Раз в ход, тратит действие. Крыша цели гасит эффект целиком и тратится.
+              {description?.what ?? "Способность применяется к выбранному сопернику."}
             </p>
+            <p className="mb-2 text-[var(--color-badge)]">Цена: {costLabel}</p>
             <div className="grid gap-1">
               {options.map((action, position) => {
                 const target = game.players.find(player => player.id === action.payload.target_id);
@@ -376,7 +388,7 @@ function PowerButton({
                     hint={
                       target
                         ? `⚠${target.scandals}/${target.scandal_limit} · 🛡${target.roofs}${
-                            target.roofs > 0 ? " — Крыша погасит" : ""
+                            target.roofs > 0 && blockedByRoof ? " — Крыша погасит" : ""
                           }`
                         : undefined
                     }
@@ -402,7 +414,9 @@ function PowerButton({
         >
           {label}
         </b>
-        <small className="text-3xs text-ink-muted">выбрать цель ›</small>
+        <small className="text-3xs text-ink-muted">
+          {spendsAction ? "выбрать цель ›" : "без действия · выбрать цель ›"}
+        </small>
       </button>
     </CardPopover>
   );

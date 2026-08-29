@@ -170,8 +170,8 @@ function HandCardDetails({
       <PopoverBody>
         <p className="mb-2 text-ink">{card.text}</p>
         <p className="mb-2">
-          Розыгрыш бесплатный и не тратит действие, но <strong>одна карта за ход</strong>. Сброс тоже
-          бесплатный и тоже один за ход.
+          Розыгрыш и сброс бесплатны и не тратят действие, и <strong>сколько угодно за ход</strong>:
+          лимит стоит на покупке — одна покупка карт за ход.
         </p>
 
         {variants.length > 0 ? (

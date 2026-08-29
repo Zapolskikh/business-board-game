@@ -39,6 +39,8 @@ export interface PowerStatus {
   power: string;
   available: boolean;
   spends_action: boolean;
+  /** Гасит ли Крыша цели этот эффект. Все, кроме «Отобрать Крышу»: она бьёт мимо защиты. */
+  blocked_by_roof: boolean;
   gates: PowerGate[];
 }
 
