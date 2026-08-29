@@ -1,11 +1,15 @@
+import * as Dialog from "@radix-ui/react-dialog";
 import * as Popover from "@radix-ui/react-popover";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { useIsPortrait } from "../lib/layout";
 
 /* Обёртка поповера — единственное место, знающее про Radix.
  *
  * Контент поповеров пишется отдельными компонентами, которые не знают, во что их обернули.
- * Мобильная версия подменит здесь Popover.Content на выезжающий снизу Sheet, и ни один
- * компонент контента при этом не изменится.
+ * Вертикально та же начинка открывается окном по центру экрана — и это не косметика:
+ * поповер привязан к своей карточке, а карточка на телефоне может стоять у самого края,
+ * и половина окна уезжала за экран. По центру помещается всё и всегда, независимо от того,
+ * по какой из шести карточек нажали и открыта ли при этом боковая шторка.
  */
 export function CardPopover({
   children,
@@ -20,6 +24,48 @@ export function CardPopover({
   align?: "start" | "center" | "end";
   label?: string;
 }) {
+  const portrait = useIsPortrait();
+  const [open, setOpen] = useState(false);
+
+  if (portrait) {
+    return (
+      /* Немодально и со своим затемнением — по той же причине, что и у шторок: модальный
+       * Radix запирает указатель на своём слое, а окно открывается и поверх шторки, то есть
+       * слоёв два. Смешивать модальный с немодальным — известный способ получить залипший
+       * `pointer-events: none` на всей странице. */
+      <Dialog.Root open={open} modal={false} onOpenChange={setOpen}>
+        <Dialog.Trigger asChild>{children}</Dialog.Trigger>
+        <Dialog.Portal>
+          {/* Выше шторок (z-50), потому что открывается и поверх них: карточка игрока
+            * лежит в левой шторке, а её подробности должны быть видны целиком. */}
+          {open && (
+            <button
+              type="button"
+              aria-label="Закрыть"
+              onClick={() => setOpen(false)}
+              className="fixed inset-0 z-[60] bg-[#000a]"
+            />
+          )}
+          <Dialog.Content
+            aria-describedby={undefined}
+            className="ui-v2 fixed left-1/2 top-1/2 z-[61] grid max-h-[85dvh] w-[min(94vw,360px)]
+              -translate-x-1/2 -translate-y-1/2 grid-rows-[minmax(0,1fr)_auto] overflow-hidden
+              rounded-[12px] border border-line-2 bg-panel font-sans text-ink
+              shadow-[0_24px_80px_#000c]"
+          >
+            <Dialog.Title className="sr-only">{label ?? "Подробности"}</Dialog.Title>
+            <div className="overflow-auto">{content}</div>
+            {/* Отдельная кнопка, а не только тап мимо окна: мимо окна на телефоне
+              * промахиваются в соседнюю карточку, и вместо закрытия открывается она. */}
+            <Dialog.Close className="border-t border-line px-3 py-2.5 text-center text-xs text-ink-muted">
+              Закрыть
+            </Dialog.Close>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    );
+  }
+
   return (
     <Popover.Root>
       <Popover.Trigger asChild>{children}</Popover.Trigger>

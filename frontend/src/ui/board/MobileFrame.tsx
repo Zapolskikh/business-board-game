@@ -110,6 +110,11 @@ function Sheet({
         <Dialog.Content
           aria-describedby={undefined}
           onOpenAutoFocus={event => event.preventDefault()}
+          /* Шторка закрывается только своими кнопками, затемнением и Esc, но не «нажатием
+           * мимо». Мимо — это в том числе окно с описанием карточки, которое открывается
+           * поверх шторки отдельным слоем: без этого тап по описанию игрока закрывал бы
+           * заодно и список игроков под ним. */
+          onInteractOutside={event => event.preventDefault()}
           className={`ui-v2 fixed inset-y-0 z-50 grid w-[min(88vw,340px)] grid-rows-[auto_minmax(0,1fr)]
             gap-1 border-line bg-surface p-1.5 font-sans text-ink shadow-[0_0_60px_#000c]
             ${side === "left" ? "left-0 border-r" : "right-0 border-l"}`}
