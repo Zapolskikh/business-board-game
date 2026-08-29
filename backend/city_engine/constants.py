@@ -117,7 +117,12 @@ RULES_VERSION = "city-1.12.0"
 # «деньги → очки» family and «Предписание о демонтаже» (takes a development level); the two defence
 # cards now hand out the same Крыша as the third; the two projects that required automation ask for
 # tagged objects instead. The events array is gone from the catalog entirely.
-CONTENT_VERSION = "city-content-2026-08-28b"
+CONTENT_VERSION = "city-content-2026-08-29a"
+# 2026-08-29a: the legendary pass. Four of the eight printed a number and nothing else, so they
+# were replaced by cards that reach a lever no object could touch before: «Маркет-мейкер» re-deals
+# a market slot, «Агломерация» counts a built quarter twice, «Градостроительная хартия» waives one
+# project condition per game, «Лоббистский кабинет» draws a card every turn. The offshore keeps its
+# grey discount and loses the roof capacity it shared with the fortress.
 # 2026-08-28b: non-resource engine projects score two fewer points at the same price; the base
 # roof limit is one (two for the Мафия); the Силовик gains the mass roof-sweep action.
 # 2026-08-28a: 32 action cards. «Заморозка активов» (freeze) and the card that undid it (unblock)
@@ -311,6 +316,15 @@ ACTION_CARD_COST = 3
 # round. Duplicates are fine by design — a card is a blind draw, not a collectible, and seeing the
 # same card twice in fifteen rounds reads as luck rather than repetition.
 ACTION_DECK_COPIES = 2
+# How many cards a hand holds. Reaching the cap is the player's problem, not the engine's: a draw
+# that finds no room is simply lost, which is what makes the «Лоббистский кабинет» a reason to
+# keep spending rather than a reason to hoard.
+HAND_LIMIT = 3
+# One purchase a turn. The cap used to sit on the play and the discard instead, because buying
+# twice and shredding four cards beat the campaign as an influence pump. Capping the supply closes
+# that at the source and leaves a hand the player has already paid for free to spend at any speed —
+# which is what a card layer needs to feel alive rather than rationed.
+CARD_PURCHASE_FLAG = "action_card_bought"
 # What a point costs when a card buys it outright: worse than an object (2$) and much better than a
 # hoarded point (10$), and it needs no slot — which is the whole point. Six slots cap the object
 # channel, so a full tableau had nowhere to put money: two measured matches ended with 248$ and 864$

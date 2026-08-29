@@ -29,6 +29,7 @@ export function MarketCardDetails({
   onBuy,
   mark,
   onMark,
+  refresh,
 }: {
   item: MarketAsset;
   asset: AssetMeta;
@@ -40,6 +41,7 @@ export function MarketCardDetails({
   onBuy: () => void;
   mark?: LegalAction;
   onMark: (action: LegalAction) => void;
+  refresh?: LegalAction;
 }) {
   const owned = district ? districtCount(me, district.id, assets) : 0;
   const points = assetPoints(asset);
@@ -114,6 +116,17 @@ export function MarketCardDetails({
             {mark.payload.power === "mafia_lock"
               ? "🔒 Серая метка — закрыть слот всем, кроме себя (Крыша)"
               : "🏷️ Метка — карта работает на вас (действие + скандал)"}
+          </button>
+        )}
+        {/* Пересдача стоит рядом с покупкой не случайно: это второй ответ на тот же
+          * вопрос «что делать с этим слотом» — и единственный способ снять чужую серую метку. */}
+        {refresh && (
+          <button
+            onClick={() => onMark(refresh)}
+            className="mb-1 rounded-md border border-line bg-panel-2 px-2 py-2 text-center text-xs
+              font-semibold hover:border-accent"
+          >
+            🔁 Пересдать слот — раз в раунд, без действия
           </button>
         )}
         <button

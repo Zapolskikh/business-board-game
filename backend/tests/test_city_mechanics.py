@@ -174,7 +174,13 @@ def test_point_cards_are_a_better_rate_than_the_always_available_patronage() -> 
     assert price / card.value < PATRONAGE_MONEY / PATRONAGE_POINTS
 
 
-def test_only_one_card_may_be_discarded_per_turn() -> None:
+def test_the_hand_may_be_spent_at_any_speed_but_bought_once_a_turn() -> None:
+    """The turn cap sits on the supply, not on what a player already paid for.
+
+    Shredding two cards in one turn used to be a better influence pump than the campaign action.
+    That is closed by capping the purchase instead, which leaves the hand free to move — the thing
+    that made the card layer feel rationed rather than alive.
+    """
     engine = CityEngine()
     state = make_state()
     player = state.current_player
@@ -182,13 +188,16 @@ def test_only_one_card_may_be_discarded_per_turn() -> None:
     second = give_card(state, player, "bailout")
 
     state = run(engine, state, "convert_action_card", {"card_uid": first.uid, "into": "influence"})
+    state = run(engine, state, "convert_action_card", {"card_uid": second.uid, "into": "influence"})
+    assert state.current_player.hand == []
 
-    # A purchase draws two cards and the discard costs no action, so shredding both in one turn
-    # made the blind draw a better influence pump than the campaign action it competes with.
+    state.current_player.money = 50
+    state.current_player.influence = 50
+    state = run(engine, state, "buy_action_card", {})
     legal = engine.legal_actions(state, state.current_player.id)
-    assert not any(action["type"] == "convert_action_card" for action in legal)
+    assert not any(action["type"] == "buy_action_card" for action in legal)
     with pytest.raises(IllegalActionError):
-        run(engine, state, "convert_action_card", {"card_uid": second.uid, "into": "influence"})
+        run(engine, state, "buy_action_card", {})
 
 
 def test_project_requirement_progress_gives_partial_credit() -> None:
@@ -304,18 +313,21 @@ def test_targeted_card_hits_target_without_roof() -> None:
     assert state.player_by_id(target.id).scandals > 0
 
 
-def test_deal_cards_apply_discounts_and_only_one_card_per_turn() -> None:
+def test_deal_cards_apply_discounts_and_may_be_chained_in_one_turn() -> None:
     engine = CityEngine()
     state = make_state()
     player = state.current_player
     subsidy = give_card(state, player, "market_subsidy")
-    give_card(state, player, "grant")
+    grant = give_card(state, player, "grant")
     original_price = engine.asset_price(state, player, state.market[0].card_id)
 
     state = run(engine, state, "play_action_card", {"card_uid": subsidy.uid})
     assert engine.asset_price(state, state.current_player, state.market[0].card_id) == max(1, original_price - 4)
-    legal = engine.legal_actions(state, state.current_player.id)
-    assert not any(action["type"] == "play_action_card" for action in legal)
+
+    # The second card goes down in the same turn: playing costs no action, and the cap that used
+    # to sit here moved to the purchase.
+    state = run(engine, state, "play_action_card", {"card_uid": grant.uid})
+    assert state.current_player.hand == []
 
 
 def test_a_vote_of_no_confidence_that_takes_a_role_says_so() -> None:
@@ -364,7 +376,9 @@ def test_sixth_scandal_jails_the_actor_and_burns_the_rest_of_the_turn() -> None:
     # A double-scandal card charges the attacker one scandal before the target is touched.
     held = give_card(state, actor, "controlled_leak")
     actor.scandals = 5
-    give_asset(state, actor, "mayor_secretariat")  # carryAction must not rescue the lost actions
+    # A banked action must not survive the arrest. Nothing in the catalog grants `carryAction`
+    # since «Секретариат мэра» left, so the guard is set up by hand rather than by an object.
+    actor.banked_actions = 1
 
     state = run(engine, state, "play_action_card", {"card_uid": held.uid, "target_id": target.id})
 
@@ -1305,7 +1319,6 @@ def test_every_action_card_has_a_working_engine_path(card_id: str) -> None:
 
     next_state = run(engine, state, "play_action_card", payload)
     assert held.uid not in {item.uid for item in next_state.current_player.hand}
-    assert next_state.turn_flags["card_played"] is True
 
 
 def test_the_relief_card_pays_in_slots_because_money_cannot_buy_the_scarce_half() -> None:

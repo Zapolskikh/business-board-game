@@ -33,6 +33,7 @@ export function MarketCard({
   onBuy,
   mark,
   onMark,
+  refresh,
 }: {
   item: MarketAsset;
   asset: AssetMeta;
@@ -45,6 +46,8 @@ export function MarketCard({
   /** Метка роли на этот слот, если движок её сейчас разрешает: капиталист или мафиози. */
   mark?: LegalAction;
   onMark: (action: LegalAction) => void;
+  /** Пересдача слота «Маркет-мейкером» — тоже только когда движок её предлагает. */
+  refresh?: LegalAction;
 }) {
   const owned = district ? districtCount(me, district.id, assets) : 0;
   // Обе метки публичны по правилам, поэтому рисуются на лице карточки, а не в поповере:
@@ -72,6 +75,7 @@ export function MarketCard({
           onBuy={onBuy}
           mark={mark}
           onMark={onMark}
+          refresh={refresh}
         />
       }
     >

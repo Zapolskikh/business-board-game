@@ -77,6 +77,9 @@ export function MarketGrid({
                     action => action.type === "use_role_power" && action.payload.market_uid === item.uid,
                   )}
                   onMark={onBuy}
+                  refresh={legal.find(
+                    action => action.type === "market_refresh" && action.payload.market_uid === item.uid,
+                  )}
                 />
               </motion.div>
             );

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "content_version": "city-content-2026-08-28b",
+  "content_version": "city-content-2026-08-29a",
   "districts": [
     {
       "id": "residential",
@@ -221,21 +221,19 @@
       }
     },
     {
-      "id": "urban_ecosystem",
-      "title": "Городская экосистема",
+      "id": "agglomeration",
+      "title": "Агломерация",
       "district": "residential",
       "rarity": "legendary",
       "cost": 16,
       "income": 2,
       "influence": 1,
-      "text": "+2◆ за раунд. Синергия 4+: +1◆ каждый раунд.",
+      "text": "Каждый ваш объект Спального района считается за два: в глубине района, в условиях проектов и в синергии. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "infrastructure"
       ],
       "effects": {
-        "influenceBonus": {
-          "value": 2
-        },
+        "districtDouble": "residential",
         "synergyInfluence": 1
       }
     },
@@ -352,21 +350,19 @@
       }
     },
     {
-      "id": "global_exchange",
-      "title": "Международная фондовая биржа",
+      "id": "market_maker",
+      "title": "Маркет-мейкер",
       "district": "business",
       "rarity": "legendary",
-      "cost": 18,
-      "income": 1,
-      "influence": 2,
-      "text": "+2◆ за раунд. Синергия 4+: +1◆ каждый раунд.",
+      "cost": 17,
+      "income": 2,
+      "influence": 1,
+      "text": "Раз в раунд, без действия: сбросить одну карту рынка и выложить ей замену. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "finance"
       ],
       "effects": {
-        "influenceBonus": {
-          "value": 2
-        },
+        "marketRefresh": 1,
         "synergyInfluence": 1
       }
     },
@@ -742,19 +738,19 @@
       }
     },
     {
-      "id": "mayor_secretariat",
-      "title": "Секретариат мэра",
+      "id": "planning_charter",
+      "title": "Градостроительная хартия",
       "district": "government",
       "rarity": "legendary",
       "cost": 16,
       "income": 1,
       "influence": 2,
-      "text": "Пассив: одно неиспользованное действие сохраняется и переносится на следующий ход. Синергия 4+: +1◆ каждый раунд.",
+      "text": "Один раз за партию: взять городской проект, не выполнив его условие. Цена проекта и действие остаются. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "government"
       ],
       "effects": {
-        "carryAction": 1,
+        "projectWaiver": 1,
         "synergyInfluence": 1
       }
     },
@@ -884,15 +880,14 @@
       "district": "shadows",
       "rarity": "legendary",
       "cost": 15,
-      "income": 0,
-      "influence": 1,
-      "text": "Не приносит базовый доход; серые операции дают на 1 скандал меньше, лимит Крыш увеличен на 1. Синергия 4+: +1◆ каждый раунд.",
+      "income": 1,
+      "influence": 2,
+      "text": "Серые операции дают на 1 скандал меньше. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "grey"
       ],
       "effects": {
         "greyScandalReduction": 1,
-        "roofCapacity": 1,
         "synergyInfluence": 1
       }
     },
@@ -1064,41 +1059,20 @@
       }
     },
     {
-      "id": "conglomerate_hq",
-      "title": "Штаб-квартира конгломерата",
+      "id": "lobby_office",
+      "title": "Лоббистский кабинет",
       "district": "business",
       "rarity": "legendary",
-      "cost": 17,
+      "cost": 18,
       "income": 1,
-      "influence": 2,
-      "text": "+1$ за каждый район, где у вас есть объект: Спальный, Промзона, Технокластер, Административный, Серый сектор. Синергия 4+: +1◆ каждый раунд.",
+      "influence": 1,
+      "text": "В начале каждого хода вы тянете карту действий. Если рука полна, карта не приходит. Синергия 4+: +1◆ каждый раунд.",
       "tags": [
         "finance",
-        "infrastructure"
+        "politics"
       ],
       "effects": {
-        "districtLinks": [
-          {
-            "district": "residential",
-            "value": 1
-          },
-          {
-            "district": "industrial",
-            "value": 1
-          },
-          {
-            "district": "tech",
-            "value": 1
-          },
-          {
-            "district": "government",
-            "value": 1
-          },
-          {
-            "district": "shadows",
-            "value": 1
-          }
-        ],
+        "turnCard": 1,
         "synergyInfluence": 1
       }
     },

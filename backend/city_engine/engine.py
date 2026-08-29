@@ -17,6 +17,7 @@ from city_engine.constants import (
     CAMPAIGN_TIERS,
     CAPACITY_COSTS,
     CARD_DISCARD_VALUE,
+    CARD_PURCHASE_FLAG,
     CASH_TO_INFLUENCE_MONEY,
     CONSEQUENCE_EVENTS,
     CRISIS_PR_INFLUENCE,
@@ -30,6 +31,7 @@ from city_engine.constants import (
     GREY_OPERATION_POINTS,
     GREY_SUCCESS_SCANDALS,
     HACK_INFLUENCE_BASE,
+    HAND_LIMIT,
     INFLUENCE_PER_POINT,
     JOURNALIST_SCANDAL_LIMIT,
     LOBBYING_INFLUENCE,
@@ -85,6 +87,7 @@ class CityEngine:
             "buy_asset": self._buy_asset,
             "reroll_projects": self._reroll_projects,
             "sell_asset": self._sell_asset,
+            "market_refresh": self._market_refresh,
             "crisis_pr": self._crisis_pr,
             "buy_action_card": self._buy_action_card,
             "convert_action_card": self._convert_action_card,
@@ -198,6 +201,18 @@ class CityEngine:
                 Command(type="city_project", actor_id=actor_id, payload={"project_id": project_id})
                 for project_id in state.project_board
             )
+            # The charter is a separate offer rather than a fallback inside the ordinary one: it is
+            # worth exactly one project per game, so taking it has to be a choice the player sees.
+            if not player.project_waiver_used and self.effect_total(player, "projectWaiver") > 0:
+                candidates.extend(
+                    Command(
+                        type="city_project",
+                        actor_id=actor_id,
+                        payload={"project_id": project_id, "use_waiver": True},
+                    )
+                    for project_id in state.project_board
+                    if not self.project_requirement_met(player, self.project(project_id))
+                )
             if player.roofs < self.roof_limit(player) and player.money >= self.roof_price(state, player):
                 candidates.append(Command(type="buy_roof", actor_id=actor_id))
             if player.influence >= CRISIS_PR_INFLUENCE and player.scandals > 0:
@@ -228,22 +243,33 @@ class CityEngine:
         for owned in player.assets:
             # Selling costs no action, so it stays available with an empty counter — see _sell_asset.
             candidates.append(Command(type="sell_asset", actor_id=actor_id, payload={"asset_uid": owned.uid}))
+        # The re-deal costs no action either, so it too survives an empty counter.
+        if self.market_refresh_available(state, player) and state.market_deck:
+            candidates.extend(
+                Command(type="market_refresh", actor_id=actor_id, payload={"market_uid": item.uid})
+                for item in state.market
+            )
         # The project re-deal spends an action now, so unlike the market reroll it disappears once
         # the turn is out of actions.
         if can_act and player.money >= PROJECT_REROLL_MONEY and state.project_deck:
             candidates.append(Command(type="reroll_projects", actor_id=actor_id))
-        if can_act and player.money >= ACTION_CARD_COST and player.influence >= 1 and len(player.hand) < 3:
+        if (
+            can_act
+            and not self._flag(state, CARD_PURCHASE_FLAG)
+            and player.money >= ACTION_CARD_COST
+            and player.influence >= 1
+            and len(player.hand) < HAND_LIMIT
+        ):
             candidates.append(Command(type="buy_action_card", actor_id=actor_id))
         for held in player.hand:
-            if not self._flag(state, "card_converted"):
-                candidates.extend(
-                    Command(
-                        type="convert_action_card",
-                        actor_id=actor_id,
-                        payload={"card_uid": held.uid, "into": into},
-                    )
-                    for into in ("money", "influence")
+            candidates.extend(
+                Command(
+                    type="convert_action_card",
+                    actor_id=actor_id,
+                    payload={"card_uid": held.uid, "into": into},
                 )
+                for into in ("money", "influence")
+            )
             card = self.action_card(held.card_id)
             if card.targeted:
                 candidates.extend(
@@ -611,8 +637,27 @@ class CityEngine:
         round with a card, so every one of them counts through here. Grey unlocks, project
         conditions and object synergy go through ``district_count`` instead, which is the one that
         honours the card.
+
+        ``districtDouble`` is the exception that counts a real object twice. It is deliberately
+        applied here rather than in ``district_count``: the whole point of the «Агломерация» is
+        that the doubled quarter is *built*, so it has to reach the role passives too — and it must
+        not multiply a district the player merely rented with «Зонирование».
         """
-        return sum(self.owned_definition(asset).district == district for asset in player.assets)
+        objects = sum(self.owned_definition(asset).district == district for asset in player.assets)
+        return objects * (1 + self.district_multiplier(player, district))
+
+    def district_multiplier(self, player: PlayerState, district: str) -> int:
+        """Extra copies each built object of this district is counted as. Zero for everybody else.
+
+        Read off the portfolio directly rather than through ``effect_total``, because the value is
+        a district name and not a number, and because the object granting it must be standing: a
+        marked market card does not multiply what the player owns.
+        """
+        return sum(
+            1
+            for asset in player.assets
+            if str(self.owned_definition(asset).effects.get("districtDouble", "")) == district
+        )
 
     def effect_total(self, player: PlayerState, key: str) -> int:
         """Passive bonuses from objects and from completed projects share one vocabulary.
@@ -785,9 +830,21 @@ class CityEngine:
         cost_influence, cost_money = self.project_cost(player, project)
         if player.influence < cost_influence or player.money < cost_money:
             raise IllegalActionError("not enough resources for the project")
+        waived = False
         if not self.project_requirement_met(player, project):
-            raise IllegalActionError("the project condition is not met")
+            # «Городской устав»: once a game, the condition is waived — the price is not. Taking a
+            # project is three separate gates (the money, the built city, the action) and letting
+            # one card open all three would hand out seven points for owning it. The waiver is
+            # explicit in the payload rather than automatic: it is worth one project in the whole
+            # game, and the engine must not spend it on the first condition a player happens to miss.
+            if not command.payload.get("use_waiver"):
+                raise IllegalActionError("the project condition is not met")
+            if player.project_waiver_used or self.effect_total(player, "projectWaiver") < 1:
+                raise IllegalActionError("there is no city charter to waive the condition")
+            waived = True
         self._spend_action(state)
+        if waived:
+            player.project_waiver_used = True
         player.influence -= cost_influence
         player.money -= cost_money
         player.projects.append(project_id)
@@ -801,6 +858,7 @@ class CityEngine:
             points=project.points,
             cost_influence=cost_influence,
             cost_money=cost_money,
+            waived=waived,
         )
 
     def _refill_project_board(self, state: GameState) -> None:
@@ -984,7 +1042,7 @@ class CityEngine:
         player.influence += int(purchase.get("influence", 0))
         if purchase.get("roofs"):
             player.roofs = min(self.roof_limit(player), player.roofs + int(purchase["roofs"]))
-        if purchase.get("card") and len(player.hand) < 3:
+        if purchase.get("card") and len(player.hand) < HAND_LIMIT:
             drawn = self._draw_action_card(state, player)
             if drawn:
                 state.append_event(
@@ -1051,7 +1109,7 @@ class CityEngine:
         state.append_event("crisis_pr", player.id, cost=CRISIS_PR_INFLUENCE, scandals=player.scandals)
 
     def _draw_action_card(self, state: GameState, player: PlayerState) -> HeldCard | None:
-        if len(player.hand) >= 3 or not state.action_deck:
+        if len(player.hand) >= HAND_LIMIT or not state.action_deck:
             return None
         card_id = state.action_deck.pop(0)
         # The deck holds duplicates, so the card id alone no longer identifies a card in hand — two
@@ -1062,21 +1120,28 @@ class CityEngine:
         return held
 
     def _buy_action_card(self, state: GameState, command: Command) -> None:
-        """A blind draw for an action.
+        """A blind draw for an action, once a turn.
 
         Cards used to be a face-up market bought without spending an action, which made buying
         the influence card strictly better than the campaign action — 5$ into 3◆ for free while
         the basic action gave 2◆ and ate a turn slot. Now the card is random and costs the action,
         so it competes honestly, and a bad draw is cushioned by a stronger discard.
+
+        The turn cap moved here from the play and the discard. Those two were capped because
+        buying twice and shredding everything was a better influence pump than the campaign; the
+        cap on the *supply* closes that without freezing the hand a player already paid for.
         """
         player = state.current_player
-        if len(player.hand) >= 3:
+        if self._flag(state, CARD_PURCHASE_FLAG):
+            raise IllegalActionError("only one action-card purchase per turn")
+        if len(player.hand) >= HAND_LIMIT:
             raise IllegalActionError("action-card hand limit reached")
         if player.money < ACTION_CARD_COST or player.influence < 1:
             raise IllegalActionError(f"an action card requires {ACTION_CARD_COST} money and 1 influence")
         if not state.action_deck:
             raise IllegalActionError("the action deck is empty")
         self._spend_action(state)
+        self._mark_flag(state, CARD_PURCHASE_FLAG)
         player.money -= ACTION_CARD_COST
         player.influence -= 1
         # Two cards, because one blind card never beat a project for the same action: the whole
@@ -1091,18 +1156,14 @@ class CityEngine:
         )
 
     def _convert_action_card(self, state: GameState, command: Command) -> None:
-        """Discard one card for a consolation unit — once a turn, like playing one.
+        """Discard one card for a consolation unit. No action, no turn cap.
 
-        A purchase draws two cards and a discard costs no action, so shredding both in the same
-        turn turned the blind draw into the best influence pump in the game: 3$ and one action
-        for +4◆, against +2◆ for the campaign that is supposed to be the influence action. Bots
-        found it and bought cards they never intended to read. Capping it at one a turn — the
-        same rule the card play already follows — leaves the discard as the cushion for a bad
-        draw it was meant to be, without touching what a card is worth.
+        The cap used to live here: a purchase draws two cards and a discard costs no action, so
+        shredding both in one turn turned the blind draw into the best influence pump in the game.
+        That is now closed at the source — one purchase a turn — and the hand a player already
+        paid for is theirs to spend at whatever speed they like.
         """
         player = state.current_player
-        if self._flag(state, "card_converted"):
-            raise IllegalActionError("only one action card may be discarded per turn")
         card_uid = self._payload_string(command, "card_uid")
         into = self._payload_string(command, "into")
         if into not in {"money", "influence"}:
@@ -1110,7 +1171,6 @@ class CityEngine:
         held = next((card for card in player.hand if card.uid == card_uid), None)
         if held is None:
             raise IllegalActionError("action card is not in the player's hand")
-        self._mark_flag(state, "card_converted")
         player.hand.remove(held)
         # Softens a blind draw: returning a single unit made the discard a pure loss on a card
         # that cost 3$ and 1◆, so nobody ever used it on purpose.
@@ -1128,8 +1188,6 @@ class CityEngine:
         held = next((card for card in player.hand if card.uid == card_uid), None)
         if held is None:
             raise IllegalActionError("action card is not in the player's hand")
-        if self._flag(state, "card_played"):
-            raise IllegalActionError("only one action card may be played per turn")
         card = self.action_card(held.card_id)
         target: PlayerState | None = None
         if card.targeted:
@@ -1143,7 +1201,6 @@ class CityEngine:
         self._validate_card_costs(state, player, card, command)
 
         player.hand.remove(held)
-        self._mark_flag(state, "card_played")
         before = self._resource_snapshot(state)
         if card.targeted and target is not None:
             if target.id == player.id:
@@ -2156,6 +2213,12 @@ class CityEngine:
         bonus = min(1, self.effect_total(player, "extraActions"))
         state.actions_left = base_actions + (0 if jailed else bonus + player.banked_actions)
         player.banked_actions = 0
+        # «Лоббистский кабинет». Переполненная рука теряет добор молча — это и есть цена
+        # карты: она платит тому, кто разыгрывает, а не тому, кто копит.
+        if not jailed and self.effect_total(player, "turnCard"):
+            drawn = self._draw_action_card(state, player)
+            if drawn:
+                state.append_event("free_action_card_drawn", player.id, card_id=drawn.card_id)
         state.turn_flags = {}
         state.append_event(
             "turn_started",
@@ -2199,6 +2262,46 @@ class CityEngine:
                 remaining.append(card_id)
         state.market_deck = remaining
         state.market.extend(MarketAsset(uid=f"asset:{card_id}", card_id=card_id) for card_id in drawn)
+
+    def market_refresh_available(self, state: GameState, player: PlayerState) -> bool:
+        """Can this player still re-deal a market slot this round?
+
+        Round-scoped rather than turn-scoped: at one a turn the «Маркет-мейкер» would cycle the
+        whole board over a circle and nobody could plan a purchase two turns ahead, which is the
+        rotation rule's entire job.
+        """
+        return self.effect_total(player, "marketRefresh") > 0 and player.market_refresh_round < state.round_number
+
+    def _market_refresh(self, state: GameState, command: Command) -> None:
+        """«Маркет-мейкер»: send one market slot to the bottom of the deck and deal its replacement.
+
+        Costs no action on purpose. What it really spends is the card's own opportunity: a slot
+        re-dealt is a slot nobody at the table can plan around any more, and the player using it
+        loses the same visibility. Marks come off with the slot, exactly as they do on rotation —
+        so this is also the one answer the table has to a grey mark it cannot outwait.
+        """
+        player = state.current_player
+        if self.effect_total(player, "marketRefresh") < 1:
+            raise IllegalActionError("no object grants a market re-deal")
+        if player.market_refresh_round >= state.round_number:
+            raise IllegalActionError("the market has already been re-dealt this round")
+        market_uid = self._payload_string(command, "market_uid")
+        item = next((entry for entry in state.market if entry.uid == market_uid), None)
+        if item is None:
+            raise IllegalActionError("this card is not on the market")
+        if not state.market_deck:
+            raise IllegalActionError("the market deck is empty")
+        player.market_refresh_round = state.round_number
+        self._drop_market_marks(state, item)
+        state.market = [entry for entry in state.market if entry.uid != item.uid]
+        state.market_deck.append(item.card_id)
+        self._refill_market(state, 1)
+        state.append_event(
+            "market_refreshed",
+            player.id,
+            market_uid=item.uid,
+            asset_id=item.card_id,
+        )
 
     def _shuffle_action_deck(self, state: GameState) -> None:
         """Cards are a blind draw, so the only thing to maintain is a shuffled deck."""

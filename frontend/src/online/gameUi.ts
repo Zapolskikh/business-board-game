@@ -475,9 +475,12 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
   if (action.type === "end_turn") return "Завершить ход";
   if (action.type === "reroll_projects") return `Пересобрать доску проектов (${projectRerollMoney(meta)}$ + действие)`;
   if (action.type === "city_project") {
+    // Хартия снимает требования проекта, но один раз за партию, и об этом нужно
+    // предупредить до клика: обратно право не вернуть.
+    const waiver = payload.use_waiver === true ? " · по Хартии, без требований" : "";
     return project
-      ? `«${project.title}» · ${project.cost_influence}◆+${project.cost_money}$ → ${project.points} очков`
-      : "Городской проект";
+      ? `«${project.title}» · ${project.cost_influence}◆+${project.cost_money}$ → ${project.points} очков${waiver}`
+      : `Городской проект${waiver}`;
   }
   if (action.type === "buy_capacity") return capacityLabel(player);
   if (action.type === "buy_roof") return `Купить Крышу (${roofCost(player, game)}$)`;
@@ -493,6 +496,10 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
     const asset = assets.get(owned?.card_id ?? "");
     const points = asset ? assetPoints(asset) : 0;
     return `Продать «${asset?.title ?? "объект"}» за ${points}$ (−${points} очков)`;
+  }
+  if (action.type === "market_refresh") {
+    const marketItem = game.market.find(item => item.uid === payload.market_uid);
+    return `Пересдать «${assets.get(marketItem?.card_id ?? "")?.title ?? "слот"}»`;
   }
   if (action.type === "buy_action_card") return `Купить «${cards.get(stringValue(payload.card_id))?.title ?? payload.card_id}»`;
   if (action.type === "convert_action_card") {
@@ -539,6 +546,7 @@ const eventVerbs: Record<string, string> = {
   roof_seized: "отбирает Крышу",
   market_claimed: "ставит метку на карту рынка",
   market_locked: "закрывает слот серой меткой",
+  market_refreshed: "пересдаёт слот рынка",
   project_vetoed: "накладывает право вето",
   capacity_bought: "расширяет бизнес",
   asset_bought: "покупает объект",
@@ -767,6 +775,8 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       return lead(txt(` ставит метку на «${asset ?? assetId}»: карта работает на него, но остаётся в продаже`));
     case "market_locked":
       return lead(txt(` закрывает «${asset ?? assetId}» серой меткой: до конца раунда её не купит никто другой`));
+    case "market_refreshed":
+      return lead(txt(` пересдаёт слот рынка: «${asset ?? assetId}» уходит в низ колоды`));
     case "project_vetoed": {
       const vetoed = meta.projects.find(item => item.id === stringValue(data.project_id));
       return lead(txt(` накладывает вето на «${vetoed?.title ?? stringValue(data.project_id)}»`));
@@ -1131,6 +1141,11 @@ export function assetEffectLines(
   if (numberValue(effects.scandalReduction)) passive.push([`−${numberValue(effects.scandalReduction)} скандал в начале хода`, "true"]);
   if (numberValue(effects.greyScandalReduction)) passive.push([`−${numberValue(effects.greyScandalReduction)} скандала от серых операций`, "true"]);
   if (numberValue(effects.carryAction)) passive.push([`Переносит 1 неистраченное действие на следующий ход`, "true"]);
+  if (numberValue(effects.turnCard)) passive.push([`+1 карта действий в начале хода`, "true"]);
+  if (numberValue(effects.marketRefresh)) passive.push([`Раз в раунд без действия: пересдать карту рынка`, "true"]);
+  if (numberValue(effects.projectWaiver)) passive.push([`Раз за партию: проект без выполнения условия`, "true"]);
+  if (typeof effects.districtDouble === "string")
+    passive.push([`Каждый ваш объект «${districtTitle(effects.districtDouble)}» считается за два`, "true"]);
   if (numberValue(effects.takeoverCompensation)) passive.push([`+${numberValue(effects.takeoverCompensation)}◆, если у вас перехватят роль`, "true"]);
   for (const [text] of passive) lines.push({ text, active: true, boosted: false });
 

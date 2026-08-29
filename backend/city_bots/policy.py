@@ -469,10 +469,33 @@ def _strategic_action_bonus(
             for item in effects.get("roleBonuses", [])
             if item.get("role") == preferred
         )
+        # The four legendary levers pay in tempo, not in resources, so the one-ply lookahead scores
+        # them at their printed income and nothing else. Valued here instead, each against what it
+        # actually replaces: a card a turn, a re-deal a round, a doubled quarter, a waived condition.
+        if effects.get("turnCard"):
+            deck = state.action_deck or list(engine.catalog.action_cards)
+            bonus += sum(_card_value(engine, card_id, player) for card_id in deck) / len(deck)
+        if effects.get("marketRefresh"):
+            bonus += 3.0 * profile.planning
+        doubled = str(effects.get("districtDouble", ""))
+        if doubled:
+            bonus += 2.5 * engine.owned_district_count(player, doubled)
+        if effects.get("projectWaiver") and not player.project_waiver_used:
+            bonus += 5.0 * profile.planning
     elif action_type == "buy_action_card":
         # A blind draw, so value it at the average card rather than a chosen one.
         deck = state.action_deck or list(engine.catalog.action_cards)
         bonus += sum(_card_value(engine, card_id, player) for card_id in deck) / len(deck)
+    elif action_type == "market_refresh":
+        # The re-deal moves no resource, so the lookahead scores it at zero and the bot would only
+        # ever fire it by accident. What it is actually worth is the gap between the slot being
+        # thrown away and an average draw — so a slot the bot has no use for is worth re-dealing,
+        # and one it is saving up for is not.
+        market = next(item for item in state.market if item.uid == payload["market_uid"])
+        asset = engine.asset(market.card_id)
+        wanted = engine.district_count(player, asset.district) in {1, 3}
+        affordable = player.money >= engine.asset_price(state, player, market.card_id)
+        bonus += -6.0 if wanted and affordable else 2.5 * profile.planning
     elif action_type == "play_action_card":
         held = next(card for card in player.hand if card.uid == payload["card_uid"])
         card = engine.action_card(held.card_id)
