@@ -36,6 +36,7 @@ export function BoardView({
   error,
   onExit,
   layout,
+  liveSession = false,
 }: {
   game: GameState;
   meta: CityMeta;
@@ -47,6 +48,8 @@ export function BoardView({
   onExit: () => void;
   /** Раскладка принудительно — для галереи и тестов. Без неё решает ширина вьюпорта. */
   layout?: BoardLayout;
+  /** Подключённая партия разрешает сетевой экспорт хроники; /dev работает без сессии. */
+  liveSession?: boolean;
 }) {
   const index = useMemo(() => indexMaps(meta), [meta]);
   const [chronicle, setChronicle] = useState(false);
@@ -122,6 +125,10 @@ export function BoardView({
   );
 
   const Frame = portrait ? MobileShell : BoardScaler;
+  const currentPlayer = game.players[game.current_player_index];
+  const showStatus = Boolean(
+    error || busy || game.status === "finished" || (currentPlayer?.id === context.me.id && context.me.jail_turns > 0),
+  );
 
   return (
     <BoardLayoutProvider layout={portrait ? "portrait" : "wide"}>
@@ -129,7 +136,9 @@ export function BoardView({
       {/* Поля и зазоры на телефоне вдвое меньше: каждые четыре точки по краю — это две точки
         * ширины карточки, а их всего около полутора сотен. */}
       <div
-        className={`grid h-full w-full grid-rows-[auto_auto_minmax(0,1fr)] font-sans text-ink ${
+        className={`grid h-full w-full font-sans text-ink ${
+          showStatus ? "grid-rows-[auto_auto_minmax(0,1fr)]" : "grid-rows-[auto_minmax(0,1fr)]"
+        } ${
           portrait ? "gap-1 p-1" : "gap-1.5 p-2"
         }`}
       >
@@ -145,7 +154,7 @@ export function BoardView({
         onRules={() => setRules(true)}
         onExit={onExit}
       />
-      <StatusBar game={game} me={context.me} busy={busy} error={error} />
+      {showStatus && <StatusBar game={game} me={context.me} busy={busy} error={error} />}
 
       {portrait ? (
         <MobileFrame center={city} left={players} right={actions} />
@@ -157,7 +166,13 @@ export function BoardView({
         </div>
       )}
 
-      <Chronicle open={chronicle} onClose={() => setChronicle(false)} game={game} meta={meta} />
+      <Chronicle
+        open={chronicle}
+        onClose={() => setChronicle(false)}
+        game={game}
+        meta={meta}
+        exportEnabled={liveSession}
+      />
 
       <DetailsModal open={score} onClose={() => setScore(false)} label="Счёт и доход">
         <ScoreDetails game={game} me={context.me} meta={meta} />
@@ -194,12 +209,12 @@ export function BoardView({
               key={player.id}
               className="flex items-baseline gap-2 rounded-md bg-panel-2 px-2.5 py-2"
             >
-              <b className="w-5 text-gold">{position + 1}.</b>
+              <b className="w-5 text-points">{position + 1}.</b>
               <b className="flex-1 text-ink">{player.name}</b>
               <span className="text-ink-dim">
                 {index.roles.get(player.role ?? "")?.title ?? "без роли"}
               </span>
-              <b className="text-sm text-gold">{scoreOf(game, player)}</b>
+              <b className="text-sm text-points">{scoreOf(game, player)}</b>
             </li>
           ))}
         </ol>
@@ -238,6 +253,7 @@ export function Board({ roomName, onExit }: { roomName: string; onExit: () => vo
       busy={isPending}
       error={error || (room.error instanceof Error ? room.error.message : "")}
       onExit={onExit}
+      liveSession
     />
   );
 }

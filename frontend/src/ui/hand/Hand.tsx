@@ -8,10 +8,10 @@ import { findActions, resolve, usedThisTurn, type ActionContext } from "../lib/a
 import type { Indexes } from "../lib/board";
 
 const toneColor: Record<string, string> = {
-  attack: "#ff6b6b",
-  defence: "#55b5ff",
-  resource: "#39c47a",
-  score: "#f2c14e",
+  attack: "#d4939a",
+  defence: "#9fc4d1",
+  resource: "#91c5a5",
+  score: "#d4b3df",
 };
 
 /* Рука. Розыгрыш и сброс бесплатны и действия не тратят, но и того и другого —
@@ -42,20 +42,21 @@ export function Hand({
       <div className="grid min-h-0 grid-rows-[auto_repeat(3,minmax(0,1fr))] gap-1">
         <button
           type="button"
+          data-ui="draw-card-button"
           disabled={draw.kind !== "ready"}
           onClick={() => draw.kind === "ready" && onAction(draw.action)}
           title={draw.kind === "blocked" ? draw.reason : "Тянет две случайные карты из колоды"}
-          className="grid gap-px rounded-md border border-[#2f7a4d] bg-[#152a1e] px-[7px] py-[5px]
+          className="grid gap-px rounded-md border border-good bg-[#121a15] px-[7px] py-[5px]
             enabled:hover:border-good disabled:border-line disabled:bg-panel-2 disabled:opacity-45"
         >
-          <b className="text-[11.5px] text-[#8ee0ae]">+ Вытянуть 2 карты</b>
+          <b className="text-[11.5px] text-good">+ Вытянуть 2 карты</b>
           {/* Цена всегда на кнопке, а не вместо неё причина отказа: без цены нельзя
             * решить, копить ли на карты или на объект. Красным — тот ресурс, которого не хватает. */}
           <small className="text-3xs text-ink-muted">
-            <b className={me.money < actionCardCost(meta) ? "font-bold text-bad" : "font-normal"}>
+            <b className={me.money < actionCardCost(meta) ? "font-bold text-bad" : "font-semibold text-money"}>
               {actionCardCost(meta)}$
             </b>{" "}
-            + <b className={me.influence < 1 ? "font-bold text-bad" : "font-normal"}>1◆</b> +{" "}
+            + <b className={me.influence < 1 ? "font-bold text-bad" : "font-semibold text-influence"}>1◆</b> +{" "}
             <b className={game.actions_left < 1 ? "font-bold text-bad" : "font-normal"}>⚡</b>
           </small>
         </button>
@@ -93,6 +94,7 @@ export function Hand({
                 >
                   <button
                     type="button"
+                    data-ui="hand-card"
                     style={{ "--tone": toneColor[card.tone] ?? "#2d3d50" } as CSSProperties}
                     className="grid h-full w-full content-center gap-px rounded-md border border-line
                       border-l-[3px] border-l-[var(--tone)] bg-panel-2 px-[7px] py-[5px] text-left
@@ -115,7 +117,7 @@ export function Hand({
           <div
             key={`empty-${position}`}
             className="grid place-content-center rounded-md border border-dashed border-line
-              bg-[#0e1720] text-2xs text-ink-dim"
+              bg-surface text-2xs text-ink-dim"
           >
             пусто
           </div>

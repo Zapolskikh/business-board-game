@@ -5,8 +5,8 @@ import type { Availability } from "../lib/actions";
  * единообразной: одинаковые отступы, одинаковые размеры подписей.
  */
 
-/* Функциональные зоны доски. Каждая получает свой оттенок подложки и свой цвет линии под
- * заголовком — см. --color-zone-* в theme.css.
+/* Функциональные зоны доски. Подложка у них общая и почти чёрная, отличается только
+ * пастельный акцент заголовка — см. --color-zone-* в theme.css.
  *
  * Через CSS-переменные, а не через готовые классы на каждую зону: линию рисует SectionHead,
  * который живёт внутри панели и о зоне ничего не знает. Переменная каскадом доходит до него
@@ -22,12 +22,8 @@ export function zoneStyle(zone?: Zone): CSSProperties | undefined {
   } as CSSProperties;
 }
 
-/** Линия под заголовком зоны. Три пикселя: тоньше не читается на плотной доске.
- *
- * Отступ под заголовком урезан с 5px до 2px ровно на её толщину, поэтому линия ничего не стоит
- * по высоте. Доска плотная: панели рынка и города отдают всю свободную высоту карточкам, и
- * четыре добавленных пикселя переполняли таблицу свойств внутри них. */
-export const zoneRule = "border-b-[3px] border-b-[var(--zone-accent,transparent)]";
+/** Тихий разделитель заголовка и содержимого зоны. */
+export const zoneRule = "border-b border-b-line";
 
 export function Panel({
   children,
@@ -59,7 +55,8 @@ export function Panel({
 export function SectionHead({ title, meta, extra }: { title: string; meta?: ReactNode; extra?: ReactNode }) {
   return (
     <div className={`flex items-baseline gap-2 px-0.5 pb-[2px] ${zoneRule}`}>
-      <h2 className="text-[10.5px] font-bold uppercase tracking-[0.09em] text-ink-muted">{title}</h2>
+      <h2 className="text-[10.5px] font-bold uppercase tracking-[0.09em]
+        text-[var(--zone-accent,var(--color-ink-muted))]">{title}</h2>
       {extra}
       {/* Подпись обрезается, а не распирает панель. `whitespace-nowrap` без `overflow-hidden`
         * растил её на всю длину текста, панель уезжала за свою колонку, и вся центральная
@@ -95,24 +92,25 @@ export function ActionButton({
   return (
     <button
       type="button"
+      data-ui="action-button"
       data-state={status}
       disabled={!ready}
       onClick={onClick}
       title={state.kind === "blocked" ? state.reason : undefined}
       className={`grid min-w-0 gap-px rounded-md border border-line bg-panel-2 px-[7px] py-[5px]
-        enabled:hover:border-accent
-        data-[state=blocked]:opacity-45
+        data-[state=ready]:border-line-2 enabled:hover:border-accent enabled:hover:bg-panel-3
+        data-[state=blocked]:opacity-35
         data-[state=pending]:animate-pulse
-        data-[state=spent]:border-[#4d3535] data-[state=spent]:bg-[#1c1616] data-[state=spent]:opacity-70
-        ${tone === "danger" ? "border-[#5c3340]" : ""}`}
+        data-[state=spent]:border-[#4a3034] data-[state=spent]:bg-[#1c1416] data-[state=spent]:opacity-65
+        ${tone === "danger" ? "border-[#594047]" : ""}`}
     >
       <b className={`overflow-hidden text-ellipsis whitespace-nowrap text-[11.5px] font-semibold ${
-        tone === "danger" ? "text-[#ff9aa8]" : "text-ink"
+        tone === "danger" ? "text-bad" : "text-ink"
       }`}>
         {label}
       </b>
       <small className={`overflow-hidden text-ellipsis whitespace-nowrap text-3xs ${
-        spent ? "text-[#c78e8e]" : "text-ink-muted"
+        spent ? "text-bad" : "text-ink-muted"
       }`}>
         {/* Всегда цена действия, а не причина отказа. Правила учат по тому, что делает
           * кнопка, а не по «Сейчас недоступно»: половина панели недоступна почти всегда,
@@ -145,9 +143,10 @@ export const DrawerRow = forwardRef<
     <button
       ref={ref}
       type="button"
+      data-ui="drawer-row"
       onClick={onClick}
       className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[7px]
-        rounded-md border border-line bg-panel-2 px-2 py-[7px] hover:border-accent"
+        rounded-md border border-line bg-panel-2 px-2 py-[7px] hover:border-line-2 hover:bg-panel-3"
       {...rest}
     >
       <span>{icon}</span>
@@ -160,7 +159,7 @@ export const DrawerRow = forwardRef<
       {badge !== undefined ? (
         <span
           className={`rounded-lg px-1.5 text-3xs ${
-            badgeOn ? "bg-[#1d3b2a] text-[#7fdaa6]" : "bg-panel-3 text-ink-muted"
+            badgeOn ? "bg-[#17231c] text-good" : "bg-panel-3 text-ink-muted"
           }`}
         >
           {badge}
@@ -220,23 +219,32 @@ export function KeyValue({ rows }: { rows: [ReactNode, ReactNode][] }) {
   );
 }
 
-export function EffectList({ lines }: { lines: { text: string; active: boolean; boosted?: boolean }[] }) {
+export function EffectList({
+  lines,
+  title,
+}: {
+  lines: { text: string; active: boolean; boosted?: boolean }[];
+  title?: string;
+}) {
   if (lines.length === 0) return null;
   return (
-    <ul className="mb-2 grid gap-0.5">
-      {lines.map((line, index) => (
-        <li
-          key={index}
-          className={
-            line.active
-              ? "relative pl-3.5 text-good before:absolute before:left-0 before:content-['✓']"
-              : "relative pl-3.5 text-ink-dim before:absolute before:left-1 before:content-['·']"
-          }
-        >
-          {line.text}
-          {line.boosted && <span className="ml-1 text-gold">⚙×2</span>}
-        </li>
-      ))}
-    </ul>
+    <>
+      {title && <p className="mb-1 font-semibold text-ink">{title}</p>}
+      <ul className="mb-2 grid gap-0.5">
+        {lines.map((line, index) => (
+          <li
+            key={index}
+            className={
+              line.active
+                ? "relative pl-3.5 text-good before:absolute before:left-0 before:content-['✓']"
+                : "relative pl-3.5 text-ink-dim before:absolute before:left-1 before:content-['·']"
+            }
+          >
+            {line.text}
+            {line.boosted && <span className="ml-1 text-gold">⚙×2</span>}
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }

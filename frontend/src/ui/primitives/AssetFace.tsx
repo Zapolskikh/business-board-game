@@ -9,12 +9,8 @@ import type { AssetMeta, DistrictMeta } from "../../online/types";
  * заново ищет, где что написано, когда карта переезжает с рынка в город. Различаются
  * только верхний правый угол (цена/очки против состояния) и нижняя строка.
  *
- * Зоны сверху вниз:
- *   1. лево | район | право   — числа стоят на одном месте у всех карточек
- *   2. название
- *   3. редкость и теги
- *   4. доход и синергии — три строки, заполнение по столбцам
- *   5. нижняя строка
+ * Зоны сверху вниз: категория и теги, название с очками, экономика, условия, состояние.
+ * Цвет остаётся у семантических чисел и небольших маркеров, а не у поверхности целиком.
  */
 
 /* Один источник правды на редкость — токены темы, а не копия хексов здесь. Копия уже
@@ -27,18 +23,52 @@ const rarityColor: Record<string, string> = {
   legendary: "var(--color-rar-legendary)",
 };
 
+/* На светлой карточке пастель рамки слишком бледна для мелкой надписи. Подпись получает
+ * отдельный, насыщенный цвет той же редкости; у обычной карты это почти чёрный. */
+const rarityTextColor: Record<string, string> = {
+  common: "#171717",
+  uncommon: "#17713d",
+  rare: "#1d5f9f",
+  epic: "#713b9e",
+  legendary: "#ad5908",
+};
+
 export const assetRarityColor = (rarity: string): string => rarityColor[rarity] ?? rarityColor.common;
 
-/** Толщина рамки редкости. Внутренняя тень, а не бордер: не участвует в раскладке. */
-const rarityRing = "inset 0 0 0 2px var(--rc)";
+export const ASSET_FACE_EFFECT_CAP = 4;
 
-/* Легендарная получает мягкое свечение, эпическая — послабее, остальные только рамку и бейдж.
- * Ступенька в оформлении, а не только в цвете: две верхние редкости должны быть видны с другого
- * конца доски, не считываясь как «просто ещё один оттенок». */
-const rarityGlow: Record<string, string> = {
-  epic: "0 0 10px -2px color-mix(in srgb, var(--rc), transparent 55%)",
-  legendary: "0 0 14px -2px color-mix(in srgb, var(--rc), transparent 40%)",
-};
+/**
+ * Лицевая сторона — резюме, не полный лист правил. Общие правила района всегда остаются
+ * в раскрытии; уникальные свойства приоритетнее, а при переполнении одна из четырёх ячеек
+ * резервируется под явный переход к полному описанию.
+ */
+export function assetFaceEffectSummary(lines: AssetEffectLine[]): {
+  visible: AssetEffectLine[];
+  hidden: number;
+  standard: number;
+} {
+  const priority: Record<AssetEffectLine["kind"], number> = {
+    purchase: 0,
+    passive: 1,
+    object: 2,
+    district: 3,
+    sector: 4,
+  };
+  const unique = lines
+    .map((line, index) => ({ line, index }))
+    .filter(({ line }) => line.kind !== "district" && line.kind !== "sector")
+    .sort((left, right) =>
+      priority[left.line.kind] - priority[right.line.kind]
+      || Number(right.line.active) - Number(left.line.active)
+      || left.index - right.index,
+    )
+    .map(({ line }) => line);
+  const standard = lines.length - unique.length;
+  const needsOverflow = unique.length > ASSET_FACE_EFFECT_CAP;
+  const limit = needsOverflow ? ASSET_FACE_EFFECT_CAP - 1 : ASSET_FACE_EFFECT_CAP;
+  const visible = unique.slice(0, limit);
+  return { visible, hidden: unique.length - visible.length, standard };
+}
 
 export function AssetFace({
   asset,
@@ -66,6 +96,7 @@ export function AssetFace({
    * остаётся то, по чему выбирают: цена, очки, название и доход. Редкость несёт рамка, а
    * теги, синергии и условия — поповер по нажатию. */
   const portrait = useIsPortrait();
+  const summary = assetFaceEffectSummary(lines);
 
   if (portrait) {
     return (
@@ -73,7 +104,7 @@ export function AssetFace({
         <span className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1">
           {topLeft}
           <span className="overflow-hidden text-center text-ellipsis whitespace-nowrap text-3xs
-            font-bold text-[var(--dc)]">
+            font-bold text-[var(--card-district)]">
             {district?.icon}
           </span>
           {topRight}
@@ -84,12 +115,14 @@ export function AssetFace({
         </h3>
 
         <span className="flex items-center gap-1.5 overflow-hidden text-3xs whitespace-nowrap">
-          {income > 0 && <b className="font-bold text-good">+{income}$</b>}
-          {influence > 0 && <b className="font-bold text-[#c9a2ff]">+{influence}◆</b>}
-          {lines.length > 0 && (
-            <span className="overflow-hidden text-ellipsis text-ink-dim" title={lines[0].text}>
-              {lines[0].short}
+          {income > 0 && <b className="font-bold text-money">+{income}$</b>}
+          {influence > 0 && <b className="font-bold text-influence">+{influence}◆</b>}
+          {summary.visible[0] ? (
+            <span className="overflow-hidden text-ellipsis text-ink-dim" title={summary.visible[0].text}>
+              {summary.visible[0].short}
             </span>
+          ) : summary.hidden > 0 && (
+            <span className="text-ink-dim">↗ {summary.hidden} эффекта</span>
           )}
         </span>
 
@@ -100,89 +133,83 @@ export function AssetFace({
 
   return (
     <>
-      {/* 1 */}
-      <span className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5">
-        {topLeft}
-        <span className="overflow-hidden text-ellipsis whitespace-nowrap text-center text-3xs
-          font-bold uppercase tracking-wide text-[var(--dc)]">
-          {district?.icon} {district?.title}
-        </span>
-        {topRight}
-      </span>
-
-      {/* 2 */}
-      <h3 className="overflow-hidden text-ellipsis whitespace-nowrap text-[12.5px] font-semibold text-ink">
-        {asset.title}
-      </h3>
-
-      {/* 3 — теги на лице карточки потому, что по ним считаются требования проектов */}
+      {/* Категория и служебные метки — тихая строка над названием. */}
       <span className="flex min-w-0 items-center gap-1.5 overflow-hidden text-3xs">
-        {/* Бейдж, а не просто цветное слово: третий носитель редкости после рамки и
-          * градиента. Цветное слово в общем ряду с тегами читалось как ещё один тег. */}
-        <span
-          className="shrink-0 rounded border px-1 font-bold uppercase tracking-wide
-            border-[var(--rc)] bg-[color-mix(in_srgb,var(--rc),transparent_82%)] text-[var(--rc)]"
-          title={`Редкость: ${rarityLabels[asset.rarity] ?? asset.rarity}`}
-        >
-          {rarityLabels[asset.rarity] ?? asset.rarity}
+        <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-bold
+          uppercase tracking-wide text-[var(--card-district)]">
+          {district?.icon} {district?.title}
         </span>
         {asset.tags.map(tag => (
           <span
             key={tag}
-            className="rounded border border-line-2 bg-panel-3 px-1 font-semibold lowercase text-ink"
+            className="shrink-0 rounded bg-panel-3 px-1 font-semibold lowercase text-ink-muted"
           >
             {tag}
           </span>
         ))}
+        <span
+          className="ml-auto shrink-0 rounded border border-[var(--rc)] bg-panel px-1 font-bold
+            uppercase tracking-wide text-[var(--rt)]"
+          title={`Редкость: ${rarityLabels[asset.rarity] ?? asset.rarity}`}
+        >
+          {rarityLabels[asset.rarity] ?? asset.rarity}
+        </span>
       </span>
 
-      {/* 4 — четыре строки на две равные колонки, заполнение по столбцам: сначала
-        * сверху вниз, потом следующий столбец. Колонки ровно пополам (1fr каждая), а не
-        * по самой длинной строке: иначе одно длинное свойство съедало почти всю карточку
-        * и второй столбец обрезался.
-        *
-        * 4×2 = восемь мест, и в них помещается 70 объектов каталога из 71: у остальных максимум
-        * семь строк. Единственное исключение — «Центр городского управления» с девятью: четыре
-        * связи районов плюс синергии; девятая строка уйдёт в поповер, ради одной карты сжимать
-        * остальные семьдесят не стоит.
-        *
-        * Влезает это только потому, что в ячейке стоит `line.short` — ярлык вроде «Мафиози +1$»,
-        * а не фраза «+1$ пока вы „Мафиози“ (синергия сектора)», от которой оставалась половина.
-        *
-        * Разделители рисуют сами ячейки, а не фон-подложка: подложка красила бы и пустые
-        * клетки сетки. */}
-      <span
-        className={`grid min-h-0 min-w-0 grid-rows-4 content-start overflow-hidden text-3xs
-          leading-tight
-          [&>*]:min-w-0 [&>*]:overflow-hidden [&>*]:text-ellipsis [&>*]:whitespace-nowrap
-          [&>*]:border-b [&>*]:border-r [&>*]:border-line/70 [&>*]:px-1 [&>*]:py-px
-          ${portrait ? "grid-cols-1" : "grid-flow-col grid-cols-2"}`}
-      >
-        {income > 0 && <b className="whitespace-nowrap font-bold text-good">+{income}$/раунд</b>}
+      {/* Название и очки получают отдельный ярус: метрики больше не давят на категорию. */}
+      <span className="flex min-w-0 items-start gap-2">
+        <h3 className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[13px]
+          font-semibold leading-tight text-ink">
+          {asset.title}
+        </h3>
+        {topRight}
+      </span>
+
+      {/* Экономика — одна спокойная плашка по центру карточки. */}
+      <span className="flex min-h-[27px] min-w-0 items-center gap-2 rounded-md bg-panel px-2 py-1
+        text-[10.5px]">
+        {topLeft}
+        {topLeft && income > 0 && <span className="h-3 w-px bg-line" />}
+        {income > 0 && (
+          <b className="whitespace-nowrap font-semibold text-money">
+            +{income}$ <small className="font-normal text-ink-dim">за раунд</small>
+          </b>
+        )}
         {influence > 0 && (
-          <b className="whitespace-nowrap font-bold text-[#c9a2ff]">+{influence}◆ разово</b>
+          <b className="whitespace-nowrap font-semibold text-influence">
+            +{influence}◆ <small className="font-normal text-ink-dim">разово</small>
+          </b>
         )}
-        {lines.length === 0 && income === 0 && influence === 0 && (
-          <span className="whitespace-nowrap text-ink">без условий и синергий</span>
+      </span>
+
+      {/* Две строки — жёсткий контракт лица карты. Полные правила района и хвост сложных
+        * объектов находятся в поповере; поэтому никакой объём контента не меняет высоту. */}
+      <span className="grid min-h-0 min-w-0 grid-cols-2 grid-rows-2 content-start gap-x-3 gap-y-1
+        overflow-hidden text-3xs leading-tight">
+        {summary.visible.length === 0 && summary.hidden === 0 && income === 0 && influence === 0 && (
+          <span className="col-span-2 text-ink-dim">Без условий и синергий</span>
         )}
-        {lines.map((line, position) => (
+        {summary.visible.map((line, position) => (
           <span
             key={position}
             title={line.text}
-            className={`overflow-hidden text-ellipsis whitespace-nowrap font-semibold ${
-              line.active ? "text-good" : "text-ink"
+            className={`min-w-0 overflow-hidden text-ellipsis whitespace-nowrap ${
+              line.active ? "font-semibold text-good" : "text-ink-muted"
             }`}
           >
-            {line.active ? "✓ " : "· "}
-            {/* Ярлык, а не полная фраза: ячейка не переносится и режется многоточием, а полный
-              * текст лежит во всплывающей подсказке ячейки и в поповере карточки. */}
+            <span className={line.active ? "text-good" : "text-ink-dim"}>{line.active ? "✓" : "·"}</span>{" "}
             {line.short}
             {line.boosted && <span className="text-gold"> ⚙×2</span>}
           </span>
         ))}
+        {summary.hidden > 0 && (
+          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-semibold
+            text-[var(--card-district)]" title="Нажмите на карточку, чтобы увидеть все эффекты">
+            ↗ ещё {summary.hidden} · открыть
+          </span>
+        )}
       </span>
 
-      {/* 5 */}
       {bottom}
     </>
   );
@@ -193,41 +220,19 @@ export function assetFaceStyle(districtColor: string | undefined, rarity: string
   return {
     "--dc": districtColor ?? "var(--color-line)",
     "--rc": assetRarityColor(rarity),
-    /* Редкость — свечением от краёв к центру, а не точкой в углу: цвет читается
-     * боковым зрением, точку же надо было искать и сверять с легендой. */
-    backgroundImage:
-      "radial-gradient(115% 80% at 50% 50%, transparent 28%, color-mix(in srgb, var(--rc), transparent 58%) 100%)",
-    /* Толщина рамки — внутренней тенью поверх 1px бордера, а не самим бордером.
-     *
-     * Тень не участвует в раскладке, поэтому редкость читается тремя пикселями, а карточка
-     * внутри остаётся ровно того же размера, что и до перекраски. Настоящий `border-[3px]`
-     * забирал по 2px сверху и снизу, и таблица свойств — четыре фиксированные строки на
-     * `minmax(0,1fr)` — переставала помещаться: строки наезжали друг на друга.
-     */
-    boxShadow: [rarityRing, rarityGlow[rarity]].filter(Boolean).join(", "),
+    "--rt": rarityTextColor[rarity] ?? rarityTextColor.common,
   } as CSSProperties;
 }
 
-/* Внешняя рамка принадлежит редкости целиком, и только ей.
- *
- * Раньше левый край в 3px красился районом, а редкость жила в градиенте и маленькой
- * подписи — то есть цвет по краю карточки означал то одно, то другое, и система была
- * неоднозначной. Район никуда не делся: он стоит иконкой и названием в первой строке
- * карточки, где его и читают. Наведение поднимает подложку на ступень (--color-panel-3),
- * а не перекрашивает рамку — иначе оно стирало бы редкость ровно в тот момент, когда
- * игрок разглядывает карточку.
- */
-/* Рамка редкости рисуется внутренней тенью, а не толстой рамкой — см. `rarityRing` в
- * `assetFaceStyle`. Здесь остаётся ровно 1px, как было до перекраски: `border-[3px]` по всему
- * периметру забирал у карточки 4px высоты, а таблица свойств стоит на `minmax(0,1fr)` и четырёх
- * фиксированных строках — эти 4px её и переполняли, строки наезжали друг на друга. */
-export const assetFaceGrid = `grid h-full w-full min-h-0 min-w-0
-  grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] gap-1
+/* Бежевая поверхность отделяет игровой объект от интерфейса, а тонкая рамка целиком
+ * принадлежит редкости. Наведение меняет только тон бумаги и не стирает этот сигнал. */
+export const assetFaceGrid = `game-card grid h-full w-full min-h-0 min-w-0
+  grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] gap-1.5
   rounded-card border border-[var(--rc)] bg-panel-2
-  px-2 py-1.5 text-left transition-colors hover:bg-panel-3`;
+  px-2.5 py-2 text-left transition-colors hover:bg-panel-3`;
 
 /** Та же карточка вертикально: четыре зоны вместо пяти, поля вдвое уже. */
-export const assetFaceGridPortrait = `grid h-full w-full min-h-0 min-w-0
+export const assetFaceGridPortrait = `game-card grid h-full w-full min-h-0 min-w-0
   grid-rows-[auto_minmax(0,1fr)_auto_auto] gap-0.5
   rounded-card border border-[var(--rc)] bg-panel-2
   px-1 py-1 text-left transition-colors hover:bg-panel-3`;

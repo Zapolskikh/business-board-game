@@ -35,7 +35,7 @@ export function ScoreDetails({ game, me, meta }: { game: GameState; me: PlayerSt
               ["Роль", score.role],
               ...(score.bonus ? ([["Карты на очки", score.bonus]] as [string, number][]) : []),
               ["Скандалы", <span className="text-bad">{score.scandals}</span>],
-              ["Итого", <b className="text-gold">{score.total}</b>],
+              ["Итого", <b className="text-points">{score.total}</b>],
             ]}
           />
         )}

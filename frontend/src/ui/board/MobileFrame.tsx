@@ -116,7 +116,7 @@ function Sheet({
            * заодно и список игроков под ним. */
           onInteractOutside={event => event.preventDefault()}
           className={`ui-v2 fixed inset-y-0 z-50 grid w-[min(88vw,340px)] grid-rows-[auto_minmax(0,1fr)]
-            gap-1 border-line bg-surface p-1.5 font-sans text-ink shadow-[0_0_60px_#000c]
+            gap-1 border-line bg-surface p-1.5 font-sans text-ink
             ${side === "left" ? "left-0 border-r" : "right-0 border-l"}`}
         >
           <div className="flex items-center gap-2 px-1">

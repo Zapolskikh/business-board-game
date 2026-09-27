@@ -15,11 +15,14 @@ export function Chronicle({
   onClose,
   game,
   meta,
+  exportEnabled = true,
 }: {
   open: boolean;
   onClose: () => void;
   game: GameState;
   meta: CityMeta;
+  /** В /dev нет серверной сессии; сама хроника работает, сетевые кнопки экспорта — нет. */
+  exportEnabled?: boolean;
 }) {
   const events = [...game.event_log].reverse();
 
@@ -30,7 +33,7 @@ export function Chronicle({
         *
         * Панель вынесена отдельно не ради красоты: она ходит в сессию и кеш запросов,
         * а хроника смонтирована всегда — так эти зависимости нужны только при открытом окне. */}
-      {open && <ExportBar game={game} meta={meta} />}
+      {open && exportEnabled && <ExportBar game={game} meta={meta} />}
       <ol className="grid gap-1">
         {events.map(event => {
           const segments = describeEventSegments(event, game, meta);

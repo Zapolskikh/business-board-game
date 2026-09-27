@@ -16,6 +16,9 @@ import "../theme.css";
  */
 
 const names = Object.keys(scenarios) as ScenarioName[];
+const query = new URLSearchParams(location.search);
+const requestedScenario = query.get("scenario");
+const initialScenario = names.find(item => item === requestedScenario) ?? names[1];
 
 const spares: MarketAsset[] = [
   { uid: "n-1", card_id: "insurance", price: 7 },
@@ -24,13 +27,13 @@ const spares: MarketAsset[] = [
 ];
 
 export function Gallery() {
-  const [name, setName] = useState<ScenarioName>(names[1]);
-  const [pendingUid, setPendingUid] = useState<string | null>(null);
+  const [name, setName] = useState<ScenarioName>(initialScenario);
+  const [pendingUid, setPendingUid] = useState<string | null>(query.has("pending") ? "__first__" : null);
   const [rotations, setRotations] = useState(0);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(query.has("busy"));
+  const [error, setError] = useState(query.has("error") ? "Команда не выполнена: ревизия устарела" : "");
   const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight });
-  const [panel, setPanel] = useState(true);
+  const [panel, setPanel] = useState(query.get("panel") !== "0");
 
   useEffect(() => {
     const onResize = () => setSize({ w: window.innerWidth, h: window.innerHeight });
@@ -49,12 +52,13 @@ export function Gallery() {
       ? base.market
       : [...spares.map(item => ({ ...item, uid: `${item.uid}-${rotations}` })), ...base.market.slice(3)];
   const game: GameState = { ...base, market };
+  const effectivePendingUid = pendingUid === "__first__" ? game.market[0]?.uid ?? null : pendingUid;
 
   const context: ActionContext = {
     game,
     me,
     legal: room.legal_actions ?? [],
-    pending: pendingUid ? { type: "buy_asset", payload: { market_uid: pendingUid } } : undefined,
+    pending: effectivePendingUid ? { type: "buy_asset", payload: { market_uid: effectivePendingUid } } : undefined,
   };
 
   const tight = size.h < 820;
@@ -78,7 +82,7 @@ export function Gallery() {
       <div className="ui-v2 fixed bottom-2 left-1/2 z-30 -translate-x-1/2 font-sans">
         {panel ? (
           <div className="flex flex-wrap items-center gap-1.5 rounded-[10px] border border-line-2
-            bg-panel/95 px-2.5 py-2 shadow-[0_16px_40px_#000a] backdrop-blur">
+            bg-panel px-2.5 py-2">
             <b className="text-2xs uppercase tracking-wide text-ink-dim">Сценарий</b>
             {names.map(item => (
               <button
@@ -148,8 +152,7 @@ export function Gallery() {
         ) : (
           <button
             onClick={() => setPanel(true)}
-            className="rounded-full border border-line-2 bg-panel/95 px-3 py-1.5 text-3xs text-ink-muted
-              shadow-[0_16px_40px_#000a]"
+            className="rounded-full border border-line-2 bg-panel px-3 py-1.5 text-3xs text-ink-muted"
           >
             ⚙ пульт галереи
           </button>

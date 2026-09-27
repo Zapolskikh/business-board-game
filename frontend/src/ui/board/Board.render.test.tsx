@@ -63,8 +63,15 @@ describe("BoardView", () => {
     expect(render("Слоты заняты")).toContain("Нет свободного слота");
   });
 
-  it("на чужом ходу показывает, кого ждём", () => {
-    expect(render("Ход соперника")).toContain("Ход игрока");
+  it("на чужом ходу подсвечивает ровно одну карточку вместо отдельной строки статуса", () => {
+    const html = render("Ход соперника");
+    expect(html).toContain("grid-rows-[auto_minmax(0,1fr)]");
+    expect(html.match(/data-player-state="turn"/g)).toHaveLength(1);
+    expect(html).toContain("player-turn");
+  });
+
+  it("не занимает место строкой «Ваш ход»", () => {
+    expect(render("Богатый ход")).not.toContain("Ваш ход");
   });
 
   it("переживает игрока без роли, без карт и без объектов", () => {

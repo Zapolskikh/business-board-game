@@ -61,7 +61,7 @@ interface Props {
 interface ChoiceState { title: string; actions: LegalAction[] }
 type MobileGameTab = "city" | "players" | "actions" | "log" | "menu";
 
-const playerColors = ["#58a6ff", "#3fb950", "#f0883e", "#d65db1", "#e3b341", "#9b6ee7"];
+const playerColors = ["#9fc4d1", "#91c5a5", "#d9a17e", "#ca91b8", "#d9bd78", "#b9a2d4"];
 // Cleanups are missing on purpose: they all live on the single 🧯 button in «Защита и репутация»,
 // which substitutes the price of whichever role the viewer holds.
 const rolePowers: Record<string, string[]> = {

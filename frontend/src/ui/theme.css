@@ -9,29 +9,25 @@
 @import "tailwindcss/utilities.css" layer(utilities);
 
 @theme {
-  /* Шрифт тот же, что в styles.css: два интерфейса не должны отличаться начертанием,
-   * пока они живут рядом. */
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Bahnschrift напоминает городскую навигацию и заголовки настольной игры, но остаётся
+   * хорошо читаемым на 9–12px. На системах без него используется более мягкий Trebuchet. */
+  --font-sans: "Bahnschrift", "Trebuchet MS", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
 
-  /* Палитра Midnight City. Ночная, но не «сплошное тёмно-синее полотно»: карточка на
-   * 20-25% светлее подложки, и это важнее любых новых оттенков — на прежней палитре
-   * шесть карточек рынка сливались друг с другом и с панелью под ними.
-   *
-   * Лестница по светлоте: surface < topbar < panel < card < card-hover. Каждая ступень
-   * различима без рамки, поэтому рамка свободна и уходит целиком под редкость. */
-  --color-surface: #0d1520;
-  --color-topbar: #152232;
-  --color-panel: #1a2939;
-  --color-panel-2: #263a4e;
-  --color-panel-3: #304960;
-  --color-line: #405970;
-  --color-line-2: #536b82;
-  --color-ink: #f5f7fa;
-  --color-ink-muted: #bac6d3;
-  --color-ink-dim: #7f91a4;
-  --color-accent: #48a8ff;
-  --color-good: #42dfa0;
-  --color-bad: #ff6b7b;
+  /* Нейтральная игровая сцена. Большие площади почти чёрные, карточки отделяются
+   * светлотой, а цвет зарезервирован для информации и состояния. */
+  --color-surface: #050607;
+  --color-topbar: #0b0d10;
+  --color-panel: #090b0e;
+  --color-panel-2: #15191f;
+  --color-panel-3: #1d232b;
+  --color-line: #2b3139;
+  --color-line-2: #414a55;
+  --color-ink: #f2f0ea;
+  --color-ink-muted: #c5c7c9;
+  --color-ink-dim: #7f8790;
+  --color-accent: #9bbbd0;
+  --color-good: #8fc9aa;
+  --color-bad: #df8e98;
 
   /* Три отдельных «жёлтых», которые раньше были одним --gold на всё сразу.
    *
@@ -41,33 +37,37 @@
    * `warning` — скандалы, тюрьма, «раз в ход»: это предупреждение, а не редкость.
    * `badge` — серо-синие плашки с числами. Их на доске больше всего, и именно они
    * съедали золото. */
-  --color-gold: #ffb547;
-  --color-warning: #ffc857;
-  --color-badge: #536b82;
+  --color-gold: #e0bc72;
+  --color-warning: #dda36d;
+  --color-badge: #aeb9c3;
+  --color-money: #a8d0ad;
+  --color-influence: #b3bfe5;
+  --color-points: #d4b3df;
+  --color-defence: #9fc4d1;
 
 
   /* Районы — из backend/city_engine/content/catalog.json. Единственный источник правды
    * всё равно бэкенд: он присылает district.color в /meta. Здесь копия для статичных
    * случаев (легенды, фикстуры), в рантайме цвет берётся из meta. */
-  --color-d-residential: #4fa3d1;
-  --color-d-business: #d7aa3d;
-  --color-d-industrial: #b56f42;
-  --color-d-tech: #9b6ee7;
-  --color-d-government: #5f78c8;
-  --color-d-shadows: #8a455e;
+  --color-d-residential: #8fc4d8;
+  --color-d-business: #d9bd78;
+  --color-d-industrial: #d9a17e;
+  --color-d-tech: #bca1d9;
+  --color-d-government: #9aaee6;
+  --color-d-shadows: #ca91a4;
 
   /* Редкость — привычная лестница серебро → зелёный → синий → фиолетовый → золото.
    * Прежний набор шёл серый → голубой → фиолетовый → оранжевый → жёлтый: он ничему не
    * соответствовал и путал редкое с эпическим, потому что синий на доске означает
    * «действие», а не «редкость».
    *
-   * Показывается тремя способами сразу (см. AssetFace): рамка карточки, бейдж со словом
-   * и градиент внутри. Одного цветного слова мало — его надо найти и сверить с легендой. */
-  --color-rar-common: #a4b0be;
-  --color-rar-uncommon: #42d98b;
-  --color-rar-rare: #4d9fff;
-  --color-rar-epic: #b56cff;
-  --color-rar-legendary: #ffb547;
+   * Показывается тонкой рамкой и компактным бейджем (см. AssetFace), но не окрашивает
+   * всю карточку. Этого достаточно для узнавания без свечения и цветной заливки. */
+  --color-rar-common: #aeb6bd;
+  --color-rar-uncommon: #91c5a5;
+  --color-rar-rare: #8fb9d6;
+  --color-rar-epic: #b9a2d4;
+  --color-rar-legendary: #d9bd78;
 
   /* Доска плотная: рабочий размер 12px, ниже него две ступени для подписей. */
   --text-3xs: 0.5625rem;
@@ -80,9 +80,8 @@
 }
 
 @layer base {
-  /* Функциональные зоны. Не перекраска панели целиком, а сдвиг подложки на пару градусов
-   * плюс цветная линия под заголовком: интерфейс остаётся цельным, но рынок, город и
-   * действия различаются боковым зрением, без чтения заголовков.
+  /* Функциональные зоны лежат на одном чёрном фоне. Собственный пастельный акцент получает
+   * только заголовок: цвет помогает навигации, но не превращает доску в цветное полотно.
    *
    * Здесь, а не в `@theme`, и это не стилистический выбор. Tailwind v4 вырезает из `@theme`
    * всё, на что не ссылается ни один класс в исходниках, а зона задаётся из JS —
@@ -94,18 +93,48 @@
    * На `.ui-v2`, а не на `:root`: старый интерфейс живёт в этом же бандле и зон не имеет.
    */
   .ui-v2 {
-    --color-zone-players: #1b2836;
-    --color-zone-players-accent: #8ea4bb;
-    --color-zone-projects: #24273b;
-    --color-zone-projects-accent: #a78bfa;
-    --color-zone-market: #192e42;
-    --color-zone-market-accent: #48a8ff;
-    --color-zone-city: #183430;
-    --color-zone-city-accent: #42dfa0;
-    --color-zone-actions: #22283c;
-    --color-zone-actions-accent: #7c8cff;
-    --color-zone-chronicle: #172532;
-    --color-zone-chronicle-accent: #8ea4bb;
+    --color-zone-players: #090b0e;
+    --color-zone-players-accent: #9fc4d1;
+    --color-zone-projects: #090b0e;
+    --color-zone-projects-accent: #b9a2d4;
+    --color-zone-market: #090b0e;
+    --color-zone-market-accent: #8fb9d6;
+    --color-zone-city: #090b0e;
+    --color-zone-city-accent: #91c5a5;
+    --color-zone-actions: #090b0e;
+    --color-zone-actions-accent: #b3bfe5;
+    --color-zone-chronicle: #090b0e;
+    --color-zone-chronicle-accent: #d9bd78;
+
+    /* Основной интерфейс чуть плотнее обычного текста. У Bahnschrift есть настоящий
+     * промежуточный вес, поэтому мелкие подписи не превращаются в жирные заголовки. */
+    font-weight: 500;
+    letter-spacing: 0.005em;
+  }
+
+  /* Объекты и проекты — физический слой игры поверх почти чёрного стола. Локальная
+   * подмена токенов позволяет существующим классам текста и фона автоматически
+   * перейти на тёмный текст, не меняя семантику денег, очков и состояний. */
+  .ui-v2 .game-card {
+    --color-panel: #d4c4a7;
+    --color-panel-2: #e7dcc6;
+    --color-panel-3: #ddcfb4;
+    --color-line: #ae9a78;
+    --color-line-2: #786548;
+    --color-ink: #201b15;
+    --color-ink-muted: #554a3c;
+    --color-ink-dim: #766957;
+    --color-good: #2f704e;
+    --color-bad: #a33f49;
+    --color-gold: #8c5d0a;
+    --color-warning: #975326;
+    --color-badge: #4f5d66;
+    --color-money: #2e7045;
+    --color-influence: #4e6092;
+    --color-points: #754d84;
+    --card-district: color-mix(in srgb, var(--dc) 64%, #17120d);
+    color: var(--color-ink);
+    font-weight: 550;
   }
 
   /* Ресет вместо preflight, ограниченный новым интерфейсом.
@@ -167,8 +196,29 @@
     animation: v2-pop-in 120ms ease-out;
   }
 
+  /* Ход читается на самой карточке игрока: рамка спокойно «дышит», а короткий маркер
+   * движется вдоль левого края. Никакого свечения — анимация меняет только плоские цвета
+   * и положение маркера, поэтому не спорит с ресурсами и редкостью карточек. */
+  .ui-v2 .player-turn {
+    animation: v2-player-turn 2.8s ease-in-out infinite;
+  }
+
+  .ui-v2 .player-turn::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 12%;
+    width: 3px;
+    height: 24%;
+    border-radius: 0 3px 3px 0;
+    background: var(--color-good);
+    animation: v2-turn-marker 2.8s ease-in-out infinite alternate;
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .ui-v2[data-state="open"] {
+    .ui-v2[data-state="open"],
+    .ui-v2 .player-turn,
+    .ui-v2 .player-turn::before {
       animation: none;
     }
   }
@@ -179,4 +229,20 @@
     opacity: 0;
     transform: scale(0.97);
   }
+}
+
+@keyframes v2-player-turn {
+  0%, 100% {
+    border-color: color-mix(in srgb, var(--color-good) 55%, var(--color-line));
+    background-color: #101612;
+  }
+  50% {
+    border-color: var(--color-good);
+    background-color: #151d18;
+  }
+}
+
+@keyframes v2-turn-marker {
+  from { transform: translateY(0); }
+  to { transform: translateY(210%); }
 }

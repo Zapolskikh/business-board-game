@@ -26,8 +26,17 @@ import { GreyDetails } from "./GreyDetails";
 /* Цена действия с красным числом того ресурса, которого не хватает, — та же практика,
  * что в городских проектах. Красное число говорит не только «нельзя», но и чего именно
  * не хватает, а значит — что делать следующим ходом. */
-function Need({ short, children }: { short: boolean; children: ReactNode }) {
-  return <b className={short ? "font-bold text-bad" : "font-normal"}>{children}</b>;
+function Need({
+  short,
+  children,
+  tone = "plain",
+}: {
+  short: boolean;
+  children: ReactNode;
+  tone?: "plain" | "money" | "influence";
+}) {
+  const toneClass = tone === "money" ? "text-money" : tone === "influence" ? "text-influence" : "";
+  return <b className={short ? "font-bold text-bad" : `font-semibold ${toneClass}`}>{children}</b>;
 }
 
 
@@ -101,13 +110,13 @@ export function ActionsPanel({
     >
       <Panel className="pb-2">
         <div className={`flex items-center gap-2 px-0.5 pt-px pb-[2px] ${zoneRule}`}>
-          <h2 className="text-[11px] font-bold uppercase tracking-[0.09em] text-ink-muted">Действия</h2>
+          <h2 className="text-[11px] font-bold uppercase tracking-[0.09em] text-[var(--zone-accent)]">Действия</h2>
           <span className="ml-auto flex gap-1">
             {Array.from({ length: Math.max(3, game.actions_left) }).map((_, position) => (
               <i
                 key={position}
                 className={`size-[9px] rounded-full ${
-                  position < game.actions_left ? "bg-good shadow-[0_0_6px_#39c47a66]" : "bg-line-2"
+                  position < game.actions_left ? "bg-good" : "bg-line-2"
                 }`}
               />
             ))}
@@ -118,7 +127,12 @@ export function ActionsPanel({
       <Panel>
         <div className="px-0.5 text-3xs uppercase tracking-[0.08em] text-ink-dim">Базовые</div>
         <div className="mt-1.5 grid grid-cols-2 gap-1">
-          <ActionButton label="Заказ" cost="+2$ в кошелёк" state={work} onClick={() => act(work)} />
+          <ActionButton
+            label="Заказ"
+            cost={<><span className="font-semibold text-money">+2$</span> в кошелёк</>}
+            state={work}
+            onClick={() => act(work)}
+          />
           {tiers.map(tier => {
             const campaign = resolve(context, "basic_action", { kind: "campaign", spend: tier.spend });
             return (
@@ -127,7 +141,8 @@ export function ActionsPanel({
                 label="Обмен"
                 cost={
                   <>
-                    <Need short={me.money < tier.spend}>{tier.spend}$</Need> → {tier.gain}◆
+                    <Need short={me.money < tier.spend} tone="money">{tier.spend}$</Need>
+                    {" → "}<span className="font-semibold text-influence">{tier.gain}◆</span>
                   </>
                 }
                 state={campaign}
@@ -139,7 +154,8 @@ export function ActionsPanel({
             label="Патронаж"
             cost={
               <>
-                <Need short={me.money < patron.money}>{patron.money}$</Need> → {patron.points} оч
+                    <Need short={me.money < patron.money} tone="money">{patron.money}$</Need>
+                    {" → "}<span className="font-semibold text-points">{patron.points} оч</span>
               </>
             }
             state={patronAction}
@@ -150,8 +166,8 @@ export function ActionsPanel({
             label="Лоббирование"
             cost={
               <>
-                <Need short={me.influence < lobby.influence}>{lobby.influence}◆</Need> →{" "}
-                {lobby.points} оч
+                    <Need short={me.influence < lobby.influence} tone="influence">{lobby.influence}◆</Need>
+                    {" → "}<span className="font-semibold text-points">{lobby.points} оч</span>
               </>
             }
             state={lobbyAction}
@@ -167,7 +183,7 @@ export function ActionsPanel({
                 "−1 ⚠ скандал"
               ) : (
                 <>
-                  <Need short={me.influence < crisisPrInfluence(meta)}>
+                  <Need short={me.influence < crisisPrInfluence(meta)} tone="influence">
                     {crisisPrInfluence(meta)}◆
                   </Need>{" "}
                   → −1 ⚠ скандал
@@ -181,7 +197,7 @@ export function ActionsPanel({
             label="Крыша"
             cost={
               <>
-                <Need short={me.money < roofPrice(game)}>{roofPrice(game)}$</Need> · есть {me.roofs}{" "}
+                <Need short={me.money < roofPrice(game)} tone="money">{roofPrice(game)}$</Need> · есть {me.roofs}{" "}
                 из {me.roof_limit}
               </>
             }
@@ -265,8 +281,8 @@ export function ActionsPanel({
         type="button"
         disabled={endTurn.kind !== "ready"}
         onClick={() => act(endTurn)}
-        className="rounded-[7px] bg-good px-2 py-2.5 text-center text-[13.5px] font-extrabold
-          text-[#04130b] enabled:hover:brightness-110 disabled:bg-panel-2 disabled:text-ink-muted
+        className="rounded-[7px] border border-good bg-[#1a2a21] px-2 py-2.5 text-center text-[13.5px]
+          font-extrabold text-good enabled:hover:bg-[#203429] disabled:border-line disabled:bg-panel-2 disabled:text-ink-muted
           disabled:opacity-60"
       >
         {endTurn.kind === "pending" ? "Завершаем…" : "Завершить ход"}
@@ -404,12 +420,12 @@ function PowerButton({
     >
       <button
         type="button"
-        className={`grid min-w-0 gap-px rounded-md border bg-panel-2 px-[7px] py-[5px] hover:border-accent
-          ${danger ? "border-[#5c3340]" : "border-line"}`}
+          className={`grid min-w-0 gap-px rounded-md border bg-panel-2 px-[7px] py-[5px]
+          hover:bg-panel-3 ${danger ? "border-[#594047] hover:border-bad" : "border-line hover:border-line-2"}`}
       >
         <b
           className={`overflow-hidden text-ellipsis whitespace-nowrap text-[11.5px] font-semibold ${
-            danger ? "text-[#ff9aa8]" : "text-ink"
+            danger ? "text-bad" : "text-ink"
           }`}
         >
           {label}

@@ -1,6 +1,6 @@
 import { forwardRef, type ForwardedRef } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { assetEffectLines, assetPoints, districtCount } from "../../online/gameUi";
+import { assetEffectLines, assetPoints, districtCount, districtSynergyValue } from "../../online/gameUi";
 import type { AssetMeta, CityMeta, DistrictMeta, LegalAction, OwnedAsset } from "../../online/types";
 import { AssetFace, assetFaceGrid, assetFaceGridPortrait, assetFaceStyle } from "../primitives/AssetFace";
 import { CardPopover, PopoverBody, PopoverFooter, PopoverHeader } from "../primitives/CardPopover";
@@ -103,7 +103,7 @@ export function CityPanel({
           <div
             key={`free-${position}`}
             className="grid place-content-center justify-items-center gap-1 rounded-card border
-              border-dashed border-line bg-[#0e1720] px-[7px] py-1.5 text-ink-dim"
+              border-dashed border-line bg-surface px-[7px] py-1.5 text-ink-dim"
           >
             <b className="text-[11.5px] text-ink-muted">Слот {me.assets.length + position + 1}</b>
             <span className="text-3xs">Свободно</span>
@@ -134,11 +134,11 @@ export function CityPanel({
                     : "Сначала откройте предыдущий слот"
               }
               className="grid place-content-center justify-items-center gap-[3px] rounded-card
-                border border-dashed border-[#3d3050] bg-[#141019] px-[7px] py-1.5
+                border border-dashed border-line bg-surface px-[7px] py-1.5
                 enabled:hover:border-accent disabled:opacity-60"
             >
               <b className="text-[11.5px] text-ink-muted">🔒 Слот {slot + 1}</b>
-              <span className="rounded border border-[#52407a] bg-[#2a2140] px-2 py-0.5 text-2xs text-[#c9b3ef]">
+              <span className="rounded bg-panel-3 px-2 py-0.5 text-2xs text-influence">
                 Открыть · <b className={short ? "font-bold text-bad" : ""}>{price ?? "?"}$</b>
               </span>
             </button>
@@ -172,10 +172,12 @@ const OwnedSlot = forwardRef(function OwnedSlot({
 }, ref: ForwardedRef<HTMLButtonElement>) {
   const value = assetPoints(asset);
   const portrait = useIsPortrait();
+  const districtSynergy = districtSynergyValue(owns);
   return (
     <button
       ref={ref}
       type="button"
+      data-ui="asset-card"
       style={assetFaceStyle(district?.color, asset.rarity)}
       className={portrait ? assetFaceGridPortrait : assetFaceGrid}
       {...rest}
@@ -192,8 +194,7 @@ const OwnedSlot = forwardRef(function OwnedSlot({
         topLeft={null}
         topRight={
           <span
-            className={`rounded-[10px] border border-line-2 bg-panel-3 font-extrabold
-              whitespace-nowrap text-[var(--color-badge)] ${
+            className={`rounded-md bg-panel px-1.5 font-bold whitespace-nowrap text-points ${
                 portrait ? "px-1 text-3xs" : "px-1.5 text-[11px]"
               }`}
           >
@@ -207,17 +208,18 @@ const OwnedSlot = forwardRef(function OwnedSlot({
               * шесть заняты. */}
             <span
               className="h-[13px] overflow-hidden text-ellipsis whitespace-nowrap rounded px-1
-                text-3xs font-semibold leading-[13px] text-good"
+                text-3xs font-semibold leading-[13px] text-money"
             >
               {portrait ? `${value}$` : `Продать за ${value}$`}
             </span>
-            <span
-              className={`whitespace-nowrap text-[15px] font-extrabold leading-none tabular-nums ${
-                owns >= 2 ? "text-good" : "text-ink"
-              }`}
+            <span className="flex items-baseline gap-1 whitespace-nowrap text-3xs text-ink-dim"
               title="Ваши объекты этого района. Синергия включается на 2 и на 4."
             >
-              {owns}/4
+              район
+              <b className={`text-[12px] tabular-nums ${owns >= 2 ? "text-good" : "text-ink-muted"}`}>
+                {owns}/4
+              </b>
+              {districtSynergy > 0 && <b className="text-money">+{districtSynergy}$</b>}
             </span>
           </span>
         }
@@ -247,6 +249,8 @@ function OwnedDetails({
 }) {
   const value = assetPoints(asset);
   const lines = assetEffectLines(asset, context.me, meta, index.assets, { includeSynergy: true });
+  const objectLines = lines.filter(line => line.kind !== "district" && line.kind !== "sector");
+  const districtLines = lines.filter(line => line.kind === "district" || line.kind === "sector");
   const owns = districtCount(context.me, asset.district, index.assets);
 
   return (
@@ -261,7 +265,8 @@ function OwnedDetails({
             ["Продажа", `${value}$ — половина цены · не требует действия`],
           ]}
         />
-        <EffectList lines={lines} />
+        <EffectList title="Свойства объекта" lines={objectLines} />
+        <EffectList title="Правила района" lines={districtLines} />
         <p>
           Продажа возвращает ровно столько, сколько объект даёт очков, — смысл только в том, что
           покупается вместо. Слот освобождается сразу, действие не тратится.
@@ -272,8 +277,8 @@ function OwnedDetails({
           type="button"
           disabled={sellState.kind !== "ready"}
           onClick={onSell}
-          className="rounded-md border border-[#5c3340] px-2 py-2 text-center text-xs font-semibold
-            text-[#ff9aa8] enabled:hover:border-bad disabled:opacity-50"
+          className="rounded-md border border-[#594047] bg-[#21161a] px-2 py-2 text-center text-xs
+            font-semibold text-bad enabled:hover:border-bad disabled:opacity-50"
         >
           {sellState.kind === "ready"
             ? `Продать за ${value}$`

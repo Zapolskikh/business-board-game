@@ -47,11 +47,11 @@ export function CardPopover({
             />
           )}
           <Dialog.Content
+            data-ui="card-details"
             aria-describedby={undefined}
             className="ui-v2 fixed left-1/2 top-1/2 z-[61] grid max-h-[85dvh] w-[min(94vw,360px)]
               -translate-x-1/2 -translate-y-1/2 grid-rows-[minmax(0,1fr)_auto] overflow-hidden
-              rounded-[12px] border border-line-2 bg-panel font-sans text-ink
-              shadow-[0_24px_80px_#000c]"
+              rounded-[12px] border border-line-2 bg-panel font-sans text-ink"
           >
             <Dialog.Title className="sr-only">{label ?? "Подробности"}</Dialog.Title>
             <div className="overflow-auto">{content}</div>
@@ -71,13 +71,14 @@ export function CardPopover({
       <Popover.Trigger asChild>{children}</Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
+          data-ui="card-details"
           side={side}
           align={align}
           sideOffset={8}
           collisionPadding={10}
           aria-label={label}
           className="ui-v2 z-50 w-[340px] max-h-[min(460px,80vh)] overflow-auto rounded-[10px]
-            border border-line-2 bg-panel font-sans text-ink shadow-[0_20px_60px_#000c]"
+            border border-line-2 bg-panel font-sans text-ink"
         >
           {content}
           <Popover.Arrow className="fill-line-2" width={12} height={6} />
@@ -90,9 +91,9 @@ export function CardPopover({
 /** Шапка/подвал контента — общие для всех поповеров, поэтому живут рядом с обёрткой. */
 export function PopoverHeader({ title, subtitle }: { title: ReactNode; subtitle?: ReactNode }) {
   return (
-    <div className="flex items-baseline gap-2 border-b border-line px-3 py-2.5">
-      <b className="flex-1 text-[13.5px] font-bold">{title}</b>
-      {subtitle && <span className="text-2xs text-ink-dim">{subtitle}</span>}
+    <div className="flex min-w-0 items-baseline gap-2 border-b border-line px-3 py-2.5">
+      <b className="min-w-0 flex-1 text-[13.5px] font-bold">{title}</b>
+      {subtitle && <span className="shrink-0 text-2xs text-ink-dim">{subtitle}</span>}
     </div>
   );
 }

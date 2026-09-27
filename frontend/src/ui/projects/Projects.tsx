@@ -202,23 +202,23 @@ const ProjectCard = forwardRef<
     <button
       ref={ref}
       type="button"
+      data-ui="project-card"
       data-state={pending ? "pending" : ready ? "ready" : met ? "met" : "locked"}
-      className="grid w-full gap-[3px] rounded-card border border-line bg-panel-2 px-[7px] py-1.5
-        text-left hover:border-accent
-        data-[state=ready]:border-[#2f7a4d] data-[state=ready]:bg-[#13291d]
+      className="game-card grid min-w-0 w-full gap-[3px] overflow-hidden rounded-card border
+        border-[#8f75a7] bg-panel-2 px-[7px] py-1.5 text-left hover:bg-panel-3
+        data-[state=ready]:border-good data-[state=ready]:bg-[#d4dec8]
         data-[state=pending]:animate-pulse"
       {...rest}
     >
-      <span className="flex items-baseline gap-1.5">
+      <span className="flex min-w-0 items-baseline gap-1.5 overflow-hidden">
         <b
-          className={`flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-semibold ${
+          className={`min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-semibold ${
             portrait ? "text-[11px]" : "text-[12.5px]"
           }`}
         >
           {project.title}
         </b>
-        <span className="rounded-[10px] border border-line-2 bg-panel-3 px-1.5 text-[11px]
-          font-extrabold whitespace-nowrap text-[var(--color-badge)]">
+        <span className="rounded-md bg-panel px-1.5 text-[11px] font-bold whitespace-nowrap text-points">
           {project.points} оч
         </span>
         {veto && (
@@ -237,7 +237,7 @@ const ProjectCard = forwardRef<
         )}
         {leaving && (
           <span
-            className="rounded bg-[#3a2d12] px-1 text-3xs text-[var(--color-warning)]"
+            className="rounded bg-[#ead5ae] px-1 text-3xs text-[var(--color-warning)]"
             title="Уходит в конце раунда"
           >
             ⏳
@@ -252,18 +252,17 @@ const ProjectCard = forwardRef<
         * Красным горит именно та цифра, которой не хватает, — независимо от условия.
         * «✓ готово» рядом с недоступной кнопкой сбивало с толку: выполнено требование,
         * а не покупка, и второй половины ответа на карточке не было. */}
-      <span className="flex items-center gap-1.5">
-        <span className="flex-1 text-[11.5px] font-semibold">
-          <span className={shortInfluence ? "text-bad" : undefined}>{project.cost_influence}◆</span>
+      <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+        <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-[11.5px] font-semibold">
+          <span className={shortInfluence ? "text-bad" : "text-influence"}>{project.cost_influence}◆</span>
           {" + "}
-          <span className={shortMoney ? "text-bad" : undefined}>{project.cost_money}$</span>
+          <span className={shortMoney ? "text-bad" : "text-money"}>{project.cost_money}$</span>
         </span>
         {(counted || standing) && (
           <span
             data-met={met || undefined}
-            className="rounded-[10px] border border-line bg-panel-3 px-1.5 text-[11px] font-extrabold
-              tabular-nums whitespace-nowrap text-ink-muted
-              data-[met]:border-[#2f7a4d] data-[met]:bg-[#13291d] data-[met]:text-good"
+            className="rounded-md bg-panel px-1.5 text-[11px] font-bold tabular-nums whitespace-nowrap
+              text-ink-muted data-[met]:text-good"
           >
             {counted ? `${standing.have}/${standing.needed}` : met ? "✓ готово" : "не готово"}
           </span>
@@ -370,8 +369,8 @@ function ProjectDetails({
           type="button"
           disabled={state.kind !== "ready"}
           onClick={onTake}
-          className="rounded-md border border-good bg-good px-2 py-2 text-center text-xs font-semibold
-            text-[#04130b] disabled:border-line disabled:bg-panel-2 disabled:text-ink-muted disabled:opacity-60"
+          className="rounded-md border border-good bg-[#1a2a21] px-2 py-2 text-center text-xs
+            font-semibold text-good disabled:border-line disabled:bg-panel-2 disabled:text-ink-muted disabled:opacity-60"
         >
           {state.kind === "ready"
             ? `Взять · ${project.cost_influence}◆ + ${project.cost_money}$`

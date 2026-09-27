@@ -26,14 +26,15 @@ export function Modal({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-[#0009]" />
         <Dialog.Content
+          data-ui="modal"
           style={{ width: `min(${width}px, 94vw)` }}
           className="ui-v2 fixed left-1/2 top-1/2 z-50 grid max-h-[88vh] -translate-x-1/2 -translate-y-1/2
             grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-[12px] border border-line-2
-            bg-panel font-sans text-ink shadow-[0_24px_80px_#000c]"
+            bg-panel font-sans text-ink"
         >
-          <div className="flex items-baseline gap-2 border-b border-line px-3.5 py-2.5">
-            <Dialog.Title className="flex-1 text-sm font-bold">{title}</Dialog.Title>
-            {subtitle && <span className="text-2xs text-ink-dim">{subtitle}</span>}
+          <div className="flex min-w-0 items-baseline gap-2 border-b border-line px-3.5 py-2.5">
+            <Dialog.Title className="min-w-0 flex-1 truncate text-sm font-bold">{title}</Dialog.Title>
+            {subtitle && <span className="shrink-0 text-2xs text-ink-dim">{subtitle}</span>}
             <Dialog.Close className="px-1 text-base text-ink-dim hover:text-ink" aria-label="Закрыть">
               ✕
             </Dialog.Close>
@@ -72,10 +73,11 @@ export function DetailsModal({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-[#0009]" />
         <Dialog.Content
+          data-ui="details-modal"
           style={{ width: `min(${width}px, 94vw)` }}
           className="ui-v2 fixed left-1/2 top-1/2 z-50 grid max-h-[88vh] -translate-x-1/2 -translate-y-1/2
             grid-rows-[minmax(0,1fr)] overflow-auto rounded-[12px] border border-line-2 bg-panel
-            font-sans text-xs leading-relaxed text-ink-muted shadow-[0_24px_80px_#000c]"
+            font-sans text-xs leading-relaxed text-ink-muted [&>div:first-of-type]:pr-10"
         >
           <Dialog.Title className="sr-only">{label}</Dialog.Title>
           <Dialog.Close

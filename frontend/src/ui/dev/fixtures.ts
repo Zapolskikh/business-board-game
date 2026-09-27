@@ -24,21 +24,21 @@ import type {
  */
 
 export const districts: DistrictMeta[] = [
-  { id: "residential", title: "Спальный район", icon: "🏘️", color: "#4fa3d1", description: "Жильё и сервис." },
-  { id: "business", title: "Деловой центр", icon: "🏙️", color: "#d7aa3d", description: "Офисы и финансы." },
-  { id: "industrial", title: "Промзона", icon: "🏭", color: "#b56f42", description: "Логистика и производство." },
-  { id: "tech", title: "Технокластер", icon: "🧠", color: "#9b6ee7", description: "Технологии и данные." },
-  { id: "government", title: "Административный квартал", icon: "🏛️", color: "#5f78c8", description: "Власть и регламент." },
-  { id: "shadows", title: "Серый сектор", icon: "🌒", color: "#8a455e", description: "То, о чём не пишут." },
+  { id: "residential", title: "Спальный район", icon: "🏘️", color: "#8fc4d8", description: "Жильё и сервис." },
+  { id: "business", title: "Деловой центр", icon: "🏙️", color: "#d9bd78", description: "Офисы и финансы." },
+  { id: "industrial", title: "Промзона", icon: "🏭", color: "#d9a17e", description: "Логистика и производство." },
+  { id: "tech", title: "Технокластер", icon: "🧠", color: "#bca1d9", description: "Технологии и данные." },
+  { id: "government", title: "Административный квартал", icon: "🏛️", color: "#9aaee6", description: "Власть и регламент." },
+  { id: "shadows", title: "Серый сектор", icon: "🌒", color: "#ca91a4", description: "То, о чём не пишут." },
 ];
 
 export const roles: RoleMeta[] = [
-  { id: "capitalist", title: "Капиталист", icon: "💼", color: "#d4af37", passive: "+1$ за каждый свой объект, +1◆ за объект Промзоны.", power: "Метка на карту рынка.", districts: ["business"] },
-  { id: "politician", title: "Политик", icon: "🏛️", color: "#4f7de0", passive: "+1◆ за каждый жилой объект на столе.", power: "Чистка, Договоримся, Право вето.", districts: ["government"] },
-  { id: "journalist", title: "Журналист", icon: "📰", color: "#32a86a", passive: "Рейтинг: +1◆ за свой скандал при жилом объекте.", power: "Раздуть скандал и Публикация.", districts: [] },
-  { id: "fraudster", title: "Аферист", icon: "🎭", color: "#aa68ee", passive: "4 действия, +30% к шансу серых операций.", power: "Криптоскам: 25% кошельков соперников.", districts: ["tech"] },
-  { id: "mafia", title: "Мафиози", icon: "🔪", color: "#b84343", passive: "Предел Крыш 2 вместо 1, Крыша дешевле.", power: "Рэкет, Замять дело, Серая метка.", districts: ["shadows"] },
-  { id: "military", title: "Силовик", icon: "⚖️", color: "#70848b", passive: "Читает счётчик скандалов цели.", power: "Санкция, Проверка, Отобрать Крышу.", districts: ["industrial"] },
+  { id: "capitalist", title: "Капиталист", icon: "💼", color: "#d9bd78", passive: "+1$ за каждый свой объект, +1◆ за объект Промзоны.", power: "Метка на карту рынка.", districts: ["business"] },
+  { id: "politician", title: "Политик", icon: "🏛️", color: "#9aaee6", passive: "+1◆ за каждый жилой объект на столе.", power: "Чистка, Договоримся, Право вето.", districts: ["government"] },
+  { id: "journalist", title: "Журналист", icon: "📰", color: "#8fc7aa", passive: "Рейтинг: +1◆ за свой скандал при жилом объекте.", power: "Раздуть скандал и Публикация.", districts: [] },
+  { id: "fraudster", title: "Аферист", icon: "🎭", color: "#c0a2dc", passive: "4 действия, +30% к шансу серых операций.", power: "Криптоскам: 25% кошельков соперников.", districts: ["tech"] },
+  { id: "mafia", title: "Мафиози", icon: "🔪", color: "#d4939a", passive: "Предел Крыш 2 вместо 1, Крыша дешевле.", power: "Рэкет, Замять дело, Серая метка.", districts: ["shadows"] },
+  { id: "military", title: "Силовик", icon: "⚖️", color: "#aab5bd", passive: "Читает счётчик скандалов цели.", power: "Санкция, Проверка, Отобрать Крышу.", districts: ["industrial"] },
 ];
 
 export const assets: AssetMeta[] = [
@@ -51,6 +51,9 @@ export const assets: AssetMeta[] = [
   { id: "city_ecosystem", title: "Городская экосистема", district: "government", rarity: "legendary", cost: 16, income: 0, influence: 2, points: 8, text: "+2◆ за раунд. Синергия 4+: +1◆ каждый раунд.", tags: ["administration"] },
   { id: "media_net", title: "Городская медиасеть", district: "residential", rarity: "uncommon", cost: 7, income: 1, influence: 0, points: 3, text: "+1◆ за раунд, если есть объект Административного квартала.", tags: ["media"] },
   { id: "pawnshops", title: "Ломбардная сеть", district: "shadows", rarity: "rare", cost: 9, income: 2, influence: 0, points: 4, text: "Открывает «Вброс» и «Пробить крышу».", tags: ["shadow"] },
+  { id: "industrial_cluster", title: "Промышленный кластер", district: "industrial", rarity: "epic", cost: 13, income: 3, influence: 0, points: 6, text: "+1$ за каждый связанный район. Синергия 4+: +1◆ каждый раунд.", tags: ["production", "infrastructure"], effects: { districtLinks: [{ district: "residential", value: 1 }, { district: "business", value: 1 }, { district: "shadows", value: 1 }], synergyInfluence: 1 } },
+  { id: "city_management_centre", title: "Центр городского управления", district: "government", rarity: "epic", cost: 12, income: 1, influence: 2, points: 6, text: "+1$ за каждый связанный район. Синергия 4+: +1◆ каждый раунд.", tags: ["government", "infrastructure"], effects: { districtLinks: [{ district: "residential", value: 1 }, { district: "business", value: 1 }, { district: "industrial", value: 1 }, { district: "tech", value: 1 }], synergyInfluence: 1 } },
+  { id: "regulator", title: "Федеральное агентство развития", district: "government", rarity: "epic", cost: 12, income: 2, influence: 3, points: 6, text: "+1$ за Политика и +2$ при наличии объекта Делового центра. Синергия 4+: +1◆ каждый раунд.", tags: ["government", "finance"], effects: { roleBonus: { role: "politician", value: 1 }, districtBonus: { district: "business", value: 2 }, synergyInfluence: 1 } },
 ];
 
 export const projects: ProjectMeta[] = [
@@ -161,9 +164,15 @@ const basePlayers: PlayerState[] = [
     ],
     projects: ["archive", "social_housing"],
   }),
-  player({ id: "p-bot3", name: "Bot 3", difficulty: "easy", money: 11, influence: 4, roofs: 2, jail_turns: 2, turns: 5, assets: [
-    { uid: "o-9", card_id: "auto_warehouse" },
-  ] }),
+  // Стресс-кейс левой колонки: длинная роль, пять объектов и предупреждение третьей строкой.
+  player({ id: "p-bot3", name: "Bot 3", difficulty: "easy", role: "mafia", money: 11, influence: 4,
+    roofs: 2, scandals: 4, capacity: 6, turns: 5, assets: [
+      { uid: "o-9", card_id: "auto_warehouse" },
+      { uid: "o-10", card_id: "pawnshops" },
+      { uid: "o-11", card_id: "coworking" },
+      { uid: "o-12", card_id: "insurance" },
+      { uid: "o-13", card_id: "media_net" },
+    ] }),
 ];
 
 const baseMarket: MarketAsset[] = [
@@ -288,6 +297,34 @@ export function makeRoom(overrides: Partial<RoomView> = {}): RoomView {
 /** Именованные позиции для галереи. Каждая ставит карточки рынка в нужное состояние. */
 export const scenarios = {
   "Слоты заняты": makeRoom(),
+
+  "Максимум текста": (() => {
+    const market: MarketAsset[] = [
+      { uid: "stress-1", card_id: "industrial_cluster", price: 13 },
+      { uid: "stress-2", card_id: "city_management_centre", price: 12 },
+      { uid: "stress-3", card_id: "regulator", price: 12 },
+      { uid: "stress-4", card_id: "industrial_cluster", price: 13 },
+      { uid: "stress-5", card_id: "city_management_centre", price: 12 },
+      { uid: "stress-6", card_id: "regulator", price: 12 },
+    ];
+    const game = makeGame({
+      market,
+      players: basePlayers.map(item => item.id === ME ? {
+        ...item,
+        role: "politician",
+        capacity: 6,
+        assets: [
+          { uid: "stress-owned-1", card_id: "city_management_centre" },
+          { uid: "stress-owned-2", card_id: "industrial_cluster" },
+          { uid: "stress-owned-3", card_id: "regulator" },
+          { uid: "stress-owned-4", card_id: "media_net" },
+          { uid: "stress-owned-5", card_id: "flex_offices" },
+          { uid: "stress-owned-6", card_id: "coworking" },
+        ],
+      } : { ...item }),
+    });
+    return makeRoom({ game, legal_actions: [{ type: "end_turn", payload: {} }] });
+  })(),
 
   "Есть свободный слот": makeRoom({
     game: makeGame({

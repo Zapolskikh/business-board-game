@@ -1,24 +1,54 @@
-import type { ReactNode } from "react";
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import type { CityMeta, GameState, PlayerState } from "../../online/types";
 import { otherUiLabel, switchUi } from "../../online/uiVersion";
 import { CardPopover } from "../primitives/CardPopover";
 import { ActionsDetails, DefenceDetails, ScoreDetails } from "./headerPopovers";
 import { atScandalRisk, scandalLimit } from "../lib/board";
 
-function Res({ children, label }: { children: ReactNode; label: string }) {
+type ButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
+  children: ReactNode;
+  label: string;
+};
+
+/* Оба компонента бывают Radix-триггерами через `asChild`, поэтому ref обязан доходить
+ * до настоящей кнопки. Иначе поповер существует, но остаётся в скрытой позиции. */
+const Res = forwardRef<HTMLButtonElement, ButtonProps>(function Res(
+  { children, label, className = "", ...rest },
+  ref,
+) {
   return (
     <button
+      ref={ref}
       type="button"
       aria-label={label}
-      className="flex items-center gap-1 rounded-[14px] px-2 py-[3px] text-[13px] font-bold
-        whitespace-nowrap hover:bg-panel-3"
+      className={`flex items-center gap-1 rounded-[14px] px-2 py-[3px] text-[13px] font-bold
+        whitespace-nowrap hover:bg-panel-3 ${className}`}
+      {...rest}
     >
       {children}
     </button>
   );
-}
+});
 
-const Sep = () => <span className="h-4 w-px bg-line-2" />;
+const HudStat = forwardRef<HTMLButtonElement, ButtonProps>(function HudStat(
+  { children, label, className = "", ...rest },
+  ref,
+) {
+  return (
+    <button
+      ref={ref}
+      type="button"
+      aria-label={label}
+      className={`grid min-w-0 content-center gap-px px-2.5 py-1 text-left hover:bg-panel-3 ${className}`}
+      {...rest}
+    >
+      <span className="text-[8px] font-semibold uppercase tracking-[0.1em] text-ink-dim">{label}</span>
+      <span className="flex items-center gap-1.5 whitespace-nowrap text-[12.5px] font-bold">{children}</span>
+    </button>
+  );
+});
+
+const Sep = () => <span className="h-4 w-px shrink-0 self-center bg-line-2" />;
 
 /* Шапка: слева кто мы и где, по центру всё, на что смотрят перед кликом, справа выходы.
  *
@@ -50,6 +80,8 @@ export function Header({
 }) {
   const score = game.score_breakdown?.[me.id]?.total ?? 0;
   const risky = atScandalRisk(me);
+  const role = meta.roles.find(item => item.id === me.role);
+  const income = game.round_forecast;
   /* Подпись у кнопки есть всегда — на узком экране она уезжает в aria-label, а не пропадает.
    * Кнопки те же самые: разница только в том, показывать ли слово рядом со значком. */
   const caption = (text: string) => (compact ? "" : ` ${text}`);
@@ -71,7 +103,7 @@ export function Header({
             bg-panel-2 px-1 py-0.5 [&_button]:gap-0.5 [&_button]:px-1 [&_button]:py-0
             [&_button]:text-[11px]"
         >
-          {chips()}
+          {compactChips()}
         </div>
       </header>
     );
@@ -90,9 +122,12 @@ export function Header({
         <em className="text-3xs not-italic text-ink-dim">{roomName}</em>
       </div>
 
-      <div className="flex items-center gap-1 justify-self-center rounded-[20px] border border-line
-        bg-panel-2 px-1.5 py-1">
-        {chips()}
+      <div
+        data-ui="player-hud"
+        className="flex min-w-0 max-w-[760px] items-stretch justify-self-center overflow-hidden rounded-lg
+          border border-line bg-panel-2"
+      >
+        {dashboard()}
       </div>
 
       <div className="flex gap-1.5">{buttons()}</div>
@@ -102,28 +137,28 @@ export function Header({
   /* Ресурсы и кнопки — один и тот же список для обеих раскладок; различается только обёртка.
    * Объявлены функциями после `return`: подъём объявлений позволяет держать их внизу файла,
    * рядом друг с другом, а не разрывать разметку шапки на две части. */
-  function chips() {
+  function compactChips() {
     return (
       <>
         <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
-          <Res label="Очки">🏆 {score}</Res>
+          <Res label="Очки" className="text-points">★ {score}</Res>
         </CardPopover>
         <Sep />
         <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
-          <Res label="Деньги">💰 {me.money}</Res>
+          <Res label="Деньги" className="text-money">● {me.money}$</Res>
         </CardPopover>
         <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
-          <Res label="Влияние">◆ {me.influence}</Res>
+          <Res label="Влияние" className="text-influence">◆ {me.influence}</Res>
         </CardPopover>
         <Sep />
         <CardPopover side="bottom" align="center" content={<DefenceDetails game={game} me={me} />}>
-          <Res label="Крыши">
+          <Res label="Крыши" className="text-defence">
             🛡 {me.roofs}
             <span className="text-2xs font-normal text-ink-dim">/{me.roof_limit}</span>
           </Res>
         </CardPopover>
         <CardPopover side="bottom" align="center" content={<DefenceDetails game={game} me={me} />}>
-          <Res label="Скандалы">
+          <Res label="Скандалы" className={risky ? "text-warning" : "text-ink-muted"}>
             <span className={risky ? "text-[var(--color-warning)]" : undefined}>
               ⚠ {me.scandals}
               <span className="text-2xs font-normal text-ink-dim">/{scandalLimit(me)}</span>
@@ -139,12 +174,81 @@ export function Header({
                 <i
                   key={index}
                   className={`size-2 rounded-full ${
-                    index < game.actions_left ? "bg-good shadow-[0_0_6px_#39c47a66]" : "bg-line-2"
+                    index < game.actions_left ? "bg-good" : "bg-line-2"
                   }`}
                 />
               ))}
             </span>
           </Res>
+        </CardPopover>
+      </>
+    );
+  }
+
+  function dashboard() {
+    return (
+      <>
+        <div className="flex min-w-[112px] items-center gap-2 px-2.5 py-1">
+          <span
+            className="grid size-7 shrink-0 place-items-center rounded-full border border-line-2 bg-panel text-sm"
+            style={{ color: role?.color }}
+          >
+            {role?.icon ?? "👤"}
+          </span>
+          <span className="grid min-w-0 gap-px">
+            <span className="text-[8px] font-semibold uppercase tracking-[0.1em] text-ink-dim">Ваша роль</span>
+            <b className="overflow-hidden text-ellipsis whitespace-nowrap text-[11.5px] text-ink">
+              {role?.title ?? "Без роли"}
+            </b>
+          </span>
+        </div>
+        <Sep />
+        <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
+          <HudStat label="Счёт" className="text-points">★ {score}</HudStat>
+        </CardPopover>
+        <Sep />
+        <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
+          <HudStat label="Ресурсы">
+            <span className="text-money">● {me.money}$</span>
+            <span className="text-influence">◆ {me.influence}</span>
+          </HudStat>
+        </CardPopover>
+        <Sep />
+        <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
+          <HudStat label="Доход раунда">
+            <span className="text-money">+{income?.money.total ?? 0}$</span>
+            <span className="text-influence">+{income?.influence.total ?? 0}◆</span>
+          </HudStat>
+        </CardPopover>
+        <Sep />
+        <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
+          <HudStat label="Город">
+            <span className="text-good">▦ {me.assets.length}/{me.capacity}</span>
+            <span className="text-points">🏛 {me.projects.length}</span>
+          </HudStat>
+        </CardPopover>
+        <Sep />
+        <CardPopover side="bottom" align="center" content={<DefenceDetails game={game} me={me} />}>
+          <HudStat label="Защита">
+            <span className="text-defence">🛡 {me.roofs}/{me.roof_limit}</span>
+            <span className={risky ? "text-warning" : "text-ink-muted"}>
+              ⚠ {me.scandals}/{scandalLimit(me)}
+            </span>
+          </HudStat>
+        </CardPopover>
+        <Sep />
+        <CardPopover side="bottom" align="end" content={<ActionsDetails game={game} />}>
+          <HudStat label="Действия">
+            <span className="flex gap-[3px]">
+              {Array.from({ length: Math.max(3, game.actions_left) }).map((_, index) => (
+                <i
+                  key={index}
+                  className={`size-2 rounded-full ${index < game.actions_left ? "bg-good" : "bg-line-2"}`}
+                />
+              ))}
+            </span>
+            <span className="text-ink-muted">{game.actions_left}</span>
+          </HudStat>
         </CardPopover>
       </>
     );
@@ -196,16 +300,8 @@ export function Header({
   }
 }
 
-/* Полоса статуса.
- *
- * Высота постоянная, и место под неё занято всегда, даже когда сказать нечего. Раньше
- * полоса схлопывалась — и на каждое действие доска дёргалась: команда уходит на сервер,
- * появляется «Сервер выполняет…», всё под ней съезжает вниз; приходит ответ, полоса
- * исчезает, всё возвращается. Дважды за действие, и как раз в тот момент, когда Motion
- * анимирует карточки, — из-за чего анимации ещё и сбивались.
- *
- * Пустая полоса вместо схлопнутой стоит одной строки высоты и снимает и то и другое.
- */
+/* Полоса оставлена только для исключительных состояний. Текущий ход теперь виден прямо
+ * на карточке игрока, поэтому отдельная пустая строка «Ваш ход / ход игрока» не нужна. */
 export function StatusBar({
   game,
   me,
@@ -217,8 +313,6 @@ export function StatusBar({
   busy: boolean;
   error: string;
 }) {
-  const current = game.players[game.current_player_index];
-  const mine = current?.id === me.id;
   const base = "flex h-[26px] items-center gap-2 rounded-md border px-2.5 text-[11.5px]";
 
   if (error) {
@@ -242,16 +336,6 @@ export function StatusBar({
       <div className={`${base} border-[#6b5518] bg-[#2a2411] text-gold`}>🏁 Партия окончена</div>
     );
   }
-  if (!mine) {
-    return (
-      <div className={`${base} border-line bg-panel-2 text-ink-muted`}>
-        <span>⏳</span>
-        <span>
-          Ход игрока <b className="text-ink">{current?.name}</b>
-        </span>
-      </div>
-    );
-  }
   if (me.jail_turns > 0) {
     return (
       <div className={`${base} border-[#7d3c45] bg-[#2a1519] text-[#ffb3b3]`}>
@@ -259,10 +343,5 @@ export function StatusBar({
       </div>
     );
   }
-  return (
-    <div className={`${base} border-transparent text-ink-dim`}>
-      <span>✓</span>
-      <span>Ваш ход</span>
-    </div>
-  );
+  return null;
 }

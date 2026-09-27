@@ -78,7 +78,7 @@ export function RolesDetails({
         )}
 
         {!me.role && (
-          <p className="text-gold">
+          <p className="text-warning">
             У вас нет роли. Без роли один скандал снимается сам в начале хода, но пассивных доходов нет.
           </p>
         )}

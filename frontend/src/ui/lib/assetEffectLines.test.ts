@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { assetEffectLines, districtCount } from "../../online/gameUi";
 import { meta } from "../dev/fixtures";
+import { ASSET_FACE_EFFECT_CAP, assetFaceEffectSummary } from "../primitives/AssetFace";
 import type { AssetMeta, PlayerState } from "../../online/types";
 
 /* Таблица свойств на карточке объекта — четыре строки в два столбца, ячейка не переносится и
@@ -114,5 +115,63 @@ describe("assetEffectLines", () => {
 
     // Два построенных объекта, каждый считается за два, плюс помеченная карта рынка.
     expect(districtCount(owner, "residential", index)).toBe(5);
+  });
+
+  it("самые насыщенные карты никогда не переполняют четыре ячейки лица", () => {
+    const fullCity = player({
+      role: "politician",
+      assets: meta.assets.map((item, index) => ({ uid: `owned-${index}`, card_id: item.id })),
+    });
+    // Стресс-профиль повторяет самые тяжёлые карты каталога: четыре межрайонные связи,
+    // награда за полный район, постоянный перк и разовый эффект покупки.
+    const crowded = asset({
+      title: "Центр с максимальным числом свойств",
+      district: "government",
+      effects: {
+        districtLinks: [
+          { district: "residential", value: 1 },
+          { district: "business", value: 1 },
+          { district: "industrial", value: 1 },
+          { district: "tech", value: 1 },
+        ],
+        synergyInfluence: 2,
+        marketRefresh: 1,
+        purchase: { card: true, scandals: 1 },
+      },
+    });
+    const all = [...meta.assets, crowded].map(card => ({
+      card,
+      lines: assetEffectLines(card, fullCity, meta, catalog, { includeSynergy: true }),
+    }));
+    const largest = all.reduce((left, right) => right.lines.length > left.lines.length ? right : left);
+
+    // Проверяем путь через настоящий построитель строк, а не готовый игрушечный массив.
+    expect(largest.lines.length).toBeGreaterThan(ASSET_FACE_EFFECT_CAP);
+    for (const { card, lines } of all) {
+      const summary = assetFaceEffectSummary(lines);
+      const occupiedCells = summary.visible.length + (summary.hidden > 0 ? 1 : 0);
+      const uniqueCount = lines.filter(line => line.kind !== "district" && line.kind !== "sector").length;
+      expect(occupiedCells, card.title).toBeLessThanOrEqual(ASSET_FACE_EFFECT_CAP);
+      expect(summary.hidden, card.title).toBe(uniqueCount - summary.visible.length);
+      expect(summary.standard, card.title).toBe(lines.length - uniqueCount);
+      expect(summary.visible.every(line => line.kind !== "district" && line.kind !== "sector"), card.title)
+        .toBe(true);
+    }
+  });
+
+  it("повторяющиеся правила района отделены от уникальных свойств объекта", () => {
+    const card = asset({
+      district: "government",
+      effects: { marketRefresh: 1, roleBonus: { role: "politician", value: 2 } },
+    });
+    const lines = assetEffectLines(card, player({ role: "politician" }), meta, catalog, {
+      includeSynergy: true,
+    });
+    const summary = assetFaceEffectSummary(lines);
+
+    expect(lines.some(line => line.kind === "sector")).toBe(true);
+    expect(summary.visible.map(line => line.short)).toContain("Пересдача рынка");
+    expect(summary.visible.some(line => line.kind === "sector")).toBe(false);
+    expect(summary.standard).toBeGreaterThan(0);
   });
 });

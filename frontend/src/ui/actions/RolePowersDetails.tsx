@@ -40,7 +40,7 @@ export function RolePowersDetails({
       <>
         <PopoverHeader title="⚡ Возможности роли" subtitle="роли нет" />
         <PopoverBody>
-          <p className="text-gold">
+          <p className="text-warning">
             У вас нет роли. Без роли один скандал снимается сам в начале хода, но пассивных
             доходов и активных способностей нет. Роль стоит <strong>{game.role_price}◆</strong> и
             берётся из справочника ролей.
@@ -89,7 +89,7 @@ export function RolePowersDetails({
                   key={status.power}
                   data-on={status.available || undefined}
                   className="rounded-md border border-line bg-panel-2 px-2 py-1.5
-                    data-[on]:border-[#2f7a4d]"
+                    data-[on]:border-good"
                 >
                   <div className="flex items-baseline gap-1.5">
                     <b className="flex-1 text-xs font-semibold text-ink">
@@ -99,7 +99,7 @@ export function RolePowersDetails({
                       className={`rounded px-1 text-3xs font-semibold ${
                         status.spends_action
                           ? "bg-panel-3 text-ink-muted"
-                          : "bg-[#1d3b2a] text-[#7fdaa6]"
+                          : "bg-[#17231c] text-good"
                       }`}
                     >
                       {status.spends_action ? "⚡ действие" : "без действия"}

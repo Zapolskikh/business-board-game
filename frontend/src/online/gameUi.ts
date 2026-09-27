@@ -577,7 +577,7 @@ const eventVerbs: Record<string, string> = {
 };
 
 // Colours assigned to players by seat order — must match Game.tsx rendering.
-export const playerColors = ["#58a6ff", "#3fb950", "#f0883e", "#d65db1", "#e3b341", "#9b6ee7"];
+export const playerColors = ["#9fc4d1", "#91c5a5", "#d9a17e", "#ca91b8", "#d9bd78", "#b9a2d4"];
 
 export function playerColor(game: GameState, playerId: string | null | undefined): string {
   if (!playerId) return "var(--city-dim)";
@@ -1067,7 +1067,20 @@ export function buildGameLogMarkdown(room: RoomView, meta: CityMeta, version: st
  * самое в форме «Мафиози +1$»: сначала условие, потом число, без служебных слов.
  *
  * Один построитель на обе формы, а не два списка: разъезжаются именно копии. */
-export interface AssetEffectLine { text: string; short: string; active: boolean; boosted: boolean }
+export type AssetEffectKind = "district" | "sector" | "object" | "passive" | "purchase";
+export interface AssetEffectLine {
+  text: string;
+  short: string;
+  active: boolean;
+  boosted: boolean;
+  /** Общие правила района отделены от уникальных свойств самой карты. */
+  kind: AssetEffectKind;
+}
+
+/** Общая лестница районной синергии. Используется и в расчёте строк, и в компактном футере карты. */
+export function districtSynergyValue(count: number): number {
+  return count >= 4 ? 2 : count >= 2 ? 1 : 0;
+}
 
 /* Профильный район каждой роли: за объект своего района роль доплачивает +1$.
  *
@@ -1120,19 +1133,25 @@ export function assetEffectLines(
    * Деловым центром и Политика с Администрацией удалены в 1.12.0 вместе с чартерами, а здесь
    * дожили и рисовали галочку у условия, которого движок не засчитывает. */
   const hasLink = (district: string): boolean => districtCount(owner, district, assets) > 0;
-  const push = (text: string, label: string, active: boolean): void => {
-    lines.push({ text, short: label, active, boosted: false });
+  const push = (
+    text: string,
+    label: string,
+    active: boolean,
+    kind: AssetEffectKind = "object",
+  ): void => {
+    lines.push({ text, short: label, active, boosted: false, kind });
   };
 
   // Generic district + role synergy (only for owned cards, where it is not shown elsewhere).
   if (includeSynergy) {
     const count = districtCount(owner, asset.district, assets);
-    const synergy = count >= 4 ? 2 : count >= 2 ? 1 : 0;
+    const synergy = districtSynergyValue(count);
     if (synergy > 0) {
       push(
         `+${synergy}$ синергия района «${districtTitle(asset.district)}» (${count}/4)`,
         `Район ${count}/4: +${synergy}$`,
         true,
+        "district",
       );
     }
     // The district's matching role always grants +1$ — shown for every object of that district,
@@ -1145,6 +1164,7 @@ export function assetEffectLines(
         `+1$ пока вы «${roleTitle(synergyRole)}» (синергия сектора)`,
         `${roleTitle(synergyRole)}: район +1$`,
         hasRole(synergyRole),
+        "sector",
       );
     }
     /* Награда за глубину: эпик и легендарка полностью собранного района платят ещё и влиянием.
@@ -1262,7 +1282,7 @@ export function assetEffectLines(
       `+${numberValue(effects.takeoverCompensation)}◆, если у вас перехватят роль`,
       `+${numberValue(effects.takeoverCompensation)}◆ за перехват`,
     ]);
-  for (const [text, label] of passive) push(text, label, true);
+  for (const [text, label] of passive) push(text, label, true, "passive");
 
   const purchase = effects.purchase as
     | { money?: number; influence?: number; roofs?: number; card?: boolean; scandals?: number }
@@ -1276,7 +1296,12 @@ export function assetEffectLines(
     if (purchase.scandals) parts.push(`+${purchase.scandals} скандал`);
     // Ярлык без слова «действия»: в ячейке от него остаётся многоточие, а смысл несёт число.
     const brief = parts.map(part => part.replace(" Крыша", "🛡").replace("карта действия", "карта"));
-    if (parts.length) push(`При покупке: ${parts.join(", ")}`, `Покупка: ${brief.join(", ")}`, false);
+    if (parts.length) push(
+      `При покупке: ${parts.join(", ")}`,
+      `Покупка: ${brief.join(", ")}`,
+      false,
+      "purchase",
+    );
   }
 
   return lines;

@@ -45,7 +45,7 @@ export const atScandalRisk = (player: PlayerState): boolean =>
  * Порядок берём из turn_order, как и всё остальное: движок — единственный источник.
  * Оттенки не пересекаются с золотым (очки), зелёным (свой ход) и акцентным (я).
  */
-const PLAYER_COLORS = ["#64b5ff", "#ff8f9c", "#6fdc9b", "#c79bff"];
+const PLAYER_COLORS = ["#9fc4d1", "#d39ca5", "#91c5a5", "#b9a2d4"];
 
 export function playerColor(game: GameState, playerId: string): string {
   const position = turnPosition(game, playerId);

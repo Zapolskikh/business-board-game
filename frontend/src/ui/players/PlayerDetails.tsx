@@ -69,8 +69,11 @@ export function PlayerDetails({
       <PopoverBody>
         <KeyValue
           rows={[
-            ["Счёт", `${score?.total ?? 0} очков`],
-            ["Ресурсы", `💰${player.money} ◆${player.influence}`],
+            ["Счёт", <span className="text-points">★ {score?.total ?? 0} очков</span>],
+            [
+              "Ресурсы",
+              <span><span className="text-money">● {player.money}$</span>{" · "}<span className="text-influence">◆ {player.influence}</span></span>,
+            ],
             [
               "Скандалы",
               <span className={player.scandals >= scandalLimit(player) - 1 ? "text-[var(--color-warning)]" : undefined}>
@@ -80,9 +83,11 @@ export function PlayerDetails({
             ],
             [
               "Крыши",
-              player.roofs > 0
-                ? `${player.roofs} из ${player.roof_limit} — направленный эффект будет погашен`
-                : `0 из ${player.roof_limit} — не защищён`,
+              <span className={player.roofs > 0 ? "text-defence" : "text-ink-muted"}>
+                {player.roofs > 0
+                  ? `${player.roofs} из ${player.roof_limit} — направленный эффект будет погашен`
+                  : `0 из ${player.roof_limit} — не защищён`}
+              </span>,
             ],
             ["Очередь хода", position >= 0 ? `${position + 1}-й в этом раунде` : "—"],
             ...(player.is_bot ? ([["Бот", player.difficulty]] as [string, string][]) : []),
@@ -122,7 +127,7 @@ export function PlayerDetails({
                 return (
                   <li key={projectId} className="flex items-baseline gap-1.5">
                     <span className="text-ink">{project?.title ?? projectId}</span>
-                    <span className="ml-auto text-gold">{project?.points ?? 0} очк</span>
+                    <span className="ml-auto text-points">{project?.points ?? 0} очк</span>
                   </li>
                 );
               })}
