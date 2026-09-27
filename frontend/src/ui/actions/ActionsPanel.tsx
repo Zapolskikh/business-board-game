@@ -265,7 +265,7 @@ export function ActionsPanel({
         </div>
       </Panel>
 
-      <DetailsModal open={drawer === "roles"} onClose={() => setDrawer(null)} label="Роли">
+      <DetailsModal open={drawer === "roles"} onClose={() => setDrawer(null)} label="Роли" width={1040}>
         <RolesDetails game={game} meta={meta} index={index} context={context} onAction={onAction} />
       </DetailsModal>
       <DetailsModal open={drawer === "powers"} onClose={() => setDrawer(null)} label="Возможности роли">
