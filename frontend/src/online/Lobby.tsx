@@ -36,36 +36,165 @@ export function Lobby({ roomId, meta, initialPassword = "", playerId, onBack, on
   const join = async (index: number) => {
     setBusy(true); setError("");
     try {
-      const next = await cityApi.join(roomId, { password, seat_index: index, player_name: playerName });
+      const next = await cityApi.join(roomId, { password, seat_index: index, player_name: playerName.trim() || "Игрок" });
       setRoom(next);
-      const playerId = next.seats[index].player_id;
-      if (playerId) onJoined(password, playerId);
+      const joinedId = next.seats[index].player_id;
+      if (joinedId) onJoined(password, joinedId);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Вход не выполнен"); }
     finally { setBusy(false); }
   };
   const bot = (index: number, difficulty: Difficulty, preferred_role: string | null) => act(() => cityApi.seat(roomId, { password, seat_index: index, kind: "bot", difficulty, preferred_role }));
   const clear = (index: number) => act(() => cityApi.seat(roomId, { password, seat_index: index, kind: "empty" }));
 
-  if (!room) return <main className="online-shell"><button onClick={onBack}>← Комнаты</button><p>{error || "Загрузка…"}</p></main>;
-  return <main className="online-shell">
-    <header className="brand"><div><button onClick={onBack}>← Комнаты</button><h1>{room.name}</h1><p>{room.status === "waiting" ? "Настройте места и запустите игру" : "Выберите своё человеческое место"}</p></div></header>
-    <section className="panel lobby-auth"><label>Пароль комнаты<input type="password" value={password} onChange={event => setPassword(event.target.value)} /></label><label>Имя нового игрока<input value={playerName} maxLength={32} onChange={event => setPlayerName(event.target.value)} /></label></section>
-    {error && <p className="error">{error}</p>}
-    <section className="seat-grid">{room.seats.map(seat => <article className={`panel seat ${seat.kind}`} key={seat.index}>
-      <h3>Место {seat.index + 1}</h3>
-      <strong>{seat.kind === "empty" ? "Свободно" : seat.name}</strong>
-      {seat.kind === "bot" && <small>{difficultyLabels[seat.difficulty] ?? seat.difficulty} · {seat.preferred_role ? `цель: ${meta.roles.find(role => role.id === seat.preferred_role)?.title}` : "любая роль"}</small>}
-      {(seat.kind === "empty" || seat.kind === "human") && <button className="primary" disabled={busy || !password || (seat.kind === "empty" && room.status !== "waiting")} onClick={() => join(seat.index)}>{seat.kind === "human" ? "Сесть на это место" : "Занять"}</button>}
-      {room.status === "waiting" && seat.kind !== "human" && <BotConfigurator seat={seat} roles={meta.roles} disabled={busy || !password} onApply={(difficulty, role) => bot(seat.index, difficulty, role)} />}
-      {room.status === "waiting" && seat.kind !== "empty" && <button className="danger" disabled={busy} onClick={() => clear(seat.index)}>Освободить</button>}
-    </article>)}</section>
-    {room.status === "waiting" && <button className="start-game primary" disabled={busy || !password || room.players < 2 || room.humans < 1} onClick={() => act(() => cityApi.start(roomId, password))}>Начать игру</button>}
-  </main>;
+  if (!room) return (
+    <main className="rooms-app lobby-page lobby-loading">
+      <button type="button" className="rooms-button subtle" onClick={onBack}>← Все комнаты</button>
+      <div className="rooms-empty"><span className="loading-ring" /> <h2>{error || "Загружаем комнату…"}</h2></div>
+    </main>
+  );
+
+  const waiting = room.status === "waiting";
+  const canControl = password.length >= 4;
+  const enoughPlayers = room.players >= 2;
+  const hasHuman = room.humans >= 1;
+  const canStart = waiting && canControl && enoughPlayers && hasHuman && !busy;
+
+  return (
+    <main className="rooms-app lobby-page" data-ui="lobby">
+      <header className="rooms-topbar lobby-topbar">
+        <button type="button" className="rooms-button back-button" onClick={onBack}>← Комнаты</button>
+        <div className="lobby-title">
+          <span className={`lobby-status status-${room.status}`}><i />{waiting ? "Лобби открыто" : room.status === "playing" ? "Игра идёт" : "Партия завершена"}</span>
+          <h1>{room.name}</h1>
+        </div>
+        <div className="room-code"><span>Код комнаты</span><b>{room.id.slice(0, 8)}</b></div>
+      </header>
+
+      {error && <p className="rooms-alert" role="alert">⚠ {error}</p>}
+
+      <section className="lobby-intro">
+        <div><span className="eyebrow">Подготовка партии</span><h2>{waiting ? "Выберите место и соберите стол" : "Вернитесь на своё место"}</h2></div>
+        <p>{waiting ? "Людей и ботов можно комбинировать. Для старта нужны хотя бы два игрока и один человек." : "Игра уже запущена. Введите пароль и выберите своё человеческое место."}</p>
+      </section>
+
+      <div className="lobby-layout">
+        <section className="rooms-panel seats-panel">
+          <div className="rooms-section-head">
+            <div><span className="eyebrow">Игровой стол</span><h2>Места игроков</h2></div>
+            <span className="seat-total"><b>{room.players}</b> / {room.capacity} занято</span>
+          </div>
+          <div className="seat-grid-v2">
+            {room.seats.map(seat => (
+              <SeatCard
+                key={seat.index}
+                seat={seat}
+                roles={meta.roles}
+                waiting={waiting}
+                busy={busy}
+                canControl={canControl}
+                currentPlayerId={playerId}
+                onJoin={() => void join(seat.index)}
+                onBot={(difficulty, role) => void bot(seat.index, difficulty, role)}
+                onClear={() => void clear(seat.index)}
+              />
+            ))}
+          </div>
+        </section>
+
+        <aside className="lobby-sidebar">
+          <section className="rooms-panel access-card">
+            <div className="rooms-section-head"><div><span className="eyebrow">Ваши данные</span><h2>Вход в комнату</h2></div><span className={canControl ? "access-state ready" : "access-state"}>{canControl ? "готово" : "нужен пароль"}</span></div>
+            <label className="room-field"><span>Имя игрока</span><input value={playerName} maxLength={32} placeholder="Как вас показать за столом" onChange={event => setPlayerName(event.target.value)} /></label>
+            <label className="room-field"><span>Пароль комнаты</span><input type="password" value={password} placeholder="Для входа и настройки" onChange={event => setPassword(event.target.value)} /></label>
+            <p className="access-note">Выберите свободное место слева. Если вы возвращаетесь в игру, нажмите на своё прежнее место.</p>
+          </section>
+
+          <section className="rooms-panel launch-card">
+            <span className="eyebrow">Готовность</span>
+            <h2>{waiting ? "Можно начинать?" : "Партия уже началась"}</h2>
+            <ul className="launch-checks">
+              <li className={canControl ? "met" : ""}><i>{canControl ? "✓" : "·"}</i><span>Пароль комнаты введён</span></li>
+              <li className={enoughPlayers ? "met" : ""}><i>{enoughPlayers ? "✓" : "·"}</i><span>Не меньше двух игроков</span><b>{room.players}/2</b></li>
+              <li className={hasHuman ? "met" : ""}><i>{hasHuman ? "✓" : "·"}</i><span>Есть человек за столом</span><b>{room.humans}</b></li>
+            </ul>
+            {waiting ? (
+              <button className="rooms-button primary launch-button" disabled={!canStart} onClick={() => void act(() => cityApi.start(roomId, password))}>
+                {busy ? "Подождите…" : "Начать игру →"}
+              </button>
+            ) : playerId ? (
+              <button className="rooms-button primary launch-button" onClick={onPlay}>Вернуться в игру →</button>
+            ) : (
+              <p className="launch-hint">Сначала выберите своё человеческое место.</p>
+            )}
+            {waiting && !canStart && <p className="launch-hint">Выполните условия выше — кнопка станет активной.</p>}
+          </section>
+        </aside>
+      </div>
+    </main>
+  );
 }
 
-// Only Reborn is offered: the other three policies were written when money was points and objects
-// were the whole game, so after the influence pass they play a version of the rules that no longer
-// exists — they never sell an object and never buy influence. The engine still accepts them.
+function SeatCard({
+  seat,
+  roles,
+  waiting,
+  busy,
+  canControl,
+  currentPlayerId,
+  onJoin,
+  onBot,
+  onClear,
+}: {
+  seat: RoomSeat;
+  roles: RoleMeta[];
+  waiting: boolean;
+  busy: boolean;
+  canControl: boolean;
+  currentPlayerId?: string;
+  onJoin: () => void;
+  onBot: (difficulty: Difficulty, role: string | null) => void;
+  onClear: () => void;
+}) {
+  const mine = Boolean(currentPlayerId && seat.player_id === currentPlayerId);
+  const preferredRole = roles.find(role => role.id === seat.preferred_role);
+  return (
+    <article className={`seat-card-v2 seat-${seat.kind} ${mine ? "seat-mine" : ""}`} data-ui="seat-card">
+      <header>
+        <span className="seat-number">{seat.index + 1}</span>
+        <span className="seat-kind">{seat.kind === "empty" ? "свободно" : seat.kind === "bot" ? "бот" : mine ? "ваше место" : "игрок"}</span>
+      </header>
+
+      <div className="seat-identity">
+        <span className="seat-avatar">{seat.kind === "bot" ? "◆" : seat.kind === "human" ? "●" : "+"}</span>
+        <span>
+          <strong>{seat.kind === "empty" ? "Свободное место" : seat.name}</strong>
+          <small>{seat.kind === "bot" ? `${difficultyLabels[seat.difficulty] ?? seat.difficulty} · ${preferredRole ? preferredRole.title : "любая роль"}` : seat.kind === "human" ? (mine ? "Вы уже за столом" : "Человеческий игрок") : "Можно занять самому или добавить бота"}</small>
+        </span>
+      </div>
+
+      {seat.kind === "human" ? (
+        mine ? <div className="seat-confirmed">✓ Место закреплено за вами</div> : <button type="button" className="rooms-button secondary seat-action" disabled={busy || !canControl} onClick={onJoin}>{waiting ? "Сесть на это место" : "Вернуться на место"}</button>
+      ) : seat.kind === "empty" ? (
+        <>
+          <button type="button" className="rooms-button secondary seat-action" disabled={busy || !canControl || !waiting} onClick={onJoin}>Занять место</button>
+          {waiting && (
+            <details className="bot-setup">
+              <summary>Добавить бота <span>⌄</span></summary>
+              <BotConfigurator seat={seat} roles={roles} disabled={busy || !canControl} onApply={onBot} />
+            </details>
+          )}
+        </>
+      ) : (
+        <>
+          {waiting && <BotConfigurator seat={seat} roles={roles} disabled={busy || !canControl} onApply={onBot} />}
+          {waiting && <button type="button" className="rooms-button text-danger" disabled={busy || !canControl} onClick={onClear}>Убрать бота</button>}
+        </>
+      )}
+    </article>
+  );
+}
+
+// Only Reborn is offered: the engine still accepts the retired policies, but they play the old economy.
 function BotConfigurator({ seat, roles, disabled, onApply }: {
   seat: RoomSeat;
   roles: RoleMeta[];
@@ -74,14 +203,16 @@ function BotConfigurator({ seat, roles, disabled, onApply }: {
 }) {
   const [role, setRole] = useState(seat.preferred_role ?? "");
   useEffect(() => { setRole(seat.preferred_role ?? ""); }, [seat.preferred_role]);
-  return <div className="bot-controls">
-    <p className="bot-model">Модель: <b>Claude Reborn</b></p>
-    <label>Роль
-      <select value={role} onChange={event => setRole(event.target.value)}>
-        <option value="">Любая</option>
-        {roles.map(item => <option value={item.id} key={item.id}>{item.icon} {item.title}</option>)}
-      </select>
-    </label>
-    <button disabled={disabled} onClick={() => onApply("expert", role || null)}>{seat.kind === "bot" ? "Применить" : "Посадить бота"}</button>
-  </div>;
+  return (
+    <div className="bot-controls-v2">
+      <div className="bot-model-v2"><span>Модель бота</span><b>Claude Reborn</b></div>
+      <label className="room-field">Предпочитаемая роль
+        <select value={role} onChange={event => setRole(event.target.value)}>
+          <option value="">Любая роль</option>
+          {roles.map(item => <option value={item.id} key={item.id}>{item.icon} {item.title}</option>)}
+        </select>
+      </label>
+      <button type="button" className="rooms-button subtle" disabled={disabled} onClick={() => onApply("expert", role || null)}>{seat.kind === "bot" ? "Сохранить настройки" : "Посадить бота"}</button>
+    </div>
+  );
 }

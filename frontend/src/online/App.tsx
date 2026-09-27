@@ -20,13 +20,13 @@ export default function App() {
   useEffect(() => { cityApi.meta().then(setMeta).catch(reason => setFatal(reason instanceof Error ? reason.message : "Backend недоступен")); }, []);
   const back = useCallback(() => { setRoomId(null); setSession(null); setPlaying(false); setInitialPassword(""); }, []);
   const play = useCallback(() => setPlaying(true), []);
-  if (fatal) return <main className="online-shell"><section className="panel"><h1>Backend недоступен</h1><p className="error">{fatal}</p><button onClick={() => location.reload()}>Повторить</button></section></main>;
-  if (!meta) return <div className="loading">Загрузка городского каталога…</div>;
+  if (fatal) return <main className="rooms-app app-state"><section className="rooms-panel"><span className="eyebrow">Ошибка соединения</span><h1>Сервер игры недоступен</h1><p className="rooms-alert">{fatal}</p><button className="rooms-button primary" onClick={() => location.reload()}>Попробовать снова</button></section></main>;
+  if (!meta) return <div className="rooms-app app-state"><span className="loading-ring" /><p>Загружаем городской каталог…</p></div>;
   if (!roomId) return <RoomBrowser onOpen={(id, password = "") => { setRoomId(id); setInitialPassword(password); }} />;
   if (playing && session) {
     return useLegacyUi
       ? <Game roomId={roomId} password={session.password} playerId={session.playerId} meta={meta} onExit={back} />
-      : <Suspense fallback={<div className="loading">Загрузка интерфейса…</div>}>
+      : <Suspense fallback={<div className="rooms-app app-state"><span className="loading-ring" /><p>Готовим игровой стол…</p></div>}>
           <GameScreen roomId={roomId} password={session.password} playerId={session.playerId} meta={meta} roomName={roomId} onExit={back} />
         </Suspense>;
   }
