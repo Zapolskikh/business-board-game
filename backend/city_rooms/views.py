@@ -82,12 +82,13 @@ def room_view(
     game["market_deck_count"] = len(game.pop("market_deck"))
     game["action_deck_count"] = len(game.pop("action_deck"))
     game["project_deck_count"] = len(game.pop("project_deck"))
-    # Live score itemised by the engine. The client used to re-implement the formula; with money
-    # and influence now converting at a rate, one authoritative breakdown is the only sane option.
+    # Live score itemised by the engine. The client must not re-implement the formula: money and
+    # influence convert at a rate, and one authoritative breakdown is the only sane option.
     engine = _scoring_engine()
     game["score_breakdown"] = {player.id: engine.score_breakdown(player) for player in room.game.players}
     # Moving the token is free, so the payoff of each option must be on screen, not in the head.
-    # A permanent project perk paying +1◆ a round was indistinguishable from one paying nothing.
+    # Unitemised, a permanent project perk paying +1◆ a round is indistinguishable from one paying
+    # nothing.
     game["round_forecast"] = _round_forecast(room, viewer_id)
     game.pop("rng", None)
     game.pop("processed_command_ids", None)
@@ -100,37 +101,37 @@ def room_view(
     for player in game["players"]:
         if player["id"] != viewer_id:
             player["hand_count"] = len(player.pop("hand"))
-    # The Крыша cap is engine-derived — the Мафия gets one more and two objects raise it — so the
-    # board printed a bare "🛡 2" that told nobody whether another token could still be bought.
     # Both limits are engine-derived — the Мафия gets one more Крыша, the Журналист one more
-    # scandal, and objects can raise the roof cap — so the board printed bare "🛡 2" and a
-    # hardcoded "/5" that was simply wrong for one role in six.
+    # scandal, and objects can raise the roof cap — so they ship with the view. A bare "🛡 2" tells
+    # nobody whether another token can still be bought, and a hardcoded "/5" is wrong for one role
+    # in six.
     for player_state in room.game.players:
         view = next(item for item in game["players"] if item["id"] == player_state.id)
         view["roof_limit"] = engine.roof_limit(player_state)
         view["scandal_limit"] = engine.scandal_limit(player_state)
     # The viewer's own price for every market slot: discounts are per-player, so the client
-    # must not recompute them (two implementations of asset_price already drifted apart once).
+    # must not recompute them — two implementations of one price formula drift, and the engine's
+    # is the authoritative one.
     viewer_for_role = next((player for player in room.game.players if player.id == viewer_id), None)
     # Every perk of the viewer's role, with what it pays now and what the missing district would
-    # add. A perk that silently pays less is invisible, which is the bug we fixed on the board.
+    # add. A perk that silently pays less is a perk the player cannot see at all.
     if viewer_for_role is not None:
         game["role_perks"] = engine.role_perks(room.game, viewer_for_role)
-        # What each active power needs and what the viewer is missing. The client used to keep its
-        # own list of powers per role — a copy of a rule in another language, which had already
-        # drifted — and it could only print "сейчас недоступна" with no reason attached.
+        # What each active power needs and what the viewer is missing. The client must not keep its
+        # own list of powers per role — a copy of a rule in another language is a copy that drifts,
+        # and it can only print "сейчас недоступна" with no reason attached.
         game["role_powers"] = engine.role_power_status(room.game, viewer_for_role)
         # What each targeted power would actually take off each rival. The formulas grow with the
-        # round, the districts and the target's own standing, so a client that wanted to show the
-        # number before the click had to reimplement all of them — and did not, which is why a
-        # racket could only be priced by running it.
+        # round, the districts and the target's own standing, so a client that wants to show the
+        # number before the click would have to reimplement all of them; without this, a racket can
+        # only be priced by running it.
         game["power_previews"] = [
             engine.power_preview(room.game, viewer_for_role, power, rival)
             for power in engine.ROLE_POWERS.get(viewer_for_role.role or "", ())
             for rival in room.game.players
             if rival.id != viewer_for_role.id
         ]
-        # Cards that pay off the player's own best district pick it themselves now, so the amount
+        # Cards that pay off the player's own best district pick it themselves, so the amount
         # is knowable before the play — and has to be, or the card is a blind click.
         game["card_previews"] = {
             card.id: {"district": engine.best_cash_district(viewer_for_role),
@@ -138,9 +139,8 @@ def room_view(
             for card in engine.catalog.action_cards.values()
             if card.kind == "district_cash"
         }
-        # The Крыша price grows with the round and the Мафия pays one less. The client kept its
-        # own copy of that formula, comment and all, and the comment still described a mechanic
-        # deleted in 1.4.0 — so the price ships from the engine instead.
+        # The Крыша price grows with the round and the Мафия pays one less. A client-side copy of
+        # that formula drifts, comment and all, so the price ships from the engine instead.
         game["roof_price"] = engine.roof_price(room.game, viewer_for_role)
     # The viewer's own progress on every board condition. Only the viewer's: showing everybody's
     # was considered and dropped — it turns four cards into a table nobody reads.

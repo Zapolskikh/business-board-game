@@ -391,7 +391,7 @@ h1:where(:not(.ui-v2 *)), h2:where(:not(.ui-v2 *)), h3:where(:not(.ui-v2 *)), p:
 .diff-easy { color: #b27cff; }.diff-medium { color: #4dd58a; }.diff-hard { color: #ff6b6b; }
 .viewing-badge { color: var(--player) !important; font-weight: 700; }
 .scandal-status { color: #ff9b52 !important; }
-/* One scandal away from losing the role — the cliff used to be invisible until it happened. */
+/* One scandal away from losing the role — the cliff has to be visible before it happens. */
 .scandal-at-risk { color: #ff9b52; font-weight: 700; }
 /* A move that changes nothing still looked like a decision worth making. */
 .scandal-3 { border-color: #db6d28; }.scandal-4 { border-color: #f85149; }.scandal-5, .scandal-6 { border-color: #ff2d2d; box-shadow: 0 0 10px rgba(248,81,73,.35); }

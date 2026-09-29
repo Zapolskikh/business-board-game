@@ -124,8 +124,8 @@ export interface ScoreBreakdown {
 }
 
 // What settling the round right now would pay the viewer, itemised by the engine. Both rows carry
-// a `total`; every other key sums to it. A permanent project perk paying +1◆ a round used to be
-// indistinguishable from one paying nothing, because nothing on screen added the passives up.
+// a `total`; every other key sums to it. Without the itemisation nothing on screen adds the
+// passives up, and a permanent project perk paying +1◆ a round reads as one paying nothing.
 export interface RoundForecast {
   money: { objects: number; projects: number; residents_tax: number; journalist: number; debt: number; total: number };
   influence: { objects: number; administrative: number; projects: number; synergy: number; news: number; rating: number; total: number };
@@ -154,7 +154,7 @@ export interface GameState {
   /** Статус активных способностей своей роли: доступна ли и чего не хватает. Считает движок. */
   role_powers?: PowerStatus[];
   // Что именно снимет способность с каждой цели, посчитанное тем же кодом, что её исполняет.
-  // Без этого выбор цели был гаданием: списки показывали очки, но не добычу.
+  // Без этого выбор цели — гадание: списки показывают очки, но не добычу.
   power_previews?: PowerPreview[];
   // Для карт, которые больше не спрашивают район: движок сам берёт лучший и говорит сумму.
   card_previews?: Record<string, { district: string | null; money: number }>;
@@ -163,7 +163,7 @@ export interface GameState {
   // unlocks the difference. Computed by the engine — the client only prints labels.
   role_perks?: { key: string; value: number; potential?: number; needs?: string | null }[];
   // What a Крыша costs the viewer right now: the price grows with the round and the Мафия pays
-  // one less. Shipped rather than derived — the client's copy of the formula drifted once already.
+  // one less. Shipped rather than derived — a client-side copy of the formula drifts.
   roof_price?: number;
   // The viewer's own standing on every board condition, counted by the engine — never here.
   project_progress?: Record<string, { binary: boolean; met: boolean; have: number; needed: number }>;

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+from dataclasses import replace
 from types import SimpleNamespace
 
 from city_engine.engine import CityEngine
@@ -81,11 +82,33 @@ def test_variance_and_machine_report_are_stable() -> None:
     assert "self_delta_sq" in report["ledger"]["counters"]
 
 
-def test_static_checks_are_conservative_and_complete() -> None:
-    engine = CityEngine()
-    report = render_static(engine)
+def test_the_dominance_check_finds_a_planted_pair_and_clears_the_live_catalog() -> None:
+    """A detector that never fires is indistinguishable from one that cannot.
 
-    assert isinstance(dominated_objects(engine), list)
+    Asserting only that the live catalog is clean passes just as happily when the comparison is
+    broken, which is the failure mode that matters: this check is how a strictly-worse object is
+    caught before it reaches a table. So plant one and require it to be found, then require the
+    shipped catalog to be clean by the same comparison.
+    """
+
+    engine = CityEngine()
+    assert dominated_objects(engine) == [], "the shipped catalog must carry no dominated object"
+
+    reference = next(iter(engine.catalog.assets.values()))
+    weaker = replace(reference, id="__planted_weak", cost=reference.cost + 2)
+    engine.catalog.assets[weaker.id] = weaker
+    try:
+        assert (weaker.id, reference.id) in dominated_objects(engine)
+    finally:
+        del engine.catalog.assets[weaker.id]
+
+
+def test_the_static_report_prints_every_section() -> None:
+    """The report is read by a human looking for one section; a silently missing one reads as
+    "nothing to report" rather than "not checked"."""
+
+    report = render_static(CityEngine())
+
     assert "OBJECT DOMINANCE" in report
     assert "ACTION CARDS VS DISCARD" in report
     assert "CITY PROJECTS: IMMEDIATE NET AND REACHABILITY" in report

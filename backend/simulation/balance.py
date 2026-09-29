@@ -80,7 +80,7 @@ def fractional_score(engine: CityEngine, player: PlayerState) -> float:
     ``score`` floors money and influence, and it has to — 28$ is two points, not 2.8. But a floored
     number cannot see a single action at all: work (+2$) moves the score by zero four times out of
     five. Nothing here re-implements a rule; the itemised score comes from the engine and only the
-    two rows it floors by design are recomputed at the rate it used to floor them.
+    two rows it floors by design are recomputed at the exact rate.
     """
     rows = engine.score_breakdown(player)
     exact = player.money / MONEY_PER_POINT + player.influence / INFLUENCE_PER_POINT

@@ -91,7 +91,7 @@ def test_the_policy_prices_the_new_card_families() -> None:
     player = state.current_player
 
     # «Меценатство»: 4 points for 12$. Worth almost its face value with the money, near nothing
-    # without it — the bot used to score it at its raw `value` either way.
+    # without it — the bot must not score it at its raw `value` either way.
     patronage = next(card for card in engine.catalog.action_cards.values() if card.kind == "buy_points")
     player.money = 0
     assert _card_value(engine, patronage.id, player) < 1

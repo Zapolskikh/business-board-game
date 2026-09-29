@@ -74,4 +74,4 @@ export function marketCardReason(state: MarketCardState): string {
   }
 }
 
-export const isInteractive = (state: MarketCardState): boolean => state.kind === "buyable";
+

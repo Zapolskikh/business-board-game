@@ -85,7 +85,7 @@ def test_the_action_deck_holds_several_copies_of_every_card() -> None:
 
 
 def test_two_copies_of_one_card_are_told_apart_in_hand() -> None:
-    """The uid used to be the card id, which was unique only while the deck was."""
+    """The uid must not be the card id: that is unique only while the deck is."""
     engine = CityEngine()
     state = make_state()
     player = state.current_player
@@ -177,9 +177,9 @@ def test_point_cards_are_a_better_rate_than_the_always_available_patronage() -> 
 def test_the_hand_may_be_spent_at_any_speed_but_bought_once_a_turn() -> None:
     """The turn cap sits on the supply, not on what a player already paid for.
 
-    Shredding two cards in one turn used to be a better influence pump than the campaign action.
-    That is closed by capping the purchase instead, which leaves the hand free to move — the thing
-    that made the card layer feel rationed rather than alive.
+    Shredding two cards in one turn must not out-pump the campaign action. That is closed by
+    capping the purchase instead, which leaves the hand free to move — capping the hand is what
+    makes the card layer feel rationed rather than alive.
     """
     engine = CityEngine()
     state = make_state()
@@ -252,8 +252,8 @@ def test_object_income_is_flat_and_nothing_multiplies_it() -> None:
     engine = CityEngine()
     state = make_state()
     player = state.current_player
-    # District development used to raise this by 25% per level, twice, for 2$ and one action — the
-    # cheapest exponent in the game. It is gone: an object earns what it prints, plus synergy.
+    # Nothing may scale this by a percentage per level: a multiplier bought for 2$ and one action
+    # is the cheapest exponent in the game. An object earns what it prints, plus synergy.
     first = give_asset(state, player, "delivery")  # 2$
     second = give_asset(state, player, "media")  # 1$
     printed = engine.owned_definition(first).income + engine.owned_definition(second).income
@@ -331,7 +331,7 @@ def test_deal_cards_apply_discounts_and_may_be_chained_in_one_turn() -> None:
 
 
 def test_a_vote_of_no_confidence_that_takes_a_role_says_so() -> None:
-    """Losing a role is the loudest thing on the board, and this path used to do it in silence."""
+    """Losing a role is the loudest thing on the board, so this path must not do it in silence."""
     engine = CityEngine()
     state = make_state()
     actor = state.current_player
@@ -568,7 +568,7 @@ def test_the_mafia_buries_a_case_for_money_and_needs_the_city_hall() -> None:
     player.scandals = 3
     player.roofs = 2
 
-    # A Крыша used to be an accepted payment. It is the whole defence now, so it is not for sale.
+    # A Крыша is the whole defence, so it must not be accepted as payment here.
     with pytest.raises(IllegalActionError):
         run(engine, state, "use_role_power", {"power": "mafia_cleanup"})
 
@@ -678,7 +678,7 @@ def test_the_sanction_ladder_reads_the_target_scandal_counter() -> None:
     state = run(engine, state, "use_role_power", {"power": "military_sanction", "target_id": target.id})
     target = state.player_by_id(target.id)
     assert (target.money, target.influence, target.role) == (40 - (3 + state.round_number), 9, "capitalist")
-    # And the scandal stays: the sanction used to heal what it hit, knocking its own next tier away.
+    # And the scandal stays: a sanction that heals what it hits knocks its own next tier away.
     assert target.scandals == 2
 
     # Three: influence goes too.
@@ -821,10 +821,10 @@ def test_settlement_reports_where_influence_came_from() -> None:
 
     settled = next(event for event in state.event_log if event.type == "round_settled")
     breakdown = settled.data["influence_sources"][politician.id]
-    # Itemised by source: a project perk paying +1◆ a round used to be indistinguishable from one
-    # paying nothing, because the whole passive arrived as a single unlabelled number.
-    # The residents line pays 1◆ per residential object anywhere in the city; the politician's two
-    # are the only ones on this table. It used to be money, and the row was called the residents tax.
+    # Itemised by source: arriving as a single unlabelled number, a project perk paying +1◆ a
+    # round is indistinguishable from one paying nothing.
+    # The residents line pays 1◆ per residential object anywhere in the city — influence, not money
+    # — and the politician's two are the only ones on this table.
     assert breakdown == {
         "objects": 0,
         "synergy": 0,
@@ -1386,8 +1386,8 @@ def test_the_relief_card_pays_in_slots_because_money_cannot_buy_the_scarce_half(
 
     state = run(engine, state, "play_action_card", {"card_uid": held.uid})
 
-    # It used to pay 3$ to anybody not in last place: a third of a point, less than discarding the
-    # card for 2◆. A slot is the half of an object purchase that money cannot replace.
+    # A slot is the half of an object purchase that money cannot replace, which is why the card
+    # pays one instead of cash worth less than discarding it for 2◆.
     assert state.current_player.capacity == capacity + 1
 
 
@@ -1621,7 +1621,7 @@ def test_selling_costs_no_action_so_a_swap_costs_only_the_purchase() -> None:
     cheap = give_asset(state, player, "delivery")  # cost 4 → refund 2
     give_asset(state, player, "media")
     give_asset(state, player, "warehouse")
-    player.capacity = 3  # full slots: the case the swap command used to exist for
+    player.capacity = 3  # full slots: the case a dedicated swap command would exist for
     player.money = 30
     state.market.append(MarketAsset(uid="asset:replacement", card_id="robotics"))
     price = engine.asset_price(state, player, "robotics")
@@ -1743,11 +1743,11 @@ def test_the_campaign_is_one_button_at_one_rate() -> None:
     player = state.current_player
     assert (player.money, player.influence) == (20 - spend, gain)
 
-    # Laundering used to be the unbounded rival channel this rate was tuned against. It is gone:
-    # the grey layer no longer sells influence, so the button is the only conversion left.
+    # The grey layer does not sell influence, so this button is the only conversion in the game
+    # and nothing unbounded competes with the rate it is tuned at.
     assert spend / gain == pytest.approx(5 / 3)
 
-    # Every other amount is gone, including the two tiers that used to exist.
+    # Exactly one amount is legal: a tiered price list is a second rate to keep in sync.
     state = make_state()
     state.current_player.money = 20
     for rejected in (2, 4, 9):
@@ -1849,8 +1849,9 @@ def test_the_journalist_ceiling_cannot_be_laundered_into_another_seat() -> None:
 def test_a_hostile_takeover_moves_money_instead_of_burning_it() -> None:
     """Both halves scale from the card's own value, so the table total does not move.
 
-    The attacker's side used to be a hardcoded 2 against a card printed at 3, so every play
-    destroyed a dollar — invisible in either player's own delta, visible only in the sum.
+    The attacker's side must not be a constant against a card printed at a different value: the
+    mismatch destroys a dollar a play, invisible in either player's own delta and visible only in
+    the sum.
     """
     engine = CityEngine()
     state = make_state()
@@ -1889,7 +1890,7 @@ def test_reaching_the_scandal_limit_announces_the_lost_role() -> None:
 
     engine.add_scandal(state, player, 1)
 
-    # Losing a role used to be readable only by diffing your own state between two turns.
+    # Losing a role must not be readable only by diffing your own state between two turns.
     event = state.event_log[-1]
     assert event.type == "scandal_limit_reached"
     assert (event.actor_id, event.data["role_id"], event.data["jailed"]) == (player.id, "politician", False)
@@ -1939,7 +1940,7 @@ def test_one_token_answers_a_takeover_a_leak_and_a_scandal() -> None:
     attacker, holder = state.player_by_id(attacker.id), state.player_by_id(holder.id)
     assert (holder.role, holder.roofs, attacker.influence) == ("capitalist", 0, 30)
 
-    # And the compromat leak, which used to want a card of its own.
+    # And the compromat leak, which needs no card of its own.
     state = make_state()
     target = rival_of(state, state.current_player)
     target.role = "military"
@@ -1994,18 +1995,18 @@ def test_roof_blocks_a_journalist_scandal_like_any_other_attack() -> None:
     state = run(engine, state, "use_role_power", {"power": "journalist_publish", "target_id": target.id})
     hit = state.player_by_id(target.id)
 
-    # Every other targeted effect checks the roof; these two used to punch straight through.
+    # Every targeted effect checks the roof; these two must not punch straight through.
     assert hit.scandals == 0
     assert hit.roofs == 0
     assert any(event.type == "targeted_effect_blocked" for event in state.event_log)
 
 
 def test_every_project_is_unique_and_only_the_board_offers_one() -> None:
-    """Two repeatable initiatives used to sit outside the deck as an always-open scoring outlet.
+    """No repeatable initiative may sit outside the deck as an always-open scoring outlet.
 
-    They answered the question patronage and lobbying already answer — turning a pile into points —
-    and answered it worse, so the sinks were raised and the initiatives removed. What is left is a
-    single shared race: taking a project denies it to everybody else for the rest of the game.
+    It would answer the question patronage and lobbying already answer — turning a pile into
+    points — and answer it worse. What is left is a single shared race: taking a project denies it
+    to everybody else for the rest of the game.
     """
     engine = CityEngine()
     catalog = load_catalog()
@@ -2173,8 +2174,8 @@ def test_the_engine_says_which_powers_are_free_and_which_the_roof_stops() -> Non
 
 
 # One word that has to appear in a role's printed ability text for each power it holds. A text is
-# not testable, but "the card does not mention this power at all" is: every drift found in the
-# 1.12.0 role pass was of exactly that shape — a power gained or deleted and the card never touched.
+# not testable, but "the card does not mention this power at all" is, and that is the exact shape
+# drift takes: a power gained or deleted and the card never touched.
 # Adding a power to ROLE_POWERS fails this test until both the mapping and the text are updated.
 ROLE_POWER_KEYWORDS = {
     "capitalist_claim": "етк",  # «Поставить метку» / «метка»
@@ -2197,9 +2198,8 @@ ROLE_POWER_KEYWORDS = {
 def test_every_role_power_is_named_on_the_role_card() -> None:
     """The card a player reads must list the powers the engine actually gives them.
 
-    Before the 1.12.0 role pass was finished, the Капиталист's card said «активных способностей
-    нет» while `capitalist_claim` existed, the Силовик's still described the mass roof sweep that
-    had been deleted, and the Мафиози's never mentioned `mafia_lock`.
+    Untested, a role card drifts into saying «активных способностей нет» while the engine has
+    one, describing a power the engine does not implement, or omitting one it does.
     """
     engine = CityEngine()
     catalog = load_catalog()
@@ -2214,7 +2214,7 @@ def test_every_role_power_is_named_on_the_role_card() -> None:
 
 
 def test_the_engine_owns_the_list_of_role_powers() -> None:
-    """The clients used to keep their own copy, and it still listed a power deleted in 1.12.0."""
+    """The clients must not keep their own copy: a second copy drifts into listing dead powers."""
     engine = CityEngine()
     assert set(engine.ROLE_POWERS) == set(load_catalog().roles)
     handled = set(engine.ROLE_POWERS["military"])

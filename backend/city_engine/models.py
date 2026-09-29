@@ -31,8 +31,7 @@ class OwnedAsset:
     Per-object state keeps failing here. Automation was a ritual — three or four identical
     purchases per player, welding value into objects that could then never be replaced. Blocking
     was worse: one flag, one card that set it, one card that cleared it, and half the rules that
-    read a portfolio quietly ignored it (see the 1.10.0 note in constants). An object is either
-    owned or it is not.
+    read a portfolio quietly ignored it. An object is either owned or it is not.
     """
 
     uid: str
@@ -324,7 +323,7 @@ class GameState:
         if self.turn_order and self.turn_order[self.turns_taken_in_round] != ids[self.current_player_index]:
             raise StateValidationError("current player must match the turn order position")
         # Every project is unique: the board is a shared race, so a project one player takes is
-        # gone from the game. There is no longer a repeatable class to exempt from this rule.
+        # gone from the game. No class of project is exempt from this rule.
         project_ids = [*self.project_board, *self.project_deck]
         for player in self.players:
             project_ids.extend(player.projects)

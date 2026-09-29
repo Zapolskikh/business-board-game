@@ -1,166 +1,21 @@
-"""Version and rules constants persisted with every game snapshot."""
+"""Version and rules constants persisted with every game snapshot.
+
+Why the versions matter: a snapshot carries the rules it was played under, and the engine refuses
+to open a room whose version does not match. Scoring an old board by today's rules would settle it
+against an agreement its players never made. Every bump and the reasoning behind it is in
+``CHANGELOG.md`` at the repository root.
+"""
 
 SCHEMA_VERSION = 1
-# 1.4.0-rc.1: the asset market expires in rounds instead of turns and rotates only when a round
-# opens, so `MarketAsset` carries a different field and old snapshots cannot be replayed.
-#
-# 1.3.0-rc.2: the project board is re-dealt in full instead of rotating one card, and that now costs
-# an action on top of the money; money printed on action cards grows with the round.
-#
-# 1.3.0-rc.1: the influence economy pass. Campaign converts money in tiers, selling an object is
-# free, object replacement is gone, both rerolls are priced in money, and two grey operations now
-# trade in influence instead of cash. Snapshots taken under 1.2.x would be scored against rules
-# their players never agreed to, so state validation rejects them.
-# 1.6.0: the role pass. Every perk either earns its place or leaves, and three roles gain a tie to
-# a district that is not their own. Capitalist: the -1$ discount goes, business conditions are
-# satisfied by charter, +1◆ per own industrial object. Politician: the flat +1◆ and the housing
-# influence go, administrative objects pay 2◆ each. Journalist: the news line goes, money is 1$ a
-# rival scandal and 2$ with a business object, the rating ceiling is 2 plus one per housing object,
-# and the publication costs an action for two scandals. Fraudster: one flat chance bonus instead of
-# two ladders, the comeback pays influence, and the crypto scam is now 25% of every wallet for five
-# scandals. Mafia: racket money from Серый сектор objects, influence from administrative ones.
-# Military: a sanction ladder at 2/3/4 scandals, no object confiscation, no healing the target.
-#
-# 1.5.1: the passive payout is back at 10$ and 3◆ a point, and lobbying is repriced to 3◆ → 2
-# points so that both sinks pay double what hoarding pays. See the note above the constants for the
-# measurement that reverted 1.5.0.
-#
-# 1.5.0: money and influence stopped scoring. They used to pay 1 point per 10$ and per 3◆, and two
-# measured games ended with a quarter to a third of every final score sitting in a wallet its owner
-# never spent — one bot finished last holding 410$, another ended on 72◆ with nothing left to buy.
-# Both are fuel now. The only way out of a pile is an action: patronage (10$ → 2) for money,
-# lobbying (6◆ → 2) for influence, one press of each a turn.
-#
-# 1.4.1: patronage. A live 15-round game on 1.4.0 finished with 1217$ unspent across the table —
-# 121 points of dead capital — because the only sinks need a slot or influence. One basic action now
-# turns 10$ into 2 points, unbounded and repeatable, at a rate deliberately worse than an object or
-# a project.
-#
-# 1.4.0: the simplification pass. Automation, city events, forged/copied roles, the investment
-# action pool and business upkeep leave the game; the three defences merge into one Крыша; campaign
-# has one tier; every scandal cleanup costs an action; grey operations gate on a district instead of
-# one card; the asset market rotates its three oldest slots once a round; cards can buy points
-# outright. Snapshots taken under 1.3.x describe a game with different rules, so state validation
-# rejects them — old rooms will not open.
+
+# Bumped whenever a rule changes what a snapshot means. 1.14.0: zoning now opens the mafia racket
+# and the politician's deal (active powers read the rented district, role passives still do not),
+# and the city tender picks the largest district itself instead of asking.
 RULES_VERSION = "city-1.14.0"
-# 1.14.0: «Зонирование» finally means the same thing everywhere. The rented district already
-# counted for project conditions, grey unlocks and synergy, but the mafia racket and the
-# politician's deal gated on built objects alone — so the racket refused to fire on the very board
-# state whose payout formula, three lines below the gate, was about to count the rented quarter.
-# Active powers read the rented district now; role *passives* still pay only on what was built.
-#
-# «Городской тендер» no longer asks which district to cash: there was exactly one right answer
-# and it was a click that could only be got wrong. The engine takes the largest quarter and ships
-# the amount, so the card prints what it will pay before it is played.
-# 1.13.0: the settlement that closed the last round is deleted, and one action card may be bought
-# per turn (the cap that used to sit on playing and discarding one).
-#
-# A settlement is what a player carries into the *next* round; after the final round there is none,
-# so the payout could only ever be scored at the passive rate — 3 to 10 points a seat that no
-# decision at that table could still influence, on top of the objects and projects the score
-# already pays for. Six exported matches moved every player by 4-7 points and one one-point finish
-# became a tie. The debt row survives the cut on purpose: «Мостовой кредит» is 10$ now against 4$
-# at the end of the round, and dropping the whole settlement would make the last round the one
-# where the loan is free.
-# 1.12.0: the role pass. Every charter that worked by fiat is replaced by something the table can
-# see and answer, and the two roles that only had passives get a line to press.
-#
-# Journalist: the rating ceiling is gone. It was 2 plus one per housing object, which capped the
-# role's own currency exactly when it was working and quietly turned it into a housing engine. One
-# housing object now switches the line on and the rating *is* the scandal counter.
-# Fraudster: the grey comeback (+1◆ per place behind) is deleted — a reward for losing, on the one
-# layer that already pays for itself.
-# Capitalist: the business charter and the virtual district link both go, and in their place the
-# role gets `capitalist_claim` — an action and a scandal mark a card on the open market, and it
-# pays the capitalist as if it stood in their city while everyone else can still buy it away.
-# Politician: the virtual administrative link goes; the Административный квартал becomes the role's
-# own district and pays a dollar an object like every other role's, while housing pays 1◆ per
-# residential object anywhere in the city. Plus two new lines: `politician_deal` rents a district
-# for the round out of the Серый сектор, and `politician_veto` closes one project to everybody else.
-# Mafia: `mafia_lock` spends a Крыша, not an action, to close a market slot to everybody else for
-# a round.
-# Military: `military_roof_sweep` is replaced by `military_inspection` (a scandal for every rival
-# standing in the Серый сектор) and `military_roof_seize` (take one Крыша and keep it).
-# «Зонирование» no longer requires an object in the district it opens — that requirement made the
-# card a multiplier on a quarter you had instead of a way into one you did not.
-#
-# `MarketAsset` gains two marks and `PlayerState` a mirror of the capitalist's, so 1.11.0 snapshots
-# describe a board this engine cannot read.
-# 1.11.0: the base roof limit falls from two to one (the Мафия keeps one extra), and the Силовик
-# gains a repeatable action that removes one roof from every rival and scores once per removed token.
-# 1.10.0: object blocking is deleted, and a role no longer carries its ceilings out of the seat.
-#
-# Blocking existed for one card in a deck of 34 («Заморозка активов»), plus a second card whose
-# only job was to undo it. For that it put a mutable flag on every object in every portfolio, and
-# every rule that reads a portfolio then had to decide whether to honour it — half of them did not.
-# `district_count` never did, so a frozen object still opened grey operations (whose own error
-# message promised an *active* object), still paid the district synergy of its neighbours, and
-# still satisfied project conditions, while `_income_breakdown` and `passive_influence_breakdown`
-# honoured it. Two readings of one flag is not a mechanic, it is a bug surface. `OwnedAsset.blocked`
-# leaves the state, `freeze`/`unblock` leave the catalog, and every "is this object active" test in
-# the engine collapses into "does the player own it".
-#
-# Roles: `scandal_limit` and `roof_limit` both depend on the role, and nothing re-checked them when
-# the role changed. A journalist who hit their own limit of 6 was parked at 6 scandals under a
-# limit of 5 — one point of score worse than the same event for any other role, and a state the
-# engine's own invariant says cannot exist. A mafia holding its extra Крыша kept it after claiming
-# another seat. Both are now clamped by `_apply_role_limits`, called at every point where
-# a role is gained, swapped, stripped or lost. Claiming a role is gated on BASE_SCANDAL_LIMIT for
-# everybody, so the journalist's extra headroom can no longer be laundered into a different seat.
-#
-# Also: «Враждебное поглощение» pays the attacker what the victim loses (card.value, scaled by the
-# round) instead of a hardcoded 2 — a dollar used to vanish from the table on every play.
-# 1.8.0: the fraudster's crypto scam finally follows the rule printed on the role card: one
-# command takes 25% of every unprotected rival wallet and always creates five scandals.  The old
-# implementation exposed six flat amounts (1..6), which let a one-point reduction turn amount=1
-# into a free, repeatable table-wide drain.  Reduction perks remain deliberately stackable: their
-# payoff is the reward for assembling a specialised grey engine.
-# 1.7.0: district development is deleted outright — object income is the printed number plus
-# synergies, with no `ceil(base × 1.25)` per level. `district_levels` leaves the player state, so a
-# 1.6.0 snapshot describes a board this engine cannot score. Repeatable projects and their
-# surcharge are gone with it, as is `antitrust_active`. Rooms opened under 1.6.0 will not load —
-# that is the point: the alternative is a game that loads and then fails on a card nobody can play.
-#
-# 2026-08-26a: 34 action cards, 40 projects. Removed: the two city initiatives (`city_initiative`,
-# `municipal_programme`), the two cards that referenced district development (`antitrust`,
-# `infrastructure`) and «Антимонопольное расследование», which punished the same
-# «4 objects in a district» threshold that `synergyInfluence` now rewards. Added: `self_target` on
-# the three scandal cards, `synergyInfluence` on all 19 epic and legendary assets. Repriced the
-# four projects whose permanent perk cost less than it paid.
-#
-# 2026-08-22a: the role texts finally describe the game. They still advertised investment
-# actions, forged roles, the burn-contacts power and the district tribute — all deleted between
-# 1.4.0 and 1.5.1 — and a player read them in the role tooltip.
-#
-# 2026-08-21a: 37 action cards. The automation and role-forgery cards are gone, replaced by the
-# «деньги → очки» family and «Предписание о демонтаже» (takes a development level); the two defence
-# cards now hand out the same Крыша as the third; the two projects that required automation ask for
-# tagged objects instead. The events array is gone from the catalog entirely.
+
+# Bumped whenever the catalog changes, even if no rule moved: card texts are part of the agreement
+# too. 2026-09-29: the tender and zoning texts rewritten for 1.14.0.
 CONTENT_VERSION = "city-content-2026-09-29"
-# 2026-08-29c: the same pass over the five remaining roles. The Капиталист's card said it had no
-# active ability while `capitalist_claim` existed and still promised the charter deleted in 1.12.0;
-# the Политик's described the housing tax as money and the Спальный as its own quarter, when the
-# role has paid influence off the whole city and owned the Администрация since that same pass; the
-# Аферист's advertised the grey comeback; the Мафиози's never mentioned `mafia_lock`; the Силовик's
-# still described the mass roof sweep, replaced by the inspection and the seizure. No number moved.
-# 2026-08-29b: the journalist's role text finally describes the role. It still promised a rating
-# capped at "2 plus one per housing object" — the ceiling 1.12.0 deleted — and said nothing about
-# the Крыша cancelling «Раздуть историю» outright, which is the single most common thing that
-# happens when the power is pressed. No card, price or effect moved.
-# 2026-08-29a: the legendary pass. Four of the eight printed a number and nothing else, so they
-# were replaced by cards that reach a lever no object could touch before: «Маркет-мейкер» re-deals
-# a market slot, «Агломерация» counts a built quarter twice, «Градостроительная хартия» waives one
-# project condition per game, «Лоббистский кабинет» draws a card every turn. The offshore keeps its
-# grey discount and loses the roof capacity it shared with the fortress.
-# 2026-08-28b: non-resource engine projects score two fewer points at the same price; the base
-# roof limit is one (two for the Мафия); the Силовик gains the mass roof-sweep action.
-# 2026-08-28a: 32 action cards. «Заморозка активов» (freeze) and the card that undid it (unblock)
-# are gone with the blocking mechanic — see the 1.10.0 note above. Nothing replaces them: the deck
-# already carries eleven other ways to spend a card on an opponent, and the freeze was the only one
-# whose effect the rest of the engine could not agree on.
-# 2026-08-26b: point-buying action cards are the premium money sink again.  Their 5$/point rate
-# was strictly worse than the always-available 20$ -> 5 point patronage button, despite first
-# costing a blind draw, 3$, 1 influence and an action.  The card rate is now 3$/point.
 
 DISTRICT_IDS = (
     "residential",
@@ -218,10 +73,10 @@ LOBBYING_POINTS = 6
 PROJECT_BOARD_SIZE = 4
 # How many market slots the opening of a round replaces: the oldest three of six.
 #
-# This used to be a per-slot countdown — six independent timers printed as "⏳2р" on every card —
-# and before that it was counted in turns, which made the printed number a lie at any table size.
-# One rotation a round, at a fixed size, is the same freshness with one rule instead of six clocks,
-# and the three slots leaving are marked so the choice "buy now or wait" stays answerable.
+# Not a per-slot countdown: six independent timers printed as "⏳2р" on every card are six clocks
+# for one rule, and a countdown measured in turns makes the printed number a lie at any table size.
+# One rotation a round, at a fixed size, is the same freshness with one rule, and the three slots
+# leaving are marked so the choice "buy now or wait" stays answerable.
 #
 # Not all six: half the market has to survive, or the see-it/save-for-it/buy-it loop breaks. Income
 # in rounds 1-5 is 3-15$ while a legendary object costs 17-18$, and the expensive rarities only
@@ -231,14 +86,14 @@ PROJECT_BOARD_SIZE = 4
 MARKET_ROTATION_SIZE = 3
 
 # --- roles ------------------------------------------------------------------------------------
-# The publication costs an action now and lands twice as hard. Two free attacks a turn — inflate
-# *and* publish on top of three ordinary actions — was the journalist's real edge over every other
+# The publication costs an action and lands twice as hard. Two free attacks a turn — inflate
+# *and* publish on top of three ordinary actions — would be the journalist's edge over every other
 # role, none of which has a power that skips the action cost.
 PUBLICATION_SCANDALS = 2
-# The fraudster's grey bonus, flat and single. It used to be split in two — +20% for the role and
-# +10% more for holding any Технокластер object — which meant the crypto exchange, itself a
-# Технокластер object, silently granted both and pinned every fraudster operation at the 0.9 ceiling.
-# One number that the player can read off the role card is worth more than two that stack invisibly.
+# The fraudster's grey bonus, flat and single. Split in two — a share for the role and more for
+# holding any Технокластер object — the crypto exchange, itself a Технокластер object, would
+# silently grant both and pin every fraudster operation at the 0.9 ceiling.
+# One number the player can read off the role card is worth more than two that stack invisibly.
 FRAUDSTER_GREY_BONUS = 0.30
 # --- grey operation payouts ---------------------------------------------------------------------
 # Every operation scores the same kind of thing, so the score sits in one table instead of being
@@ -349,10 +204,10 @@ ACTION_DECK_COPIES = 2
 # that finds no room is simply lost, which is what makes the «Лоббистский кабинет» a reason to
 # keep spending rather than a reason to hoard.
 HAND_LIMIT = 3
-# One purchase a turn. The cap used to sit on the play and the discard instead, because buying
-# twice and shredding four cards beat the campaign as an influence pump. Capping the supply closes
-# that at the source and leaves a hand the player has already paid for free to spend at any speed —
-# which is what a card layer needs to feel alive rather than rationed.
+# One purchase a turn. The cap sits on the supply, not on the play and the discard: buying twice
+# and shredding four cards would beat the campaign as an influence pump, and capping the supply
+# closes that at the source while leaving a hand the player has already paid for free to spend at
+# any speed — which is what a card layer needs to feel alive rather than rationed.
 CARD_PURCHASE_FLAG = "action_card_bought"
 # What a point costs when a card buys it outright: worse than an object (2$) and much better than a
 # hoarded point (10$), and it needs no slot — which is the whole point. Six slots cap the object
@@ -387,11 +242,10 @@ CONSEQUENCE_EVENTS = frozenset(
 )
 
 # --- grey operations -------------------------------------------------------------------------
-# The layer used to be five ways of asking the same question — "spend an action, get a resource" —
-# so a player picked whichever number was biggest and the other three lines were furniture: crypto
-# 41.9% of runs, smuggling 28.3%, hack 25.7%, laundering 4.9%, compromat 0.6%. Each operation now
-# produces something the others cannot, and the pick follows the position on the board rather than
-# a comparison of expected values:
+# The layer must not be five ways of asking the same question — "spend an action, get a resource" —
+# because then a player picks whichever number is biggest and the other lines are furniture. Each
+# operation produces something the others cannot, and the pick follows the position on the board
+# rather than a comparison of expected values:
 #
 #   behind on tempo        → Вброс         (a scandal on every rival at once)
 #   behind on money        → Памп и дамп   (drains every rival into your own wallet)
@@ -401,18 +255,18 @@ CONSEQUENCE_EVENTS = frozenset(
 #     influence for a role
 #   a rival holds a role   → Слив компромата (takes the role itself)
 #
-# Laundering left the set entirely: it traded money for influence, which is exactly what the
-# campaign does — for free, without a scandal, and at a better rate — so it was never the right
-# click. Smuggling left because the pump does the same job against all three rivals at once.
+# There is deliberately no laundering line: trading money for influence is exactly what the
+# campaign does — for free, without a scandal, and at a better rate — so it would never be the
+# right click. Nor a smuggling one: the pump does that job against all three rivals at once.
 #
-# The influence a hack takes, growing with the round. Flat 4◆ meant half of somebody's war chest in
+# The influence a hack takes, growing with the round. A flat 4◆ is half of somebody's war chest in
 # the third round and a rounding error in the twelfth; the scarce resource has to be priced against
 # how much of it is in circulation, which is what every other money figure here already does.
 HACK_INFLUENCE_BASE = 2
-# What the pump takes from *every* rival, not just the leader. As a leader-only jab it was a rider
-# on an operation that already paid its owner, which made the operation two effects in one and the
-# smuggling run redundant next to it. As a table-wide drain it is the money operation, and it is
-# the only one that scales with the number of players.
+# What the pump takes from *every* rival, not just the leader. A leader-only jab would be a rider
+# on an operation that already pays its owner, making the operation two effects in one. As a
+# table-wide drain it is the money operation, and it is the only one that scales with the number
+# of players.
 PUMP_DRAIN_BASE = 2
 # Пробить крышу pays a point per token it takes. Without it the operation is a pure set-up: you
 # spend the action and the scandal, and the defenceless target is defenceless for everybody —
@@ -422,9 +276,7 @@ PUMP_DRAIN_BASE = 2
 # all against the 36% who hold none. The per-token point is what makes aiming it worthwhile.
 ROOF_BREAK_POINT_PER_ROOF = 1
 # Leaking compromat strips a role: -3 points, the whole passive behind it, and the seat opens at
-# the free price instead of the threefold takeover. It used to carry four separate conditions —
-# a target holding a role, 3◆ paid up front and forfeited on failure, one attempt per round, and
-# the per-turn cap — and it was run in 0.6% of all grey operations. Three of the four are gone.
-# The prepayment is the one that mattered: an operation that charges the scarce resource before
-# the dice, on top of the scandal it charges after, is not a gamble, it is a tax.
+# the free price instead of the threefold takeover. Its only gate is a target holding a role: an
+# operation that charges the scarce resource before the dice, on top of the scandal it charges
+# after, is not a gamble, it is a tax, and nobody runs it.
 # Its odds live in GREY_OPERATION_CHANCE with everybody else's.

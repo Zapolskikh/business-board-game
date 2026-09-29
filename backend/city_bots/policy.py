@@ -74,11 +74,13 @@ class PolicyProfile:
 # are full. Used wherever a decision trades one currency for the other.
 INFLUENCE_IN_MONEY = 3.0
 
-# What a dollar becomes, in points, depending on where it can still go. An object is the best sink
-# in the game and the reason income is worth chasing at all; patronage is the floor once the slots
-# are full; a dollar that is never spent scores at the holding rate. All three are engine numbers,
-# not tuning: see ``content.asset_points``, ``PATRONAGE_*`` and ``MONEY_PER_POINT``.
-MONEY_RATE_OBJECT = 0.5
+# What a dollar becomes, in points, depending on where it can still go. Compounding is the
+# premium a dollar carries while a free slot can turn it into an object that pays income again;
+# patronage is the floor once the slots are full; a dollar that is never spent scores at the
+# holding rate. The last two are engine numbers, not tuning: see ``PATRONAGE_*`` and
+# ``MONEY_PER_POINT``. The premium is the one tuned value, and every rate below it is a discount
+# on it.
+MONEY_RATE_COMPOUNDING = 0.55
 MONEY_RATE_PATRONAGE = PATRONAGE_POINTS / PATRONAGE_MONEY
 MONEY_RATE_HELD = 1 / MONEY_PER_POINT
 
@@ -90,11 +92,10 @@ PROFILES = {
     "easy": PolicyProfile(horizon=3, aggression=0.12, risk_penalty=1.5, role_focus=1.4, defence=0.7),
     "medium": PolicyProfile(horizon=8, aggression=0.25, risk_penalty=2.5, role_focus=2.0, defence=1.2),
     "hard": PolicyProfile(horizon=6, aggression=0.45, risk_penalty=2.0, role_focus=1.7, defence=1.5),
-    # Only ``influence_weight`` moved in the influence pass, and it moved because it was wrong, not
-    # because it was worth tuning. Everything more aggressive was measured and rejected: forcing
-    # money out of the wallet (cash_comfort 18 / cash_drag 0.20) bought +1.1 projects a game and
-    # still lost 2.3 points and 8 points of win share over 40 games, because a dollar left in the
-    # wallet is worth 0.1 points and the project board simply has nowhere to put the influence.
+    # These numbers are deliberately not more aggressive. Forcing money out of the wallet
+    # (cash_comfort 18 / cash_drag 0.20) buys +1.1 projects a game and still loses 2.3 points and
+    # 8 points of win share over 40 games, because a dollar left in the wallet is worth 0.1 points
+    # and the project board simply has nowhere to put the extra influence.
     # See the note in ``_position_value``.
     "expert": PolicyProfile(
         horizon=7,
@@ -204,12 +205,11 @@ def _action_utility(
     action_type = str(action["type"])
     payload = dict(action.get("payload") or {})
     if action_type == "end_turn":
-        # Passing used to score -100 while an action remained, which does not mean "prefer to act"
-        # — it means "never pass". A bot whose every legal move was negative took the least bad
-        # one, so 4.4% of all decisions actively hurt the player, rising to a third of the moves
-        # in rounds 14-15: epics traded down to commons, and the free rerolls used as a place to
-        # dump a turn. A small penalty keeps any useful action ahead of passing without paying
-        # real points for the privilege of moving.
+        # Passing scores a small penalty, not a large one. Scoring it at -100 while an action
+        # remains does not mean "prefer to act" — it means "never pass": a bot whose every legal
+        # move is negative takes the least bad one, and in the last rounds that means trading epics
+        # down to commons and burning free rerolls as a place to dump a turn. A small penalty keeps
+        # any useful action ahead of passing without paying real points for the privilege of moving.
         return -0.5 if state.actions_left > 0 else 0.0
     if action_type == "grey_operation":
         return _grey_operation_utility(engine, state, player, payload, profile)
@@ -263,22 +263,22 @@ def _income_rate(
 ) -> float:
     """What one dollar of recurring income is worth, in points, per round of horizon.
 
-    A flat 0.55 was the old answer, and it is the reason a bot could finish a measured game on
-    197$ with the worst tableau at the table: it values a recurring dollar at more than twice what
-    patronage pays for it and five times what holding it scores. That premium is real only while
-    the dollar still has somewhere to compound — an empty slot turns money into points at 0.5 a
-    dollar, and the object it buys pays income again.
+    The compounding premium values a recurring dollar at more than twice what patronage pays for
+    it and five times what holding it scores. That premium is real only while the dollar still has
+    somewhere to compound — an empty slot turns money into points at 0.5 a dollar, and the object
+    it buys pays income again.
 
     Once the tableau is full, the slots are maxed and the rounds have run out, the only exit is
     the patronage button at 0.25 a dollar, and income stops being worth chasing at all. Returning
-    the true rate rather than the premium is what makes a bot start buying point-dense objects and
-    pressing the sink instead of accumulating a pile it cannot spend.
+    the true rate rather than the premium is what makes a bot buy point-dense objects and press
+    the sink instead of accumulating a pile it cannot spend: paying the premium flat is how a bot
+    finished a measured game on 197$ with the worst tableau at the table.
 
-    Older profiles keep the flat number: they were tuned against it, and the whole point of the
+    Older profiles keep the flat premium: they were tuned against it, and the whole point of the
     easier opponents is that they play the previous version of the game.
     """
     if not profile.planning:
-        return 0.55
+        return MONEY_RATE_COMPOUNDING
     rounds_left = max(0, state.max_rounds - state.round_number)
     if rounds_left < 2:
         # Nothing bought now pays back; the pile is scored as it stands.
@@ -297,10 +297,10 @@ def _income_rate(
     horizon = min(profile.horizon, rounds_left)
     projected = engine._round_income(state, player) * horizon + player.money
     if projected <= appetite:
-        return 0.55
+        return MONEY_RATE_COMPOUNDING
     # Blend by the share of projected money that still has a home.
     covered = appetite / projected
-    return MONEY_RATE_PATRONAGE + (0.55 - MONEY_RATE_PATRONAGE) * covered
+    return MONEY_RATE_PATRONAGE + (MONEY_RATE_COMPOUNDING - MONEY_RATE_PATRONAGE) * covered
 
 
 def _position_value(
@@ -315,7 +315,7 @@ def _position_value(
     # that pays influence look like a weak income card: across 48 measured player-games not one bot
     # ever owned the compromat trader or the illegal datacentre, so two of the five grey operations
     # were unreachable rather than mispriced.
-    income_rate = _income_rate(engine, state, player, profile) / 0.55
+    income_rate = _income_rate(engine, state, player, profile) / MONEY_RATE_COMPOUNDING
     recurring = (
         engine._round_income(state, player) * income_rate
         + engine.passive_influence(state, player) * profile.influence_weight
@@ -349,7 +349,7 @@ def _position_value(
     extra_action_value = min(1, engine.effect_total(player, "extraActions")) * future_turns * 1.8
     return (
         _score_function(engine, profile)(player)
-        + recurring * horizon * 0.55
+        + recurring * horizon * MONEY_RATE_COMPOUNDING
         + extra_action_value
         + defence
         + role_value
@@ -669,12 +669,11 @@ def _sell_asset_bonus(
     asset_uid: str,
     profile: PolicyProfile,
 ) -> float:
-    """Selling is free now, and the whole point of it is the purchase that follows.
+    """Selling is free, and the whole point of it is the purchase that follows.
 
     A one-step utility can only ever see the loss: the refund equals the points the object was
-    worth, so every sale scores negative and the bot would never rebuild its tableau. The
-    dedicated one-action swap used to hide this — it was 9.7% of all measured bot actions. This
-    values the sale by the best object the freed slot can immediately hold instead.
+    worth, so every sale scores negative and the bot would never rebuild its tableau. This values
+    the sale by the best object the freed slot can immediately hold instead.
     """
     owned = next((item for item in player.assets if item.uid == asset_uid), None)
     if owned is None:
@@ -696,7 +695,7 @@ def _sell_asset_bonus(
     if upgrade is None or upgrade <= 0:
         # Nothing on the market beats what is being sold, so this is a pure downgrade.
         return -4.0
-    # The purchase still costs the action the swap used to, and only a real jump is worth it.
+    # The purchase costs an action, and only a real jump is worth it.
     #
     # With a full tableau and a pile of cash this is the best rate left in the game: the refund plus
     # the surplus buy points at 2$ each, against 4$ through patronage and 10$ sitting in the wallet.
@@ -732,12 +731,12 @@ def _seat_exposure(engine: CityEngine, state: GameState, player: PlayerState) ->
 def _token_burn_value(target: PlayerState, profile: PolicyProfile) -> float:
     """What burning one Крыша off a defender is worth to the attacker.
 
-    Since 1.9.0 a run that meets nothing but tokens still scores its points and still costs its
-    scandal, so "blocked" is no longer a synonym for "wasted". The token is gone, and the seat
-    behind it is open to the next attack — which in a four-player game is usually somebody else's.
-    Hence a modest number scaled by aggression: it is the tempo half of the payout, and only a
-    profile that already values denial should pay much for it. A defender holding several tokens is
-    worth chipping at slightly less per token, because the seat stays covered either way.
+    A run that meets nothing but tokens still scores its points and still costs its scandal, so
+    "blocked" is not a synonym for "wasted". The token is gone, and the seat behind it is open to
+    the next attack — which in a four-player game is usually somebody else's. Hence a modest number
+    scaled by aggression: it is the tempo half of the payout, and only a profile that already
+    values denial should pay much for it. A defender holding several tokens is worth chipping at
+    slightly less per token, because the seat stays covered either way.
     """
     if target.roofs <= 0:
         return 0.0
@@ -772,8 +771,8 @@ def _grey_operation_utility(
     success_value = float(GREY_OPERATION_POINTS[asset_id])
     if asset_id == "smear":
         # A scandal costs its owner an action and 3◆ to wash off, so value it near a whole action;
-        # a roof answers for its owner and eats the hit instead. Since 1.9.0 that is not nothing:
-        # the token is spent, and the next attack on that seat goes through.
+        # a roof answers for its owner and eats the hit instead. That is not nothing: the token is
+        # spent, and the next attack on that seat goes through.
         exposed = sum(1 for rival in rivals if rival.roofs == 0)
         success_value += exposed * 2.0 * (1 + profile.aggression)
         success_value += sum(_token_burn_value(rival, profile) for rival in rivals if rival.roofs > 0)
@@ -790,10 +789,10 @@ def _grey_operation_utility(
     elif asset_id == "datacenter":
         target = state.player_by_id(str(payload["target_id"]))
         if target.roofs > 0:
-            # Blocked runs stopped being free in 1.9.0: the roll still scores its points and still
-            # costs its scandal, and the token is burned off the defender. Zeroing the payout here
-            # meant the bot read the honest price of the attempt against none of its reward, and
-            # so refused to touch a defended seat even when clearing the token was the whole plan.
+            # A blocked run is not free: the roll still scores its points and still costs its
+            # scandal, and the token is burned off the defender. Zeroing the payout here would read
+            # the honest price of the attempt against none of its reward, and so refuse to touch a
+            # defended seat even when clearing the token is the whole plan.
             success_value += _token_burn_value(target, profile)
         else:
             stolen = min(engine.hack_influence_steal(state), target.influence)

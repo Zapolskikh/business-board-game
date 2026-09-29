@@ -16,7 +16,8 @@ React/Vite -> REST -> FastAPI -> CityRoomService -> city_engine
 - `backend/simulation/` — массовые партии через тот же движок и те же bot policy;
 - `backend/city_rooms/` — lobby, пароли, места, optimistic locking и хранилища;
 - `backend/app/` — REST API и HTTP hardening;
-- `frontend/src/online/` — React-клиент без локальной мутации правил;
+- `frontend/src/ui/` — текущий интерфейс (v2); `frontend/src/online/` — общий слой API/типов и старый экран;
+- `CHANGELOG.md` — почему двигались `RULES_VERSION` и `CONTENT_VERSION`; старая комната не откроется после бампа;
 - `SIMPLIFICATION_TODO.md` — что осталось доделать по правилам и балансу, с замерами под каждым решением;
 - `BALANCE_REVIEW.md` — разбор механик, найденные баги и балансные находки.
 

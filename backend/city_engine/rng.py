@@ -52,11 +52,6 @@ class GameRNG:
             raise ValueError("upper must be positive")
         return int(self.random() * upper)
 
-    def randint(self, low: int, high: int) -> int:
-        if high < low:
-            raise ValueError("high must not be lower than low")
-        return low + self.randbelow(high - low + 1)
-
     def chance(self, probability: float) -> bool:
         if not 0 <= probability <= 1:
             raise ValueError("probability must be between 0 and 1")

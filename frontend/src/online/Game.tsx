@@ -69,7 +69,7 @@ const rolePowers: Record<string, string[]> = {
   politician: [],
   journalist: ["journalist_inflate", "journalist_publish"],
   mafia: ["mafia_racket"],
-  military: ["military_sanction", "military_roof_sweep"],
+  military: ["military_sanction"],
   fraudster: ["fraudster_crypto_scam"],
 };
 
@@ -80,7 +80,6 @@ const powerDescriptions: Record<string, string> = {
   mafia_racket: "Один раз за ход и за 1 действие: нужен активный объект Серого сектора. Базово отбирает до 2$, сумма растёт от раунда, ваших объектов и лидерства цели; её Крыша отменяет рэкет.",
   mafia_cleanup: "За 1 действие: 3$ и активный административный объект — снять до 2 своих скандалов.",
   military_sanction: "Один раз за ход и за 1 действие: цель должна иметь минимум 2 скандала. На 2⚠ забирает деньги, на 3⚠ ещё и влияние, на 4⚠ также снимает роль. Скандалы цели не очищает; Крыша принимает весь удар.",
-  military_roof_sweep: "За 1 действие: снять по 1 Крыше у каждого соперника. Получить по 1 очку за каждую фактически снятую Крышу. Можно применять снова, пока у соперников остаются Крыши.",
   fraudster_cleanup: "За 1 действие снять 1 свой скандал.",
   fraudster_crypto_scam: "Один раз за ход и за 1 действие: нужна активная Городская криптобиржа. Забрать 25% денег у каждого соперника без Крыши и получить 5 скандалов. Все собранные эффекты снижения скандалов складываются. Без такой подготовки Аферист сразу теряет роль.",
 };
@@ -295,9 +294,9 @@ function PlayerStrip({ game, viewedId, playerId, roles, onView }: {
     const color = playerColors[(seat.get(player.id) ?? 0) % playerColors.length];
     const position = order.indexOf(player.id);
     const done = position >= 0 && position < (game.turns_taken_in_round ?? 0);
-    // The counter used to read "n/6", which is the arrest threshold — it silently hid the cliff
-    // that actually matters: the role is stripped one scandal earlier, and the journalist has
-    // both thresholds shifted up by one.
+    // The counter reads the role's own limit, not the arrest threshold at 6: the two differ, the
+    // role is stripped one scandal earlier, and the journalist has both thresholds shifted up by
+    // one. The role limit is the one that costs you the seat.
     const roleLimit = player.role === "journalist" ? 6 : 5;
     const atRisk = player.role !== null && player.scandals >= roleLimit - 1;
     return <button
@@ -393,7 +392,7 @@ function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selected
             <span className="card-main">
               <span className="rarity-badge">{rarityLabels[asset.rarity] ?? asset.rarity}</span><b>{asset.title}</b>
               {asset.tags.length > 0 && <span className="asset-tags">{asset.tags.map(tag => <i key={tag}>{tag}</i>)}</span>}
-              {/* Points first: it is the number the whole late game turns on and it used to be nowhere. */}
+              {/* Points first: it is the number the whole late game turns on. */}
               <span className="asset-stats"><b className="stat-points on">{points} очк</b> · {price}$ · доход <b className={asset.income > 0 ? "stat-income on" : "stat-income"}>{asset.income}$</b>/раунд{asset.influence > 0 && <> · <b className="stat-inf on">+{asset.influence}◆</b> разово</>}</span>
               {effectLines.length > 0
                 ? <ul className="asset-effects">{effectLines.map((line, index) => <li key={index} className={line.active ? "effect-active" : "effect-idle"}>{line.text}{line.boosted && <span className="effect-boost">⚙×2</span>}</li>)}</ul>
@@ -410,10 +409,10 @@ function DistrictMarket({ game, meta, me, viewed, viewingOther, assets, selected
   </section>;
 }
 
-// The right-hand column of an object card. Two thirds of the width sat empty while the only place
-// that named an object's operation was a locked button in the action panel — read after the money
-// was already spent on something else. `special` is the loud part: five objects in the catalog are
-// the sole key to their grey operation, and nothing on the card used to say so.
+// The right-hand column of an object card. Without it two thirds of the width sit empty while the
+// only place that names an object's operation is a locked button in the action panel — read after
+// the money is already spent on something else. `special` is the loud part: five objects in the
+// catalog are the sole key to their grey operation, and the card has to say so.
 function AssetHintPanel({ hints }: { hints: { special: boolean; hints: AssetHint[] } }) {
   if (hints.hints.length === 0) return null;
   return <span className="asset-hints">
@@ -524,8 +523,8 @@ function OwnedAssetCard({ index, owner, asset, districtInfo, effectLines, hints,
       : asset.text && <small className="asset-summary">{asset.text}</small>}
     <AssetHintPanel hints={hints} />
     {!viewingOther && <div className="owned-actions">
-      {/* The sale is free, so "sell then buy" costs exactly the one action a purchase costs — which
-          is what the separate replacement command used to cost, without its choice matrix. */}
+      {/* The sale is free, so "sell then buy" costs exactly the one action a purchase costs — a
+          dedicated replacement command would cost the same and add a choice matrix. */}
       <button className="danger" disabled={busy || !sell} onClick={() => sell && void onAction(sell)} title={`Продать объект за ${sellValue}$ и потерять его ${sellValue} очков в финальном счёте — возврат и очки это одно и то же число. Смысл продажи только в том, что покупается вместо: объект дороже даст больше очков. Продажа бесплатна и не расходует действие, слот освобождается сразу. Жетон автоматизации, если он стоит здесь, снимается — перенесите его бесплатно на другой объект.`}>
         <strong>Продать · +{sellValue}$</strong><small>−{sellValue} очков, без действия</small>
       </button>
@@ -635,12 +634,12 @@ function DecisionPanel({ game, me, meta, roles, districts, assets, legal, busy, 
     {/* The powers stay outside the fold: they are used every turn, unlike claiming a role. */}
     {displayRoleId && <div className="action-group g-roles"><div className="role-powers" style={{ borderColor: roles.get(displayRoleId)?.color }}><strong>{roles.get(displayRoleId)?.icon} Способности: {roles.get(displayRoleId)?.title}</strong><small>{roles.get(displayRoleId)?.power}</small>{powers.map(power => {
         const variants = all("use_role_power", action => action.payload.power === power);
-        return <button className={power.includes("racket") || power.includes("sanction") || power.includes("scam") || power.includes("roof_sweep") ? "danger" : ""} disabled={busy || variants.length === 0} onClick={() => onOffer(powerLabels[power] ?? power, variants)} title={powerDescriptions[power]} key={power}>{powerLabels[power] ?? power}{variants.length > 1 ? " → выбрать" : ""}</button>;
+        return <button className={power.includes("racket") || power.includes("sanction") || power.includes("scam") ? "danger" : ""} disabled={busy || variants.length === 0} onClick={() => onOffer(powerLabels[power] ?? power, variants)} title={powerDescriptions[power]} key={power}>{powerLabels[power] ?? power}{variants.length > 1 ? " → выбрать" : ""}</button>;
       })}</div></div>}
 
     {/* Five lines of which four were locked all game. Open when at least one is actually
         available, folded to a single summary line the rest of the time. */}
-    <details className="action-group g-grey" open={greyAvailable > 0}><summary className="group-title">🌒 Серые операции <span className="group-hint">{greyUsed ? "уже проведена в этом ходу" : greyAvailable > 0 ? `доступно: ${greyAvailable}` : "нужен объект Серого сектора, Технокластера или Администрации"}</span></summary><p className="dim card-rule">Операцию открывает любой активный объект нужного района, роль не нужна. Каждая стоит 1 действие, но за ход можно провести только одну любую — попытка тратится даже при провале. При выборе можно застраховать провал Крышей.</p>{Object.entries(greyOperationLabels).map(([assetId, label]) => {
+    <details className="action-group g-grey" open={greyAvailable > 0}><summary className="group-title">🌒 Серые операции <span className="group-hint">{greyUsed ? "уже проведена в этом ходу" : greyAvailable > 0 ? `доступно: ${greyAvailable}` : "нужен объект Серого сектора, Технокластера или Администрации"}</span></summary><p className="dim card-rule">Операцию открывает любой активный объект нужного района, роль не нужна. Каждая стоит 1 действие, но за ход можно провести только одну любую — попытка тратится даже при провале. Крыша цели гасит урон, но не ваш скандал и не ваши очки.</p>{Object.entries(greyOperationLabels).map(([assetId, label]) => {
       const variants = all("grey_operation", action => action.payload.asset_id === assetId);
       const info = greyOperationInfo[assetId];
       const effect = info.effect(game.round_number, meta);

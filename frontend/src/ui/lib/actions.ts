@@ -86,9 +86,6 @@ export function resolveMany(
   return { options, pending, blocked: hint ?? turnBlock(context) ?? "Сейчас недоступно" };
 }
 
-export const isReady = (state: Availability): state is { kind: "ready"; action: LegalAction } =>
-  state.kind === "ready";
-
 /** Отметки «уже в этом ходу» приходят из движка в turn_flags — клиент их только читает. */
 export function usedThisTurn(game: GameState, flag: string): boolean {
   return Boolean(game.turn_flags?.[flag]);

@@ -57,7 +57,7 @@ export function PlayerDetails({
           label: index.cards.get(
             context.me.hand?.find(card => card.uid === action.payload.card_uid)?.card_id ?? "",
           )?.title ?? "Карта",
-          // Лимит переехал на покупку в 1.13.0: разыгрывать руку можно как угодно быстро.
+          // Лимит стоит на покупке, а не на розыгрыше: руку можно тратить как угодно быстро.
           hint: "Карта · бесплатно, без лимита за ход",
         })),
       ];

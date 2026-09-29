@@ -47,9 +47,9 @@ def asset_points(cost: int) -> int:
 
     Lives here rather than in the engine because the number has to reach the card: an object turns
     money into points at 2$ each, five times better than the 10$ a hoarded point costs, which makes
-    "sell the weak one, buy the dear one" the strongest late money sink in the game. Both clients
-    used to derive `floor(cost / 2)` themselves, so the rate was on screen nowhere and duplicated
-    in three places.
+    "sell the weak one, buy the dear one" the strongest late money sink in the game. Clients that
+    derive `floor(cost / 2)` themselves put the rate on screen nowhere and duplicate it in three
+    places.
     """
     return floor(cost / 2)
 
@@ -147,9 +147,9 @@ class ContentCatalog:
     def deck_project_ids(self) -> list[str]:
         """Every project is unique and enters the deck: the board is the only way to reach one.
 
-        Two repeatable initiatives used to sit outside the deck as an always-open scoring outlet.
-        They were a second answer to the question patronage and lobbying already answer — turning a
-        pile into points — and the weaker one, so the sinks were raised and the initiatives removed.
+        No repeatable initiative sits outside the deck as an always-open scoring outlet: it would
+        be a second, weaker answer to the question patronage and lobbying already answer — turning
+        a pile into points.
         """
         return list(self.projects)
 

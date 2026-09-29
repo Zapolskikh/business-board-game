@@ -46,7 +46,7 @@ export const powerLabels: Record<string, string> = {
 
 /* Что делает каждая активная способность и во что обходится.
  *
- * Раньше в панели стояло только название и «сейчас недоступна»: игрок не знал ни что кнопка
+ * Одного названия и «сейчас недоступна» в панели не хватает: игрок не узнаёт ни что кнопка
  * делает, ни почему она серая, ни чего ему не хватает. Текст здесь — описание, а не правило:
  * все числа, по которым способность разрешается, приходят из движка в `game.role_powers`.
  */
@@ -188,8 +188,8 @@ export const greyOperationLabels: Record<string, string> = {
 
 // Mirrors `CityEngine.GREY_OPERATION_DISTRICTS`: an operation is unlocked by any active object of
 // these districts, not by one card out of 71. Kept next to the labels because the object cards have
-// to say the same thing the operation panel says — the panel used to announce the requirement only
-// after you had already spent your money on something else.
+// to say the same thing the operation panel says — a requirement announced only by the panel is a
+// requirement you learn after spending your money on something else.
 export const greyOperationDistricts: Record<string, string[]> = {
   smear: ["shadows"],
   crypto: ["tech", "shadows"],
@@ -277,8 +277,8 @@ export function numberValue(value: unknown): number {
  * Плюс «Агломерация»: объект с `districtDouble` считает каждый ваш объект своего района за два —
  * умножается только построенное, аренда и метка не удваиваются.
  *
- * Здесь стояли только объекты и зонирование, поэтому карточка печатала «2/4» там, где движок
- * видел 4/4, и синергия на ней выглядела невключённой ровно тогда, когда она платила. */
+ * Считать здесь меньше, чем считает движок, нельзя: карточка напечатает «2/4» там, где движок
+ * видит 4/4, и синергия будет выглядеть невключённой ровно тогда, когда она платит. */
 export function districtCount(player: PlayerState, district: string, assets: Map<string, AssetMeta>): number {
   const owned = player.assets.filter(item => assets.get(item.card_id)?.district === district).length;
   const doubles = player.assets.filter(
@@ -323,7 +323,7 @@ export function campaignTiers(meta: CityMeta): { spend: number; gain: number }[]
 }
 
 /** The tier of a campaign action, resolved from the payload the engine offered. */
-export function campaignTier(meta: CityMeta, spend: unknown): { spend: number; gain: number } | undefined {
+function campaignTier(meta: CityMeta, spend: unknown): { spend: number; gain: number } | undefined {
   const wanted = numberValue(spend);
   return campaignTiers(meta).find(tier => tier.spend === wanted);
 }
@@ -693,7 +693,7 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       ids.forEach((playerId, index) => {
         if (index > 0) segments.push(txt(", "));
         segments.push(playerSeg(game, playerId), txt(" "), signed(paid(playerId), "$"));
-        // Passive influence used to be settled invisibly — only the wallet was reported.
+        // Passive influence is reported too: a wallet-only line settles it invisibly.
         if (gained(playerId) !== 0) segments.push(txt(" "), signed(gained(playerId), "◆"));
       });
       return segments;
@@ -851,8 +851,8 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
         playerSeg(game, stringValue(data.target_id)),
         txt(` — роль «${role ?? roleId}» потеряна, место освободилось`),
       );
-    // Both of these used to be invisible: the only trace was the scandal counter, so a player
-    // discovered a lost role by noticing their passive income had stopped.
+    // Both of these must be announced: with only the scandal counter as a trace, a player
+    // discovers a lost role by noticing their passive income has stopped.
     case "scandal_limit_reached": {
       const limit = numberValue(data.limit) || 5;
       const roleTitle = meta.roles.find(item => item.id === stringValue(data.role_id))?.title;
@@ -901,7 +901,7 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
   }
 }
 
-export function describeEvent(event: DomainEvent, game: GameState, meta: CityMeta): string {
+function describeEvent(event: DomainEvent, game: GameState, meta: CityMeta): string {
   return describeEventSegments(event, game, meta)
     .map(segment => segment.text)
     .join("");
@@ -1092,9 +1092,8 @@ export function districtSynergyValue(count: number): number {
 /* Профильный район каждой роли: за объект своего района роль доплачивает +1$.
  *
  * Совпадает с `supported` в `object_synergy_income`. У Политика это Административный квартал,
- * а не Спальный — район переехал в 1.12.0 вместе с тем, что жильё теперь платит ему влиянием со
- * всего города. Здесь оставался старый Спальный, и карточки жилья обещали политику доллар,
- * которого движок не платил, а на административных объектах строки не было вовсе. */
+ * а не Спальный: жильё платит ему влиянием со всего города, а доллар за объект идёт с квартала.
+ * Разойтись с движком здесь — значит обещать на карточках доллар, которого движок не платит. */
 const roleDistrictMap: Record<string, string> = {
   capitalist: "business",
   politician: "government",
@@ -1136,9 +1135,8 @@ export function assetEffectLines(
   const roleTitle = (id: string): string => meta.roles.find(item => item.id === id)?.title ?? id;
   const hasRole = (role: string): boolean => owner.role === role;
   /* Ровно `has_district_link` движка: район засчитывается тому, у кого он есть — построен,
-   * арендован «Зонированием» или помечен меткой Капиталиста. Виртуальные связи Капиталиста с
-   * Деловым центром и Политика с Администрацией удалены в 1.12.0 вместе с чартерами, а здесь
-   * дожили и рисовали галочку у условия, которого движок не засчитывает. */
+   * арендован «Зонированием» или помечен меткой Капиталиста. Виртуальных связей роли с районом
+   * нет ни у кого: лишняя такая связь рисует галочку у условия, которого движок не засчитывает. */
   const hasLink = (district: string): boolean => districtCount(owner, district, assets) > 0;
   const push = (
     text: string,

@@ -156,7 +156,7 @@ export function AssetFace({
         </span>
       </span>
 
-      {/* Название и очки получают отдельный ярус: метрики больше не давят на категорию. */}
+      {/* Название и очки получают отдельный ярус, чтобы метрики не давили на категорию. */}
       <span className="flex min-w-0 items-start gap-2">
         <h3 className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[13px]
           font-semibold leading-tight text-ink">

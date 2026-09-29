@@ -96,8 +96,8 @@ def test_backend_catalog_is_complete_and_can_create_a_game() -> None:
     assert len(catalog.roles) == 6
     assert len(catalog.assets) == 71
     assert len(catalog.action_cards) == 32
-    # Every project is unique and every one is in the deck: the two repeatable initiatives that
-    # used to live outside it are gone, and so is the district development the two cards drove.
+    # Every project is unique and every one is in the deck: nothing repeatable lives outside it,
+    # and no card drives district development.
     assert len(catalog.projects) == 40
     assert len(catalog.deck_project_ids()) == 40
     assert len(state.market) == 6

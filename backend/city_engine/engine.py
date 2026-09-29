@@ -452,9 +452,8 @@ class CityEngine:
     def has_role(player: PlayerState, role_id: str) -> bool:
         """Roles are held, never borrowed: forging and copying are gone, so this is one comparison.
 
-        It used to also accept `copied_role`, which meant every rule in the engine had two ways to
-        be true and the client had two role fields to render — for a mechanic used three times in
-        eight measured player-games, every one of them a no-op.
+        There is deliberately no second way to hold a role. A borrowed-role field would give every
+        rule in the engine two ways to be true and the client two role fields to render.
         """
         return player.role == role_id
 
@@ -538,10 +537,10 @@ class CityEngine:
     def project_requirement_standing(self, player: PlayerState, project: ProjectDefinition) -> dict[str, Any]:
         """Have/needed for a condition, or a plain yes/no for the ones with no halves.
 
-        The client used to print the condition and leave the counting to the player — 13 of the 42
-        projects gate on a tag, another 13 on a district, and across two measured games 16 tag
-        projects left the board unused. Nobody was doing the arithmetic. This is that arithmetic,
-        computed by the only component allowed to evaluate a condition.
+        A printed condition with the counting left to the player is a condition nobody checks: 13
+        of the 42 projects gate on a tag and another 13 on a district, and unread tag projects
+        leave the board unused. This is that arithmetic, computed by the only component allowed to
+        evaluate a condition.
         """
         requirement = project.requirement
         kind = str(requirement.get("type", "none"))
@@ -832,7 +831,7 @@ class CityEngine:
         """What this project costs *this* player right now, as (influence, money).
 
         Every price in the game goes through a method like this one — the client must not recompute
-        it, for the same reason it no longer recomputes asset discounts. The player argument stays
+        it, for the same reason it does not recompute asset discounts. The player argument stays
         even though nothing reads it yet: per-player project discounts are the obvious next perk,
         and every call site already passes it.
         """
@@ -888,11 +887,10 @@ class CityEngine:
     def _reroll_projects(self, state: GameState, command: Command) -> None:
         """Shuffle the whole board back into the deck and deal four fresh projects.
 
-        It used to move exactly one card — the oldest — for the same money and no action, which is
-        the round rotation you get for free anyway: as a way out of a board that fits nobody it was
-        a lottery ticket on a single blind draw. A full re-deal is a real decision, so it costs a
-        real action on top of the money; that price is also what stops a player sitting on 300$ from
-        re-dealing every turn and turning the board into a slot machine.
+        Rotating a single card would only duplicate the free round rotation and make the way out of
+        a board that fits nobody a lottery ticket on one blind draw. A full re-deal is a real
+        decision, so it costs a real action on top of the money; that price is also what stops a
+        player sitting on 300$ from re-dealing every turn and turning the board into a slot machine.
         """
         player = state.current_player
         if self._flag(state, "projects_rerolled"):
@@ -1132,7 +1130,7 @@ class CityEngine:
         if len(player.hand) >= HAND_LIMIT or not state.action_deck:
             return None
         card_id = state.action_deck.pop(0)
-        # The deck holds duplicates, so the card id alone no longer identifies a card in hand — two
+        # The deck holds duplicates, so the card id alone does not identify a card in hand — two
         # copies would share a uid, and every lookup takes the first match while the client keys its
         # hand by it. The deck only ever shrinks, so its remaining length is a free serial number.
         held = HeldCard(uid=f"card:{card_id}:{len(state.action_deck)}", card_id=card_id)
@@ -1142,14 +1140,13 @@ class CityEngine:
     def _buy_action_card(self, state: GameState, command: Command) -> None:
         """A blind draw for an action, once a turn.
 
-        Cards used to be a face-up market bought without spending an action, which made buying
-        the influence card strictly better than the campaign action — 5$ into 3◆ for free while
-        the basic action gave 2◆ and ate a turn slot. Now the card is random and costs the action,
-        so it competes honestly, and a bad draw is cushioned by a stronger discard.
+        The draw is blind and costs the action so that it competes honestly with the campaign: a
+        face-up card bought for free would turn 5$ into 3◆ with no turn slot spent, strictly better
+        than the basic action's 2◆. A bad draw is cushioned by a stronger discard.
 
-        The turn cap moved here from the play and the discard. Those two were capped because
-        buying twice and shredding everything was a better influence pump than the campaign; the
-        cap on the *supply* closes that without freezing the hand a player already paid for.
+        The turn cap sits on the purchase, not on the play or the discard. Capping the *supply* is
+        what stops buying twice and shredding everything from out-pumping the campaign, and it does
+        so without freezing the hand a player already paid for.
         """
         player = state.current_player
         if self._flag(state, CARD_PURCHASE_FLAG):
@@ -1178,10 +1175,10 @@ class CityEngine:
     def _convert_action_card(self, state: GameState, command: Command) -> None:
         """Discard one card for a consolation unit. No action, no turn cap.
 
-        The cap used to live here: a purchase draws two cards and a discard costs no action, so
-        shredding both in one turn turned the blind draw into the best influence pump in the game.
-        That is now closed at the source — one purchase a turn — and the hand a player already
-        paid for is theirs to spend at whatever speed they like.
+        The cap deliberately does not live here: a purchase draws two cards and a discard costs no
+        action, so capping the discard would be the wrong end of the leak. It is closed at the
+        source — one purchase a turn — and the hand a player already paid for is theirs to spend at
+        whatever speed they like.
         """
         player = state.current_player
         card_uid = self._payload_string(command, "card_uid")
@@ -1471,7 +1468,7 @@ class CityEngine:
                 # actions plus both powers. The publication now costs a turn and hits twice as hard.
                 self._spend_action(state)
                 player.influence -= 3
-            # Every other targeted effect checks the roof; these two used to punch straight through.
+            # Every targeted effect checks the roof; these two are no exception.
             if target.roofs > 0:
                 target.roofs -= 1
                 state.append_event("targeted_effect_blocked", target.id, power=power, by="roof")
@@ -1542,11 +1539,11 @@ class CityEngine:
             target.roofs -= 1
             return
         leader = self.ranking(state)[0].id == target.id
-        # Both halves of the demand hang off districts now, which is the point of the role: money
+        # Both halves of the demand hang off districts, which is the point of the role: money
         # from the Серый сектор it lives in, influence from the Административный квартал its cleanup
-        # already pushes it toward. The old formula also counted housing — a leftover from the
-        # deleted tribute — and drifted upward with the round on its own, rewarding the calendar
-        # instead of the tableau.
+        # already pushes it toward. Housing is deliberately not counted: it belongs to no part of
+        # this role, and a demand that grows with the round alone rewards the calendar instead of
+        # the tableau.
         money_demand = (
             2
             + 2 * self.district_count(player, "shadows")
@@ -1588,9 +1585,9 @@ class CityEngine:
         object confiscation is gone: a mechanic attached to one role that either did nothing (full
         slots) or removed nine points of score, with nothing in between to plan around.
 
-        The sanction no longer clears a scandal off the target either. It used to, which meant the
-        role healed what it hit and knocked its own next tier out of reach; the once-a-turn limit is
-        what stops a target being farmed.
+        The sanction does not clear a scandal off the target: healing what it hits would knock the
+        role's own next tier out of reach. The once-a-turn limit is what stops a target being
+        farmed.
         """
         player = state.current_player
         self._require_role(player, "military")
@@ -1856,11 +1853,11 @@ class CityEngine:
         player.money += gained
         self.add_scandal(state, player, max(0, CRYPTO_SCAM_SCANDALS - self.grey_scandal_reduction(player)))
 
-    # Every operation used to demand one exact card out of 71 — which also had to hold one of the
-    # six slots. Compare the racket, which asks for *any* Серый сектор object: 11 uses in a single
-    # game against 10 for all five grey operations across two, and 8 of those were one crypto
-    # exchange. Three of the five were never run at all. The gate is now a district, so an
-    # operation is unlocked by a shelf of the catalog instead of a single card.
+    # An operation is gated on a district, not on one exact card out of 71 that also has to hold
+    # one of the six slots. A card-shaped gate is a gate nobody opens; compare the racket, which
+    # asks for *any* Серый сектор object and is run more often on its own than the whole grey
+    # layer. A shelf of the catalog unlocks an operation, so the layer is reachable by more than
+    # one draw.
     # Серый сектор opens all five, which is the point of the district: it is the grey shelf, and the
     # racket already works that way. Технокластер opens the two technical operations and the
     # Административный квартал opens the leak, so a clean city can still reach part of the layer.
@@ -2078,11 +2075,11 @@ class CityEngine:
         """Clamp the counters whose ceiling is set by the role the player is holding *now*.
 
         Two limits move when a role does — ``scandal_limit`` (the journalist's six) and
-        ``roof_limit`` (the mafia's extra token) — and nothing used to re-check them on the way out. A
-        journalist who hit their own limit of six was left sitting at six scandals under a limit of
-        five: a point of score worse than the identical event for any other role, and a state
-        ``scandals <= scandal_limit`` says cannot exist. A mafia kept its extra Крыша after claiming
-        a different seat, where its new lower ceiling could not support it.
+        ``roof_limit`` (the mafia's extra token) — and both must be re-checked on the way out. A
+        journalist who left the seat at six scandals under a limit of five would sit a point of
+        score worse than the identical event for any other role, in a state ``scandals <=
+        scandal_limit`` says cannot exist. A mafia must not keep its extra Крыша into a different
+        seat, whose lower ceiling cannot support it.
 
         Called at every point a role is gained, swapped, stripped or lost, so the invariant holds
         after the transition rather than only inside the handler that happened to think of it.
@@ -2099,8 +2096,8 @@ class CityEngine:
     def add_scandal(self, state: GameState, player: PlayerState, amount: int) -> None:
         """Charge scandals and announce every consequence that is not a plain counter change.
 
-        Losing a role and being jailed used to happen in silence: the only trace was the scandal
-        counter moving, so a player found out their role was gone by diffing their own state.
+        Losing a role and being jailed must not happen in silence: with only the scandal counter
+        moving, a player finds out their role is gone by diffing their own state.
 
         **No Крыша check here, on purpose.** Every hostile path — a card, the racket, a sanction, a
         publication, a hack — spends the defender's token *before* it calls this, and cancels the
@@ -2207,12 +2204,12 @@ class CityEngine:
         """The trailing player opens the round and gets first pick of the market.
 
         Catch-up through access instead of cash: it costs the leader tempo without slowing the
-        player who is behind, and it replaces a starting seat that used to be drawn once and then
-        played first for all fifteen rounds.
+        player who is behind, and the order is re-derived every round rather than drawn once and
+        played for all fifteen.
         """
         # Ties break in favour of whoever played later last round, so equal scores rotate the
         # advantage instead of freezing it on the lowest seat — early rounds are all ties, and a
-        # fixed seat order there looked like the standings rule was not working at all.
+        # fixed seat order there reads as the standings rule not working at all.
         previous = state.turn_order or [player.id for player in state.players]
         order = sorted(
             state.players,
@@ -2345,11 +2342,11 @@ class CityEngine:
 
     def _settle_round(self, state: GameState) -> None:
         incomes, income_sources, influence_sources = self.settlement_preview(state)
-        # Keep the exact per-object split used by the settlement. Analytics used to reconstruct
-        # this from the state *before the command*. That is wrong when the command itself strips a
-        # role or triggers an arrest and the arrest closes the round: object synergy is then paid
-        # from the post-command board. Emitting the source rows here makes the settlement event the
-        # single source of truth, just like ``income_sources`` already is for the player totals.
+        # Keep the exact per-object split used by the settlement. Analytics must not reconstruct
+        # this from the state *before the command*: that is wrong when the command itself strips a
+        # role or triggers an arrest and the arrest closes the round, because object synergy is
+        # then paid from the post-command board. Emitting the source rows here makes the settlement
+        # event the single source of truth, just like ``income_sources`` is for the player totals.
         # Empty on the final round, where nothing is paid: these rows must add back up to the
         # ``objects`` line of the settlement, and the balance harness fails the run when they do not.
         object_income_sources = {
@@ -2407,9 +2404,9 @@ class CityEngine:
             # money doubles with a business object (connections sell the story), and the rating
             # needs a single housing object to have readers at all.
             #
-            # The ceiling is gone. It used to be 2 plus one per housing object, which capped the
-            # role's own currency at exactly the moment it was working — and it made every extra
-            # housing object worth +1◆ a round, so the role quietly turned into a housing engine.
+            # There is deliberately no ceiling on the rating. A cap that scales with housing would
+            # limit the role's own currency exactly when it is working, and make every extra
+            # housing object worth +1◆ a round, quietly turning the role into a housing engine.
             # One object switches the line on, and from there the rating simply is the scandal
             # counter: the role is paid for the thing it is built to accumulate.
             rating = 0
@@ -2419,8 +2416,8 @@ class CityEngine:
                 rate = 2 if self.owned_district_count(player, "business") > 0 else 1
                 journalist_cash = rate * sum(other.scandals for other in state.players if other.id != player.id)
             income_sources[player.id]["journalist"] = journalist_cash
-            # Influence was settled silently: players had to diff their own state to see where
-            # a politician's passive or a journalist's rating came from.
+            # Influence must not be settled silently: otherwise players diff their own state to see
+            # where a politician's passive or a journalist's rating came from.
             influence_sources[player.id] = {
                 **self.passive_influence_breakdown(state, player),
                 "rating": rating,
@@ -2472,11 +2469,10 @@ class CityEngine:
         objects = 0
         for owned in self.effective_assets(player):
             asset = self.owned_definition(owned)
-            # The printed income, flat. District development used to multiply this by 1.25 per
-            # level, up to twice, for 2$ and one action — by far the cheapest exponent in the game
-            # and the thing that made building strictly better than anything else a turn could buy.
-            # Depth is still rewarded, but through synergy and influence, which no multiplier
-            # compounds. See object_synergy_income.
+            # The printed income, flat. Nothing multiplies it: a per-level multiplier on income is
+            # the cheapest exponent in the game and makes building strictly better than anything
+            # else a turn can buy. Depth is rewarded through synergy and influence instead, which
+            # no multiplier compounds. See object_synergy_income.
             objects += asset.income + self.object_synergy_income(state, player, owned)
         return {
             "objects": objects,
@@ -2486,10 +2482,10 @@ class CityEngine:
     def residents_influence(self, state: GameState, player: PlayerState) -> int:
         """The politician's passive: 1◆ per residential object anywhere in the city, rivals' too.
 
-        It used to pay money, and money is the currency the role needed least: the administrative
-        quarter it represents now pays that (see ROLE_DISTRICTS), while this line pays the scarce
-        one. It is still the only passive in the game that reads the opponents' boards, which is
-        why the forecast shows it on its own row.
+        It pays influence, not money: money is the currency this role needs least, and the
+        administrative quarter it represents already pays that (see ROLE_DISTRICTS). It is the only
+        passive in the game that reads the opponents' boards, which is why the forecast shows it on
+        its own row.
         """
         if not self.has_role(player, "politician"):
             return 0
@@ -2555,11 +2551,10 @@ class CityEngine:
     def has_district_link(self, player: PlayerState, district: str) -> bool:
         """Does the player actually have a foothold in this district?
 
-        Two roles used to answer yes without owning anything — the capitalist in the Деловой
-        центр, the politician in the Администрации. A virtual object is invisible: the card said
-        "at a business object" and paid at a table where the player had none, so the condition on
-        the card was not the condition in the engine. Both charters are gone; the districts are
-        now earned like everybody else's, or rented for a round with «Зонирование».
+        No role gets a virtual foothold. A virtual object is invisible: the card says "at a
+        business object" and would pay at a table where the player has none, so the condition on
+        the card would not be the condition in the engine. Districts are earned like everybody
+        else's, or rented for a round with «Зонирование».
         """
         return self.district_count(player, district) > 0
 
@@ -2571,10 +2566,10 @@ class CityEngine:
 
         Takes the state because the politician's row counts the whole city, rivals included.
         """
-        # The politician: 1◆ per residential object anywhere on the table. Two administrative
-        # objects of their own used to pay this instead; the administrative quarter is now the
-        # role's own district and pays a dollar an object like every other role's does, so this
-        # line moved to the currency the role is short of and to the board it actually governs.
+        # The politician: 1◆ per residential object anywhere on the table. It is not paid off the
+        # role's own administrative objects: the administrative quarter is the role's own district
+        # and pays a dollar an object like every other role's does, so this line pays the currency
+        # the role is short of, on the board it actually governs.
         residents = self.residents_influence(state, player)
         # The capitalist: 1◆ per own industrial object. The role earns more money than anyone and
         # spends actions converting it — this is the cross-district tie that pays it in the currency
@@ -2591,11 +2586,10 @@ class CityEngine:
             active_district = not bonus.get("district") or self.has_district_link(player, bonus["district"])
             if active_role and active_district:
                 object_effects += int(bonus["value"])
-        # The reward for building deep. Development used to be it, and it paid in money multiplied
-        # by itself; this pays a flat token in the currency projects are bought with, and only from
-        # round four or so, because the objects that carry it are the late ones. Deliberately an
-        # explicit effect rather than "epics behave differently": a rule the card prints beats a
-        # rule the player has to learn.
+        # The reward for building deep, paid as a flat token in the currency projects are bought
+        # with rather than as money multiplied by itself, and only from round four or so, because
+        # the objects that carry it are the late ones. Deliberately an explicit effect rather than
+        # "epics behave differently": a rule the card prints beats a rule the player has to learn.
         synergy = sum(
             int(self.owned_definition(owned).effects.get("synergyInfluence", 0))
             for owned in player.assets
@@ -2609,10 +2603,10 @@ class CityEngine:
             "projects": self.effect_total(player, "passiveInfluence"),
         }
 
-    # Every active power of every role, in the order the panel should list them. The clients used
-    # to keep their own copy of this list to grey out a power that is not available right now; a
-    # copy of a rule in another language is a copy that drifts, and this one already had the
-    # deleted `military_roof_sweep` in it.
+    # Every active power of every role, in the order the panel should list them. The clients must
+    # not keep their own copy of this list to grey out a power that is not available right now: a
+    # copy of a rule in another language is a copy that drifts, and it drifts towards listing
+    # powers the engine does not implement.
     ROLE_POWERS = {
         "capitalist": ("capitalist_claim",),
         "politician": ("politician_cleanup", "politician_deal", "politician_veto"),
@@ -2646,8 +2640,8 @@ class CityEngine:
 
     # Whether the target's Крыша answers for them. Every targeted power is stopped by the token
     # except the one whose whole job is to take it — a defence that answers the attack on itself
-    # would make that line unreachable. The client used to print "Крыша погасит" next to every
-    # target of every power, including that one, directly under the sentence saying it will not.
+    # would make that line unreachable. Shipped so the client does not print "Крыша погасит" under
+    # the one power whose text says it will not.
     POWER_BLOCKED_BY_ROOF = {
         "military_roof_seize": False,
     }
@@ -2657,8 +2651,8 @@ class CityEngine:
 
         The numbers are formulas — the racket demand grows with the round, the districts and the
         target's standing; the sanction reads a ladder off their scandal counter — and a client
-        that wants to show them before the click would have to reimplement every one. It did not,
-        so the only way to know what a racket was worth was to run it.
+        that wants to show them before the click would have to reimplement every one. Without this,
+        the only way to know what a racket is worth is to run it.
 
         Returns the resources actually moved, already clamped by what the target holds, plus the
         flag that matters more than any of them: whether a Крыша is about to eat the whole thing.
@@ -2814,9 +2808,9 @@ class CityEngine:
         rows: list[dict[str, Any]] = []
         if player.role == "capitalist":
             rows.append({"key": "capitalist_objects", "value": len(player.assets), "needs": None})
-            # Строки чартера здесь больше нет: сам чартер удалён в 1.12.0 вместе с виртуальной
-            # связью с Деловым центром, а перк пережил его и печатал в панели бонус, которого
-            # движок не даёт. Вместо него у роли теперь есть `capitalist_claim`.
+            # Здесь перечисляется только то, что движок действительно платит: строка перка,
+            # которому в движке ничего не соответствует, печатает игроку несуществующий бонус.
+            # Связи с Деловым центром у роли нет — у неё есть `capitalist_claim`.
             rows.append({"key": "capitalist_industrial_influence", "value": count("industrial"), "needs": "industrial"})
         elif player.role == "politician":
             rows.append(

@@ -359,7 +359,7 @@ def describe_event(event: dict[str, Any], game: dict[str, Any], catalog: Catalog
             breakdown = sources.get(player_id)
             paid = sum(int(value) for value in breakdown.values()) if breakdown else int(incomes.get(player_id, 0))
             parts = [f"{key} {int(value):+d}" for key, value in (breakdown or {}).items() if int(value) != 0]
-            # Influence is settled here too and used to be invisible in the log.
+            # Influence is settled here too, so the log has to report it and not just the wallet.
             gained = sum(int(value) for value in (influence.get(player_id) or {}).values())
             if gained:
                 parts.extend(

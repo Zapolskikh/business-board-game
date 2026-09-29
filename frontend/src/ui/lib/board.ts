@@ -12,22 +12,6 @@ export const roofPrice = (game: GameState): number => game.roof_price ?? 3;
 
 export const maxCapacity = (meta: CityMeta): number => meta.scoring?.max_capacity ?? 6;
 
-/** Цена следующего слота города. undefined — расширяться некуда. */
-export function nextSlotPrice(meta: CityMeta, player: PlayerState): number | undefined {
-  return meta.scoring?.capacity_costs?.[String(player.capacity)];
-}
-
-/** Все цены лестницы расширения — для поповера слотов. */
-export function slotLadder(meta: CityMeta): { capacity: number; cost: number }[] {
-  const costs = meta.scoring?.capacity_costs ?? {};
-  return Object.entries(costs)
-    .map(([capacity, cost]) => ({ capacity: Number(capacity), cost }))
-    .sort((left, right) => left.capacity - right.capacity);
-}
-
-export const isMyTurn = (game: GameState, me: PlayerState): boolean =>
-  game.status === "playing" && game.players[game.current_player_index]?.id === me.id;
-
 export const currentPlayer = (game: GameState): PlayerState | undefined =>
   game.players[game.current_player_index];
 
