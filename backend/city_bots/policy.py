@@ -13,6 +13,7 @@ from typing import Any
 
 from city_engine.commands import Command
 from city_engine.constants import (
+    CAPACITY_COSTS,
     CASH_TO_INFLUENCE_MONEY,
     FRAUDSTER_GREY_BONUS,
     GREY_FAILURE_SCANDALS,
@@ -23,6 +24,7 @@ from city_engine.constants import (
     MAX_CAPACITY,
     MONEY_PER_POINT,
     PATRONAGE_MONEY,
+    PATRONAGE_POINTS,
     POINTS_CARD_RATE,
     ROOF_BREAK_POINT_PER_ROOF,
 )
@@ -71,6 +73,18 @@ class PolicyProfile:
 # turns 1◆ into roughly 1.5 points, while a dollar buys 0.5 in an object and 0.1 once the slots
 # are full. Used wherever a decision trades one currency for the other.
 INFLUENCE_IN_MONEY = 3.0
+
+# What a dollar becomes, in points, depending on where it can still go. An object is the best sink
+# in the game and the reason income is worth chasing at all; patronage is the floor once the slots
+# are full; a dollar that is never spent scores at the holding rate. All three are engine numbers,
+# not tuning: see ``content.asset_points``, ``PATRONAGE_*`` and ``MONEY_PER_POINT``.
+MONEY_RATE_OBJECT = 0.5
+MONEY_RATE_PATRONAGE = PATRONAGE_POINTS / PATRONAGE_MONEY
+MONEY_RATE_HELD = 1 / MONEY_PER_POINT
+
+# What an empty slot is expected to cost to fill. Only used to ask "does this income still have
+# anywhere to go", so the average of the market is enough and a live lookup would be noise.
+_MARKET_OBJECT_COST = 12
 
 PROFILES = {
     "easy": PolicyProfile(horizon=3, aggression=0.12, risk_penalty=1.5, role_focus=1.4, defence=0.7),
@@ -241,6 +255,54 @@ def _fractional_score(engine: CityEngine, player: PlayerState) -> float:
     return breakdown["total"] - breakdown["money"] - breakdown["influence"] + exact
 
 
+def _income_rate(
+    engine: CityEngine,
+    state: GameState,
+    player: PlayerState,
+    profile: PolicyProfile,
+) -> float:
+    """What one dollar of recurring income is worth, in points, per round of horizon.
+
+    A flat 0.55 was the old answer, and it is the reason a bot could finish a measured game on
+    197$ with the worst tableau at the table: it values a recurring dollar at more than twice what
+    patronage pays for it and five times what holding it scores. That premium is real only while
+    the dollar still has somewhere to compound — an empty slot turns money into points at 0.5 a
+    dollar, and the object it buys pays income again.
+
+    Once the tableau is full, the slots are maxed and the rounds have run out, the only exit is
+    the patronage button at 0.25 a dollar, and income stops being worth chasing at all. Returning
+    the true rate rather than the premium is what makes a bot start buying point-dense objects and
+    pressing the sink instead of accumulating a pile it cannot spend.
+
+    Older profiles keep the flat number: they were tuned against it, and the whole point of the
+    easier opponents is that they play the previous version of the game.
+    """
+    if not profile.planning:
+        return 0.55
+    rounds_left = max(0, state.max_rounds - state.round_number)
+    if rounds_left < 2:
+        # Nothing bought now pays back; the pile is scored as it stands.
+        return MONEY_RATE_HELD
+    room = max(0, player.capacity - len(player.assets)) + (MAX_CAPACITY - player.capacity)
+    if room <= 0:
+        return MONEY_RATE_PATRONAGE
+    # Slots left, but a slot only absorbs so much. What the tableau can still swallow is the empty
+    # slots plus the capacity upgrades that open them, and the wallet already covers part of it —
+    # income beyond that is surplus the moment it is earned, whatever the round. This is the
+    # "income is already stable" case: the bot stops paying the compounding premium for the tenth
+    # dollar a round it has no way to deploy, and starts buying objects for their points instead.
+    appetite = room * _MARKET_OBJECT_COST + sum(
+        CAPACITY_COSTS.get(step, 0) for step in range(player.capacity, MAX_CAPACITY)
+    )
+    horizon = min(profile.horizon, rounds_left)
+    projected = engine._round_income(state, player) * horizon + player.money
+    if projected <= appetite:
+        return 0.55
+    # Blend by the share of projected money that still has a home.
+    covered = appetite / projected
+    return MONEY_RATE_PATRONAGE + (0.55 - MONEY_RATE_PATRONAGE) * covered
+
+
 def _position_value(
     engine: CityEngine,
     state: GameState,
@@ -253,7 +315,11 @@ def _position_value(
     # that pays influence look like a weak income card: across 48 measured player-games not one bot
     # ever owned the compromat trader or the illegal datacentre, so two of the five grey operations
     # were unreachable rather than mispriced.
-    recurring = engine._round_income(state, player) + engine.passive_influence(state, player) * profile.influence_weight
+    income_rate = _income_rate(engine, state, player, profile) / 0.55
+    recurring = (
+        engine._round_income(state, player) * income_rate
+        + engine.passive_influence(state, player) * profile.influence_weight
+    )
     # One or two scandals are ordinary score loss, already present in the engine score.  The extra
     # risk term is only for the danger zone near role loss.  Squaring the whole counter made an
     # expert spend 19 actions and scarce influence cleaning from 2 -> 1 in one measured game,
@@ -562,13 +628,29 @@ def _strategic_action_bonus(
             # The points land in the score, so the plain utility already sees them; what it cannot
             # see is that this is the *floor*. Take it when the board has nothing to give and the
             # wallet is past what a purchase can absorb — never instead of a reachable project.
-            spare = (
-                player.money - profile.cash_comfort - PATRONAGE_MONEY
-                if payload.get("kind") == "patronage"
-                else player.influence - LOBBYING_INFLUENCE
-            )
-            bonus += 1.5 if spare > 0 else -2.0
-            bonus -= 2.0 if _affordable_projects(engine, state, player) else 0.0
+            #
+            # The bonus scales with the surplus instead of being a flat nudge, and that is the
+            # whole fix: a flat +1.5 lost to every purchase on the board, so bots finished measured
+            # games on 90$ each — 11.6 points apiece thrown away — and a seventh of them never
+            # pressed the button once. A pile worth four presses has to outbid four other actions,
+            # not one.
+            if payload.get("kind") == "patronage":
+                # Counted against the price, not against the comfort buffer: at 40$ the button can
+                # be pressed once and still leave a working balance, and that is exactly the point
+                # where income visibly outruns spending. Keying it on the buffer instead put the
+                # first press at 50$ and scored it below the flat nudge it replaced.
+                presses = (player.money - PATRONAGE_MONEY) // PATRONAGE_MONEY
+                bonus += min(5.0, presses * 1.6) if presses > 0 else -2.0
+            else:
+                bonus += 1.5 if player.influence - LOBBYING_INFLUENCE > 0 else -2.0
+            # Only a project that can actually be paid for this turn outranks the sink. One whose
+            # influence is still missing is not a reason to keep holding the money.
+            payable = [
+                project
+                for project in _affordable_projects(engine, state, player)
+                if player.influence >= project.cost_influence and player.money >= project.cost_money
+            ]
+            bonus -= 2.0 if payable else 0.0
         else:
             bonus += 1.0 if _affordable_projects(engine, state, player) else 0.0
     elif action_type == "buy_capacity" and profile.planning:
@@ -615,7 +697,13 @@ def _sell_asset_bonus(
         # Nothing on the market beats what is being sold, so this is a pure downgrade.
         return -4.0
     # The purchase still costs the action the swap used to, and only a real jump is worth it.
-    return upgrade * 1.5 - 1.0 + (1.0 if profile.planning else 0.0)
+    #
+    # With a full tableau and a pile of cash this is the best rate left in the game: the refund plus
+    # the surplus buy points at 2$ each, against 4$ through patronage and 10$ sitting in the wallet.
+    # So the surplus raises the priority of rebuilding rather than of dumping money into the sink —
+    # the sink is the floor, the swap is the ceiling.
+    surplus = max(0, player.money - profile.cash_comfort)
+    return upgrade * 1.5 - 1.0 + (1.0 + min(2.5, surplus / 40) if profile.planning else 0.0)
 
 
 def _seat_exposure(engine: CityEngine, state: GameState, player: PlayerState) -> float:

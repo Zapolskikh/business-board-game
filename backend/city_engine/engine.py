@@ -281,7 +281,7 @@ class CityEngine:
                     for target in state.players
                     if target.id != actor_id or card.self_target
                 )
-            elif card.kind in {"district_cash", "zoning"}:
+            elif card.kind == "zoning":
                 candidates.extend(
                     Command(
                         type="play_action_card",
@@ -629,6 +629,26 @@ class CityEngine:
     def marked_district(self, player: PlayerState) -> str | None:
         """The district of the capitalist's marked card, if there is one."""
         return self.asset(player.marked_card_id).district if player.marked_card_id else None
+
+    def best_cash_district(self, player: PlayerState) -> str | None:
+        """The player's largest district, or ``None`` if they hold nothing anywhere.
+
+        Cards that pay per object in a district of the player's choice have exactly one right
+        answer, and it is this one. Ordered by district id after the count so the pick is stable
+        between a preview and the play that follows it.
+        """
+        best = max(
+            ((self.district_count(player, district), district) for district in DISTRICT_IDS),
+            key=lambda item: (item[0], item[1]),
+        )
+        return best[1] if best[0] > 0 else None
+
+    def district_cash_payout(self, state: GameState, player: PlayerState, per_object: int) -> int:
+        """What a «Городской тендер» pays right now: per object of the best district, capped."""
+        district = self.best_cash_district(player)
+        if district is None:
+            return 0
+        return min(self._round_scaled(state, 10), self.district_count(player, district) * per_object)
 
     def owned_district_count(self, player: PlayerState, district: str) -> int:
         """Objects actually standing in the district — no zoning, no virtual anything.
@@ -1253,17 +1273,16 @@ class CityEngine:
             raise IllegalActionError(f"this card requires {card.value * POINTS_CARD_RATE} money")
         if card.kind == "capacity" and player.capacity >= MAX_CAPACITY:
             raise IllegalActionError("the business is already at the slot limit")
-        if card.kind in {"district_cash", "zoning"}:
+        if card.kind == "zoning":
             district = self._payload_string(command, "district")
             if district not in DISTRICT_IDS:
                 raise InvalidCommandError(f"unknown district: {district}")
             # «Зонирование» opens a district the player does not have; requiring them to own one
             # already made it a multiplier on a quarter they had rather than a way into a new one,
             # which is the only reason to play it: a government project, a grey operation, or the
-            # synergy step that needs one more object. The cash card keeps the gate — it pays per
-            # object, so with none it would pay nothing anyway.
-            if card.kind == "district_cash" and self.district_count(player, district) < 1:
-                raise IllegalActionError("the selected district needs an owned object")
+            # synergy step that needs one more object.
+        if card.kind == "district_cash" and self.best_cash_district(player) is None:
+            raise IllegalActionError("the card pays per owned object and there is none")
         if card.kind == "market_discount" and (len(player.assets) >= player.capacity or not state.market):
             raise IllegalActionError("there is no available object purchase")
         if card.kind == "project":
@@ -1295,9 +1314,12 @@ class CityEngine:
             player.money += card.value
             player.debt += 4
         elif kind == "district_cash":
-            district = str(command.payload["district"])
-            cap = self._round_scaled(state, 10)
-            player.money += min(cap, self.district_count(player, district) * card.value)
+            # The player never had a reason to pick anything but their largest quarter, so the
+            # choice was a click that could only ever be got wrong. The engine takes the best one
+            # and the card prints what it will pay — see ``district_cash_payout``.
+            district = self.best_cash_district(player)
+            player.money += self.district_cash_payout(state, player, card.value)
+            command.payload["district"] = district
         elif kind == "influence":
             player.money -= 2
             player.influence += card.value
@@ -1508,7 +1530,11 @@ class CityEngine:
         player = state.current_player
         self._require_role(player, "mafia")
         self._once_per_turn(state, "mafia_racket")
-        if self.owned_district_count(player, "shadows") < 1:
+        # ``district_count``, not ``owned_district_count``: the payout below already counts the
+        # rented quarter, so gating on built objects alone refused the power on exactly the board
+        # state it was about to reward. «Зонирование» exists to open a district the player
+        # does not have — a grey unlock, a project condition, and this.
+        if self.district_count(player, "shadows") < 1:
             raise IllegalActionError("racket requires a shadows asset")
         target = self._target_player(state, player, self._payload_string(command, "target_id"))
         self._spend_action(state)
@@ -1716,7 +1742,7 @@ class CityEngine:
         player = state.current_player
         self._require_role(player, "politician")
         self._once_per_turn(state, "politician_deal")
-        if self.owned_district_count(player, "shadows") < 1:
+        if self.district_count(player, "shadows") < 1:
             raise IllegalActionError("the deal requires a shadows object")
         if player.influence < POLITICIAN_DEAL_INFLUENCE:
             raise IllegalActionError(f"the deal requires {POLITICIAN_DEAL_INFLUENCE} influence")
@@ -2626,6 +2652,48 @@ class CityEngine:
         "military_roof_seize": False,
     }
 
+    def power_preview(self, state: GameState, player: PlayerState, power: str, target: PlayerState) -> dict[str, Any]:
+        """What this power would take off this target if used right now.
+
+        The numbers are formulas — the racket demand grows with the round, the districts and the
+        target's standing; the sanction reads a ladder off their scandal counter — and a client
+        that wants to show them before the click would have to reimplement every one. It did not,
+        so the only way to know what a racket was worth was to run it.
+
+        Returns the resources actually moved, already clamped by what the target holds, plus the
+        flag that matters more than any of them: whether a Крыша is about to eat the whole thing.
+        """
+        blocked = target.roofs > 0 and self.POWER_BLOCKED_BY_ROOF.get(power, True)
+        preview: dict[str, Any] = {"power": power, "target_id": target.id, "blocked_by_roof": blocked}
+        if power == "mafia_racket":
+            leader = self.ranking(state)[0].id == target.id
+            demand = (
+                2
+                + 2 * self.district_count(player, "shadows")
+                + floor(state.round_number / 3)
+                + (RACKET_LEADER_BONUS if leader else 0)
+            )
+            preview["money"] = min(demand, target.money)
+            preview["influence"] = min(self.district_count(player, "government"), target.influence)
+            preview["leader_bonus"] = leader
+            # The scandal is the price of a racket run without a piece of the city hall.
+            preview["self_scandals"] = int(self.district_count(player, "government") < 1)
+        elif power == "military_sanction":
+            tier = target.scandals
+            preview["money"] = min(target.money, 3 + state.round_number)
+            preview["influence"] = (
+                min(target.influence, 2 + floor(state.round_number / 4)) if tier >= SANCTION_INFLUENCE_TIER else 0
+            )
+            preview["strips_role"] = bool(tier >= SANCTION_ROLE_TIER and target.role)
+        elif power == "journalist_publish":
+            preview["scandals"] = PUBLICATION_SCANDALS
+        elif power == "journalist_inflate":
+            preview["scandals"] = 1
+            preview["self_scandals"] = 1
+        elif power == "military_roof_seize":
+            preview["roofs"] = 1
+        return preview
+
     def role_power_status(self, state: GameState, player: PlayerState) -> list[dict[str, Any]]:
         """Every power of the player's role: can it be used now, and if not, what is missing.
 
@@ -2688,7 +2756,7 @@ class CityEngine:
             gate("own_scandal", player.scandals, 1)
         elif power == "politician_deal":
             gate("influence", player.influence, POLITICIAN_DEAL_INFLUENCE)
-            gate("district", self.owned_district_count(player, "shadows"), 1, district="shadows")
+            gate("district", self.district_count(player, "shadows"), 1, district="shadows")
             gate("scandal_room", self.scandal_limit(player) - player.scandals, 1)
         elif power == "politician_veto":
             gate("influence", player.influence, POLITICIAN_VETO_INFLUENCE)
@@ -2708,7 +2776,7 @@ class CityEngine:
         elif power == "fraudster_crypto_scam":
             gate("own_asset", sum(1 for a in player.assets if a.card_id == "crypto"), 1, asset_id="crypto")
         elif power == "mafia_racket":
-            gate("district", self.owned_district_count(player, "shadows"), 1, district="shadows")
+            gate("district", self.district_count(player, "shadows"), 1, district="shadows")
             gate("rival", len(rivals), 1)
         elif power == "mafia_cleanup":
             gate("own_scandal", player.scandals, 1)
@@ -2787,11 +2855,22 @@ class CityEngine:
                 }
             )
         elif player.role == "mafia":
+            # The racket is an active power, not a passive, and its formula counts the rented
+            # quarter — so these two rows have to read the same number the power will pay. Через
+            # ``count`` они печатали меньше, чем движок выдавал после «Зонирования».
             rows.append(
-                {"key": "mafia_racket_money", "value": 2 + 2 * count("shadows"), "needs": "shadows"},
+                {
+                    "key": "mafia_racket_money",
+                    "value": 2 + 2 * self.district_count(player, "shadows"),
+                    "needs": "shadows",
+                },
             )
             rows.append(
-                {"key": "mafia_racket_influence", "value": count("government"), "needs": "government"},
+                {
+                    "key": "mafia_racket_influence",
+                    "value": self.district_count(player, "government"),
+                    "needs": "government",
+                },
             )
             rows.append({"key": "mafia_roofs", "value": self.roof_limit(player), "needs": None})
         elif player.role == "military":

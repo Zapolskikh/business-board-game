@@ -17,12 +17,15 @@ export function CardPopover({
   side = "right",
   align = "start",
   label,
+  width = 340,
 }: {
   children: ReactNode;
   content: ReactNode;
   side?: "top" | "right" | "bottom" | "left";
   align?: "start" | "center" | "end";
   label?: string;
+  /** Ширина в пикселях: карточке игрока нужен его стол, а он в 340px не помещается. */
+  width?: number;
 }) {
   const portrait = useIsPortrait();
   const [open, setOpen] = useState(false);
@@ -49,7 +52,8 @@ export function CardPopover({
           <Dialog.Content
             data-ui="card-details"
             aria-describedby={undefined}
-            className="ui-v2 fixed left-1/2 top-1/2 z-[61] grid max-h-[85dvh] w-[min(94vw,360px)]
+            style={{ width: `min(94vw, ${Math.max(width, 360)}px)` }}
+            className="ui-v2 fixed left-1/2 top-1/2 z-[61] grid max-h-[85dvh]
               -translate-x-1/2 -translate-y-1/2 grid-rows-[minmax(0,1fr)_auto] overflow-hidden
               rounded-[12px] border border-line-2 bg-panel font-sans text-ink"
           >
@@ -77,7 +81,8 @@ export function CardPopover({
           sideOffset={8}
           collisionPadding={10}
           aria-label={label}
-          className="ui-v2 z-50 w-[340px] max-h-[min(460px,80vh)] overflow-auto rounded-[10px]
+          style={{ width: `min(94vw, ${width}px)` }}
+          className="ui-v2 z-50 max-h-[min(460px,80vh)] overflow-auto rounded-[10px]
             border border-line-2 bg-panel font-sans text-ink"
         >
           {content}

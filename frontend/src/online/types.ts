@@ -44,6 +44,21 @@ export interface PowerStatus {
   gates: PowerGate[];
 }
 
+// Итог применения способности к конкретной цели, посчитанный движком заранее.
+// Поля появляются только те, которые эта способность вправду трогает.
+export interface PowerPreview {
+  power: string;
+  target_id: string;
+  blocked_by_roof: boolean;
+  money?: number;
+  influence?: number;
+  scandals?: number;
+  roofs?: number;
+  leader_bonus?: boolean;
+  self_scandals?: number;
+  strips_role?: boolean;
+}
+
 export interface HeldCard { uid: string; card_id: string }
 // `price` is the viewer's own price, computed by the engine (discounts are per-player).
 export interface MarketAsset {
@@ -138,6 +153,11 @@ export interface GameState {
   project_veto?: Record<string, string>;
   /** Статус активных способностей своей роли: доступна ли и чего не хватает. Считает движок. */
   role_powers?: PowerStatus[];
+  // Что именно снимет способность с каждой цели, посчитанное тем же кодом, что её исполняет.
+  // Без этого выбор цели был гаданием: списки показывали очки, но не добычу.
+  power_previews?: PowerPreview[];
+  // Для карт, которые больше не спрашивают район: движок сам берёт лучший и говорит сумму.
+  card_previews?: Record<string, { district: string | null; money: number }>;
   project_board: string[];
   // Every perk of the viewer's role: what it pays now, the ceiling, and the district that
   // unlocks the difference. Computed by the engine — the client only prints labels.

@@ -80,7 +80,15 @@ class CityRoomService:
         if seat is None or seat.kind != "human":
             raise RoomAccessError("viewer must select an occupied human seat")
 
-    def join(self, room_id: str, *, password: str, seat_index: int, player_name: str) -> RoomState:
+    def join(
+        self,
+        room_id: str,
+        *,
+        password: str,
+        seat_index: int,
+        player_name: str,
+        release_seat_index: int | None = None,
+    ) -> RoomState:
         room = self.repository.get(room_id)
         expected = room.revision
         self._authorize(room, password)
@@ -96,6 +104,14 @@ class CityRoomService:
             seat.kind = "human"
             seat.player_id = f"seat-{seat.index + 1}"
             seat.name = clean_name
+        if (
+            release_seat_index is not None
+            and release_seat_index != seat_index
+            and room.status == "waiting"
+        ):
+            previous = self._seat(room, release_seat_index)
+            if previous.kind == "human":
+                room.seats[release_seat_index] = RoomSeat(index=release_seat_index)
         room.touch()
         self.repository.save(room, expected)
         return room

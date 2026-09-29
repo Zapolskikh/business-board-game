@@ -15,6 +15,7 @@ import { DetailsModal } from "../primitives/Modal";
 import { ActionButton, DrawerRow, ListItem, Panel, zoneRule, zoneStyle } from "../primitives/atoms";
 import { findActions, resolve, resolveMany, usedThisTurn, type ActionContext } from "../lib/actions";
 import { roofPrice, type Indexes } from "../lib/board";
+import { findPreview, previewCost, previewGain, scoreOf, targetStats } from "../lib/powerPreview";
 import { RolesDetails } from "./RolesDetails";
 import { RolePowersDetails } from "./RolePowersDetails";
 import { GreyDetails } from "./GreyDetails";
@@ -396,19 +397,31 @@ function PowerButton({
             <div className="grid gap-1">
               {options.map((action, position) => {
                 const target = game.players.find(player => player.id === action.payload.target_id);
+                const preview = findPreview(game, power, target?.id);
+                const gain = previewGain(preview);
+                const cost = previewCost(preview);
                 return (
                   <ListItem
                     key={position}
                     icon="🎯"
                     title={target?.name ?? "Цель"}
                     hint={
-                      target
-                        ? `⚠${target.scandals}/${target.scandal_limit} · 🛡${target.roofs}${
-                            target.roofs > 0 && blockedByRoof ? " — Крыша погасит" : ""
-                          }`
-                        : undefined
+                      target ? (
+                        <>
+                          <span className="block">{targetStats(target, preview, blockedByRoof)}</span>
+                          {cost && <span className="block text-gold">{cost}</span>}
+                        </>
+                      ) : undefined
                     }
-                    right={`${game.score_breakdown?.[target?.id ?? ""]?.total ?? 0} оч`}
+                    right={
+                      <span className="grid text-right">
+                        {/* Добыча — крупно: ради неё цель и выбирают. Очки — под ней, мельче. */}
+                        {gain && <span className="text-good">{gain}</span>}
+                        <span className="text-3xs font-normal text-ink-muted">
+                          {scoreOf(game, target?.id)} оч
+                        </span>
+                      </span>
+                    }
                     onClick={() => onAction(action)}
                   />
                 );

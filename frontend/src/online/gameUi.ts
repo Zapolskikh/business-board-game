@@ -520,11 +520,18 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
   if (action.type === "play_action_card") {
     const held = player.hand?.find(item => item.uid === payload.card_uid);
     const title = cards.get(held?.card_id ?? "")?.title ?? "Карта";
+    /* Карты, где игрок всё равно выбрал бы свой максимум, район больше не спрашивают:
+     * движок берёт лучший сам и присылает посчитанную сумму. Печатаем её, иначе кнопка
+     * «Разыграть» не говорит, ради чего её жмут. */
+    const preview = game.card_previews?.[held?.card_id ?? ""];
+    const auto = preview
+      ? ` · ${preview.money}$${preview.district ? ` (${districts.get(preview.district)?.title ?? preview.district})` : ""}`
+      : "";
     const detail = target ? ` → ${target.name}`
       : district ? ` · ${district.title}`
       : role ? ` · ${role.title}`
       : project ? ` · «${project.title}» (${project.cost_money}$ → ${project.points} очков)`
-      : "";
+      : auto;
     return `${title}${detail}`;
   }
   if (action.type === "grey_operation") {

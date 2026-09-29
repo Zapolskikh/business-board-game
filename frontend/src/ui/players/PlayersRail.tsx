@@ -35,6 +35,7 @@ export function PlayersRail({
           <CardPopover
             key={player.id}
             label={`${player.name} — подробности`}
+            width={520}
             content={
               <PlayerDetails
                 player={player}

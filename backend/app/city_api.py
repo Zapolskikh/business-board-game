@@ -34,6 +34,7 @@ class JoinRoomRequest(BaseModel):
     password: str = Field(min_length=4, max_length=128)
     seat_index: int = Field(ge=0, le=MAX_PLAYERS - 1)
     player_name: str = Field(min_length=1, max_length=32)
+    release_seat_index: int | None = Field(default=None, ge=0, le=MAX_PLAYERS - 1)
 
 
 class SeatRequest(BaseModel):

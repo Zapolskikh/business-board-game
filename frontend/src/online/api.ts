@@ -32,7 +32,7 @@ export const cityApi = {
   }),
   create: (body: { name: string; password: string; capacity: number; max_rounds: number; role_price: number }) =>
     request<RoomView>("/api/city/rooms", json(body)),
-  join: (id: string, body: { password: string; seat_index: number; player_name: string }) =>
+  join: (id: string, body: { password: string; seat_index: number; player_name: string; release_seat_index?: number | null }) =>
     request<RoomView>(`/api/city/rooms/${id}/join`, json(body)),
   seat: (id: string, body: { password: string; seat_index: number; kind: "bot" | "empty"; difficulty?: Difficulty; preferred_role?: string | null }) =>
     request<RoomView>(`/api/city/rooms/${id}/seats`, json(body)),

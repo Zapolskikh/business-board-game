@@ -65,6 +65,9 @@ export function Hand({
           {hand.map(held => {
             const card = index.cards.get(held.card_id);
             if (!card) return null;
+            /* Карты, где выбор был формальным, движок решает сам и присылает итог.
+             * Сумма на лице карты — чтобы её было видно без открытия поповера. */
+            const preview = game.card_previews?.[card.id];
             return (
               <motion.div
                 key={held.uid}
@@ -104,7 +107,11 @@ export function Hand({
                       {card.title}
                     </b>
                     <small className="overflow-hidden text-ellipsis whitespace-nowrap text-3xs text-ink-muted">
-                      {card.text}
+                      {preview ? (
+                        <b className="font-semibold text-money">сейчас {preview.money}$</b>
+                      ) : (
+                        card.text
+                      )}
                     </small>
                   </button>
                 </CardPopover>
@@ -171,6 +178,15 @@ function HandCardDetails({
       <PopoverHeader title={card.title} subtitle={card.tone} />
       <PopoverBody>
         <p className="mb-2 text-ink">{card.text}</p>
+        {game.card_previews?.[card.id] && (
+          <p className="mb-2 text-money">
+            Сейчас это {game.card_previews[card.id].money}$
+            {game.card_previews[card.id].district
+              ? ` — район ${index.districts.get(game.card_previews[card.id].district!)?.title ?? ""}`
+              : " — у вас пока нет объектов"}
+            .
+          </p>
+        )}
         <p className="mb-2">
           Розыгрыш и сброс бесплатны и не тратят действие, и <strong>сколько угодно за ход</strong>:
           лимит стоит на покупке — одна покупка карт за ход.

@@ -36,7 +36,13 @@ export function Lobby({ roomId, meta, initialPassword = "", playerId, onBack, on
   const join = async (index: number) => {
     setBusy(true); setError("");
     try {
-      const next = await cityApi.join(roomId, { password, seat_index: index, player_name: playerName.trim() || "Игрок" });
+      const current = room?.seats.find(item => item.kind === "human" && item.player_id === playerId);
+      const next = await cityApi.join(roomId, {
+        password,
+        seat_index: index,
+        player_name: playerName.trim() || "\u0418\u0433\u0440\u043e\u043a",
+        release_seat_index: current && current.index !== index ? current.index : null,
+      });
       setRoom(next);
       const joinedId = next.seats[index].player_id;
       if (joinedId) onJoined(password, joinedId);

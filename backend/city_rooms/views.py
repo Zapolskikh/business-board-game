@@ -120,6 +120,24 @@ def room_view(
         # own list of powers per role — a copy of a rule in another language, which had already
         # drifted — and it could only print "сейчас недоступна" with no reason attached.
         game["role_powers"] = engine.role_power_status(room.game, viewer_for_role)
+        # What each targeted power would actually take off each rival. The formulas grow with the
+        # round, the districts and the target's own standing, so a client that wanted to show the
+        # number before the click had to reimplement all of them — and did not, which is why a
+        # racket could only be priced by running it.
+        game["power_previews"] = [
+            engine.power_preview(room.game, viewer_for_role, power, rival)
+            for power in engine.ROLE_POWERS.get(viewer_for_role.role or "", ())
+            for rival in room.game.players
+            if rival.id != viewer_for_role.id
+        ]
+        # Cards that pay off the player's own best district pick it themselves now, so the amount
+        # is knowable before the play — and has to be, or the card is a blind click.
+        game["card_previews"] = {
+            card.id: {"district": engine.best_cash_district(viewer_for_role),
+                      "money": engine.district_cash_payout(room.game, viewer_for_role, card.value)}
+            for card in engine.catalog.action_cards.values()
+            if card.kind == "district_cash"
+        }
         # The Крыша price grows with the round and the Мафия pays one less. The client kept its
         # own copy of that formula, comment and all, and the comment still described a mechanic
         # deleted in 1.4.0 — so the price ships from the engine instead.

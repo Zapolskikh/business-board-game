@@ -14,6 +14,8 @@ import { indexMaps } from "../lib/board";
 import { useCommand, useGame, useLegalActions, useMe, useMeta, useRoom } from "../lib/session";
 import { Chronicle } from "./Chronicle";
 import { ChronicleRail } from "./ChronicleRail";
+import { useTurnBriefing } from "./briefing";
+import { TurnBriefingModal } from "./TurnBriefing";
 import { BoardScaler } from "./BoardScaler";
 import { MobileFrame } from "./MobileFrame";
 import { Header, StatusBar } from "./Header";
@@ -63,6 +65,10 @@ export function BoardView({
     setSeen(current => (current === null || chronicle ? logCount : current));
   }, [chronicle, logCount]);
   const unseen = seen === null ? 0 : Math.max(0, logCount - seen);
+
+  /* Сводка своего хода: собирается из снимка на конец прошлого хода и всплывает сама,
+   * когда ход возвращается. Хроника на это не годится — в ней всё подряд и без дельт. */
+  const { briefing, close: closeBriefing } = useTurnBriefing(game, context.me, meta);
 
   const ranking = useMemo(
     () => [...game.players].sort((left, right) => scoreOf(game, right) - scoreOf(game, left)),
@@ -173,6 +179,8 @@ export function BoardView({
         meta={meta}
         exportEnabled={liveSession}
       />
+
+      <TurnBriefingModal briefing={briefing} onClose={closeBriefing} />
 
       <DetailsModal open={score} onClose={() => setScore(false)} label="Счёт и доход">
         <ScoreDetails game={game} me={context.me} meta={meta} />

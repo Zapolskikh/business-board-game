@@ -42,7 +42,16 @@ SCHEMA_VERSION = 1
 # one card; the asset market rotates its three oldest slots once a round; cards can buy points
 # outright. Snapshots taken under 1.3.x describe a game with different rules, so state validation
 # rejects them — old rooms will not open.
-RULES_VERSION = "city-1.13.0"
+RULES_VERSION = "city-1.14.0"
+# 1.14.0: «Зонирование» finally means the same thing everywhere. The rented district already
+# counted for project conditions, grey unlocks and synergy, but the mafia racket and the
+# politician's deal gated on built objects alone — so the racket refused to fire on the very board
+# state whose payout formula, three lines below the gate, was about to count the rented quarter.
+# Active powers read the rented district now; role *passives* still pay only on what was built.
+#
+# «Городской тендер» no longer asks which district to cash: there was exactly one right answer
+# and it was a click that could only be got wrong. The engine takes the largest quarter and ships
+# the amount, so the card prints what it will pay before it is played.
 # 1.13.0: the settlement that closed the last round is deleted, and one action card may be bought
 # per turn (the cap that used to sit on playing and discarding one).
 #
@@ -127,7 +136,7 @@ RULES_VERSION = "city-1.13.0"
 # «деньги → очки» family and «Предписание о демонтаже» (takes a development level); the two defence
 # cards now hand out the same Крыша as the third; the two projects that required automation ask for
 # tagged objects instead. The events array is gone from the catalog entirely.
-CONTENT_VERSION = "city-content-2026-08-29c"
+CONTENT_VERSION = "city-content-2026-09-29"
 # 2026-08-29c: the same pass over the five remaining roles. The Капиталист's card said it had no
 # active ability while `capitalist_claim` existed and still promised the charter deleted in 1.12.0;
 # the Политик's described the housing tax as money and the Спальный as its own quarter, when the
