@@ -1,4 +1,4 @@
-import { assetEffectLines, assetPoints, districtCount, moneyPerPoint } from "../../online/gameUi";
+import { assetEffectLines, assetPoints, districtCount } from "../../online/gameUi";
 import type {
   AssetMeta,
   CityMeta,
@@ -48,7 +48,6 @@ export function MarketCardDetails({
   const lines = assetEffectLines(asset, me, meta, assets, { includeSynergy: true });
   const objectLines = lines.filter(line => line.kind !== "district" && line.kind !== "sector");
   const districtLines = lines.filter(line => line.kind === "district" || line.kind === "sector");
-  const perPoint = (state.price / Math.max(1, points)).toFixed(1);
 
   return (
     <>
@@ -77,11 +76,6 @@ export function MarketCardDetails({
 
         <EffectList title="Свойства объекта" lines={objectLines} />
         <EffectList title="Правила района" lines={districtLines} />
-
-        <p className="mb-2">
-          Объект отдаёт очко за {perPoint}$ против {moneyPerPoint(meta)}$ за очко у денег в кошельке —
-          поэтому объекты и есть главный сток денег.
-        </p>
 
         {item.leaving && (
           <p className="text-[var(--color-warning)]">⏳ Слот уходит в конце раунда: карта вернётся в низ колоды.</p>

@@ -40,8 +40,7 @@ export function ScoreDetails({ game, me, meta }: { game: GameState; me: PlayerSt
           />
         )}
         <p className="mb-2">
-          Деньги и влияние — топливо, а не счёт: лежащие они дают очко за {moneyPerPoint(meta)}$, а через
-          патронаж и лоббирование — заметно дешевле. Копить их до конца партии невыгодно.
+          Оставшиеся на руках деньги и влияние дают очко за {moneyPerPoint(meta)}$.
         </p>
 
         {forecast && (
@@ -111,7 +110,7 @@ export function ActionsDetails({ game }: { game: GameState }) {
       <PopoverHeader title="⚡ Действия" subtitle={`осталось ${game.actions_left}`} />
       <PopoverBody>
         <p className="mb-2">
-          В ходу три действия. Неиспользованные сгорают, кроме одного переносимого.
+          В ходу три действия. Неиспользованные сгорают в конце хода.
         </p>
         <p className="mb-2">
           <strong className="text-good">Не тратят действие:</strong> продажа объекта, розыгрыш и

@@ -68,7 +68,6 @@ function assetEffectSummary(asset: AssetMeta, meta: CityMeta): string {
   if (num(effects.roofCapacity)) parts.push(`+${num(effects.roofCapacity)} к пределу Крыш`);
   if (num(effects.scandalReduction)) parts.push(`−${num(effects.scandalReduction)} скандал в начале хода`);
   if (num(effects.greyScandalReduction)) parts.push(`−${num(effects.greyScandalReduction)} скандала от серых операций`);
-  if (num(effects.carryAction)) parts.push(`переносит 1 действие на следующий ход`);
   if (num(effects.takeoverCompensation)) parts.push(`+${num(effects.takeoverCompensation)}◆ при перехвате роли`);
   const purchase = effects.purchase as
     | { money?: number; influence?: number; roofs?: number; card?: boolean; scandals?: number }
@@ -470,7 +469,7 @@ export function buildRulesHtml(meta: CityMeta, rolePrice: number): string {
       <p><b>Деньги — это топливо, а не очки.</b> Побеждает не тот, кто больше накопил, а тот, кто больше построил. Счёт считается так:</p>
       <ul>
         <li><b>Городские проекты</b> — от 1 до 9 очков, чаще всего 6–7, по цифре на карточке проекта. Главный источник очков.</li>
-        <li><b>Объекты</b> — половина цены объекта, округление вниз; это число написано прямо на карточке (<b>N очк</b>). Через объект деньги превращаются в очки по <b>2$ за очко</b> против <b>${moneyPerPoint(meta)}$ за очко</b> у денег в кошельке — в пять раз выгоднее, и потому объекты и есть главный сток денег.</li>
+        <li><b>Объекты</b> — половина цены объекта, округление вниз; это число написано прямо на карточке (<b>N очк</b>): через объект деньги превращаются в очки по <b>2$ за очко</b>.</li>
         <li><b>Роль</b> — +3 очка, если в финале у вас есть роль.</li>
         <li><b>Прочие очки</b> — патронаж (<b>${patronage(meta).money}$ → ${patronage(meta).points}</b>) и лоббирование (<b>${lobbying(meta).influence}◆ → ${lobbying(meta).points}</b>), по одному нажатию каждого за ход, плюс карты, покупающие очки напрямую.</li>
         <li><b>Деньги</b> — 1 очко за каждые полные <b>${moneyPerPoint(meta)}$</b>.</li>
@@ -539,7 +538,6 @@ export function buildRulesHtml(meta: CityMeta, rolePrice: number): string {
       </ul>
       <h3>🏷️ Продажа и обмен объекта</h3>
       <p><b>Продажа не расходует действие.</b> Вы получаете <code>⌊цена/2⌋</code> и сразу освобождаете слот. Отдельной команды «заменить объект» больше нет: продайте слабый и купите на рынке сильный — весь обмен стоит ровно одно действие покупки, столько же, сколько стоила замена, но без лишнего интерфейса.</p>
-      <div class="tip"><b>Практика:</b> дешёвые объекты первых раундов не приговор. Объект стоит <b>половину своей цены</b> в очках, и это число написано на карточке, так что менять слабый на дорогой — прямой способ превратить лишние деньги в очки: 2$ за очко против 10$ за очко у денег в кошельке.</div>
     </section>
 
     <section id="districts">

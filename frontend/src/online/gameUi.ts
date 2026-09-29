@@ -1246,8 +1246,6 @@ export function assetEffectLines(
       `−${numberValue(effects.greyScandalReduction)} скандала от серых операций`,
       `−${numberValue(effects.greyScandalReduction)}⚠ от серых`,
     ]);
-  if (numberValue(effects.carryAction))
-    passive.push([`Переносит 1 неистраченное действие на следующий ход`, `Перенос действия`]);
   if (numberValue(effects.turnCard)) passive.push([`+1 карта действий в начале хода`, `+1 карта/ход`]);
   if (numberValue(effects.marketRefresh))
     passive.push([`Раз в раунд без действия: пересдать карту рынка`, `Пересдача рынка`]);
