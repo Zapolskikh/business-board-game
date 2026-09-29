@@ -2403,12 +2403,7 @@ class CityEngine:
             # housing object worth +1◆ a round, quietly turning the role into a housing engine.
             # One object switches the line on, and from there the rating simply is the scandal
             # counter: the role is paid for the thing it is built to accumulate.
-            rating = 0
-            journalist_cash = 0
-            if journalist:
-                rating = player.scandals if self.owned_district_count(player, "residential") > 0 else 0
-                rate = 2 if self.owned_district_count(player, "business") > 0 else 1
-                journalist_cash = rate * sum(other.scandals for other in state.players if other.id != player.id)
+            journalist_cash, rating = self._journalist_income(state, player) if journalist else (0, 0)
             income_sources[player.id]["journalist"] = journalist_cash
             # Influence must not be settled silently: otherwise players diff their own state to see
             # where a politician's passive or a journalist's rating came from.
@@ -2440,6 +2435,58 @@ class CityEngine:
             }
             influence_sources = {player_id: dict.fromkeys(row, 0) for player_id, row in influence_sources.items()}
         return incomes, income_sources, influence_sources
+
+    def _journalist_income(self, state: GameState, player: PlayerState) -> tuple[int, int]:
+        """The journalist's round: money off the rivals' scandals and a rating off their own."""
+        rating = player.scandals if self.owned_district_count(player, "residential") > 0 else 0
+        rate = 2 if self.owned_district_count(player, "business") > 0 else 1
+        cash = rate * sum(other.scandals for other in state.players if other.id != player.id)
+        return cash, rating
+
+    def _round_rates(self, state: GameState, player: PlayerState) -> tuple[int, int]:
+        """What the player's board earns a round, money and influence, before debt.
+
+        The same rows ``settlement_preview`` pays, but never zeroed on the final round: this is a
+        rate for comparing boards, not a promise about the next payout.
+        """
+        cash, rating = self._journalist_income(state, player) if player.role == "journalist" else (0, 0)
+        money = sum(self._income_breakdown(state, player).values()) + cash
+        influence = sum(self.passive_influence_breakdown(state, player).values()) + rating
+        return money, influence
+
+    def purchase_preview(self, state: GameState, player: PlayerState, market_uid: str) -> dict[str, int]:
+        """How much the player's round income grows if they buy this market slot now.
+
+        The difference of two whole boards, not the card's own line: district synergy is paid per
+        object, so the second object of a quarter lifts the first one too, and «при наличии
+        объекта X» switches on cards the player already owns. A card that only listed its own
+        income undersold exactly the purchases that complete something.
+
+        The purchase is simulated on the player alone and undone before returning. A mark the
+        player has on this very slot drops with the purchase, so it is dropped in the simulation too.
+        """
+        item = next(item for item in state.market if item.uid == market_uid)
+        before = self._round_rates(state, player)
+        saved_assets, saved_mark = player.assets, player.marked_card_id
+        try:
+            player.assets = [*saved_assets, OwnedAsset(uid=f"preview:{item.uid}", card_id=item.card_id)]
+            if item.claimed_by == player.id:
+                player.marked_card_id = None
+            after = self._round_rates(state, player)
+        finally:
+            player.assets, player.marked_card_id = saved_assets, saved_mark
+        return {"money": after[0] - before[0], "influence": after[1] - before[1]}
+
+    def owned_yield(self, state: GameState, player: PlayerState, owned: OwnedAsset) -> dict[str, int]:
+        """What one standing object pays its owner a round: its own share of the settlement.
+
+        Role passives that count a whole district (the politician's residents, the capitalist's
+        industry, the journalist) are the role's rows, not any one object's, and stay out.
+        """
+        return {
+            "money": self.owned_definition(owned).income + self.object_synergy_income(state, player, owned),
+            "influence": self._object_influence(player, owned) + self._object_synergy_influence(player, owned),
+        }
 
     def round_forecast(self, state: GameState, player: PlayerState) -> dict[str, dict[str, int]]:
         """The viewer's own itemised round payout, money and influence, with a ``total`` row.
@@ -2542,6 +2589,22 @@ class CityEngine:
                 result += int(link["value"])
         return result
 
+    def _object_influence(self, player: PlayerState, owned: OwnedAsset) -> int:
+        """An object's own ``influenceBonus`` — paid only while its role and district hold."""
+        bonus = self.owned_definition(owned).effects.get("influenceBonus")
+        if not bonus:
+            return 0
+        active_role = not bonus.get("role") or self.has_role(player, bonus["role"])
+        active_district = not bonus.get("district") or self.has_district_link(player, bonus["district"])
+        return int(bonus["value"]) if active_role and active_district else 0
+
+    def _object_synergy_influence(self, player: PlayerState, owned: OwnedAsset) -> int:
+        """The depth reward: an object of a fully built quarter pays its ``synergyInfluence``."""
+        asset = self.owned_definition(owned)
+        if self.district_count(player, asset.district) < 4:
+            return 0
+        return int(asset.effects.get("synergyInfluence", 0))
+
     def has_district_link(self, player: PlayerState, district: str) -> bool:
         """Does the player actually have a foothold in this district?
 
@@ -2571,24 +2634,12 @@ class CityEngine:
         industrial = 0
         if self.has_role(player, "capitalist"):
             industrial = self.owned_district_count(player, "industrial")
-        object_effects = 0
-        for owned in player.assets:
-            bonus = self.owned_definition(owned).effects.get("influenceBonus")
-            if not bonus:
-                continue
-            active_role = not bonus.get("role") or self.has_role(player, bonus["role"])
-            active_district = not bonus.get("district") or self.has_district_link(player, bonus["district"])
-            if active_role and active_district:
-                object_effects += int(bonus["value"])
+        object_effects = sum(self._object_influence(player, owned) for owned in player.assets)
         # The reward for building deep, paid as a flat token in the currency projects are bought
         # with rather than as money multiplied by itself, and only from round four or so, because
         # the objects that carry it are the late ones. Deliberately an explicit effect rather than
         # "epics behave differently": a rule the card prints beats a rule the player has to learn.
-        synergy = sum(
-            int(self.owned_definition(owned).effects.get("synergyInfluence", 0))
-            for owned in player.assets
-            if self.district_count(player, self.owned_definition(owned).district) >= 4
-        )
+        synergy = sum(self._object_synergy_influence(player, owned) for owned in player.assets)
         return {
             "objects": object_effects,
             "synergy": synergy,

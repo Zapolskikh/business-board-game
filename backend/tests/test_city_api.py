@@ -301,3 +301,25 @@ def test_journal_is_exported_only_after_the_game_is_finished() -> None:
         assert set(body["score_breakdown"]) == {"seat-1", "seat-2"}
     finally:
         app.dependency_overrides.clear()
+
+
+def test_state_carries_purchase_previews_and_object_yields() -> None:
+    """Market cards show what a purchase adds to the viewer's round, city cards what they pay."""
+    service = CityRoomService(InMemoryRoomRepository())
+    app.dependency_overrides[get_room_service] = lambda: service
+    client = TestClient(app)
+    try:
+        room_id = _start_two_seat_room(client, name="Previews")
+        game = client.get(
+            f"/api/city/rooms/{room_id}/state",
+            params={"viewer_id": "seat-1"},
+            headers={"X-Room-Password": "secret"},
+        ).json()["game"]
+
+        assert game["market"]
+        for item in game["market"]:
+            assert set(item["preview"]) == {"money", "influence"}
+        for player in game["players"]:
+            assert set(player["asset_yields"]) == {owned["uid"] for owned in player["assets"]}
+    finally:
+        app.dependency_overrides.clear()

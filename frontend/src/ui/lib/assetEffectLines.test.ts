@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { assetEffectLines, districtCount } from "../../online/gameUi";
 import { meta } from "../dev/fixtures";
-import { ASSET_FACE_EFFECT_CAP, assetFaceEffectSummary } from "../primitives/AssetFace";
+import { assetFaceSummary } from "../primitives/AssetFace";
 import type { AssetMeta, PlayerState } from "../../online/types";
 
 /* Таблица свойств на карточке объекта — четыре строки в два столбца, ячейка не переносится и
@@ -117,61 +117,39 @@ describe("assetEffectLines", () => {
     expect(districtCount(owner, "residential", index)).toBe(5);
   });
 
-  it("самые насыщенные карты никогда не переполняют четыре ячейки лица", () => {
-    const fullCity = player({
-      role: "politician",
-      assets: meta.assets.map((item, index) => ({ uid: `owned-${index}`, card_id: item.id })),
-    });
-    // Стресс-профиль повторяет самые тяжёлые карты каталога: четыре межрайонные связи,
-    // награда за полный район, постоянный перк и разовый эффект покупки.
-    const crowded = asset({
-      title: "Центр с максимальным числом свойств",
-      district: "government",
+  it("лицо карты: разовое — всё, что даёт покупка, особое — только безусловные свойства", () => {
+    const card = asset({
+      influence: 1,
       effects: {
-        districtLinks: [
-          { district: "residential", value: 1 },
-          { district: "business", value: 1 },
-          { district: "industrial", value: 1 },
-          { district: "tech", value: 1 },
-        ],
-        synergyInfluence: 2,
-        marketRefresh: 1,
-        purchase: { card: true, scandals: 1 },
+        purchase: { influence: 2, money: 2, roofs: 1, card: true },
+        roofCapacity: 1,
+        turnRoof: 1,
+        districtBonus: { district: "government", value: 2 },
       },
     });
-    const all = [...meta.assets, crowded].map(card => ({
-      card,
-      lines: assetEffectLines(card, fullCity, meta, catalog, { includeSynergy: true }),
-    }));
-    const largest = all.reduce((left, right) => right.lines.length > left.lines.length ? right : left);
+    const lines = assetEffectLines(card, player(), meta, catalog, { includeSynergy: true });
+    const summary = assetFaceSummary(card, lines);
 
-    // Проверяем путь через настоящий построитель строк, а не готовый игрушечный массив.
-    expect(largest.lines.length).toBeGreaterThan(ASSET_FACE_EFFECT_CAP);
-    for (const { card, lines } of all) {
-      const summary = assetFaceEffectSummary(lines);
-      const occupiedCells = summary.visible.length + (summary.hidden > 0 ? 1 : 0);
-      const uniqueCount = lines.filter(line => line.kind !== "district" && line.kind !== "sector").length;
-      expect(occupiedCells, card.title).toBeLessThanOrEqual(ASSET_FACE_EFFECT_CAP);
-      expect(summary.hidden, card.title).toBe(uniqueCount - summary.visible.length);
-      expect(summary.standard, card.title).toBe(lines.length - uniqueCount);
-      expect(summary.visible.every(line => line.kind !== "district" && line.kind !== "sector"), card.title)
-        .toBe(true);
-    }
+    // Напечатанное влияние и влияние покупки движок начисляет одним моментом.
+    expect(summary.oneTime).toEqual(["+3◆", "+2$", "+1 Крыша", "+карта"]);
+    expect(summary.unique).toEqual(["+1 Крыша/ход", "лимит Крыш +1"]);
+    // Условие «при наличии Администрации» не выполнено — оно и есть скрытое.
+    expect(summary.hidden).toBe(1);
   });
 
-  it("повторяющиеся правила района отделены от уникальных свойств объекта", () => {
-    const card = asset({
-      district: "government",
-      effects: { marketRefresh: 1, roleBonus: { role: "politician", value: 2 } },
-    });
-    const lines = assetEffectLines(card, player({ role: "politician" }), meta, catalog, {
-      includeSynergy: true,
-    });
-    const summary = assetFaceEffectSummary(lines);
+  it("выполненное условие уже в числе дохода и в сноску не попадает", () => {
+    const government = meta.assets.find(item => item.district === "government") as AssetMeta;
+    const card = asset({ effects: { districtBonus: { district: "government", value: 2 } } });
+    const owner = player({ assets: [{ uid: "g", card_id: government.id }] });
+    const summary = assetFaceSummary(card, assetEffectLines(card, owner, meta, catalog, { includeSynergy: true }));
+    expect(summary.hidden).toBe(0);
+  });
 
-    expect(lines.some(line => line.kind === "sector")).toBe(true);
-    expect(summary.visible.map(line => line.short)).toContain("Пересдача рынка");
-    expect(summary.visible.some(line => line.kind === "sector")).toBe(false);
-    expect(summary.standard).toBeGreaterThan(0);
+  it("особый бонус любой карты каталога укладывается в одно поле", () => {
+    for (const card of meta.assets) {
+      const summary = assetFaceSummary(card, assetEffectLines(card, player(), meta, catalog, { includeSynergy: true }));
+      // Две строки поля при базовой ширине доски.
+      expect(summary.unique.join(" · ").length, card.title).toBeLessThanOrEqual(2 * CELL_LIMIT);
+    }
   });
 });

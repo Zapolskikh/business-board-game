@@ -71,6 +71,15 @@ export interface MarketAsset {
   /** Серая метка мафиози: до конца locked_round слот закрыт для всех, кроме него. */
   locked_by?: string | null;
   locked_round?: number;
+  /** На сколько вырастет доход зрителя за раунд, если купить этот слот. Считает движок:
+   * синергия платится за каждый объект района, и покупка поднимает уже стоящие карты. */
+  preview?: AssetYield;
+}
+
+/** Деньги и влияние за раунд. */
+export interface AssetYield {
+  money: number;
+  influence: number;
 }
 
 export interface PlayerState {
@@ -100,6 +109,8 @@ export interface PlayerState {
   debt: number;
   zoning_district: string | null;
   turns: number;
+  /** Что каждый объект приносит владельцу за раунд сейчас: uid → доля объекта в выплате. */
+  asset_yields?: Record<string, AssetYield>;
 }
 
 export interface DomainEvent {

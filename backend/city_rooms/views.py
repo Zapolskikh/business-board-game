@@ -157,5 +157,17 @@ def room_view(
         if market_prices and item["uid"] in market_prices:
             item["price"] = market_prices[item["uid"]]
         item["leaving"] = item["uid"] in leaving
+        # How much the viewer's round income grows with this purchase. The whole-board difference,
+        # because synergy is paid per object and a purchase lifts cards the viewer already owns —
+        # a figure the client could only get by re-implementing the settlement.
+        if viewer is not None:
+            item["preview"] = engine.purchase_preview(room.game, viewer, item["uid"])
+    # What each standing object pays its owner right now, for every player: city cards show their
+    # own share of the settlement rather than the printed income plus a client-side guess.
+    for player_state in room.game.players:
+        view = next(item for item in game["players"] if item["id"] == player_state.id)
+        view["asset_yields"] = {
+            owned.uid: engine.owned_yield(room.game, player_state, owned) for owned in player_state.assets
+        }
     result["game"] = game
     return result

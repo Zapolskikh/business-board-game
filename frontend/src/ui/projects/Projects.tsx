@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { forwardRef } from "react";
+import { forwardRef, type CSSProperties } from "react";
 import { projectPerkText, projectRequirementText, projectRerollMoney } from "../../online/gameUi";
 import type { CityMeta, GameState, LegalAction, ProjectMeta } from "../../online/types";
 import { CardPopover, PopoverBody, PopoverFooter, PopoverHeader } from "../primitives/CardPopover";
@@ -7,6 +7,7 @@ import { KeyValue, Panel, zoneRule } from "../primitives/atoms";
 import { resolve, usedThisTurn, type ActionContext } from "../lib/actions";
 import type { Indexes } from "../lib/board";
 import { useIsPortrait } from "../lib/layout";
+import { projectArt, projectIcon, projectKind } from "../assets/cards";
 
 /* Доска проектов. Общая для всех: кто взял — тот и забрал, остальным проект недоступен.
  * Поэтому карточка на доске показывает только цену и прогресс, а «почему» — в поповере.
@@ -191,36 +192,38 @@ const ProjectCard = forwardRef<
   ref,
 ) {
   const met = standing?.met ?? false;
-  const counted = standing && !standing.binary;
   const perk = projectPerkText(project);
+  const kind = projectKind(project.perk);
+  const art = projectArt(kind);
+  const icon = projectIcon(kind);
+  const star = projectIcon("score");
   /* Вертикально на карточке остаются только те две строки, по которым выбирают: название с
    * очками и цена с прогрессом. Текст условия и постоянный бонус уезжают в поповер — иначе
    * четыре проекта съедают треть экрана, которой не хватает рынку. */
   const portrait = useIsPortrait();
 
+  /* Слои по комплекту из presets: фон категории с рамкой, отдельная иконка награды, текст
+   * и сегментированный прогресс. Надписи в фон не запечены, поэтому данные — только из движка. */
   return (
     <button
       ref={ref}
       type="button"
       data-ui="project-card"
+      data-kind={kind}
       data-state={pending ? "pending" : ready ? "ready" : met ? "met" : "locked"}
-      className="game-card grid min-w-0 w-full gap-[3px] overflow-hidden rounded-card border
-        border-[#8f75a7] bg-panel-2 px-[7px] py-1.5 text-left hover:bg-panel-3
-        data-[state=ready]:border-good data-[state=ready]:bg-[#d4dec8]
-        data-[state=pending]:animate-pulse"
+      style={art ? ({ "--project-art": `url(${art})` } as CSSProperties) : undefined}
+      className={`game-card project-card grid w-full min-w-0 overflow-hidden text-left
+        data-[state=pending]:animate-pulse ${portrait ? "gap-[2px] px-2 py-1.5" : "gap-[3px] px-3 py-[7px]"}`}
       {...rest}
     >
-      <span className="flex min-w-0 items-baseline gap-1.5 overflow-hidden">
+      <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
         <b
-          className={`min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-semibold ${
-            portrait ? "text-[11px]" : "text-[12.5px]"
+          className={`project-card-title min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap ${
+            portrait ? "text-[11.5px]" : "text-[14px]"
           }`}
         >
           {project.title}
         </b>
-        <span className="rounded-md bg-panel px-1.5 text-[11px] font-bold whitespace-nowrap text-points">
-          {project.points} оч
-        </span>
         {veto && (
           <span
             className={`rounded px-1 text-3xs ${
@@ -243,60 +246,86 @@ const ProjectCard = forwardRef<
             ⏳
           </span>
         )}
+        <span className="flex shrink-0 items-center gap-0.5 whitespace-nowrap" title={`${project.points} очков`}>
+          {star && <img src={star} alt="" className="size-[15px]" />}
+          <b className="project-card-title text-[15px] leading-none">{project.points}</b>
+          {!portrait && <small className="text-3xs text-ink-dim">оч</small>}
+        </span>
       </span>
 
-      {/* Цена слева, прогресс — отдельной плашкой под очками, в правой колонке.
-        * Хвостом к тексту требования «0/3» сливается с ним: единственное число, которое
-        * меняется по ходу партии, читается тогда хуже всего.
-        *
-        * Красным горит именно та цифра, которой не хватает, — независимо от условия.
-        * «✓ готово» рядом с недоступной кнопкой сбивает с толку: выполнено требование,
-        * а не покупка, и вторая половина ответа должна быть на карточке. */}
+      {/* Постоянный бонус — ради него половину проектов и берут, поэтому он крупно и с
+        * иконкой категории. Единица начисления — ровно та, что в правилах. */}
+      {!portrait && (
+        <span className="project-card-plate flex min-w-0 items-center gap-1.5 overflow-hidden" title={perk}>
+          {icon && <img src={icon} alt="" className="size-[20px] shrink-0 object-contain" />}
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[11.5px] font-semibold
+            text-[var(--project-ink)]">
+            {kind === "points" ? "Только победные очки" : perk}
+          </span>
+        </span>
+      )}
+
+      {!portrait && (
+        <span
+          className={`project-card-plate overflow-hidden text-ellipsis whitespace-nowrap !pl-1 text-2xs leading-tight ${
+            met ? "font-semibold text-good" : "text-ink-muted"
+          }`}
+        >
+          {met ? "✓ " : "Условие: "}
+          {projectRequirementText(project, meta)}
+        </span>
+      )}
+
+      {/* Цена справа, прогресс слева. Красным горит именно та цифра, которой не хватает, —
+        * «✓» у прогресса значит «условие выполнено», а не «можно купить». */}
       <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
-        <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-[11.5px] font-semibold">
+        {standing && <ProjectProgress standing={standing} compact={portrait} />}
+        <span className="project-card-plate ml-auto shrink-0 whitespace-nowrap !pl-1.5 text-[11.5px] font-bold"
+          title="Цена проекта">
           <span className={shortInfluence ? "text-bad" : "text-influence"}>{project.cost_influence}◆</span>
           {" + "}
           <span className={shortMoney ? "text-bad" : "text-money"}>{project.cost_money}$</span>
         </span>
-        {(counted || standing) && (
-          <span
-            data-met={met || undefined}
-            className="rounded-md bg-panel px-1.5 text-[11px] font-bold tabular-nums whitespace-nowrap
-              text-ink-muted data-[met]:text-good"
-          >
-            {counted ? `${standing.have}/${standing.needed}` : met ? "✓ готово" : "не готово"}
-          </span>
-        )}
       </span>
-
-      {!portrait && (
-        <span
-          className={`overflow-hidden text-ellipsis whitespace-nowrap text-2xs ${
-            met ? "text-good" : "text-ink-muted"
-          }`}
-        >
-          {met ? "✓ " : ""}
-          {projectRequirementText(project, meta)}
-        </span>
-      )}
-      {/* Постоянный бонус проекта — на лице карточки, а не только в поповере при покупке.
-        *
-        * Здесь была полоска прогресса, и она дублировала плашку «0/3» справа: то же самое число,
-        * той же длины, только без цифр. А единственное, чего на карточке не было вовсе, — то,
-        * ради чего половину проектов и берут: перк платит каждый раунд до конца партии, и
-        * сравнить два проекта, не видя его, нельзя. */}
-      {!portrait && (
-        <span
-          title={perk}
-          className="overflow-hidden text-ellipsis whitespace-nowrap text-2xs leading-none
-            text-[var(--color-badge)]"
-        >
-          {perk === "без постоянного бонуса" ? "только очки" : `⚙ ${perk}`}
-        </span>
-      )}
     </button>
   );
 });
+
+/* Сегменты по одному на единицу условия; при больших требованиях — сплошная шкала,
+ * иначе десяток сегментов превращается в пунктир. Бинарное условие — один сегмент. */
+function ProjectProgress({ standing, compact }: { standing: NonNullable<Standing>; compact: boolean }) {
+  const total = standing.binary ? 1 : Math.max(1, standing.needed);
+  const done = standing.binary ? (standing.met ? 1 : 0) : Math.min(standing.have, total);
+  const label = standing.binary ? (standing.met ? "готово" : "нет") : `${standing.have}/${standing.needed}`;
+  return (
+    <span
+      role="progressbar"
+      aria-label="Выполнение условия"
+      aria-valuemin={0}
+      aria-valuemax={total}
+      aria-valuenow={done}
+      data-met={standing.met || undefined}
+      className="project-card-plate flex min-w-0 items-center gap-1.5"
+    >
+      {total <= 6 ? (
+        <span className="flex gap-[3px]">
+          {Array.from({ length: total }, (_, position) => (
+            <span
+              key={position}
+              data-filled={position < done || undefined}
+              className={`project-segment ${compact ? "w-2.5" : total > 4 ? "w-3" : "w-[18px]"}`}
+            />
+          ))}
+        </span>
+      ) : (
+        <span className="project-segment relative w-12 overflow-hidden">
+          <span className="project-segment absolute inset-y-0 left-0" data-filled style={{ width: `${(done / total) * 100}%` }} />
+        </span>
+      )}
+      <b className={`text-[11.5px] tabular-nums ${standing.met ? "text-good" : "text-ink-muted"}`}>{label}</b>
+    </span>
+  );
+}
 
 function ProjectDetails({
   project,

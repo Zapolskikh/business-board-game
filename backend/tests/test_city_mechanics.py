@@ -2215,3 +2215,53 @@ def test_the_engine_owns_the_list_of_role_powers() -> None:
     assert set(engine.ROLE_POWERS) == set(load_catalog().roles)
     handled = set(engine.ROLE_POWERS["military"])
     assert "military_roof_sweep" not in handled
+
+
+def _residential_ids(engine: CityEngine) -> list[str]:
+    return [
+        asset.id for asset in engine.catalog.assets.values() if asset.district == "residential" and not asset.effects
+    ]
+
+
+def test_purchase_preview_is_the_whole_board_difference() -> None:
+    """The second object of a quarter lifts the first one too, and the preview must say so."""
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.role = None
+    first, second = _residential_ids(engine)[:2]
+    player.assets = [OwnedAsset(uid="own-1", card_id=first)]
+    player.money = 100
+    state.market[0] = MarketAsset(uid="slot-x", card_id=second)
+
+    preview = engine.purchase_preview(state, player, "slot-x")
+    # Printed income, +1$ synergy on the new object and +1$ on the one already standing.
+    assert preview["money"] == engine.asset(second).income + 2
+
+    before = engine.round_forecast(state, player)
+    state = run(engine, state, "buy_asset", {"market_uid": "slot-x"})
+    after = engine.round_forecast(state, state.player_by_id(player.id))
+    assert preview["money"] == after["money"]["total"] - before["money"]["total"]
+    assert preview["influence"] == after["influence"]["total"] - before["influence"]["total"]
+
+
+def test_purchase_preview_leaves_the_state_untouched() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    snapshot = state.to_dict()
+    for item in state.market:
+        engine.purchase_preview(state, player, item.uid)
+    assert state.to_dict() == snapshot
+
+
+def test_owned_yields_add_up_to_the_objects_row() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.role = None
+    ids = _residential_ids(engine)[:3]
+    player.assets = [OwnedAsset(uid=f"own-{index}", card_id=card) for index, card in enumerate(ids)]
+    yields = [engine.owned_yield(state, player, owned) for owned in player.assets]
+    forecast = engine.round_forecast(state, player)
+    assert sum(item["money"] for item in yields) == forecast["money"]["objects"]

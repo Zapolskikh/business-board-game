@@ -389,10 +389,36 @@ export function projectRequirementText(project: ProjectMeta, meta: CityMeta): st
     case "district_objects": return `объектов в «${districtTitle(requirement.district)}» не меньше ${count}`;
     case "district_depth": return `не меньше ${count} объектов в одном районе`;
     case "distinct_districts": return `объекты в ${count} разных районах`;
-    case "tag_objects": return `объектов с тегом «${requirement.tag}» не меньше ${count}`;
+    case "tag_objects": return `объектов с тегом «${tagLabel(requirement.tag ?? "")}» не меньше ${count}`;
     default: return requirement.type;
   }
 }
+
+/* Теги в каталоге — служебные id. Игроку показываются русские названия: и на карточке объекта,
+ * и в условии проекта, иначе «объекты с тегом government» не найти глазами на доске. */
+export const tagLabels: Record<string, string> = {
+  finance: "Финансы",
+  grey: "Серое",
+  government: "Управление",
+  production: "Производство",
+  politics: "Политика",
+  security: "Безопасность",
+  tech: "Технологии",
+  service: "Сервис",
+  infrastructure: "Инфраструктура",
+  data: "Данные",
+  logistics: "Логистика",
+  media: "Медиа",
+  energy: "Энергетика",
+  ai: "ИИ",
+  legal: "Право",
+  office: "Офис",
+  crypto: "Крипто",
+  contract: "Контракты",
+  lobby: "Лобби",
+};
+
+export const tagLabel = (tag: string): string => tagLabels[tag] ?? tag;
 
 const perkLabels: Record<string, (value: number) => string> = {
   passiveMoney: value => `+${value}$ в каждый раунд`,
@@ -1234,7 +1260,7 @@ export function assetEffectLines(
   if (numberValue(effects.roofCapacity))
     passive.push([
       `+${numberValue(effects.roofCapacity)} к пределу Крыш`,
-      `+${numberValue(effects.roofCapacity)} к пределу Крыш`,
+      `лимит Крыш +${numberValue(effects.roofCapacity)}`,
     ]);
   if (numberValue(effects.scandalReduction))
     passive.push([

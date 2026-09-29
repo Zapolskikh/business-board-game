@@ -1,5 +1,5 @@
 import { motion } from "motion/react";
-import { forwardRef } from "react";
+import { forwardRef, type CSSProperties, type ReactNode } from "react";
 import { difficultyLabels } from "../../online/gameUi";
 import type { CityMeta, GameState, LegalAction, PlayerState } from "../../online/types";
 import { CardPopover } from "../primitives/CardPopover";
@@ -7,6 +7,7 @@ import { Panel, SectionHead } from "../primitives/atoms";
 import type { ActionContext } from "../lib/actions";
 import { atScandalRisk, playerColor, scandalLimit, type Indexes } from "../lib/board";
 import { PlayerDetails } from "./PlayerDetails";
+import { playerFrame, projectIcon, roleIcon, statIcon } from "../assets/cards";
 
 /* Игроки — четыре строки на всю высоту колонки, без скролла.
  *
@@ -78,9 +79,13 @@ const PlayerRow = forwardRef<HTMLButtonElement, PlayerRowProps>(function PlayerR
   const risky = atScandalRisk(player);
   const color = playerColor(game, player.id);
   const shielded = player.roofs > 0;
+  const star = projectIcon("score");
 
-  /* Два спокойных яруса: личность и счёт сверху, ресурсы и защита снизу. Цвет принадлежит
-   * значениям, а не квадрантам, поэтому четыре игрока не превращаются в таблицу из линий. */
+  const avatar = roleIcon(player.role ?? undefined);
+
+  /* Макет из presets: пергамент в золотой рамке, цветная полоса игрока слева, круглый значок
+   * роли, крупный счёт справа и плашка ресурсов снизу. Цвет игрока — полоса, кольцо и счёт;
+   * у ресурсов свои смысловые цвета, как и на всей доске. */
   return (
     <motion.button
       ref={ref}
@@ -93,52 +98,76 @@ const PlayerRow = forwardRef<HTMLButtonElement, PlayerRowProps>(function PlayerR
       /* `data-state` занят Radix: CardPopover записывает туда open/closed. Собственное
        * состояние игрока держим отдельно, иначе стили хода тихо перетираются. */
       data-player-state={turn ? "turn" : isMe ? "me" : "idle"}
-      className={`relative grid min-h-0 grid-rows-[minmax(28px,1fr)_auto] gap-1 overflow-hidden rounded-lg
-        border bg-panel-2 px-2 py-1 text-left
-        data-[player-state=idle]:border-line data-[player-state=me]:border-line-2
-        data-[player-state=me]:bg-panel-3 data-[player-state=turn]:border-good
-        data-[player-state=turn]:bg-[#121a15] hover:border-line-2
-        data-[player-state=turn]:hover:border-good
-        ${turn ? "player-turn" : ""} ${player.jail_turns > 0 ? "opacity-60" : ""}`}
+      style={{ "--player-color": color, "--player-frame": playerFrame ? `url(${playerFrame})` : "none" } as CSSProperties}
+      className={`game-card player-card grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-1 overflow-hidden
+        py-1 pr-1 pl-3 text-left ${player.jail_turns > 0 ? "opacity-60" : ""}`}
       {...rest}
     >
-      {/* ЛЕВО-ВЕРХ: кто играет */}
-      <span className="flex min-w-0 items-center gap-2">
+      <span className="player-card-stripe" aria-hidden />
+      {turn && (
         <span
-          className="grid size-7 shrink-0 place-items-center rounded-full border bg-panel text-[13px]"
-          style={{ borderColor: role?.color ?? color }}
-        >
-          {role?.icon ?? "👤"}
+          aria-hidden
+          className="absolute top-1/2 left-[3px] size-0 -translate-y-1/2 border-y-[5px] border-l-[6px]
+            border-y-transparent border-l-[#c9a55a]"
+        />
+      )}
+
+      <span className="flex min-h-0 min-w-0 items-center gap-2">
+        <span className="player-card-avatar grid size-12 shrink-0 place-items-center rounded-full">
+          {avatar ? (
+            <img src={avatar} alt={role?.title ?? "Без роли"} className="size-[30px] object-contain" />
+          ) : (
+            <span className="text-[16px]">{role?.icon ?? "👤"}</span>
+          )}
         </span>
+
         <span className="grid min-w-0 flex-1 gap-px overflow-hidden">
           <span className="flex min-w-0 items-center gap-1">
-            <b
-              className="overflow-hidden text-ellipsis whitespace-nowrap text-[12.5px] font-bold"
-              style={{ color }}
-            >
+            <b className="card-serif min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[16px]
+              leading-tight">
               {player.name}
             </b>
-            {player.is_bot && (
-              <span className="shrink-0 rounded bg-panel px-1 text-3xs uppercase text-ink-dim">
-                {difficultyLabels[player.difficulty] ?? player.difficulty}
-              </span>
-            )}
+            <span
+              className="player-card-plate flex shrink-0 items-center gap-0.5 rounded-md px-1 py-0.5"
+              title="Победные очки"
+            >
+              {star && <img src={star} alt="" className="size-3.5" />}
+              <b
+                className={`card-serif player-card-score leading-none tabular-nums ${
+                  score > 99 ? "text-[15px]" : "text-[18px]"
+                }`}
+              >
+                {score}
+              </b>
+            </span>
           </span>
           <span className="flex min-w-0 items-center gap-1 text-2xs text-ink-muted">
             <span className="overflow-hidden text-ellipsis whitespace-nowrap">
               {role?.title ?? "Без роли"}
             </span>
             <span className="shrink-0 whitespace-nowrap">· {player.assets.length} об.</span>
+          </span>
+          <span className="flex min-h-[15px] min-w-0 items-center gap-1 overflow-hidden text-3xs">
+            {player.is_bot && (
+              <span className="shrink-0 rounded bg-panel/60 px-1 uppercase text-ink-dim">
+                {difficultyLabels[player.difficulty] ?? player.difficulty}
+              </span>
+            )}
+            {turn && (
+              <span className="player-card-turn-pill shrink-0 rounded-full px-1.5 font-semibold">
+                ✦ Ходит
+              </span>
+            )}
             {player.jail_turns > 0 ? (
               <span
-                className="ml-auto shrink-0 rounded bg-[#28171b] px-1 font-semibold text-bad"
+                className="shrink-0 rounded bg-[#e6c8c4] px-1 font-semibold text-bad"
                 title={`В тюрьме: осталось ходов ${player.jail_turns}`}
               >
                 🚔 {player.jail_turns}
               </span>
             ) : risky ? (
               <span
-                className="ml-auto shrink-0 rounded bg-[#241c13] px-1 font-semibold text-warning"
+                className="shrink-0 rounded bg-[#ecd3b4] px-1 font-semibold text-warning"
                 title="Ещё один скандал — и роль будет потеряна"
               >
                 ⚠ роль
@@ -146,31 +175,46 @@ const PlayerRow = forwardRef<HTMLButtonElement, PlayerRowProps>(function PlayerR
             ) : null}
           </span>
         </span>
-        <span className="ml-auto flex shrink-0 items-baseline gap-1 rounded-md bg-panel px-1.5 py-1
-          text-points">
-          <span className="text-3xs">★</span>
-          <b className={`font-extrabold leading-none tabular-nums ${score > 99 ? "text-[14px]" : "text-[17px]"}`}>
-            {score}
-          </b>
-        </span>
       </span>
 
-      {/* Ресурсы собраны в спокойную нижнюю плашку; цвет объясняет смысл числа. */}
-      <span className="flex items-center gap-2 rounded-md bg-panel px-1.5 py-1 text-[11.5px] font-semibold">
-        <span title="Деньги" className="text-money">
-          <span className="text-ink-dim">●</span> {player.money}$
-        </span>
-        <span title="Влияние" className="text-influence">
-          ◆ {player.influence}
-        </span>
-        <span title="Скандалы" className={risky ? "text-warning" : "text-ink-muted"}>
-          <span className={risky ? "text-warning" : "text-ink-dim"}>⚠</span> {player.scandals}/
-          {scandalLimit(player)}
-        </span>
-        <span className={`ml-auto ${shielded ? "text-defence" : "text-ink-dim"}`} title="Крыши">
-          🛡 {player.roofs}/{player.roof_limit}
-        </span>
+      {/* Ресурсы — плашка из четырёх равных ячеек, у каждой свой значок и смысловой цвет. */}
+      <span className="player-card-plate grid grid-cols-4 items-center rounded-md py-0.5 text-[12px] font-bold">
+        <Stat icon={statIcon("money")} label="Деньги" className="text-money">
+          {player.money}$
+        </Stat>
+        <Stat icon={statIcon("influence")} label="Влияние" className="text-influence">
+          {player.influence}
+        </Stat>
+        <Stat icon={statIcon("scandal")} label="Скандалы" className={risky ? "text-bad" : "text-ink-muted"}>
+          {player.scandals}/{scandalLimit(player)}
+        </Stat>
+        <Stat icon={statIcon("roof")} label="Крыши" className={shielded ? "text-defence" : "text-ink-dim"}>
+          {player.roofs}/{player.roof_limit}
+        </Stat>
       </span>
     </motion.button>
   );
 });
+
+function Stat({
+  icon,
+  label,
+  className,
+  children,
+}: {
+  icon: string | undefined;
+  label: string;
+  className: string;
+  children: ReactNode;
+}) {
+  return (
+    <span
+      title={label}
+      className={`flex min-w-0 items-center justify-center gap-0.5 whitespace-nowrap border-l border-[#d8c59d]
+        tabular-nums first:border-l-0 ${className}`}
+    >
+      {icon && <img src={icon} alt="" className="size-4 shrink-0" />}
+      {children}
+    </span>
+  );
+}

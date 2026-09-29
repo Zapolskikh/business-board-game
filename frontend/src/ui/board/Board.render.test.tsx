@@ -2,6 +2,8 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { GameState, PlayerState } from "../../online/types";
 import { BoardView } from "./Board";
+import { MarketCardDetails } from "../market/MarketCardDetails";
+import { marketCardState } from "../market/marketCardState";
 import type { ActionContext } from "../lib/actions";
 import { ME, meta, scenarios, type ScenarioName } from "../dev/fixtures";
 import type { BoardLayout } from "../lib/layout";
@@ -59,15 +61,39 @@ describe("BoardView", () => {
     expect(html).toContain("6$");
   });
 
-  it("объясняет отсутствие слота на карточке рынка", () => {
-    expect(render("Слоты заняты")).toContain("Нет свободного слота");
+  it("причина «нельзя купить» — в окне подробностей, а не на лице карточки рынка", () => {
+    expect(render("Слоты заняты")).not.toContain("Нет свободного слота");
+
+    const room = scenarios["Слоты заняты"];
+    const game = room.game as GameState;
+    const me = game.players.find(player => player.id === ME) as PlayerState;
+    const assets = new Map(meta.assets.map(asset => [asset.id, asset]));
+    const item = game.market[0];
+    const asset = assets.get(item.card_id)!;
+    const state = marketCardState({ item, asset, game, me, legal: room.legal_actions ?? [] });
+    const details = text(
+      renderToString(
+        <MarketCardDetails
+          item={item}
+          asset={asset}
+          district={meta.districts.find(district => district.id === asset.district)}
+          me={me}
+          meta={meta}
+          assets={assets}
+          state={state}
+          onBuy={() => {}}
+          onMark={() => {}}
+        />,
+      ),
+    );
+    expect(details).toContain("Нет свободного слота");
   });
 
   it("на чужом ходу подсвечивает ровно одну карточку вместо отдельной строки статуса", () => {
     const html = render("Ход соперника");
     expect(html).toContain("grid-rows-[auto_minmax(0,1fr)]");
     expect(html.match(/data-player-state="turn"/g)).toHaveLength(1);
-    expect(html).toContain("player-turn");
+    expect(html.match(/player-card-turn-pill/g)).toHaveLength(1);
   });
 
   it("не занимает место строкой «Ваш ход»", () => {

@@ -1,8 +1,8 @@
 import { forwardRef, type ForwardedRef } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { assetEffectLines, assetPoints, districtCount, districtSynergyValue } from "../../online/gameUi";
-import type { AssetMeta, CityMeta, DistrictMeta, LegalAction, OwnedAsset } from "../../online/types";
-import { AssetFace, assetFaceGrid, assetFaceGridPortrait, assetFaceStyle } from "../primitives/AssetFace";
+import type { AssetMeta, AssetYield, CityMeta, DistrictMeta, LegalAction, OwnedAsset } from "../../online/types";
+import { AssetFace, assetFaceGrid, assetFaceGridPortrait, assetFaceStyle, type AssetBullet } from "../primitives/AssetFace";
 import { CardPopover, PopoverBody, PopoverFooter, PopoverHeader } from "../primitives/CardPopover";
 import { useIsPortrait } from "../lib/layout";
 import { EffectList, KeyValue, Panel, SectionHead } from "../primitives/atoms";
@@ -73,6 +73,7 @@ export function CityPanel({
                   label={`${asset.title} — подробности`}
                   content={
                     <OwnedDetails
+                      uid={owned.uid}
                       asset={asset}
                       districtTitle={district?.title}
                       districtIcon={district?.icon}
@@ -92,6 +93,8 @@ export function CityPanel({
                       includeSynergy: true,
                     })}
                     owns={district ? districtCount(me, district.id, index.assets) : 0}
+                    // Без доли от движка (галерея) — напечатанный доход.
+                    income={me.asset_yields?.[owned.uid] ?? { money: asset.income, influence: 0 }}
                   />
                 </CardPopover>
               </motion.div>
@@ -149,10 +152,10 @@ export function CityPanel({
   );
 }
 
-/* Купленный объект выглядит ровно так же, как выглядел на рынке: те же зоны в том же
- * порядке. Иначе после покупки игрок заново ищет, где что написано. Отличий два —
- * цена наверху означает возврат при продаже, а внизу вместо причины отказа стоит
- * либо цена продажи, либо отметка о блокировке.
+/* Купленный объект выглядит ровно так же, как выглядел на рынке: те же поля в том же порядке.
+ * Иначе после покупки игрок заново ищет, где что написано. Отличия: плашки цены нет, доход —
+ * доля этого объекта в выплате раунда (её присылает движок), разовая награда уже получена,
+ * а среди значков справа — цена продажи.
  *
  * forwardRef обязателен: Radix с asChild цепляется к кнопке через ref, и без него
  * поповер молча не открывается — а вместе с ним пропадает единственная кнопка продажи. */
@@ -162,6 +165,7 @@ const OwnedSlot = forwardRef(function OwnedSlot({
   district,
   lines,
   owns,
+  income,
   ...rest
 }: {
   owned: OwnedAsset;
@@ -169,66 +173,40 @@ const OwnedSlot = forwardRef(function OwnedSlot({
   district: DistrictMeta | undefined;
   lines: ReturnType<typeof assetEffectLines>;
   owns: number;
+  income: AssetYield;
 }, ref: ForwardedRef<HTMLButtonElement>) {
   const value = assetPoints(asset);
   const portrait = useIsPortrait();
   const districtSynergy = districtSynergyValue(owns);
+  const bullets: AssetBullet[] = [
+    {
+      key: "district",
+      icon: "▦",
+      text: `район ${owns}/4${districtSynergy > 0 ? ` +${districtSynergy}$` : ""}`,
+      tone: owns >= 2 ? "good" : undefined,
+      title: "Ваши объекты этого района. Синергия включается на 2 и на 4.",
+    },
+    /* Возврат при продаже равен очкам объекта. Продажа — единственный способ освободить слот,
+     * когда все шесть заняты, поэтому цена стоит на лице, а не только в окне. */
+    { key: "sell", icon: "💰", text: `${value}$`, tone: "dim", title: `Продажа за ${value}$ — не тратит действие` },
+  ];
   return (
     <button
       ref={ref}
       type="button"
       data-ui="asset-card"
-      style={assetFaceStyle(district?.color, asset.rarity)}
+      data-uid={owned.uid}
+      style={assetFaceStyle(district?.color, asset.rarity, district?.id)}
       className={portrait ? assetFaceGridPortrait : assetFaceGrid}
       {...rest}
     >
-      <AssetFace
-        asset={asset}
-        district={district}
-        lines={lines}
-        income={asset.income}
-        influence={0}
-        /* Возврат при продаже равен очкам объекта — это одно и то же число. Печатать его
-         * ещё и слева сверху, где у рынка стоит цена, значит трижды повторить одно; строка
-         * продажи внизу и бейдж очков справа уже всё сказали. */
-        topLeft={null}
-        topRight={
-          <span
-            className={`rounded-md bg-panel px-1.5 font-bold whitespace-nowrap text-points ${
-                portrait ? "px-1 text-3xs" : "px-1.5 text-[11px]"
-              }`}
-          >
-            {value} оч
-          </span>
-        }
-        bottom={
-          <span className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5">
-            {/* У карточки рынка здесь стоит причина отказа, у своего объекта — цена продажи.
-              * Место пустовало, а продажа — единственный способ освободить слот, когда все
-              * шесть заняты. */}
-            <span
-              className="h-[13px] overflow-hidden text-ellipsis whitespace-nowrap rounded px-1
-                text-3xs font-semibold leading-[13px] text-money"
-            >
-              {portrait ? `${value}$` : `Продать за ${value}$`}
-            </span>
-            <span className="flex items-baseline gap-1 whitespace-nowrap text-3xs text-ink-dim"
-              title="Ваши объекты этого района. Синергия включается на 2 и на 4."
-            >
-              район
-              <b className={`text-[12px] tabular-nums ${owns >= 2 ? "text-good" : "text-ink-muted"}`}>
-                {owns}/4
-              </b>
-              {districtSynergy > 0 && <b className="text-money">+{districtSynergy}$</b>}
-            </span>
-          </span>
-        }
-      />
+      <AssetFace asset={asset} district={district} lines={lines} income={income} bullets={bullets} owned />
     </button>
   );
 });
 
 function OwnedDetails({
+  uid,
   asset,
   districtTitle,
   districtIcon,
@@ -238,6 +216,7 @@ function OwnedDetails({
   sellState,
   onSell,
 }: {
+  uid: string;
   asset: AssetMeta;
   districtTitle?: string;
   districtIcon?: string;
@@ -260,7 +239,15 @@ function OwnedDetails({
         <KeyValue
           rows={[
             ["Район", `${districtIcon ?? ""} ${districtTitle ?? asset.district} · у вас ${owns} из 4`],
-            ["Доход", `+${asset.income}$ за раунд`],
+            [
+              "Доход",
+              (() => {
+                const share = context.me.asset_yields?.[uid];
+                return share
+                  ? `+${share.money}$${share.influence ? ` и +${share.influence}◆` : ""} за раунд сейчас · напечатано +${asset.income}$`
+                  : `+${asset.income}$ за раунд`;
+              })(),
+            ],
             ["В счёт", `${value} очков`],
             ["Продажа", `${value}$ — половина цены · не требует действия`],
           ]}

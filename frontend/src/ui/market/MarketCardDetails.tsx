@@ -45,7 +45,10 @@ export function MarketCardDetails({
 }) {
   const owned = district ? districtCount(me, district.id, assets) : 0;
   const points = assetPoints(asset);
-  const lines = assetEffectLines(asset, me, meta, assets, { includeSynergy: true });
+  // Строки — для города после покупки, как и сноска на лице карточки.
+  const after: PlayerState = { ...me, assets: [...me.assets, { uid: `preview:${item.uid}`, card_id: asset.id }] };
+  const lines = assetEffectLines(asset, after, meta, assets, { includeSynergy: true });
+  const blocked = state.kind !== "buyable" && state.kind !== "buying";
   const objectLines = lines.filter(line => line.kind !== "district" && line.kind !== "sector");
   const districtLines = lines.filter(line => line.kind === "district" || line.kind === "sector");
 
@@ -53,6 +56,16 @@ export function MarketCardDetails({
     <>
       <PopoverHeader title={asset.title} subtitle={district?.title} />
       <PopoverBody>
+        {/* Почему купить нельзя — первым делом, а не серой кнопкой внизу: с лица карточки эта
+          * строка ушла, и окно по нажатию — единственное место, где игрок её увидит. */}
+        {blocked && (
+          <p
+            role="alert"
+            className="mb-2 rounded-md border border-[#6b3a41] bg-[#2a171b] px-2 py-1.5 font-semibold text-bad"
+          >
+            ⛔ {marketCardReason(state)}
+          </p>
+        )}
         <dl className="mb-2 grid grid-cols-[auto_1fr] gap-x-2.5 gap-y-0.5">
           <dt className="text-ink-dim">Район</dt>
           <dd className="font-medium text-ink">
@@ -69,9 +82,27 @@ export function MarketCardDetails({
           <dd className="font-semibold text-points">{points} очков</dd>
           <dt className="text-ink-dim">Доход</dt>
           <dd className="font-medium text-money">
-            +{asset.income}$ за раунд
-            {asset.influence > 0 && <span className="text-influence"> · +{asset.influence}◆ разово</span>}
+            {item.preview ? (
+              <>
+                {item.preview.money >= 0 ? "+" : "−"}{Math.abs(item.preview.money)}$ за раунд
+                {item.preview.influence !== 0 && (
+                  <span className="text-influence"> · {item.preview.influence > 0 ? "+" : "−"}{Math.abs(item.preview.influence)}◆ за раунд</span>
+                )}
+                <span className="block text-2xs font-normal text-ink-dim">
+                  Прибавка ко всему доходу: вместе с синергиями, которые покупка включит в вашем городе.
+                  Напечатано на карте: +{asset.income}$.
+                </span>
+              </>
+            ) : (
+              <>+{asset.income}$ за раунд</>
+            )}
           </dd>
+          {asset.influence > 0 && (
+            <>
+              <dt className="text-ink-dim">Сразу</dt>
+              <dd className="font-medium text-influence">+{asset.influence}◆ при покупке</dd>
+            </>
+          )}
         </dl>
 
         <EffectList title="Свойства объекта" lines={objectLines} />
