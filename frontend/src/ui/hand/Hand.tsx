@@ -46,8 +46,8 @@ export function Hand({
           disabled={draw.kind !== "ready"}
           onClick={() => draw.kind === "ready" && onAction(draw.action)}
           title={draw.kind === "blocked" ? draw.reason : "Тянет две случайные карты из колоды"}
-          className="grid gap-px rounded-md border border-good bg-[#121a15] px-[7px] py-[5px]
-            enabled:hover:border-good disabled:border-line disabled:bg-panel-2 disabled:opacity-45"
+          className="grid gap-px rounded-md border border-good/60 bg-panel-2 px-[7px] py-[5px]
+            enabled:hover:bg-panel-3 disabled:border-line disabled:opacity-45"
         >
           <b className="text-[11.5px] text-good">+ Вытянуть 2 карты</b>
           {/* Цена всегда на кнопке, а не вместо неё причина отказа: без цены нельзя
@@ -123,8 +123,7 @@ export function Hand({
         {Array.from({ length: Math.max(0, 3 - hand.length) }).map((_, position) => (
           <div
             key={`empty-${position}`}
-            className="grid place-content-center rounded-md border border-dashed border-line
-              bg-surface text-2xs text-ink-dim"
+            className="empty-slot grid place-content-center rounded-md text-2xs text-ink-dim"
           >
             пусто
           </div>

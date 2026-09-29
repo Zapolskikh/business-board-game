@@ -3,6 +3,13 @@ import type { CityMeta, GameState, PlayerState } from "../../online/types";
 import { CardPopover } from "../primitives/CardPopover";
 import { ActionsDetails, DefenceDetails, ScoreDetails } from "./headerPopovers";
 import { atScandalRisk, scandalLimit } from "../lib/board";
+import { projectIcon, roleIcon, statIcon } from "../assets/cards";
+import { setTheme, useTheme } from "../lib/theme";
+import { themes, type ThemeId } from "../themes";
+
+/** Значок ресурса в шапке — та же графика, что на карточках игроков. */
+const Icon = ({ src }: { src: string | undefined }) =>
+  src ? <img src={src} alt="" className="size-4 shrink-0" /> : null;
 
 type ButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
   children: ReactNode;
@@ -112,9 +119,9 @@ export function Header({
     /* Своя ступень светлоты, между подложкой и панелями: шапка не входит ни в одну из
      * функциональных зон, и на общем `bg-panel` она читалась как ещё одна панель. */
     <header className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-panel
-      border border-line bg-topbar px-2.5 py-1.5">
+      bg-topbar px-3 py-1.5">
       <div className="flex items-baseline gap-2.5">
-        <b className="text-base font-extrabold">Город влияния</b>
+        <b className="card-serif text-[19px]">Город влияния</b>
         <span className="text-[11px] text-ink-muted">
           Раунд {game.round_number} / {game.max_rounds}
         </span>
@@ -123,8 +130,10 @@ export function Header({
 
       <div
         data-ui="player-hud"
-        className="flex min-w-0 max-w-[760px] items-stretch justify-self-center overflow-hidden rounded-lg
-          border border-line bg-panel-2"
+        /* Пергамент с золотой каймой — «табличка» игрока, как карточки на столе. Токены
+         * `.game-card` переводят текст и цвета смысла на тёмные, под бумагу. */
+        className="game-card hud-plate flex min-w-0 max-w-[780px] items-stretch justify-self-center overflow-hidden
+          rounded-lg"
       >
         {dashboard()}
       </div>
@@ -188,11 +197,9 @@ export function Header({
     return (
       <>
         <div className="flex min-w-[112px] items-center gap-2 px-2.5 py-1">
-          <span
-            className="grid size-7 shrink-0 place-items-center rounded-full border border-line-2 bg-panel text-sm"
-            style={{ color: role?.color }}
-          >
-            {role?.icon ?? "👤"}
+          <span className="player-card-avatar grid size-7 shrink-0 place-items-center rounded-full
+            [--player-color:#c9a55a] [border-width:2px]">
+            <img src={roleIcon(me.role ?? undefined)} alt="" className="size-[18px]" />
           </span>
           <span className="grid min-w-0 gap-px">
             <span className="text-[8px] font-semibold uppercase tracking-[0.1em] text-ink-dim">Ваша роль</span>
@@ -203,13 +210,13 @@ export function Header({
         </div>
         <Sep />
         <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
-          <HudStat label="Счёт" className="text-points">★ {score}</HudStat>
+          <HudStat label="Счёт" className="text-points"><Icon src={projectIcon("score")} />{score}</HudStat>
         </CardPopover>
         <Sep />
         <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
           <HudStat label="Ресурсы">
-            <span className="text-money">● {me.money}$</span>
-            <span className="text-influence">◆ {me.influence}</span>
+            <span className="flex items-center gap-0.5 text-money"><Icon src={statIcon("money")} />{me.money}$</span>
+            <span className="flex items-center gap-0.5 text-influence"><Icon src={statIcon("influence")} />{me.influence}</span>
           </HudStat>
         </CardPopover>
         <Sep />
@@ -229,9 +236,11 @@ export function Header({
         <Sep />
         <CardPopover side="bottom" align="center" content={<DefenceDetails game={game} me={me} />}>
           <HudStat label="Защита">
-            <span className="text-defence">🛡 {me.roofs}/{me.roof_limit}</span>
-            <span className={risky ? "text-warning" : "text-ink-muted"}>
-              ⚠ {me.scandals}/{scandalLimit(me)}
+            <span className="flex items-center gap-0.5 text-defence">
+              <Icon src={statIcon("roof")} />{me.roofs}/{me.roof_limit}
+            </span>
+            <span className={`flex items-center gap-0.5 ${risky ? "text-bad" : "text-ink-muted"}`}>
+              <Icon src={statIcon("scandal")} />{me.scandals}/{scandalLimit(me)}
             </span>
           </HudStat>
         </CardPopover>
@@ -255,9 +264,10 @@ export function Header({
 
   function buttons() {
     const shape = `rounded-md border border-line bg-panel-2 text-[11.5px] whitespace-nowrap
-      hover:border-accent ${compact ? "px-2 py-1" : "px-2.5 py-1.5"}`;
+      hover:bg-panel-3 ${compact ? "px-2 py-1" : "px-2.5 py-1.5"}`;
     return (
       <>
+        <ThemePicker className={shape} compact={compact} />
         {/* Счёт и доход — в шапке, рядом с остальными моими числами, а не в панели
           * действий: справа должно остаться то, что можно нажать в свой ход. */}
         <button type="button" onClick={onScore} aria-label="Счёт и доход" className={shape}>
@@ -332,4 +342,27 @@ export function StatusBar({
     );
   }
   return null;
+}
+
+/* Тема — личная настройка, её меняют в любой момент партии. Обычный select: он доступен с
+ * клавиатуры и на телефоне открывает родной список, а тем всего пять. */
+function ThemePicker({ className, compact }: { className: string; compact: boolean }) {
+  const theme = useTheme();
+  return (
+    <label className={`flex cursor-pointer items-center gap-1 ${className}`} title="Тема оформления">
+      🎨
+      <select
+        aria-label="Тема оформления"
+        value={theme}
+        onChange={event => setTheme(event.target.value as ThemeId)}
+        className={`cursor-pointer bg-transparent text-ink outline-none ${compact ? "w-4" : ""}`}
+      >
+        {themes.map(item => (
+          <option key={item.id} value={item.id} className="bg-panel-2 text-ink">
+            {item.title}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 }

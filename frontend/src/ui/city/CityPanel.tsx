@@ -105,10 +105,10 @@ export function CityPanel({
         {Array.from({ length: free }).map((_, position) => (
           <div
             key={`free-${position}`}
-            className="grid place-content-center justify-items-center gap-1 rounded-card border
-              border-dashed border-line bg-surface px-[7px] py-1.5 text-ink-dim"
+            className="empty-slot grid place-content-center justify-items-center gap-1 rounded-card
+              px-[7px] py-1.5 text-ink-dim"
           >
-            <b className="text-[11.5px] text-ink-muted">Слот {me.assets.length + position + 1}</b>
+            <b className="card-serif text-[13px]">Слот {me.assets.length + position + 1}</b>
             <span className="text-3xs">Свободно</span>
           </div>
         ))}
@@ -136,12 +136,11 @@ export function CityPanel({
                     ? "Открыть слот"
                     : "Сначала откройте предыдущий слот"
               }
-              className="grid place-content-center justify-items-center gap-[3px] rounded-card
-                border border-dashed border-line bg-surface px-[7px] py-1.5
-                enabled:hover:border-accent disabled:opacity-60"
+              className="empty-slot grid place-content-center justify-items-center gap-[3px] rounded-card
+                px-[7px] py-1.5 enabled:hover:bg-panel-3 disabled:opacity-60"
             >
-              <b className="text-[11.5px] text-ink-muted">🔒 Слот {slot + 1}</b>
-              <span className="rounded bg-panel-3 px-2 py-0.5 text-2xs text-influence">
+              <b className="card-serif text-[13px]">🔒 Слот {slot + 1}</b>
+              <span className="rounded border border-line bg-panel-2 px-2 py-0.5 text-2xs text-ink">
                 Открыть · <b className={short ? "font-bold text-bad" : ""}>{price ?? "?"}$</b>
               </span>
             </button>

@@ -3,7 +3,7 @@ import { forwardRef, type CSSProperties } from "react";
 import { projectPerkText, projectRequirementText, projectRerollMoney } from "../../online/gameUi";
 import type { CityMeta, GameState, LegalAction, ProjectMeta } from "../../online/types";
 import { CardPopover, PopoverBody, PopoverFooter, PopoverHeader } from "../primitives/CardPopover";
-import { KeyValue, Panel, zoneRule } from "../primitives/atoms";
+import { KeyValue, Panel, sectionTitle, zoneRule } from "../primitives/atoms";
 import { resolve, usedThisTurn, type ActionContext } from "../lib/actions";
 import type { Indexes } from "../lib/board";
 import { useIsPortrait } from "../lib/layout";
@@ -47,7 +47,7 @@ export function Projects({
       {/* Вертикально в строку помещается заголовок, счётчик своих проектов и кнопка. Всё
         * остальное — размер колоды, длинная подпись кнопки — уходит: это справка, а не решение. */}
       <div className={`flex items-baseline gap-2 overflow-hidden px-0.5 pb-[2px] ${zoneRule}`}>
-        <h2 className="whitespace-nowrap text-[10.5px] font-bold uppercase tracking-[0.09em] text-ink-muted">
+        <h2 className={sectionTitle}>
           {portrait ? "Проекты" : "Городские проекты"}
         </h2>
         <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[10.5px] text-ink-dim">

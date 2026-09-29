@@ -1,4 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
+import { useThemeStyle } from "../lib/theme";
 import { useState, type ReactNode } from "react";
 
 /* Вертикальная раскладка телефона: центр всегда на экране, бока приезжают по требованию.
@@ -96,6 +97,8 @@ function Sheet({
   onClose: () => void;
   children: ReactNode;
 }) {
+  // Шторка рендерится порталом вне доски, поэтому тему ей нужно дать самой.
+  const theme = useThemeStyle();
   return (
     <Dialog.Root open={open} modal={false} onOpenChange={next => !next && onClose()}>
       <Dialog.Portal>
@@ -115,6 +118,7 @@ function Sheet({
            * поверх шторки отдельным слоем: без этого тап по описанию игрока закрывал бы
            * заодно и список игроков под ним. */
           onInteractOutside={event => event.preventDefault()}
+          style={theme}
           className={`ui-v2 fixed inset-y-0 z-50 grid w-[min(88vw,340px)] grid-rows-[auto_minmax(0,1fr)]
             gap-1 border-line bg-surface p-1.5 font-sans text-ink
             ${side === "left" ? "left-0 border-r" : "right-0 border-l"}`}

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useThemeStyle } from "../lib/theme";
 import { scoreOf } from "../../online/gameUi";
 import { buildRulesHtml } from "../../online/rulesDocument";
 import type { CityMeta, GameState, LegalAction } from "../../online/types";
@@ -237,7 +238,8 @@ export function BoardView({
  * на телефоне стол не сжимают, а перестраивают, поэтому размеры здесь настоящие — 12px
  * подписи остаются 12px. Класс `ui-v2` обязателен: на нём висит весь ресет темы. */
 function MobileShell({ children }: { children: ReactNode }) {
-  return <div className="ui-v2 h-dvh w-dvw overflow-hidden bg-surface">{children}</div>;
+  const theme = useThemeStyle();
+  return <div style={theme} className="ui-v2 h-dvh w-dvw overflow-hidden bg-surface">{children}</div>;
 }
 
 /** Подключённая версия: всё то же самое, но из живой партии. */

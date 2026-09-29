@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useThemeStyle } from "../lib/theme";
 
 /* На сервере (и в тестах, которые рендерят доску строкой) layout-эффектов нет вовсе, и React
  * предупреждает об этом на каждый рендер. Меряем мы в браузере, так что подмена честная. */
@@ -78,8 +79,10 @@ export function BoardScaler({ children }: { children: ReactNode }) {
     ? Math.min(box.width / BOARD_WIDTH, box.height / BOARD_HEIGHT, MAX_SCALE)
     : 1;
 
+  const theme = useThemeStyle();
+
   return (
-    <div ref={frame} className="ui-v2 grid h-dvh w-dvw place-content-center overflow-hidden bg-surface">
+    <div ref={frame} style={theme} className="ui-v2 grid h-dvh w-dvw place-content-center overflow-hidden bg-surface">
       <div
         style={{
           width: BOARD_WIDTH,

@@ -12,7 +12,7 @@ import {
 import type { CityMeta, GameState, LegalAction } from "../../online/types";
 import { CardPopover, PopoverBody, PopoverHeader } from "../primitives/CardPopover";
 import { DetailsModal } from "../primitives/Modal";
-import { ActionButton, DrawerRow, ListItem, Panel, zoneRule, zoneStyle } from "../primitives/atoms";
+import { ActionButton, DrawerRow, ListItem, Panel, sectionTitle, zoneRule, zoneStyle } from "../primitives/atoms";
 import { findActions, resolve, resolveMany, usedThisTurn, type ActionContext } from "../lib/actions";
 import { roofPrice, type Indexes } from "../lib/board";
 import { findPreview, previewCost, previewGain, scoreOf, targetStats } from "../lib/powerPreview";
@@ -111,7 +111,7 @@ export function ActionsPanel({
     >
       <Panel className="pb-2">
         <div className={`flex items-center gap-2 px-0.5 pt-px pb-[2px] ${zoneRule}`}>
-          <h2 className="text-[11px] font-bold uppercase tracking-[0.09em] text-[var(--zone-accent)]">Действия</h2>
+          <h2 className={sectionTitle}>Действия</h2>
           <span className="ml-auto flex gap-1">
             {Array.from({ length: Math.max(3, game.actions_left) }).map((_, position) => (
               <i
@@ -282,9 +282,9 @@ export function ActionsPanel({
         type="button"
         disabled={endTurn.kind !== "ready"}
         onClick={() => act(endTurn)}
-        className="rounded-[7px] border border-good bg-[#1a2a21] px-2 py-2.5 text-center text-[13.5px]
-          font-extrabold text-good enabled:hover:bg-[#203429] disabled:border-line disabled:bg-panel-2 disabled:text-ink-muted
-          disabled:opacity-60"
+        /* Главная кнопка темы — единственная залитая акцентом на всей доске. */
+        className="primary-button card-serif rounded-[7px] px-2 py-2.5 text-center text-[16px]
+          disabled:opacity-50"
       >
         {endTurn.kind === "pending" ? "Завершаем…" : "Завершить ход"}
       </button>
@@ -434,7 +434,7 @@ function PowerButton({
       <button
         type="button"
           className={`grid min-w-0 gap-px rounded-md border bg-panel-2 px-[7px] py-[5px]
-          hover:bg-panel-3 ${danger ? "border-[#594047] hover:border-bad" : "border-line hover:border-line-2"}`}
+          hover:bg-panel-3 ${danger ? "border-bad/50 hover:border-bad" : "border-line hover:border-line-2"}`}
       >
         <b
           className={`overflow-hidden text-ellipsis whitespace-nowrap text-[11.5px] font-semibold ${

@@ -22,8 +22,13 @@ export function zoneStyle(zone?: Zone): CSSProperties | undefined {
   } as CSSProperties;
 }
 
-/** Тихий разделитель заголовка и содержимого зоны. */
-export const zoneRule = "border-b border-b-line";
+/* Заголовок и содержимое зоны разделяет отступ, а не линия: в формате тем у областей нет
+ * рамок, и одинокая черта под заголовком читалась как обрывок границы. */
+export const zoneRule = "mb-0.5";
+
+/** Заголовок зоны: антиква капителью, как в макете доски. */
+export const sectionTitle = `section-title whitespace-nowrap text-[13px] uppercase tracking-[0.04em]
+  text-[var(--zone-accent,var(--color-ink-muted))]`;
 
 export function Panel({
   children,
@@ -43,7 +48,7 @@ export function Panel({
        * умолчанию равна min-content. Стоит одной подписи внутри отказаться сжиматься, и панель
        * распирает свою колонку и наезжает на соседнюю — ровно это и происходило на телефоне,
        * когда Safari раздувал шрифты. Теперь распирать нечего: лишнее обрежется многоточием. */
-      className={`min-w-0 rounded-panel border border-line bg-[var(--zone-bg,var(--color-panel))] px-2 py-[7px] ${
+      className={`min-w-0 rounded-panel bg-[var(--zone-bg,var(--color-panel))] px-2 py-[7px] ${
         rows ? "grid min-h-0 grid-rows-[auto_minmax(0,1fr)]" : ""
       } ${className}`}
     >
@@ -55,8 +60,7 @@ export function Panel({
 export function SectionHead({ title, meta, extra }: { title: string; meta?: ReactNode; extra?: ReactNode }) {
   return (
     <div className={`flex items-baseline gap-2 px-0.5 pb-[2px] ${zoneRule}`}>
-      <h2 className="text-[10.5px] font-bold uppercase tracking-[0.09em]
-        text-[var(--zone-accent,var(--color-ink-muted))]">{title}</h2>
+      <h2 className={sectionTitle}>{title}</h2>
       {extra}
       {/* Подпись обрезается, а не распирает панель. `whitespace-nowrap` без `overflow-hidden`
         * растил её на всю длину текста, панель уезжала за свою колонку, и вся центральная
@@ -101,8 +105,8 @@ export function ActionButton({
         data-[state=ready]:border-line-2 enabled:hover:border-accent enabled:hover:bg-panel-3
         data-[state=blocked]:opacity-35
         data-[state=pending]:animate-pulse
-        data-[state=spent]:border-[#4a3034] data-[state=spent]:bg-[#1c1416] data-[state=spent]:opacity-65
-        ${tone === "danger" ? "border-[#594047]" : ""}`}
+        data-[state=spent]:border-bad/40 data-[state=spent]:opacity-65
+        ${tone === "danger" ? "border-bad/50" : ""}`}
     >
       <b className={`overflow-hidden text-ellipsis whitespace-nowrap text-[11.5px] font-semibold ${
         tone === "danger" ? "text-bad" : "text-ink"
@@ -159,7 +163,7 @@ export const DrawerRow = forwardRef<
       {badge !== undefined ? (
         <span
           className={`rounded-lg px-1.5 text-3xs ${
-            badgeOn ? "bg-[#17231c] text-good" : "bg-panel-3 text-ink-muted"
+            badgeOn ? "bg-panel text-good" : "bg-panel-3 text-ink-muted"
           }`}
         >
           {badge}
