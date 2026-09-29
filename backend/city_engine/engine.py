@@ -2143,9 +2143,8 @@ class CityEngine:
 
         ``_prepare_current_player`` decrements ``jail_turns`` when a turn starts, so a
         positive counter on the acting player can only mean they were jailed mid-turn.
-        Unused actions burn — including the one ``carryAction`` would normally bank —
-        and the turn passes on immediately. A player jailed by somebody else's command
-        is not the current player, so their own turn is untouched.
+        Unused actions burn and the turn passes on immediately. A player jailed by
+        somebody else's command is not the current player, so their own turn is untouched.
         """
         if command.type == "end_turn" or state.status != "playing":
             return
@@ -2158,10 +2157,6 @@ class CityEngine:
 
     def _end_turn(self, state: GameState, command: Command) -> None:
         player = state.current_player
-        if state.actions_left > 0 and player.jail_turns == 0 and self.effect_total(player, "carryAction") > 0:
-            player.banked_actions = 1
-        else:
-            player.banked_actions = 0
         state.turn_flags = {}
         state.append_event("turn_ended", player.id, round_number=state.round_number)
 
@@ -2234,8 +2229,7 @@ class CityEngine:
             player.roofs = min(self.roof_limit(player), player.roofs + 1)
         base_actions = 1 if jailed else (4 if player.role == "fraudster" else 3)
         bonus = min(1, self.effect_total(player, "extraActions"))
-        state.actions_left = base_actions + (0 if jailed else bonus + player.banked_actions)
-        player.banked_actions = 0
+        state.actions_left = base_actions + (0 if jailed else bonus)
         # «Лоббистский кабинет». Переполненная рука теряет добор молча — это и есть цена
         # карты: она платит тому, кто разыгрывает, а не тому, кто копит.
         if not jailed and self.effect_total(player, "turnCard"):

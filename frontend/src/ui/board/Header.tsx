@@ -1,6 +1,5 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import type { CityMeta, GameState, PlayerState } from "../../online/types";
-import { otherUiLabel, switchUi } from "../../online/uiVersion";
 import { CardPopover } from "../primitives/CardPopover";
 import { ActionsDetails, DefenceDetails, ScoreDetails } from "./headerPopovers";
 import { atScandalRisk, scandalLimit } from "../lib/board";
@@ -280,17 +279,6 @@ export function Header({
         </button>
         <button type="button" onClick={onRules} aria-label="Правила" className={shape}>
           📖{caption("Правила")}
-        </button>
-        {/* Переключение на старый экран и обратно. Партия живёт на сервере, поэтому
-          * перезагрузка ничего не теряет — можно сравнивать интерфейсы прямо по ходу игры. */}
-        <button
-          type="button"
-          onClick={switchUi}
-          title="Переключиться на другой интерфейс — партия на сервере не прервётся"
-          aria-label={`Переключиться на ${otherUiLabel}`}
-          className={`${shape} text-ink-muted hover:text-ink`}
-        >
-          ⇆{caption(otherUiLabel)}
         </button>
         <button type="button" onClick={onExit} aria-label="Вернуться в комнаты" className={shape}>
           ←{caption("Комнаты")}

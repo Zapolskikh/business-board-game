@@ -246,15 +246,6 @@ export const greyOperationInfo: Record<string, { asset: string; effect: (round: 
   },
 };
 
-// Role powers that are gated on owning something, and on what exactly the engine checks. The scam
-// checks a card id (`engine.py:1597`); the racket and the paid cleanup check a district
-// (`engine.py:1459`, `engine.py:1497`), so there every object of that district is the key.
-const assetGatedPowers: { power: string; role: string; asset?: string; district?: string; detail: string }[] = [
-  { power: "fraudster_crypto_scam", role: "fraudster", asset: "crypto", detail: "забрать 25% денег у всех соперников" },
-  { power: "mafia_racket", role: "mafia", district: "shadows", detail: "дань с выбранного соперника" },
-  { power: "mafia_cleanup", role: "mafia", district: "government", detail: "снять до 2 скандалов за 3$" },
-];
-
 const capacityCosts: Record<number, number> = { 3: 6, 4: 10, 5: 15 };
 
 // Points an object adds to the final score, and what selling it refunds in money — one number for
@@ -403,16 +394,6 @@ export function projectRequirementText(project: ProjectMeta, meta: CityMeta): st
   }
 }
 
-// The player's own standing on a condition, printed straight after it. The counting is the
-// engine's (`project_requirement_standing`); this only formats what it sent. Without it a tag
-// condition is homework: 16 tag projects left the board unused across two measured games.
-export function projectProgressText(game: GameState, projectId: string): string {
-  const standing = game.project_progress?.[projectId];
-  if (!standing) return "";
-  if (standing.binary) return standing.met ? " (вы: да)" : " (вы: нет)";
-  return ` (вы: ${Math.min(standing.have, standing.needed)}/${standing.needed})`;
-}
-
 const perkLabels: Record<string, (value: number) => string> = {
   passiveMoney: value => `+${value}$ в каждый раунд`,
   passiveInfluence: value => `+${value}◆ в каждый раунд`,
@@ -421,7 +402,6 @@ const perkLabels: Record<string, (value: number) => string> = {
   turnRoof: () => "+1 Крыша в начале каждого хода",
   roofCapacity: value => `+${value} к пределу Крыш`,
   extraInvestmentActions: () => "+1 инвестиционное действие в начале хода",
-  carryAction: () => "переносит 1 неистраченное действие",
 };
 
 export function projectPerkText(project: ProjectMeta): string {
@@ -438,18 +418,14 @@ export function marketPrice(asset: AssetMeta, item: MarketAsset): number {
 
 // Matches the engine `roof_price`: the cost grows with the round, and a forged mafia mandate
 // pays the discounted price too, because the engine checks the copied role as well.
-export function roofCost(player: PlayerState, game: GameState): number {
+function roofCost(player: PlayerState, game: GameState): number {
   const base = 3 + Math.floor((game.round_number - 1) / 2);
   return player.role === "mafia" ? base - 1 : base;
 }
 
-export function capacityLabel(player: PlayerState): string {
+function capacityLabel(player: PlayerState): string {
   if (player.capacity >= 6) return "Максимум 6 слотов";
   return `Слот ${player.capacity + 1}: ${capacityCosts[player.capacity] ?? "?"}$`;
-}
-
-export function actionIdentity(action: LegalAction): string {
-  return `${action.type}:${JSON.stringify(action.payload)}`;
 }
 
 interface LabelContext {
@@ -583,8 +559,8 @@ const eventVerbs: Record<string, string> = {
   game_finished: "Партия завершена",
 };
 
-// Colours assigned to players by seat order — must match Game.tsx rendering.
-export const playerColors = ["#9fc4d1", "#91c5a5", "#d9a17e", "#ca91b8", "#d9bd78", "#b9a2d4"];
+// Colours assigned to players by seat order.
+const playerColors = ["#9fc4d1", "#91c5a5", "#d9a17e", "#ca91b8", "#d9bd78", "#b9a2d4"];
 
 export function playerColor(game: GameState, playerId: string | null | undefined): string {
   if (!playerId) return "var(--city-dim)";
@@ -1311,161 +1287,3 @@ export function assetEffectLines(
 
   return lines;
 }
-
-export interface AssetHint {
-  kind: "grey" | "power" | "project" | "upgrade";
-  icon: string;
-  title: string;
-  detail: string;
-  // Whether the owner could act on it right now: the object is active in their business and the
-  // role, if the ability needs one, is theirs. A market card is a promise, so nothing is ready yet.
-  ready: boolean;
-  tooltip: string;
-}
-
-// What an object hands its owner besides income: the operations only it unlocks, and the projects on
-// the board that count it. This is an index over the catalog and the board, not a second
-// implementation of any rule — nothing here re-evaluates a condition, so it cannot drift from the
-// engine the way a local copy of `project_requirement_met` would.
-export function assetHints(
-  asset: AssetMeta,
-  owner: PlayerState,
-  game: GameState,
-  meta: CityMeta,
-  assets: Map<string, AssetMeta>,
-  options?: { active?: boolean; market?: boolean },
-): { special: boolean; hints: AssetHint[] } {
-  const active = options?.active ?? false;
-  const roleTitle = (id: string): string => meta.roles.find(item => item.id === id)?.title ?? id;
-  const districtTitle = (id?: string): string => meta.districts.find(item => item.id === id)?.title ?? id ?? "";
-  const hasRole = (id: string): boolean => owner.role === id;
-  const hints: AssetHint[] = [];
-
-  // The Серый сектор unlocks all five operations, so listing them one per line would bury the card
-  // under its own hints. One line each up to two, a single summary line beyond that.
-  const unlocked = Object.entries(greyOperationDistricts).filter(([, districts]) => districts.includes(asset.district));
-  const operationLine = (operationId: string): string => {
-    const grey = greyOperationInfo[operationId];
-    return `${greyOperationLabels[operationId] ?? operationId}: ${grey.effect(game.round_number, meta)} · шанс от ${grey.chance}%`;
-  };
-  if (unlocked.length > 2) {
-    hints.push({
-      kind: "grey",
-      icon: "🌒",
-      title: `Серые операции (${unlocked.length})`,
-      detail: unlocked.map(([operationId]) => greyOperationLabels[operationId] ?? operationId).join(", "),
-      ready: active,
-      tooltip: `Любой активный объект этого района открывает ${unlocked.length} серых операций, роль для них не нужна, каждая стоит 1 действие. ${unlocked.map(([operationId]) => operationLine(operationId)).join(" · ")}`,
-    });
-  } else {
-    for (const [operationId, districts] of unlocked) {
-      const grey = greyOperationInfo[operationId];
-      const label = greyOperationLabels[operationId] ?? operationId;
-      const effect = grey.effect(game.round_number, meta);
-      hints.push({
-        kind: "grey",
-        icon: "🌒",
-        title: label,
-        detail: `${effect} · шанс от ${grey.chance}%`,
-        ready: active,
-        tooltip: `Серая операция «${label}» открыта любому владельцу активного объекта районов: ${districts.map(districtTitle).join(", ")}. Роль для неё не нужна. Стоит 1 действие. Эффект при успехе: ${effect}. Базовый шанс ${grey.chance}%, у Афериста выше. ${grey.failure}`,
-      });
-    }
-  }
-
-  for (const gate of assetGatedPowers) {
-    if (gate.asset ? gate.asset !== asset.id : gate.district !== asset.district) continue;
-    const label = powerLabels[gate.power] ?? gate.power;
-    const owns = hasRole(gate.role);
-    hints.push({
-      kind: "power",
-      icon: "✴",
-      title: label,
-      detail: owns ? gate.detail : `нужна роль «${roleTitle(gate.role)}»`,
-      ready: active && owns,
-      tooltip: `Способность «${label}» роли «${roleTitle(gate.role)}» работает только при ${gate.asset ? "этом объекте" : `активном объекте района «${districtTitle(gate.district)}»`}: ${gate.detail}.`,
-    });
-  }
-
-  // With every slot taken, money only becomes points through a swap, and the swap is invisible: the
-  // refund equals the points the outgoing object was worth, so the gain is purely the difference.
-  if (options?.market && owner.assets.length >= owner.capacity) {
-    const owned = owner.assets
-      .map(item => assets.get(item.card_id))
-      .filter((item): item is AssetMeta => Boolean(item));
-    const weakest = owned.reduce<AssetMeta | null>(
-      (worst, item) => (worst === null || assetPoints(item) < assetPoints(worst) ? item : worst),
-      null,
-    );
-    const gain = weakest ? assetPoints(asset) - assetPoints(weakest) : 0;
-    if (weakest && gain > 0) {
-      hints.push({
-        kind: "upgrade",
-        icon: "⇄",
-        title: `Замена «${weakest.title}»`,
-        detail: `+${gain} очков · продажа вернёт ${assetPoints(weakest)}$`,
-        ready: false,
-        tooltip: `Слоты заняты, поэтому это единственный способ доложить очков за деньги: продайте «${weakest.title}» (${assetPoints(weakest)} очков, столько же вернётся деньгами, продажа бесплатна и не тратит действие) и купите этот объект за ${asset.cost}$ — чистыми +${gain} очков за одно действие покупки.`,
-      });
-    }
-  }
-
-  for (const project of boardProjectsFor(asset, game, meta)) {
-    hints.push({
-      kind: "project",
-      icon: "🏗️",
-      title: project.title,
-      detail: `${project.points} очков · ${projectRequirementText(project, meta)}`,
-      ready: false,
-      tooltip: `Проект «${project.title}» с доски требует: ${projectRequirementText(project, meta)}. Этот объект в условие входит. Награда: ${project.points} очков и ${projectPerkText(project)}.`,
-    });
-  }
-
-  return { special: unlocked.length > 0, hints };
-}
-
-// Projects on the board whose condition names this object's tag or district. Conditions counting
-// districts in the abstract (`distinct_districts`, `district_depth`) are left out on purpose: every
-// object feeds them somehow, so listing those would put the same two lines on all 71 cards.
-function boardProjectsFor(asset: AssetMeta, game: GameState, meta: CityMeta): ProjectMeta[] {
-  return game.project_board
-    .map(projectId => meta.projects.find(item => item.id === projectId))
-    .filter((project): project is ProjectMeta => {
-      const requirement = project?.requirement;
-      if (!requirement) return false;
-      if (requirement.type === "tag_objects") return Boolean(requirement.tag && asset.tags.includes(requirement.tag));
-      if (requirement.type === "district_objects") return requirement.district === asset.district;
-      return false;
-    })
-    .sort((left, right) => right.points - left.points)
-    .slice(0, 3);
-}
-
-export function activeBonuses(player: PlayerState, meta: CityMeta, assets: Map<string, AssetMeta>): { text: string; active: boolean }[] {
-  const role = meta.roles.find(item => item.id === player.role);
-  const result: { text: string; active: boolean }[] = [
-    role
-      ? { text: `Роль «${role.title}»: ${role.passive}`, active: true }
-      : { text: "Роль отсутствует.", active: false },
-  ];
-  for (const district of meta.districts) {
-    const count = districtCount(player, district.id, assets);
-    if (count >= 2) result.push({ text: `${district.title}: ${count}/4 объекта, районная синергия активна.`, active: true });
-    if (count >= 4) result.push({ text: `${district.title}: район собран полностью — эпические и легендарные объекты района приносят влияние каждый раунд.`, active: true });
-  }
-  if (player.debt > 0) result.push({ text: `Мостовой кредит: −${player.debt}$ при ближайшей выплате.`, active: false });
-  // One token, three jobs: the merged rule only reads as a rule if the panel states all three.
-  if (player.roofs > 0) {
-    result.push({
-      text: `Крыша (${player.roofs}): погасит следующую атаку — перехват роли, слив компромата или начисление скандалов.`,
-      active: true,
-    });
-  }
-  // A finished project can neither be blocked nor confiscated, so its perk is always on.
-  for (const projectId of player.projects) {
-    const project = meta.projects.find(item => item.id === projectId);
-    if (project) result.push({ text: `Проект «${project.title}»: ${project.points} очков, ${projectPerkText(project)}.`, active: true });
-  }
-  return result;
-}
-

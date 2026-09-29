@@ -376,16 +376,12 @@ def test_sixth_scandal_jails_the_actor_and_burns_the_rest_of_the_turn() -> None:
     # A double-scandal card charges the attacker one scandal before the target is touched.
     held = give_card(state, actor, "controlled_leak")
     actor.scandals = 5
-    # A banked action must not survive the arrest. Nothing in the catalog grants `carryAction`
-    # since «Секретариат мэра» left, so the guard is set up by hand rather than by an object.
-    actor.banked_actions = 1
 
     state = run(engine, state, "play_action_card", {"card_uid": held.uid, "target_id": target.id})
 
     jailed = state.player_by_id(actor.id)
     assert jailed.scandals == 3
     assert jailed.jail_turns == 1
-    assert jailed.banked_actions == 0
     assert state.current_player.id == target.id
     assert any(event.type == "player_jailed" for event in state.event_log)
 

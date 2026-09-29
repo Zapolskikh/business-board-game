@@ -1,10 +1,8 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { cityApi } from "./api";
-import { Game } from "./Game";
 import { Lobby } from "./Lobby";
 import { RoomBrowser } from "./RoomBrowser";
 import type { CityMeta } from "./types";
-import { useLegacyUi } from "./uiVersion";
 // Ленивая загрузка: браузер комнат и лобби не должны тянуть Motion, Radix и Query.
 const GameScreen = lazy(() => import("../ui/GameScreen").then(module => ({ default: module.GameScreen })));
 
@@ -24,11 +22,11 @@ export default function App() {
   if (!meta) return <div className="rooms-app app-state"><span className="loading-ring" /><p>Загружаем городской каталог…</p></div>;
   if (!roomId) return <RoomBrowser onOpen={(id, password = "") => { setRoomId(id); setInitialPassword(password); }} />;
   if (playing && session) {
-    return useLegacyUi
-      ? <Game roomId={roomId} password={session.password} playerId={session.playerId} meta={meta} onExit={back} />
-      : <Suspense fallback={<div className="rooms-app app-state"><span className="loading-ring" /><p>Готовим игровой стол…</p></div>}>
-          <GameScreen roomId={roomId} password={session.password} playerId={session.playerId} meta={meta} roomName={roomId} onExit={back} />
-        </Suspense>;
+    return (
+      <Suspense fallback={<div className="rooms-app app-state"><span className="loading-ring" /><p>Готовим игровой стол…</p></div>}>
+        <GameScreen roomId={roomId} password={session.password} playerId={session.playerId} meta={meta} roomName={roomId} onExit={back} />
+      </Suspense>
+    );
   }
   return <Lobby roomId={roomId} meta={meta} initialPassword={initialPassword} playerId={session?.playerId} onBack={back} onJoined={(password, playerId) => setSession({ password, playerId })} onPlay={play} />;
 }

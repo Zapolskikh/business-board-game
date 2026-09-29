@@ -128,7 +128,6 @@ class PlayerState:
     marked_card_id: str | None = None
     marked_market_uid: str | None = None
     turns: int = 0
-    banked_actions: int = 0
     # Последний раунд, в котором игрок обновлял рынок «Маркет-мейкером». Не флаг хода:
     # turn_flags чистятся каждый ход, а ограничение здесь раундовое, иначе карта перебирала бы
     # рынок три раза за круг и от планирования покупок ничего бы не осталось.
@@ -161,7 +160,6 @@ class PlayerState:
             "marked_card_id": self.marked_card_id,
             "marked_market_uid": self.marked_market_uid,
             "turns": self.turns,
-            "banked_actions": self.banked_actions,
             "market_refresh_round": self.market_refresh_round,
             "project_waiver_used": self.project_waiver_used,
         }
@@ -191,7 +189,6 @@ class PlayerState:
             marked_card_id=data.get("marked_card_id"),
             marked_market_uid=data.get("marked_market_uid"),
             turns=int(data.get("turns", 0)),
-            banked_actions=int(data.get("banked_actions", 0)),
             market_refresh_round=int(data.get("market_refresh_round", 0)),
             project_waiver_used=bool(data.get("project_waiver_used", False)),
         )
