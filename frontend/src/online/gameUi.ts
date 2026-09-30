@@ -250,7 +250,7 @@ export function cleanupOffer(power: string | undefined, meta: CityMeta): { label
 }
 
 export function actionCardCost(meta: CityMeta): number {
-  return meta.scoring?.action_card_cost ?? 3;
+  return meta.scoring?.action_card_cost ?? 6;
 }
 
 export function cardDiscardValue(meta: CityMeta): number {

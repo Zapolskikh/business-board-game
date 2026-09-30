@@ -79,7 +79,7 @@ def room_view(
         return result
 
     game = deepcopy(room.game.to_dict())
-    game["market_deck_count"] = len(game.pop("market_deck"))
+    game["market_deck_count"] = len(game.pop("market_deck")) + len(game.pop("market_discard", []))
     game["action_deck_count"] = len(game.pop("action_deck"))
     game["project_deck_count"] = len(game.pop("project_deck"))
     # Live score itemised by the engine. The client must not re-implement the formula: money and

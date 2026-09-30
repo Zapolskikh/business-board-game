@@ -236,6 +236,9 @@ class GameState:
     turn_serial: int = 0
     actions_left: int = 3
     market_deck: list[str] = field(default_factory=list)
+    # Cards that left the market unsold. Kept apart from the deck so the fresh deck keeps its rarity
+    # progression; drawn at random, weighted towards the rare end, once the fresh cards run out.
+    market_discard: list[str] = field(default_factory=list)
     market: list[MarketAsset] = field(default_factory=list)
     action_deck: list[str] = field(default_factory=list)
     project_board: list[str] = field(default_factory=list)
@@ -266,6 +269,7 @@ class GameState:
         cloned.players = deepcopy(self.players)
         cloned.rng = deepcopy(self.rng)
         cloned.market_deck = list(self.market_deck)
+        cloned.market_discard = list(self.market_discard)
         cloned.market = deepcopy(self.market)
         cloned.action_deck = list(self.action_deck)
         cloned.project_board = list(self.project_board)
@@ -367,6 +371,7 @@ class GameState:
             "actions_left": self.actions_left,
             "players": [player.to_dict() for player in self.players],
             "market_deck": list(self.market_deck),
+            "market_discard": list(self.market_discard),
             "market": [item.to_dict() for item in self.market],
             "action_deck": list(self.action_deck),
             "project_board": list(self.project_board),
@@ -400,6 +405,7 @@ class GameState:
             actions_left=int(data.get("actions_left", 3)),
             players=[PlayerState.from_dict(item) for item in data["players"]],
             market_deck=[str(item) for item in data.get("market_deck", [])],
+            market_discard=[str(item) for item in data.get("market_discard", [])],
             market=[MarketAsset.from_dict(item) for item in data.get("market", [])],
             action_deck=[str(item) for item in data.get("action_deck", [])],
             project_board=[str(item) for item in data.get("project_board", [])],

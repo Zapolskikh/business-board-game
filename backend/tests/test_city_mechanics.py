@@ -4,6 +4,7 @@ import pytest
 
 from city_engine.commands import Command
 from city_engine.constants import (
+    ACTION_CARD_COST,
     ACTION_DECK_COPIES,
     BASE_SCANDAL_LIMIT,
     CAMPAIGN_TIERS,
@@ -127,7 +128,7 @@ def test_buying_cards_draws_two_blind_for_one_action() -> None:
 
     # Two cards, because a single blind card never beat a project for the same action.
     assert [card.card_id for card in next_player.hand] == expected
-    assert (next_player.money, next_player.influence) == (17, 9)
+    assert (next_player.money, next_player.influence) == (20 - ACTION_CARD_COST, 9)
     assert next_state.actions_left == state.actions_left - 1
 
 
@@ -2310,3 +2311,32 @@ def test_a_tie_goes_to_whoever_took_more_city_projects() -> None:
     assert engine.ranking(state)[0].id == second.id
     state.players.reverse()
     assert engine.ranking(state)[0].id == second.id
+
+
+def test_market_cards_that_rotate_out_go_to_the_discard_not_back_into_the_deck() -> None:
+    engine = CityEngine()
+    state = make_state()
+    leaving = [item.card_id for item in state.market[:MARKET_ROTATION_SIZE]]
+    deck_before = list(state.market_deck)
+
+    engine._rotate_market(state)
+
+    assert state.market_discard == leaving
+    assert not set(leaving) & set(state.market_deck)
+    assert len(state.market_deck) == len(deck_before) - MARKET_ROTATION_SIZE
+
+
+def test_the_late_market_skips_commons_in_deck_order_and_keeps_the_rare_cards_coming() -> None:
+    """Once every rarity is open, the commons left at the top of the deck are not dealt in order:
+    a rare-and-up fresh card comes first, and the commons only return through the weighted draw."""
+    engine = CityEngine()
+    state = make_state()
+    state.round_number = 12
+    state.market = []
+    state.market_discard = []
+    state.market_deck = ["housing", "delivery", "market_maker"]
+
+    engine._refill_market(state, 1)
+
+    assert [item.card_id for item in state.market] == ["market_maker"]
+    assert state.market_deck == ["housing", "delivery"]

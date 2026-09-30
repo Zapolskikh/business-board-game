@@ -566,7 +566,7 @@ def render_state(
     lines.append(f"    районы: {districts or 'пусто'}")
     slot = CAPACITY_COSTS.get(int(me["capacity"]))
     project_reroll = catalog.scoring.get("project_reroll_money", 10)
-    card_cost = catalog.scoring.get("action_card_cost", 3)
+    card_cost = catalog.scoring.get("action_card_cost", 6)
     tiers = " / ".join(
         f"{int(row['spend'])}$→{int(row['gain'])}◆" for row in catalog.scoring.get("campaign_tiers") or []
     )

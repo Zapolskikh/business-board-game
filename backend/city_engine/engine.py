@@ -34,8 +34,10 @@ from city_engine.constants import (
     HAND_LIMIT,
     INFLUENCE_PER_POINT,
     JOURNALIST_SCANDAL_LIMIT,
+    LATE_FILLER_RARITIES,
     LOBBYING_INFLUENCE,
     LOBBYING_POINTS,
+    MARKET_DISCARD_WEIGHTS,
     MARKET_ROTATION_SIZE,
     MAX_CAPACITY,
     MILITARY_SEIZE_INFLUENCE,
@@ -245,7 +247,7 @@ class CityEngine:
             # Selling costs no action, so it stays available with an empty counter — see _sell_asset.
             candidates.append(Command(type="sell_asset", actor_id=actor_id, payload={"asset_uid": owned.uid}))
         # The re-deal costs no action either, so it too survives an empty counter.
-        if self.market_refresh_available(state, player) and state.market_deck:
+        if self.market_refresh_available(state, player) and (state.market_deck or state.market_discard):
             candidates.extend(
                 Command(type="market_refresh", actor_id=actor_id, payload={"market_uid": item.uid})
                 for item in state.market
@@ -2262,8 +2264,9 @@ class CityEngine:
     def _rotate_market(self, state: GameState) -> None:
         """Replace the oldest slots. Called only when a round opens, never mid-round.
 
-        The leaving cards go to the bottom of the deck rather than out of the game: at three a
-        round for fifteen rounds, dropping them would empty the catalog before the endgame.
+        The leaving cards go to the discard rather than out of the game: at three a round for
+        fifteen rounds, dropping them would empty the catalog before the endgame. They are discarded
+        after the refill, so a card never comes straight back into the slot it just left.
         """
         leaving = state.market[:MARKET_ROTATION_SIZE]
         if not leaving:
@@ -2271,21 +2274,56 @@ class CityEngine:
         for item in leaving:
             self._drop_market_marks(state, item)
         state.market = state.market[len(leaving) :]
-        state.market_deck.extend(item.card_id for item in leaving)
         self._refill_market(state, len(leaving))
+        state.market_discard.extend(item.card_id for item in leaving)
         state.append_event("market_rotated", expired_asset_ids=[item.card_id for item in leaving])
 
     def _refill_market(self, state: GameState, needed: int) -> None:
+        """Fresh cards in deck order while they carry the progression; then a weighted random draw.
+
+        The deck order is what builds the progression: a rarity that is not open yet is skipped and
+        stays on top, so the round it opens its cards are the next ones out. Once the last rarity is
+        open, only the rare-and-up fresh cards keep that job — the legendaries still arrive as a
+        wave. What lies under them is round-one commons, and dealt in order they walked the market
+        back down in the endgame, so those slots are drawn from the deck and the discard together,
+        weighted towards the rare end (see MARKET_DISCARD_WEIGHTS).
+        """
         drawn: list[str] = []
+        late = state.round_number >= max(self.catalog.rarity_min_round.values())
         remaining: list[str] = []
         for card_id in state.market_deck:
-            asset = self.asset(card_id)
-            if len(drawn) < needed and state.round_number >= self.catalog.rarity_min_round[asset.rarity]:
+            in_order = self._rarity_open(state, card_id) and (
+                not late or self.asset(card_id).rarity not in LATE_FILLER_RARITIES
+            )
+            if len(drawn) < needed and in_order:
                 drawn.append(card_id)
             else:
                 remaining.append(card_id)
         state.market_deck = remaining
+        rng = GameRNG(state.rng)
+        while len(drawn) < needed:
+            pool = [
+                (source, card_id)
+                for source in (state.market_deck, state.market_discard)
+                for card_id in source
+                if self._rarity_open(state, card_id)
+            ]
+            if not pool:
+                break
+            weights = [MARKET_DISCARD_WEIGHTS.get(self.asset(card_id).rarity, 1) for _source, card_id in pool]
+            roll = rng.random() * sum(weights)
+            source, pick = pool[-1]
+            for (candidate_source, card_id), weight in zip(pool, weights, strict=True):
+                roll -= weight
+                if roll < 0:
+                    source, pick = candidate_source, card_id
+                    break
+            source.remove(pick)
+            drawn.append(pick)
         state.market.extend(MarketAsset(uid=f"asset:{card_id}", card_id=card_id) for card_id in drawn)
+
+    def _rarity_open(self, state: GameState, card_id: str) -> bool:
+        return state.round_number >= self.catalog.rarity_min_round[self.asset(card_id).rarity]
 
     def market_refresh_available(self, state: GameState, player: PlayerState) -> bool:
         """Can this player still re-deal a market slot this round?
@@ -2313,13 +2351,13 @@ class CityEngine:
         item = next((entry for entry in state.market if entry.uid == market_uid), None)
         if item is None:
             raise IllegalActionError("this card is not on the market")
-        if not state.market_deck:
+        if not state.market_deck and not state.market_discard:
             raise IllegalActionError("the market deck is empty")
         player.market_refresh_round = state.round_number
         self._drop_market_marks(state, item)
         state.market = [entry for entry in state.market if entry.uid != item.uid]
-        state.market_deck.append(item.card_id)
         self._refill_market(state, 1)
+        state.market_discard.append(item.card_id)
         state.append_event(
             "market_refreshed",
             player.id,

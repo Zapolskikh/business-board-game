@@ -175,7 +175,7 @@
     "roofSeizedTail": "; teď má Ochran: ",
     "marketClaimed": " zabírá „{{title}}“: karta pracuje pro něj, ale pořád jde koupit",
     "marketLocked": " dává šedou blokaci na „{{title}}“: do konce příštího kola ji nikdo jiný nekoupí",
-    "marketRefreshed": " znovu rozdává místo na trhu: „{{title}}“ jde pod balíček",
+    "marketRefreshed": " znovu rozdává místo na trhu: „{{title}}“ jde do odhozu",
     "vetoed": " dává veto na „{{title}}“",
     "crisisPr": " krizové PR (",
     "crisisPrTail": ", zbývá {{count}}⚠)",
@@ -412,7 +412,7 @@
       "details": "{{title}} — podrobnosti", "districtRow": "Čtvrť", "districtValue": "máte {{count}} ze 4",
       "priceRow": "Cena", "scoreRow": "Body", "saleRow": "Prodejní cena", "incomeRow": "Příjem", "perRound": "za kolo",
       "purchaseRow": "Při koupi",
-      "districtRules": "Podmínky čtvrti", "leavingNote": "Karta opustí trh a na konci kola se vrátí do balíčku.",
+      "districtRules": "Podmínky čtvrti", "leavingNote": "Na konci kola karta odejde z trhu do odhozu. Později se může vrátit.",
       "lock": "🔒 Šedá blokace — koupit to místo budete moct jen vy (1 Ochrana)",
       "mark": "🏷️ Zábor — karta pracuje pro vás (akce + skandál)",
       "refresh": "🔁 Znovu rozdat místo — jednou za kolo, bez akce"

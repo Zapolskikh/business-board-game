@@ -79,7 +79,7 @@ const scoring: ScoringMeta = {
   patronage_money: 20,
   patronage_points: 5,
   crisis_pr_influence: 3,
-  action_card_cost: 3,
+  action_card_cost: 6,
   card_discard_value: 2,
   campaign_tiers: [{ spend: 5, gain: 3 }],
   grey_operation_points: { smear: 2, crypto: 2, roof_break: 2, datacenter: 3, influence_broker: 3 },

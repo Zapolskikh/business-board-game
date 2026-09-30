@@ -137,14 +137,16 @@ def test_public_meta_ships_the_points_every_object_scores() -> None:
         assert row["points"] == engine.asset_refund(OwnedAsset(uid=f"asset:{row['id']}", card_id=row["id"]))
 
 
-def test_non_resource_perk_projects_score_two_fewer_points() -> None:
+def test_special_perk_projects_trade_points_for_the_perk() -> None:
+    """A project whose reward is a special perk scores below the other projects of its difficulty:
+    the perk is the payout. Priced by the same difficulty model, so they are cheap to take."""
     engine = CityEngine()
     expected = {
-        "city_park": 1,
+        "city_park": 3,
         "night_quarter": 3,
         "security_hub": 3,
-        "defence_order": 3,
-        "city_clinics": 2,
+        "defence_order": 4,
+        "city_clinics": 4,
         "shadow_market": 4,
     }
 

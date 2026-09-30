@@ -202,7 +202,7 @@ function context(meta: CityMeta, rolePrice: number): RulesContext {
       reroll: projectRerollMoney(meta),
       rotation: marketRotationSize(meta),
       projectBoardSize: scoring?.project_board_size ?? 4,
-      cardCost: scoring?.action_card_cost ?? 3,
+      cardCost: scoring?.action_card_cost ?? 6,
       discard: scoring?.card_discard_value ?? 2,
       capacityCosts: Object.values(scoring?.capacity_costs ?? { 3: 6, 4: 10, 5: 15 }),
       pumpBase: scoring?.pump_drain_base ?? 2,

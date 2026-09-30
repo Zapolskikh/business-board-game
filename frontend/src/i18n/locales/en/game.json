@@ -175,7 +175,7 @@
     "roofSeizedTail": "; Protection now: ",
     "marketClaimed": " claims “{{title}}”: the card works for them, but it can still be bought",
     "marketLocked": " puts a grey hold on “{{title}}”: nobody else can buy it until the end of the next round",
-    "marketRefreshed": " re-deals a market slot: “{{title}}” goes under the deck",
+    "marketRefreshed": " re-deals a market slot: “{{title}}” goes to the discard",
     "vetoed": " vetoes “{{title}}”",
     "crisisPr": " crisis PR (",
     "crisisPrTail": ", {{count}}⚠ left)",
@@ -411,7 +411,7 @@
       "details": "{{title}} — details", "districtRow": "District", "districtValue": "you have {{count}} of 4",
       "priceRow": "Price", "scoreRow": "Score", "saleRow": "Sale value", "incomeRow": "Income", "perRound": "per round",
       "purchaseRow": "When purchased",
-      "districtRules": "District conditions", "leavingNote": "The card leaves the market and returns to the deck at the end of the round.",
+      "districtRules": "District conditions", "leavingNote": "At the end of the round the card leaves the market for the discard. It may come back later.",
       "lock": "🔒 Grey hold — only you can buy this slot (1 Protection)",
       "mark": "🏷️ Claim — the card works for you (action + scandal)",
       "refresh": "🔁 Re-deal the slot — once per round, no action"

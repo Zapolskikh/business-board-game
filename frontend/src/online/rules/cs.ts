@@ -155,6 +155,7 @@ const roles: Record<string, RoleGuide> = {
 export function bookCs(ctx: RulesContext): RulesChapter[] {
   const { n, rolePrice, meta } = ctx;
   const [slot4, slot5, slot6] = n.capacityCosts;
+  const lateRound = Math.max(...Object.values(meta.rarity_min_round ?? { legendary: 8 }));
   const campaign = n.campaign[0] ?? { spend: 5, gain: 3 };
   const selfCards = ctx.list(ctx.selfTargetCards, labels.and) || "některé karty skandálů";
   return [
@@ -265,9 +266,10 @@ export function bookCs(ctx: RulesContext): RulesChapter[] {
       <p>Pak začne nové kolo:</p>
       <ol>
         <li>Pořadí tahů se znovu určí podle bodů.</li>
-        <li>${n.rotation} podniky, které jsou na trhu nejdéle (označené ⏳), odejdou ze stolu a jejich místa zaplní nové z balíčku. Staré podniky jdou na spodek balíčku.</li>
+        <li>${n.rotation} podniky, které jsou na trhu nejdéle (označené ⏳), odejdou ze stolu a jejich místa zaplní nové z balíčku. Staré podniky jdou do odhozu.</li>
         <li>Projekt úplně vlevo (označený ⏳) jde na spodek balíčku projektů. Ostatní projekty se posunou o místo doleva a jako poslední se přidá nový projekt z balíčku.</li>
       </ol>
+      <p><b>Balíček trhu.</b> Do ${lateRound}. kola vycházejí podniky z balíčku popořadě — od obyčejných k legendárním, jak se otevírá jejich vzácnost. Od ${lateRound}. kola, kdy jsou otevřené všechny vzácnosti, vycházejí vzácné, epické a legendární karty z balíčku pořád první a ostatní místa zaplní náhodná karta z balíčku a odhozu. Čím vzácnější karta, tím větší šance, že padne: obyčejné a neobvyklé podniky jsou na konci hry jen výplň.</p>
       <div class="warn"><b>Po posledním kole se příjem nevyplácí.</b> Všechno, co byste vydělali na konci posledního kola, je nula, takže peníze a vliv utraťte během posledního kola.</div>
       `,
     },

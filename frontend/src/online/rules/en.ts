@@ -155,6 +155,7 @@ const roles: Record<string, RoleGuide> = {
 export function bookEn(ctx: RulesContext): RulesChapter[] {
   const { n, rolePrice, meta } = ctx;
   const [slot4, slot5, slot6] = n.capacityCosts;
+  const lateRound = Math.max(...Object.values(meta.rarity_min_round ?? { legendary: 8 }));
   const campaign = n.campaign[0] ?? { spend: 5, gain: 3 };
   const selfCards = ctx.list(ctx.selfTargetCards, labels.and) || "some scandal cards";
   return [
@@ -265,9 +266,10 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
       <p>Then a new round starts:</p>
       <ol>
         <li>The turn order is set again by points.</li>
-        <li>The ${n.rotation} businesses that have been on the market the longest (marked ⏳) leave the table, and new ones from the deck take their place. The old businesses go to the bottom of the deck.</li>
+        <li>The ${n.rotation} businesses that have been on the market the longest (marked ⏳) leave the table, and new ones from the deck take their place. The old businesses go to the discard.</li>
         <li>The leftmost project (marked ⏳) goes to the bottom of the project deck. The other projects move one place left, and a new project from the deck is added last.</li>
       </ol>
+      <p><b>The market deck.</b> Until round ${lateRound}, businesses come out of the deck in order — from common to legendary, as each rarity opens. From round ${lateRound}, when every rarity is open, the rare, epic and legendary cards of the deck still come first, and the other places are filled with a random card from the deck and the discard. The rarer the card, the better its chance: late in the game, common and uncommon businesses are only fillers.</p>
       <div class="warn"><b>There is no income after the last round.</b> Everything you would earn at the end of the last round is zero, so spend your money and influence during the last round.</div>
       `,
     },

@@ -10,15 +10,17 @@ SCHEMA_VERSION = 1
 
 # Bumped whenever a rule changes what a snapshot means. 1.15.0: a holder with a Крыша cannot be
 # bought out of their role at all, the mafia's grey mark lasts through the next round, and a tie
-# goes to whoever took more city projects.
-RULES_VERSION = "city-1.15.0"
+# goes to whoever took more city projects. 1.16.0: an action-card draw costs 6$ instead of 3$, and the late market
+# is a weighted draw instead of the recycled round-one commons.
+RULES_VERSION = "city-1.16.0"
 
 # Bumped whenever the catalog changes, even if no rule moved: card texts are part of the agreement
 # too. 2026-09-30: removed the unsupported cash-exchange purchase payout. 2026-09-30b: «Судебный
 # запрет» no longer promises to absorb a takeover — a Крыша now closes the seat instead.
 # 2026-10-01: «Крыша» is «Защита» in every Russian text; round-scaled cards say «номер раунда»
 # (which is what the engine always added) instead of «за каждый прошедший раунд».
-CONTENT_VERSION = "city-content-2026-10-01"
+# 2026-10-01b: city projects repriced by how hard their condition is — see CHANGELOG.
+CONTENT_VERSION = "city-content-2026-10-01b"
 
 DISTRICT_IDS = (
     "residential",
@@ -87,6 +89,17 @@ PROJECT_BOARD_SIZE = 4
 # rich has to coincide with the round the card appears, which turns the top of the catalog into a
 # lottery. Cards that rotate out go to the bottom of the deck, so nothing leaves the game.
 MARKET_ROTATION_SIZE = 3
+# How a late market slot is drawn. The fresh deck is dealt in order, which is what builds the
+# progression — commons early, legendaries from round 8. After that, dealing in order walked the
+# market back down: the cards left under the skipped rarer ones were round-one commons, and rotated
+# cards went to the bottom of the same deck, so by round 15 the market held 2.5 commons and 2.4
+# uncommons out of six. Now, once every rarity is open, rare-and-up fresh cards still come in order
+# and everything else is a random draw from the deck and the discard together, weighted so the late
+# market stays late: rare and up are the draw, common and uncommon the filler.
+MARKET_DISCARD_WEIGHTS = {"common": 1, "uncommon": 2, "rare": 6, "epic": 12, "legendary": 12}
+# Rarities that stop being dealt in deck order once every rarity is open: from then on they only
+# come out of the weighted draw, as filler.
+LATE_FILLER_RARITIES = frozenset({"common", "uncommon"})
 
 # --- roles ------------------------------------------------------------------------------------
 # The publication costs an action and lands twice as hard. Two free attacks a turn — inflate
@@ -194,7 +207,11 @@ CAMPAIGN_TIERS = {5: 3}
 # about a dead board rather than a default end-of-turn click.
 PROJECT_REROLL_MONEY = 10
 # An action card is a blind draw that costs an action, so it competes with the basic actions.
-ACTION_CARD_COST = 3
+# 6$, not 3$: at 3$ and 1◆ the draw was the most-picked action in the game (27% of the turns it
+# was legal, +1.16 points a buy against a 0.63 price), and discarding both cards for influence
+# turned 3$ into 3◆ — a better rate than the exchange (5$ → 3◆) with a free lottery on top. At 6$
+# the discard floor is the exchange rate, so the cards have to earn the rest by being played.
+ACTION_CARD_COST = 6
 # How many copies of each card the deck holds. One copy meant a four-player table exhausted the
 # deck around round 9 — every draw is two cards, so the catalogue lasted about seventeen buys. From
 # there on the whole card layer was simply gone, and it went precisely when the late game needs

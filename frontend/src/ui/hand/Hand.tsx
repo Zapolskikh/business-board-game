@@ -49,19 +49,21 @@ export function Hand({
           disabled={draw.kind !== "ready"}
           onClick={() => draw.kind === "ready" && onAction(draw.action)}
           title={draw.kind === "blocked" ? draw.reason : t("ui.hand.drawHint")}
-          className="grid gap-px rounded-md border border-good/60 bg-panel-2 px-2 py-1.5
+          className="grid gap-1 rounded-md border border-good/60 bg-panel-2 px-2.5 py-2
             enabled:hover:bg-panel-3 disabled:border-line disabled:opacity-45"
         >
-          <b className="text-[14px] text-good">{t("ui.hand.draw")}</b>
+          <b className="text-[15px] text-good">{t("ui.hand.draw")}</b>
           {/* Цена всегда на кнопке, а не вместо неё причина отказа: без цены нельзя
             * решить, копить ли на карты или на объект. Красным — тот ресурс, которого не хватает. */}
-          <small className="text-[11.5px] text-ink-muted">
-            <b className={me.money < actionCardCost(meta) ? "font-bold text-bad" : "font-semibold text-money"}>
+          <span className="flex items-center gap-1.5 text-[14.5px] text-ink-muted">
+            <b className={me.money < actionCardCost(meta) ? "font-bold text-bad" : "font-bold text-money"}>
               <ResourceText>{`${actionCardCost(meta)}$`}</ResourceText>
-            </b>{" "}
-            + <b className={me.influence < 1 ? "font-bold text-bad" : "font-semibold text-influence"}><ResourceText>1◆</ResourceText></b> +{" "}
-            <b className={game.actions_left < 1 ? "font-bold text-bad" : "font-normal"}><ResourceText>⚡</ResourceText></b>
-          </small>
+            </b>
+            +
+            <b className={me.influence < 1 ? "font-bold text-bad" : "font-bold text-influence"}><ResourceText>1◆</ResourceText></b>
+            +
+            <b className={game.actions_left < 1 ? "font-bold text-bad" : "font-bold text-ink"}><ResourceText>1⚡</ResourceText></b>
+          </span>
         </button>
 
         <AnimatePresence mode="popLayout" initial={false}>

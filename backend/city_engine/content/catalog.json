@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "content_version": "city-content-2026-10-01",
+  "content_version": "city-content-2026-10-01b",
   "districts": [
     {
       "id": "residential",
@@ -1773,9 +1773,9 @@
       "id": "metro_line",
       "title": "Линия метро",
       "text": "Метро связывает город: нужны объекты в трёх разных районах.",
-      "cost_influence": 5,
+      "cost_influence": 4,
       "cost_money": 6,
-      "points": 8,
+      "points": 6,
       "requirement": {
         "type": "distinct_districts",
         "count": 3
@@ -1789,7 +1789,7 @@
       "title": "Городской архив",
       "text": "Архив собирает документы из двух районов сразу.",
       "cost_influence": 3,
-      "cost_money": 3,
+      "cost_money": 6,
       "points": 5,
       "requirement": {
         "type": "distinct_districts",
@@ -1804,8 +1804,8 @@
       "title": "Городская доминанта",
       "text": "Небоскрёб ставят там, где у одного владельца уже четыре объекта.",
       "cost_influence": 5,
-      "cost_money": 8,
-      "points": 8,
+      "cost_money": 6,
+      "points": 10,
       "requirement": {
         "type": "district_depth",
         "count": 4
@@ -1818,9 +1818,9 @@
       "id": "city_park",
       "title": "Городской парк",
       "text": "Парк в жилой застройке гасит недовольство.",
-      "cost_influence": 5,
-      "cost_money": 6,
-      "points": 1,
+      "cost_influence": 3,
+      "cost_money": 4,
+      "points": 3,
       "requirement": {
         "type": "district_objects",
         "district": "residential",
@@ -1835,8 +1835,8 @@
       "title": "Социальное жильё",
       "text": "Городская программа расселения: нужен серьёзный жилой портфель.",
       "cost_influence": 4,
-      "cost_money": 3,
-      "points": 7,
+      "cost_money": 6,
+      "points": 8,
       "requirement": {
         "type": "district_objects",
         "district": "residential",
@@ -1851,7 +1851,7 @@
       "title": "Деловой квартал",
       "text": "Новый квартал офисов вокруг ваших зданий.",
       "cost_influence": 4,
-      "cost_money": 5,
+      "cost_money": 6,
       "points": 6,
       "requirement": {
         "type": "district_objects",
@@ -1866,8 +1866,8 @@
       "id": "industrial_park",
       "title": "Индустриальный парк",
       "text": "Промышленная площадка с общей инфраструктурой.",
-      "cost_influence": 3,
-      "cost_money": 5,
+      "cost_influence": 4,
+      "cost_money": 6,
       "points": 6,
       "requirement": {
         "type": "district_objects",
@@ -1882,8 +1882,8 @@
       "id": "tech_campus",
       "title": "Технопарк",
       "text": "Кампус для технологических компаний города.",
-      "cost_influence": 4,
-      "cost_money": 5,
+      "cost_influence": 3,
+      "cost_money": 7,
       "points": 6,
       "requirement": {
         "type": "district_objects",
@@ -1899,8 +1899,8 @@
       "title": "Дворец правосудия",
       "text": "Суд строят те, у кого есть вес в администрации.",
       "cost_influence": 5,
-      "cost_money": 5,
-      "points": 7,
+      "cost_money": 7,
+      "points": 6,
       "requirement": {
         "type": "district_objects",
         "district": "government",
@@ -1914,8 +1914,8 @@
       "id": "night_quarter",
       "title": "Ночной квартал",
       "text": "Легализация ночной жизни серого сектора.",
-      "cost_influence": 3,
-      "cost_money": 4,
+      "cost_influence": 2,
+      "cost_money": 3,
       "points": 3,
       "requirement": {
         "type": "district_objects",
@@ -1931,7 +1931,7 @@
       "title": "Окружная дорога",
       "text": "Объездная трасса вокруг города; нужен логистический объект.",
       "cost_influence": 3,
-      "cost_money": 4,
+      "cost_money": 5,
       "points": 5,
       "requirement": {
         "type": "tag_objects",
@@ -1946,9 +1946,9 @@
       "id": "university",
       "title": "Университет",
       "text": "Городу нужен вуз, а вузу — данные.",
-      "cost_influence": 4,
-      "cost_money": 4,
-      "points": 6,
+      "cost_influence": 3,
+      "cost_money": 6,
+      "points": 5,
       "requirement": {
         "type": "tag_objects",
         "tag": "data",
@@ -1963,7 +1963,7 @@
       "title": "Заводская агломерация",
       "text": "Два производственных объекта складываются в кластер.",
       "cost_influence": 4,
-      "cost_money": 5,
+      "cost_money": 6,
       "points": 6,
       "requirement": {
         "type": "tag_objects",
@@ -1979,7 +1979,7 @@
       "title": "Городская биржа",
       "text": "Биржа открывается там, где есть финансовые дома.",
       "cost_influence": 4,
-      "cost_money": 5,
+      "cost_money": 6,
       "points": 6,
       "requirement": {
         "type": "tag_objects",
@@ -1994,8 +1994,8 @@
       "id": "security_hub",
       "title": "Центр городской безопасности",
       "text": "Штаб охраны порядка; нужен объект с охраной; поднимает предел Защиты.",
-      "cost_influence": 5,
-      "cost_money": 6,
+      "cost_influence": 3,
+      "cost_money": 5,
       "points": 3,
       "requirement": {
         "type": "tag_objects",
@@ -2011,8 +2011,8 @@
       "id": "civic_centre",
       "title": "Многофункциональный центр",
       "text": "Единое окно для горожан на базе двух административных объектов.",
-      "cost_influence": 4,
-      "cost_money": 3,
+      "cost_influence": 3,
+      "cost_money": 7,
       "points": 6,
       "requirement": {
         "type": "tag_objects",
@@ -2027,9 +2027,9 @@
       "id": "hospital",
       "title": "Городская больница",
       "text": "Больницу доверяют только с чистой репутацией.",
-      "cost_influence": 4,
-      "cost_money": 4,
-      "points": 6,
+      "cost_influence": 3,
+      "cost_money": 6,
+      "points": 5,
       "requirement": {
         "type": "max_scandals",
         "count": 1
@@ -2042,8 +2042,8 @@
       "id": "exhibition",
       "title": "Городская выставка",
       "text": "Городская выставка держится на связях: нужны два объекта с политическим весом.",
-      "cost_influence": 4,
-      "cost_money": 4,
+      "cost_influence": 3,
+      "cost_money": 5,
       "points": 6,
       "requirement": {
         "type": "tag_objects",
@@ -2058,9 +2058,9 @@
       "id": "stadium",
       "title": "Городской стадион",
       "text": "Стадион строит тот, у кого уже большой бизнес.",
-      "cost_influence": 4,
-      "cost_money": 5,
-      "points": 6,
+      "cost_influence": 3,
+      "cost_money": 6,
+      "points": 5,
       "requirement": {
         "type": "assets",
         "count": 4
@@ -2073,9 +2073,9 @@
       "id": "city_charter",
       "title": "Городской устав",
       "text": "Устав подписывает тот, кто держит роль в городе.",
-      "cost_influence": 4,
-      "cost_money": 3,
-      "points": 6,
+      "cost_influence": 3,
+      "cost_money": 6,
+      "points": 5,
       "requirement": {
         "type": "role"
       },
@@ -2087,8 +2087,8 @@
       "id": "art_museum",
       "title": "Музей современного искусства",
       "text": "Дорого и без условий: город любит красивые жесты.",
-      "cost_influence": 6,
-      "cost_money": 6,
+      "cost_influence": 5,
+      "cost_money": 8,
       "points": 6,
       "requirement": {
         "type": "none"
@@ -2099,9 +2099,9 @@
       "id": "charity_fund",
       "title": "Благотворительный фонд",
       "text": "Взнос в город без условий и без бонусов.",
-      "cost_influence": 5,
-      "cost_money": 5,
-      "points": 5,
+      "cost_influence": 3,
+      "cost_money": 6,
+      "points": 4,
       "requirement": {
         "type": "none"
       },
@@ -2111,9 +2111,9 @@
       "id": "transport_hub",
       "title": "Транспортный узел",
       "text": "Город связывает четыре разных района.",
-      "cost_influence": 6,
+      "cost_influence": 4,
       "cost_money": 7,
-      "points": 9,
+      "points": 8,
       "requirement": {
         "type": "distinct_districts",
         "count": 4
@@ -2127,8 +2127,8 @@
       "title": "Речной порт",
       "text": "Порту нужны две логистические площадки.",
       "cost_influence": 4,
-      "cost_money": 5,
-      "points": 6,
+      "cost_money": 7,
+      "points": 8,
       "requirement": {
         "type": "tag_objects",
         "tag": "logistics",
@@ -2144,7 +2144,7 @@
       "text": "Два объекта с данными складываются в вычислительный центр.",
       "cost_influence": 5,
       "cost_money": 8,
-      "points": 7,
+      "points": 8,
       "requirement": {
         "type": "tag_objects",
         "tag": "data",
@@ -2159,7 +2159,7 @@
       "title": "Энергетическое кольцо",
       "text": "Замкнуть городские сети: нужен энергетический объект.",
       "cost_influence": 3,
-      "cost_money": 4,
+      "cost_money": 5,
       "points": 5,
       "requirement": {
         "type": "tag_objects",
@@ -2175,7 +2175,7 @@
       "title": "Городской медиахолдинг",
       "text": "Свой рупор в городе: нужен медийный объект.",
       "cost_influence": 3,
-      "cost_money": 3,
+      "cost_money": 6,
       "points": 5,
       "requirement": {
         "type": "tag_objects",
@@ -2190,9 +2190,9 @@
       "id": "defence_order",
       "title": "Оборонный заказ",
       "text": "Два охранных объекта — и город доверяет вам подряд; поднимает предел Защиты.",
-      "cost_influence": 5,
-      "cost_money": 7,
-      "points": 3,
+      "cost_influence": 3,
+      "cost_money": 4,
+      "points": 4,
       "requirement": {
         "type": "tag_objects",
         "tag": "security",
@@ -2207,9 +2207,9 @@
       "id": "city_clinics",
       "title": "Сеть городских клиник",
       "text": "Две сервисные точки разворачиваются в сеть.",
-      "cost_influence": 4,
-      "cost_money": 6,
-      "points": 2,
+      "cost_influence": 3,
+      "cost_money": 4,
+      "points": 4,
       "requirement": {
         "type": "tag_objects",
         "tag": "service",
@@ -2224,8 +2224,8 @@
       "title": "Технологический инкубатор",
       "text": "Две технологические площадки под одной защитой.",
       "cost_influence": 4,
-      "cost_money": 4,
-      "points": 6,
+      "cost_money": 6,
+      "points": 8,
       "requirement": {
         "type": "tag_objects",
         "tag": "tech",
@@ -2239,9 +2239,9 @@
       "id": "industrial_alliance",
       "title": "Промышленный альянс",
       "text": "Три завода в одном районе договариваются.",
-      "cost_influence": 5,
-      "cost_money": 5,
-      "points": 7,
+      "cost_influence": 4,
+      "cost_money": 7,
+      "points": 8,
       "requirement": {
         "type": "district_objects",
         "district": "industrial",
@@ -2255,9 +2255,9 @@
       "id": "financial_district",
       "title": "Финансовый район",
       "text": "Три деловых объекта делают квартал биржевым.",
-      "cost_influence": 5,
-      "cost_money": 5,
-      "points": 7,
+      "cost_influence": 4,
+      "cost_money": 7,
+      "points": 8,
       "requirement": {
         "type": "district_objects",
         "district": "business",
@@ -2271,9 +2271,9 @@
       "id": "silicon_quarter",
       "title": "Кремниевый квартал",
       "text": "Три объекта Технокластера рядом.",
-      "cost_influence": 5,
-      "cost_money": 5,
-      "points": 7,
+      "cost_influence": 4,
+      "cost_money": 6,
+      "points": 8,
       "requirement": {
         "type": "district_objects",
         "district": "tech",
@@ -2288,8 +2288,8 @@
       "title": "Правительственный комплекс",
       "text": "Три административных здания в одном квартале.",
       "cost_influence": 5,
-      "cost_money": 7,
-      "points": 7,
+      "cost_money": 8,
+      "points": 8,
       "requirement": {
         "type": "district_objects",
         "district": "government",
@@ -2303,8 +2303,8 @@
       "id": "shadow_market",
       "title": "Легализация теневого рынка",
       "text": "Три объекта Серого сектора выходят из тени.",
-      "cost_influence": 4,
-      "cost_money": 4,
+      "cost_influence": 2,
+      "cost_money": 3,
       "points": 4,
       "requirement": {
         "type": "district_objects",
@@ -2320,8 +2320,8 @@
       "title": "Ремесленный квартал",
       "text": "Четыре жилых объекта складываются в квартал.",
       "cost_influence": 5,
-      "cost_money": 5,
-      "points": 7,
+      "cost_money": 6,
+      "points": 10,
       "requirement": {
         "type": "district_objects",
         "district": "residential",
@@ -2335,8 +2335,8 @@
       "id": "jury_court",
       "title": "Суд присяжных",
       "text": "Городу нужен безупречный учредитель: ни одного скандала.",
-      "cost_influence": 4,
-      "cost_money": 3,
+      "cost_influence": 3,
+      "cost_money": 7,
       "points": 6,
       "requirement": {
         "type": "max_scandals",
@@ -2350,8 +2350,8 @@
       "id": "job_fair",
       "title": "Городская ярмарка вакансий",
       "text": "Пять объектов — уже заметный работодатель.",
-      "cost_influence": 4,
-      "cost_money": 4,
+      "cost_influence": 3,
+      "cost_money": 5,
       "points": 6,
       "requirement": {
         "type": "assets",
@@ -2367,7 +2367,7 @@
       "text": "Полный портфель из шести объектов.",
       "cost_influence": 5,
       "cost_money": 6,
-      "points": 8,
+      "points": 10,
       "requirement": {
         "type": "assets",
         "count": 6
@@ -2381,8 +2381,8 @@
       "title": "Инженерное бюро",
       "text": "Бюро проектирует город: нужны два инфраструктурных объекта.",
       "cost_influence": 4,
-      "cost_money": 4,
-      "points": 6,
+      "cost_money": 5,
+      "points": 8,
       "requirement": {
         "type": "tag_objects",
         "tag": "infrastructure",
