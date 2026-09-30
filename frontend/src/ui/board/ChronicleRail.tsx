@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { describeEventSegments } from "../../online/gameUi";
 import type { CityMeta, GameState } from "../../online/types";
 import { Panel, SectionHead } from "../primitives/atoms";
@@ -22,23 +23,24 @@ export function ChronicleRail({
   unseen: number;
   onOpen: () => void;
 }) {
+  const { t } = useTranslation("game");
   // Свежие сверху: лента короткая, и листать её некуда.
   const events = [...game.event_log].reverse();
 
   return (
     <Panel rows zone="chronicle">
       <SectionHead
-        title="Хроника"
-        meta={unseen > 0 ? `${unseen} новых · открыть` : `${events.length} событий · открыть`}
+        title={t("ui.chronicle.rail")}
+        meta={unseen > 0 ? t("ui.chronicle.railNew", { count: unseen }) : t("ui.chronicle.railAll", { count: events.length })}
       />
       <button
         type="button"
         onClick={onOpen}
-        aria-label="Открыть полную хронику"
+        aria-label={t("ui.chronicle.railOpen")}
         className="grid min-h-0 content-start gap-[3px] overflow-hidden rounded-md p-px text-left
           hover:bg-panel-2"
       >
-        {events.length === 0 && <span className="text-3xs text-ink-dim">Пока ничего не произошло.</span>}
+        {events.length === 0 && <span className="text-3xs text-ink-dim">{t("ui.chronicle.empty")}</span>}
         {events.slice(0, 12).map(event => {
           const segments = describeEventSegments(event, game, meta);
           if (segments.length === 0) return null;

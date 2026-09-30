@@ -1,3 +1,4 @@
+import { tr } from "../../i18n";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Popover from "@radix-ui/react-popover";
 import { useState, type ReactNode } from "react";
@@ -44,7 +45,7 @@ export function CardPopover({
           {open && (
             <button
               type="button"
-              aria-label="Закрыть"
+              aria-label={tr("game", "ui.common.close")}
               onClick={() => setOpen(false)}
               className="fixed inset-0 z-[60] bg-[#000a]"
             />
@@ -57,12 +58,12 @@ export function CardPopover({
               -translate-x-1/2 -translate-y-1/2 grid-rows-[minmax(0,1fr)_auto] overflow-hidden
               rounded-[12px] border border-line-2 bg-panel font-sans text-ink"
           >
-            <Dialog.Title className="sr-only">{label ?? "Подробности"}</Dialog.Title>
+            <Dialog.Title className="sr-only">{label ?? tr("game", "ui.common.details")}</Dialog.Title>
             <div className="overflow-auto">{content}</div>
             {/* Отдельная кнопка, а не только тап мимо окна: мимо окна на телефоне
               * промахиваются в соседнюю карточку, и вместо закрытия открывается она. */}
             <Dialog.Close className="border-t border-line px-3 py-2.5 text-center text-xs text-ink-muted">
-              Закрыть
+              {tr("game", "ui.common.close")}
             </Dialog.Close>
           </Dialog.Content>
         </Dialog.Portal>

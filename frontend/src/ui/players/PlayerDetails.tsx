@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { assetPoints, greyOperationLabels, powerLabels } from "../../online/gameUi";
 import type { CityMeta, GameState, LegalAction, PlayerState } from "../../online/types";
 import { PopoverBody, PopoverHeader } from "../primitives/CardPopover";
@@ -27,6 +28,7 @@ export function PlayerDetails({
   context: ActionContext;
   onAction: (action: LegalAction) => void;
 }) {
+  const { t } = useTranslation("game");
   const role = player.role ? index.roles.get(player.role) : undefined;
   const score = game.score_breakdown?.[player.id];
   const mine = player.id === context.me.id;
@@ -44,21 +46,21 @@ export function PlayerDetails({
           label: powerLabels[String(action.payload.power)] ?? String(action.payload.power),
           hint: (game.role_powers ?? []).find(item => item.power === action.payload.power)
             ?.spends_action === false
-            ? "Способность роли · без действия"
-            : "Способность роли · тратит действие",
+            ? t("ui.players.powerFree")
+            : t("ui.players.powerAction"),
         })),
         ...findActions(context, "grey_operation", { target_id: player.id }).map(action => ({
           action,
           label: greyOperationLabels[String(action.payload.asset_id)] ?? String(action.payload.asset_id),
-          hint: "Серая операция · одна за ход",
+          hint: t("ui.players.greyHint"),
         })),
         ...findActions(context, "play_action_card", { target_id: player.id }).map(action => ({
           action,
           label: index.cards.get(
             context.me.hand?.find(card => card.uid === action.payload.card_uid)?.card_id ?? "",
-          )?.title ?? "Карта",
+          )?.title ?? t("ui.players.card"),
           // Лимит стоит на покупке, а не на розыгрыше: руку можно тратить как угодно быстро.
-          hint: "Карта · бесплатно, без лимита за ход",
+          hint: t("ui.players.cardHint"),
         })),
       ];
 
@@ -66,35 +68,37 @@ export function PlayerDetails({
     <>
       <PopoverHeader
         title={`${role?.icon ?? "👤"} ${player.name}`}
-        subtitle={role?.title ?? "Без роли"}
+        subtitle={role?.title ?? t("ui.players.noRole")}
       />
       <PopoverBody>
         <KeyValue
           rows={[
-            ["Счёт", <span className="text-points">★ {score?.total ?? 0} очков</span>],
+            [t("ui.players.score"), <span className="text-points">{t("ui.players.scoreValue", { count: score?.total ?? 0 })}</span>],
             [
-              "Ресурсы",
+              t("ui.players.resources"),
               <span><span className="text-money">● {player.money}$</span>{" · "}<span className="text-influence">◆ {player.influence}</span></span>,
             ],
             [
-              "Скандалы",
+              t("ui.players.scandals"),
               <span className={player.scandals >= scandalLimit(player) - 1 ? "text-[var(--color-warning)]" : undefined}>
                 {player.scandals} / {scandalLimit(player)}
-                {player.role && player.scandals >= scandalLimit(player) - 1 && " — ещё один, и роль потеряна"}
+                {player.role && player.scandals >= scandalLimit(player) - 1 && t("ui.players.roleRisk")}
               </span>,
             ],
             [
-              "Крыши",
+              t("ui.players.roofs"),
               <span className={player.roofs > 0 ? "text-defence" : "text-ink-muted"}>
                 {player.roofs > 0
-                  ? `${player.roofs} из ${player.roof_limit} — направленный эффект будет погашен`
-                  : `0 из ${player.roof_limit} — не защищён`}
+                  ? t("ui.players.roofsOn", { have: player.roofs, limit: player.roof_limit })
+                  : t("ui.players.roofsOff", { limit: player.roof_limit })}
               </span>,
             ],
-            ["Очередь хода", position >= 0 ? `${position + 1}-й в этом раунде` : "—"],
-            ...(player.is_bot ? ([["Бот", player.difficulty]] as [string, string][]) : []),
+            [t("ui.players.order"), position >= 0 ? t("ui.players.orderValue", { position: position + 1 }) : "—"],
+            ...(player.is_bot
+              ? ([[t("ui.players.bot"), t(`common:difficulty.${player.difficulty}`, { defaultValue: player.difficulty })]] as [string, string][])
+              : []),
             ...(player.jail_turns > 0
-              ? ([["Тюрьма", `пропускает ходов ${player.jail_turns}`]] as [string, string][])
+              ? ([[t("ui.players.jailRow"), t("ui.players.jailValue")]] as [string, string][])
               : []),
           ]}
         />
@@ -102,7 +106,7 @@ export function PlayerDetails({
         {/* Стол соперника целиком, вместе с пустыми слотами: по одному списку купленного
           * не видно, упёрся ли он в вместимость — а это решает, стоит ли его вообще душить. */}
         <p className="mb-1 font-medium text-ink">
-          Стол: {player.assets.length} из {player.capacity}
+          {t("ui.players.table", { used: player.assets.length, capacity: player.capacity })}
         </p>
         <div className="mb-2 grid grid-cols-2 gap-1">
           {player.assets.map(owned => {
@@ -119,9 +123,9 @@ export function PlayerDetails({
                   {asset?.title ?? owned.card_id}
                 </b>
                 <small className="text-3xs text-ink-dim">
-                  <span className="text-money">+{asset?.income ?? 0}$/р</span>
+                  <span className="text-money">{t("ui.players.perRound", { value: asset?.income ?? 0 })}</span>
                   {" · "}
-                  <span className="text-points">{asset ? assetPoints(asset) : 0} очк</span>
+                  <span className="text-points">{t("ui.players.pts", { count: asset ? assetPoints(asset) : 0 })}</span>
                 </small>
               </div>
             );
@@ -133,7 +137,7 @@ export function PlayerDetails({
                 className="grid min-h-[34px] place-content-center rounded-md border border-dashed
                   border-line bg-surface text-3xs text-ink-dim"
               >
-                свободный слот
+                {t("ui.players.freeSlot")}
               </div>
             ),
           )}
@@ -141,14 +145,14 @@ export function PlayerDetails({
 
         {player.projects.length > 0 && (
           <>
-            <p className="mb-1 font-medium text-ink">Проекты</p>
+            <p className="mb-1 font-medium text-ink">{t("ui.players.projects")}</p>
             <ul className="mb-2 grid gap-0.5">
               {player.projects.map(projectId => {
                 const project = meta.projects.find(item => item.id === projectId);
                 return (
                   <li key={projectId} className="flex items-baseline gap-1.5">
                     <span className="text-ink">{project?.title ?? projectId}</span>
-                    <span className="ml-auto text-points">{project?.points ?? 0} очк</span>
+                    <span className="ml-auto text-points">{t("ui.players.pts", { count: project?.points ?? 0 })}</span>
                   </li>
                 );
               })}
@@ -160,7 +164,7 @@ export function PlayerDetails({
 
         {targeted.length > 0 && (
           <>
-            <p className="mb-1 font-medium text-ink">Направить на этого игрока</p>
+            <p className="mb-1 font-medium text-ink">{t("ui.players.target")}</p>
             <div className="grid gap-1">
               {targeted.map((item, itemIndex) => {
                 const preview = item.power ? findPreview(game, item.power, player.id) : undefined;

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { LogSegment } from "../../online/gameUi";
 import { Modal } from "../primitives/Modal";
 import type { Briefing, BriefingTone } from "./briefing";
@@ -54,16 +55,17 @@ export function TurnBriefingModal({ briefing, onClose }: { briefing: Briefing | 
   if (!briefing) return null;
 
   const arrow = "→";
+  const { t } = useTranslation("game");
 
   return (
     <Modal
       open
       onClose={onClose}
-      title="🔔 Ваш ход — что изменилось"
+      title={t("ui.briefing.title")}
       subtitle={
         briefing.fromRound === briefing.round
-          ? `раунд ${briefing.round}`
-          : `раунды ${briefing.fromRound}–${briefing.round}`
+          ? t("ui.briefing.round", { round: briefing.round })
+          : t("ui.briefing.rounds", { from: briefing.fromRound, to: briefing.round })
       }
       width={860}
       footer={
@@ -73,14 +75,14 @@ export function TurnBriefingModal({ briefing, onClose }: { briefing: Briefing | 
           className="w-full rounded-md border border-line bg-panel-2 px-2 py-2 text-center text-xs
             font-semibold hover:border-accent"
         >
-          Понятно, ходить →
+          {t("ui.briefing.go")}
         </button>
       }
     >
       <div className="grid gap-3">
         {briefing.flags.length > 0 && (
           <section className="grid gap-1">
-            <h3 className="text-2xs font-bold uppercase tracking-wide text-ink-dim">Важное</h3>
+            <h3 className="text-2xs font-bold uppercase tracking-wide text-ink-dim">{t("ui.briefing.important")}</h3>
             <ul className="grid gap-1">
               {briefing.flags.map(flag => (
                 <li
@@ -99,7 +101,7 @@ export function TurnBriefingModal({ briefing, onClose }: { briefing: Briefing | 
         {briefing.stats.length > 0 && (
           <section className="grid gap-1">
             <h3 className="text-2xs font-bold uppercase tracking-wide text-ink-dim">
-              Показатели: было {arrow} стало
+              {t("ui.briefing.stats", { arrow })}
             </h3>
             <ul className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-1">
               {briefing.stats.map(stat => {
@@ -127,11 +129,11 @@ export function TurnBriefingModal({ briefing, onClose }: { briefing: Briefing | 
 
         <section className="grid gap-1">
           <h3 className="text-2xs font-bold uppercase tracking-wide text-ink-dim">
-            Что делали с вами ({briefing.lines.length})
+            {t("ui.briefing.done", { count: briefing.lines.length })}
           </h3>
           {briefing.lines.length === 0 ? (
             <p className="rounded-md bg-panel-2 px-2.5 py-2 text-xs text-ink-dim">
-              Прямых действий против вас не было.
+              {t("ui.briefing.nothing")}
             </p>
           ) : (
             <ol className="grid gap-1">

@@ -1,3 +1,4 @@
+import { tr } from "../../i18n";
 import type { GameState, LegalAction, PlayerState } from "../../online/types";
 
 /* Доступность действия — один механизм на всю доску.
@@ -49,13 +50,13 @@ export function findActions(
 /** Причина, по которой недоступно вообще ничего. Общая для всех кнопок доски. */
 export function turnBlock(context: ActionContext): string | undefined {
   const { game, me } = context;
-  if (game.status !== "playing") return "Партия окончена";
+  if (game.status !== "playing") return tr("game", "ui.block.finished");
   if (game.players[game.current_player_index]?.id !== me.id) {
     const current = game.players[game.current_player_index];
-    return current ? `Ход игрока ${current.name}` : "Сейчас не ваш ход";
+    return current ? tr("game", "ui.block.turnOf", { name: current.name }) : tr("game", "ui.block.notYourTurn");
   }
-  if (me.jail_turns > 0) return `Тюрьма: ходов ${me.jail_turns}`;
-  if (game.actions_left <= 0) return "Действия на этот ход закончились";
+  if (me.jail_turns > 0) return tr("game", "ui.block.jailed");
+  if (game.actions_left <= 0) return tr("game", "ui.block.noActions");
   return undefined;
 }
 
@@ -70,7 +71,7 @@ export function resolve(
   }
   const action = findAction(context, type, payload);
   if (action) return { kind: "ready", action };
-  return { kind: "blocked", reason: hint ?? turnBlock(context) ?? "Сейчас недоступно" };
+  return { kind: "blocked", reason: hint ?? turnBlock(context) ?? tr("game", "ui.block.unavailable") };
 }
 
 /** Действие, у которого много вариантов по цели: открывается поповером со списком. */
@@ -83,7 +84,7 @@ export function resolveMany(
   const pending = Boolean(context.pending && matches(context.pending, type, payload));
   const options = findActions(context, type, payload);
   if (options.length > 0 || pending) return { options, pending };
-  return { options, pending, blocked: hint ?? turnBlock(context) ?? "Сейчас недоступно" };
+  return { options, pending, blocked: hint ?? turnBlock(context) ?? tr("game", "ui.block.unavailable") };
 }
 
 /** Отметки «уже в этом ходу» приходят из движка в turn_flags — клиент их только читает. */

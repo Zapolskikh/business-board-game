@@ -24,6 +24,8 @@ const json = (body: unknown): RequestInit => ({
 export const cityApi = {
   meta: () => request<CityMeta>("/api/city/meta"),
   rooms: () => request<RoomSummary[]>("/api/city/rooms"),
+  feedback: (body: { kind: "bug" | "idea" | "other"; message: string; contact: string; version: string; user_agent: string; website: string }) =>
+    request<{ id: string }>("/api/feedback", json(body)),
   room: (id: string) => request<RoomView>(`/api/city/rooms/${id}`),
   remove: (id: string, password: string) => request<void>(`/api/city/rooms/${id}`, {
     method: "DELETE",

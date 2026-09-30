@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useState, type ReactNode } from "react";
 import {
   campaignTiers,
@@ -62,6 +63,7 @@ export function ActionsPanel({
    * Пропом, а не импортом — чтобы панель действий не знала про руку. */
   beforeEndTurn?: ReactNode;
 }) {
+  const { t } = useTranslation("game");
   const me = context.me;
   const tiers = campaignTiers(meta);
   const patron = patronage(meta);
@@ -81,7 +83,7 @@ export function ActionsPanel({
   const cleanup = cleanupPower
     ? resolve(context, "use_role_power", { power: cleanupPower })
     : resolve(context, "crisis_pr");
-  const cleanupLabel = cleanupPower ? cleanupOffer(cleanupPower, meta).label : "Антикризис";
+  const cleanupLabel = cleanupPower ? cleanupOffer(cleanupPower, meta).label : t("ui.actions.cleanup");
 
   // Активные способности роли, кроме чисток — они уже на кнопке выше — и кроме тех, чья цель
   // нарисована в другом месте доски. Метку на карту рынка и вето на проект жмут на самой
@@ -111,7 +113,7 @@ export function ActionsPanel({
     >
       <Panel className="pb-2">
         <div className={`flex items-center gap-2 px-0.5 pt-px pb-[2px] ${zoneRule}`}>
-          <h2 className={sectionTitle}>Действия</h2>
+          <h2 className={sectionTitle}>{t("ui.actions.title")}</h2>
           <span className="ml-auto flex gap-1">
             {Array.from({ length: Math.max(3, game.actions_left) }).map((_, position) => (
               <i
@@ -126,11 +128,11 @@ export function ActionsPanel({
       </Panel>
 
       <Panel>
-        <div className="px-0.5 text-3xs uppercase tracking-[0.08em] text-ink-dim">Базовые</div>
+        <div className="px-0.5 text-3xs uppercase tracking-[0.08em] text-ink-dim">{t("ui.actions.basic")}</div>
         <div className="mt-1.5 grid grid-cols-2 gap-1">
           <ActionButton
-            label="Заказ"
-            cost={<><span className="font-semibold text-money">+2$</span> в кошелёк</>}
+            label={t("ui.actions.work")}
+            cost={<><span className="font-semibold text-money">+2$</span>{t("ui.actions.workCost")}</>}
             state={work}
             onClick={() => act(work)}
           />
@@ -139,7 +141,7 @@ export function ActionsPanel({
             return (
               <ActionButton
                 key={tier.spend}
-                label="Обмен"
+                label={t("ui.actions.exchange")}
                 cost={
                   <>
                     <Need short={me.money < tier.spend} tone="money">{tier.spend}$</Need>
@@ -152,11 +154,11 @@ export function ActionsPanel({
             );
           })}
           <ActionButton
-            label="Патронаж"
+            label={t("ui.actions.patronage")}
             cost={
               <>
                     <Need short={me.money < patron.money} tone="money">{patron.money}$</Need>
-                    {" → "}<span className="font-semibold text-points">{patron.points} оч</span>
+                    {" → "}<span className="font-semibold text-points">{t("ui.actions.pts", { count: patron.points })}</span>
               </>
             }
             state={patronAction}
@@ -164,11 +166,11 @@ export function ActionsPanel({
             onClick={() => act(patronAction)}
           />
           <ActionButton
-            label="Лоббирование"
+            label={t("ui.actions.lobbying")}
             cost={
               <>
                     <Need short={me.influence < lobby.influence} tone="influence">{lobby.influence}◆</Need>
-                    {" → "}<span className="font-semibold text-points">{lobby.points} оч</span>
+                    {" → "}<span className="font-semibold text-points">{t("ui.actions.pts", { count: lobby.points })}</span>
               </>
             }
             state={lobbyAction}
@@ -178,16 +180,16 @@ export function ActionsPanel({
           {/* «Антикризис» ничего не говорил о том, что делает кнопка. У ролевой чистки
             * своё название из каталога — оно точнее, его и оставляем. */}
           <ActionButton
-            label={cleanupPower ? cleanupLabel : "Чистка"}
+            label={cleanupPower ? cleanupLabel : t("ui.actions.cleanup")}
             cost={
               cleanupPower ? (
-                "−1 ⚠ скандал"
+                t("ui.actions.scandalMinus")
               ) : (
                 <>
                   <Need short={me.influence < crisisPrInfluence(meta)} tone="influence">
                     {crisisPrInfluence(meta)}◆
-                  </Need>{" "}
-                  → −1 ⚠ скандал
+                  </Need>{" → "}
+                  {t("ui.actions.scandalMinus")}
                 </>
               )
             }
@@ -195,11 +197,11 @@ export function ActionsPanel({
             onClick={() => act(cleanup)}
           />
           <ActionButton
-            label="Крыша"
+            label={t("ui.actions.roof")}
             cost={
               <>
-                <Need short={me.money < roofPrice(game)} tone="money">{roofPrice(game)}$</Need> · есть {me.roofs}{" "}
-                из {me.roof_limit}
+                <Need short={me.money < roofPrice(game)} tone="money">{roofPrice(game)}$</Need>
+                {t("ui.actions.roofHave", { have: me.roofs, limit: me.roof_limit })}
               </>
             }
             state={roof}
@@ -211,7 +213,7 @@ export function ActionsPanel({
       {role && powers.length > 0 && (
         <Panel>
           <div className="px-0.5 text-3xs uppercase tracking-[0.08em] text-ink-dim">
-            Способности · {role.icon} {role.title}
+            {t("ui.actions.powers", { icon: role.icon, role: role.title })}
           </div>
           <div className="mt-1.5 grid grid-cols-2 gap-1">
             {powers.map(power => (
@@ -237,42 +239,42 @@ export function ActionsPanel({
         <div className="grid content-start gap-1 overflow-auto p-px">
           <DrawerRow
             icon="🏷️"
-            title="Роли"
-            hint={role ? `ваша: ${role.title} · свободно ${freeRoles}` : `у вас нет роли · ${game.role_price}◆`}
+            title={t("ui.actions.roles")}
+            hint={role ? t("ui.actions.rolesMine", { role: role.title, free: freeRoles }) : t("ui.actions.rolesNone", { price: game.role_price })}
             onClick={() => setDrawer("roles")}
           />
 
           <DrawerRow
             icon="⚡"
-            title="Возможности роли"
-            hint={role ? "пассивные перки и активные способности" : "нужна роль"}
+            title={t("ui.actions.rolePowers")}
+            hint={role ? t("ui.actions.rolePowersHint") : t("ui.actions.rolePowersNone")}
             onClick={() => setDrawer("powers")}
           />
 
           <DrawerRow
             icon="🌒"
-            title="Серые операции"
+            title={t("ui.actions.grey")}
             hint={
               greySpent
-                ? "в этом ходу уже проведена"
+                ? t("ui.actions.greySpent")
                 : greyAvailable > 0
-                  ? "выберите операцию и цель"
-                  : "нужен активный объект нужного района"
+                  ? t("ui.actions.greyPick")
+                  : t("ui.actions.greyNeed")
             }
-            badge={greySpent ? "✗" : `${greyAvailable} из 5`}
+            badge={greySpent ? "✗" : t("ui.actions.greyBadge", { count: greyAvailable })}
             badgeOn={!greySpent && greyAvailable > 0}
             onClick={() => setDrawer("grey")}
           />
         </div>
       </Panel>
 
-      <DetailsModal open={drawer === "roles"} onClose={() => setDrawer(null)} label="Роли" width={1040}>
+      <DetailsModal open={drawer === "roles"} onClose={() => setDrawer(null)} label={t("ui.actions.roles")} width={1040}>
         <RolesDetails game={game} meta={meta} index={index} context={context} onAction={onAction} />
       </DetailsModal>
-      <DetailsModal open={drawer === "powers"} onClose={() => setDrawer(null)} label="Возможности роли">
+      <DetailsModal open={drawer === "powers"} onClose={() => setDrawer(null)} label={t("ui.actions.rolePowers")}>
         <RolePowersDetails game={game} meta={meta} index={index} context={context} onAction={onAction} />
       </DetailsModal>
-      <DetailsModal open={drawer === "grey"} onClose={() => setDrawer(null)} label="Серые операции">
+      <DetailsModal open={drawer === "grey"} onClose={() => setDrawer(null)} label={t("ui.actions.grey")}>
         <GreyDetails game={game} meta={meta} index={index} context={context} onAction={onAction} />
       </DetailsModal>
 
@@ -286,7 +288,7 @@ export function ActionsPanel({
         className="primary-button card-serif rounded-[7px] px-2 py-2.5 text-center text-[16px]
           disabled:opacity-50"
       >
-        {endTurn.kind === "pending" ? "Завершаем…" : "Завершить ход"}
+        {endTurn.kind === "pending" ? t("ui.actions.ending") : t("ui.actions.endTurn")}
       </button>
     </div>
   );
@@ -310,6 +312,7 @@ function PowerButton({
   context: ActionContext;
   onAction: (action: LegalAction) => void;
 }) {
+  const { t } = useTranslation("game");
   const { options, blocked, pending } = resolveMany(context, "use_role_power", { power });
   const label = powerLabels[power] ?? power;
   const byDistrict = options.length > 0 && options[0].payload.district !== undefined;
@@ -323,7 +326,7 @@ function PowerButton({
   const status = (game.role_powers ?? []).find(item => item.power === power);
   const spendsAction = status?.spends_action ?? true;
   const description = powerDescriptions[power];
-  const costLabel = description?.cost ?? (spendsAction ? "тратит действие" : "без действия");
+  const costLabel = description?.cost ?? (spendsAction ? t("ui.actions.spendsAction") : t("ui.actions.noAction"));
   const blockedByRoof = status?.blocked_by_roof ?? true;
 
   if (single || options.length === 0) {
@@ -331,11 +334,11 @@ function PowerButton({
       ? ({ kind: "ready", action: options[0] } as const)
       : pending
         ? ({ kind: "pending", action: context.pending as LegalAction } as const)
-        : ({ kind: "blocked", reason: blocked ?? "Недоступно" } as const);
+        : ({ kind: "blocked", reason: blocked ?? t("ui.actions.unavailable") } as const);
     return (
       <ActionButton
         label={label}
-        cost={spendsAction ? "тратит действие" : "без действия"}
+        cost={spendsAction ? t("ui.actions.spendsAction") : t("ui.actions.noAction")}
         tone={danger ? "danger" : "plain"}
         state={state}
         onClick={() => state.kind === "ready" && onAction(state.action)}
@@ -349,12 +352,9 @@ function PowerButton({
         side="left"
         content={
           <>
-            <PopoverHeader title={label} subtitle="выберите район" />
+            <PopoverHeader title={label} subtitle={t("ui.actions.pickDistrict")} />
             <PopoverBody>
-              <p className="mb-2">
-                Район считается вашим до конца раунда: открывает проекты и серые операции этого
-                квартала и входит в синергию. Стоит влияние и скандал, но не действие.
-              </p>
+              <p className="mb-2">{t("ui.actions.dealText")}</p>
               <div className="grid gap-1">
                 {options.map((action, position) => {
                   const district = districts.find(item => item.id === action.payload.district);
@@ -374,7 +374,7 @@ function PowerButton({
       >
         <ActionButton
           label={label}
-          cost="3◆ + скандал, без действия"
+          cost={t("ui.actions.dealCost")}
           tone="plain"
           state={{ kind: "ready", action: options[0] }}
           onClick={() => undefined}
@@ -388,12 +388,12 @@ function PowerButton({
       side="left"
       content={
         <>
-          <PopoverHeader title={label} subtitle="выберите цель" />
+          <PopoverHeader title={label} subtitle={t("ui.actions.pickTarget")} />
           <PopoverBody>
             <p className="mb-2">
-              {description?.what ?? "Способность применяется к выбранному сопернику."}
+              {description?.what ?? t("ui.actions.powerDefault")}
             </p>
-            <p className="mb-2 text-[var(--color-badge)]">Цена: {costLabel}</p>
+            <p className="mb-2 text-[var(--color-badge)]">{t("ui.actions.price", { cost: costLabel })}</p>
             <div className="grid gap-1">
               {options.map((action, position) => {
                 const target = game.players.find(player => player.id === action.payload.target_id);
@@ -404,7 +404,7 @@ function PowerButton({
                   <ListItem
                     key={position}
                     icon="🎯"
-                    title={target?.name ?? "Цель"}
+                    title={target?.name ?? t("ui.actions.target")}
                     hint={
                       target ? (
                         <>
@@ -418,7 +418,7 @@ function PowerButton({
                         {/* Добыча — крупно: ради неё цель и выбирают. Очки — под ней, мельче. */}
                         {gain && <span className="text-good">{gain}</span>}
                         <span className="text-3xs font-normal text-ink-muted">
-                          {scoreOf(game, target?.id)} оч
+                          {t("ui.actions.pts", { count: scoreOf(game, target?.id) })}
                         </span>
                       </span>
                     }
@@ -444,7 +444,7 @@ function PowerButton({
           {label}
         </b>
         <small className="text-3xs text-ink-muted">
-          {spendsAction ? "выбрать цель ›" : "без действия · выбрать цель ›"}
+          {spendsAction ? t("ui.actions.targetPick") : t("ui.actions.targetPickFree")}
         </small>
       </button>
     </CardPopover>

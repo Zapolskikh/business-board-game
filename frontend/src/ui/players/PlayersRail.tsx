@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { motion } from "motion/react";
 import { forwardRef, type CSSProperties, type ReactNode } from "react";
 import { difficultyLabels } from "../../online/gameUi";
@@ -28,14 +29,15 @@ export function PlayersRail({
   context: ActionContext;
   onAction: (action: LegalAction) => void;
 }) {
+  const { t } = useTranslation("game");
   return (
     <Panel rows zone="players">
-      <SectionHead title="Игроки" meta={`${game.players.length} в партии`} />
+      <SectionHead title={t("ui.players.title")} meta={t("ui.players.count", { count: game.players.length })} />
       <div className="grid min-h-0 grid-rows-4 gap-1 p-px">
         {game.players.map(player => (
           <CardPopover
             key={player.id}
-            label={`${player.name} — подробности`}
+            label={t("ui.players.details", { name: player.name })}
             width={520}
             content={
               <PlayerDetails
@@ -73,6 +75,7 @@ const PlayerRow = forwardRef<HTMLButtonElement, PlayerRowProps>(function PlayerR
   isMe,
   ...rest
 }, ref) {
+  const { t } = useTranslation("game");
   const role = player.role ? index.roles.get(player.role) : undefined;
   const score = game.score_breakdown?.[player.id]?.total ?? 0;
   const turn = game.players[game.current_player_index]?.id === player.id;
@@ -115,7 +118,7 @@ const PlayerRow = forwardRef<HTMLButtonElement, PlayerRowProps>(function PlayerR
       <span className="flex min-h-0 min-w-0 items-center gap-2">
         <span className="player-card-avatar grid size-12 shrink-0 place-items-center rounded-full">
           {avatar ? (
-            <img src={avatar} alt={role?.title ?? "Без роли"} className="size-[30px] object-contain" />
+            <img src={avatar} alt={role?.title ?? t("ui.players.noRole")} className="size-[30px] object-contain" />
           ) : (
             <span className="text-[16px]">{role?.icon ?? "👤"}</span>
           )}
@@ -129,7 +132,7 @@ const PlayerRow = forwardRef<HTMLButtonElement, PlayerRowProps>(function PlayerR
             </b>
             <span
               className="player-card-plate flex shrink-0 items-center gap-0.5 rounded-md px-1 py-0.5"
-              title="Победные очки"
+              title={t("ui.players.points")}
             >
               {star && <img src={star} alt="" className="size-3.5" />}
               <b
@@ -143,9 +146,9 @@ const PlayerRow = forwardRef<HTMLButtonElement, PlayerRowProps>(function PlayerR
           </span>
           <span className="flex min-w-0 items-center gap-1 text-2xs text-ink-muted">
             <span className="overflow-hidden text-ellipsis whitespace-nowrap">
-              {role?.title ?? "Без роли"}
+              {role?.title ?? t("ui.players.noRole")}
             </span>
-            <span className="shrink-0 whitespace-nowrap">· {player.assets.length} об.</span>
+            <span className="shrink-0 whitespace-nowrap">{t("ui.players.assets", { count: player.assets.length })}</span>
           </span>
           <span className="flex min-h-[15px] min-w-0 items-center gap-1 overflow-hidden text-3xs">
             {player.is_bot && (
@@ -155,22 +158,22 @@ const PlayerRow = forwardRef<HTMLButtonElement, PlayerRowProps>(function PlayerR
             )}
             {turn && (
               <span className="player-card-turn-pill shrink-0 rounded-full px-1.5 font-semibold">
-                ✦ Ходит
+                {t("ui.players.turn")}
               </span>
             )}
             {player.jail_turns > 0 ? (
               <span
                 className="shrink-0 rounded bg-[#e6c8c4] px-1 font-semibold text-bad"
-                title={`В тюрьме: осталось ходов ${player.jail_turns}`}
+                title={t("ui.players.jail")}
               >
                 🚔 {player.jail_turns}
               </span>
             ) : risky ? (
               <span
                 className="shrink-0 rounded bg-[#ecd3b4] px-1 font-semibold text-warning"
-                title="Ещё один скандал — и роль будет потеряна"
+                title={t("ui.players.risk")}
               >
-                ⚠ роль
+                {t("ui.players.riskBadge")}
               </span>
             ) : null}
           </span>
@@ -179,16 +182,16 @@ const PlayerRow = forwardRef<HTMLButtonElement, PlayerRowProps>(function PlayerR
 
       {/* Ресурсы — плашка из четырёх равных ячеек, у каждой свой значок и смысловой цвет. */}
       <span className="player-card-plate grid grid-cols-4 items-center rounded-md py-0.5 text-[12px] font-bold">
-        <Stat icon={statIcon("money")} label="Деньги" className="text-money">
+        <Stat icon={statIcon("money")} label={t("ui.players.money")} className="text-money">
           {player.money}$
         </Stat>
-        <Stat icon={statIcon("influence")} label="Влияние" className="text-influence">
+        <Stat icon={statIcon("influence")} label={t("ui.players.influence")} className="text-influence">
           {player.influence}
         </Stat>
-        <Stat icon={statIcon("scandal")} label="Скандалы" className={risky ? "text-bad" : "text-ink-muted"}>
+        <Stat icon={statIcon("scandal")} label={t("ui.players.scandals")} className={risky ? "text-bad" : "text-ink-muted"}>
           {player.scandals}/{scandalLimit(player)}
         </Stat>
-        <Stat icon={statIcon("roof")} label="Крыши" className={shielded ? "text-defence" : "text-ink-dim"}>
+        <Stat icon={statIcon("roof")} label={t("ui.players.roofs")} className={shielded ? "text-defence" : "text-ink-dim"}>
           {player.roofs}/{player.roof_limit}
         </Stat>
       </span>

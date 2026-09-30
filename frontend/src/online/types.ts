@@ -218,7 +218,17 @@ export interface AssetMeta {
   // at 10$ each held, and that rate is the whole late game.
   points?: number;
 }
-export interface ActionMeta { id: string; title: string; tone: string; text: string; kind: string; value: number; targeted?: boolean }
+export interface ActionMeta {
+  id: string;
+  title: string;
+  tone: string;
+  text: string;
+  kind: string;
+  value: number;
+  targeted?: boolean;
+  /** Карту разрешено направить на себя — ход Журналиста. */
+  self_target?: boolean;
+}
 export interface ProjectRequirement { type: string; count?: number; district?: string; tag?: string; role?: string }
 export interface ProjectMeta {
   id: string;
@@ -272,4 +282,6 @@ export interface CityMeta {
   assets: AssetMeta[];
   action_cards: ActionMeta[];
   projects: ProjectMeta[];
+  /** С какого раунда карты каждой редкости попадают на рынок. */
+  rarity_min_round?: Record<string, number>;
 }

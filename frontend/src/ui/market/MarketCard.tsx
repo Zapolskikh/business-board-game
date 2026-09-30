@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { motion } from "motion/react";
 import { assetEffectLines, districtCount } from "../../online/gameUi";
 import type {
@@ -55,6 +56,7 @@ export function MarketCard({
   const claimedByMe = item.claimed_by === me.id;
   const lockedForMe = Boolean(item.locked_by) && item.locked_by !== me.id;
   const portrait = useIsPortrait();
+  const { t } = useTranslation("game");
 
   /* Сноска «ещё N условий» — про город после покупки: условие «при наличии объекта своего же
    * района» эта карта выполнит сама. Строки только считаются, правило по-прежнему у движка. */
@@ -66,37 +68,37 @@ export function MarketCard({
   /* Метки обеих ролей публичны и меняют решение «покупать ли», поэтому стоят на лице. */
   const bullets: AssetBullet[] = [];
   if (item.leaving) {
-    bullets.push({ key: "leaving", icon: "⏳", text: "уходит", tone: "warn", title: "Слот уходит в конце раунда" });
+    bullets.push({ key: "leaving", icon: "⏳", text: t("ui.market.leaving"), tone: "warn", title: t("ui.market.leavingTitle") });
   }
   if (item.claimed_by) {
     bullets.push({
       key: "claim",
       icon: "🏷",
-      text: claimedByMe ? "ваша метка" : "метка",
+      text: claimedByMe ? t("ui.market.claimMine") : t("ui.market.claim"),
       tone: claimedByMe ? "good" : undefined,
-      title: claimedByMe ? "Ваша метка: карта уже работает на вас" : "Метка капиталиста: карта работает на него",
+      title: claimedByMe ? t("ui.market.claimMineTitle") : t("ui.market.claimTitle"),
     });
   }
   if (item.locked_by) {
     bullets.push({
       key: "lock",
       icon: "🔒",
-      text: lockedForMe ? "закрыт" : "ваша блокировка",
+      text: lockedForMe ? t("ui.market.locked") : t("ui.market.lockedMine"),
       tone: lockedForMe ? "bad" : "good",
-      title: "Серая метка мафиози: слот закрыт для всех, кроме него, до конца раунда",
+      title: t("ui.market.lockedTitle"),
     });
   }
   bullets.push({
     key: "district",
     icon: "▦",
-    text: `район ${owned}/4`,
+    text: t("ui.market.district", { count: owned }),
     tone: owned >= 2 ? "good" : undefined,
-    title: "Ваши объекты этого района. Синергия включается на 2 и на 4.",
+    title: t("ui.market.districtTitle"),
   });
 
   return (
     <CardPopover
-      label={`${asset.title} — подробности`}
+      label={t("ui.market.details", { title: asset.title })}
       content={
         <MarketCardDetails
           item={item}

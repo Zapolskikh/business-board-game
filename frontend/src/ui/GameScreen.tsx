@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import { errorText } from "../i18n/errors";
 import { useState } from "react";
 import type { CityMeta } from "../online/types";
 import { Board } from "./board/Board";
@@ -34,6 +36,7 @@ export function GameScreen({
 }
 
 function Gate({ roomName, onExit }: { roomName: string; onExit: () => void }) {
+  const { t } = useTranslation();
   const { data, error, isLoading } = useRoom();
 
   if (data?.game) return <Board roomName={roomName} onExit={onExit} />;
@@ -42,18 +45,14 @@ function Gate({ roomName, onExit }: { roomName: string; onExit: () => void }) {
     <div className="ui-v2 grid h-dvh place-content-center gap-3 justify-items-center bg-surface
       font-sans text-ink">
       <p className="text-ink-muted">
-        {isLoading
-          ? "Загрузка партии…"
-          : error instanceof Error
-            ? error.message
-            : "Партия ещё не начата"}
+        {isLoading ? t("app.loadingGame") : error ? errorText(error) : t("app.gameNotStarted")}
       </p>
       <button
         type="button"
         onClick={onExit}
         className="rounded-md border border-line bg-panel-2 px-3 py-2 text-xs hover:border-accent"
       >
-        ← К комнатам
+        {t("app.backToRooms")}
       </button>
     </div>
   );

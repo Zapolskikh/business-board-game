@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo } from "react";
 import type { AssetMeta, CityMeta, GameState, LegalAction, PlayerState } from "../../online/types";
@@ -38,16 +39,17 @@ export function MarketGrid({
     [meta.districts],
   );
   const rotation = meta.scoring?.market_rotation_size ?? 3;
+  const { t } = useTranslation("game");
   const portrait = useIsPortrait();
 
   return (
     <Panel rows zone="market">
       <SectionHead
-        title="Рынок"
+        title={t("ui.marketPanel.title")}
         meta={
           portrait
-            ? `${rotation} из ${game.market.length} уйдут · колода ${game.market_deck_count}`
-            : `${rotation} из ${game.market.length} слотов уйдут в конце раунда · в колоде ${game.market_deck_count}`
+            ? t("ui.marketPanel.metaShort", { rotation, total: game.market.length, deck: game.market_deck_count })
+            : t("ui.marketPanel.meta", { rotation, total: game.market.length, deck: game.market_deck_count })
         }
       />
 

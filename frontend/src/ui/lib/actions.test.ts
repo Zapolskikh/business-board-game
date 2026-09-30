@@ -27,7 +27,7 @@ describe("matches", () => {
 
 describe("turnBlock", () => {
   it("на чужом ходу называет игрока", () => {
-    expect(turnBlock(contextFor("Ход соперника"))).toBe("Ход игрока Bot 2");
+    expect(turnBlock(contextFor("Ход соперника"))).toBe("Сейчас ходит Bot 2");
   });
 
   it("отличает исчерпанные действия", () => {
@@ -37,7 +37,7 @@ describe("turnBlock", () => {
   it("тюрьма важнее остатка действий", () => {
     const base = contextFor("Богатый ход");
     const context: ActionContext = { ...base, me: { ...base.me, jail_turns: 2 } };
-    expect(turnBlock(context)).toBe("Тюрьма: ходов 2");
+    expect(turnBlock(context)).toBe("Арест: в этом ходу только 1 действие");
   });
 
   it("законченная партия блокирует всё", () => {
@@ -87,7 +87,7 @@ describe("resolve", () => {
 
   it("без подсказки объясняет общей причиной хода", () => {
     const state = resolve(contextFor("Ход соперника"), "buy_roof");
-    expect(state).toEqual({ kind: "blocked", reason: "Ход игрока Bot 2" });
+    expect(state).toEqual({ kind: "blocked", reason: "Сейчас ходит Bot 2" });
   });
 });
 
@@ -107,7 +107,7 @@ describe("resolveMany", () => {
       power: "mafia_racket",
     });
     expect(options).toHaveLength(0);
-    expect(blocked).toBe("Ход игрока Bot 2");
+    expect(blocked).toBe("Сейчас ходит Bot 2");
   });
 });
 

@@ -61,6 +61,9 @@ def _client_ip(request: Request) -> str:
 
 
 def _rule_for(request: Request) -> tuple[str, RateRule] | None:
+    # Живой человек пишет отзыв раз в несколько минут; пять в минуту — уже поток.
+    if request.method == "POST" and request.url.path == "/api/feedback":
+        return "feedback", RateRule(5)
     if not request.url.path.startswith("/api/city/rooms"):
         return None
     if request.method == "POST" and request.url.path == "/api/city/rooms":

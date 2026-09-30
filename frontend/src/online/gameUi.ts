@@ -11,38 +11,48 @@ import type {
   RoleMeta,
   RoomView,
 } from "./types";
+import { tr } from "../i18n";
 
-export const rarityLabels: Record<string, string> = {
-  common: "Обычный",
-  uncommon: "Необычный",
-  rare: "Редкий",
-  epic: "Эпический",
-  legendary: "Легендарный",
-};
+/* Все подписи — из locales/<язык>/game.json. Таблицы ниже — объекты с геттерами: их можно
+ * перебирать (Object.entries) и читать по ключу, а значение всегда на текущем языке. */
+const tg = (key: string, options?: Record<string, unknown>): string => tr("game", key, options);
 
-export const difficultyLabels: Record<string, string> = {
-  easy: "Easy",
-  medium: "Medium",
-  hard: "Hard",
-  expert: "Reborn",
-};
+function labelTable<K extends string>(prefix: string, keys: readonly K[]): Record<string, string> {
+  const table: Record<string, string> = {};
+  for (const key of keys) {
+    Object.defineProperty(table, key, { enumerable: true, get: () => tg(`${prefix}.${key}`) });
+  }
+  return table;
+}
 
-export const powerLabels: Record<string, string> = {
-  politician_cleanup: "Урегулировать скандал",
-  journalist_inflate: "Раздуть историю",
-  journalist_publish: "Опубликовать расследование",
-  mafia_racket: "Рэкет",
-  mafia_cleanup: "Замять дело",
-  military_sanction: "Санкции",
-  military_inspection: "Прийти с проверкой",
-  military_roof_seize: "Отобрать Крышу",
-  fraudster_cleanup: "Снять скандал",
-  fraudster_crypto_scam: "Криптоскам",
-  capitalist_claim: "Поставить метку",
-  mafia_lock: "Серая метка",
-  politician_deal: "Договоримся",
-  politician_veto: "Право вето",
-};
+export const rarityLabels = labelTable("rarity", ["common", "uncommon", "rare", "epic", "legendary"]);
+
+export const difficultyLabels: Record<string, string> = {};
+for (const key of ["easy", "medium", "hard", "expert"]) {
+  Object.defineProperty(difficultyLabels, key, { enumerable: true, get: () => tr("common", `difficulty.${key}`) });
+}
+
+const POWER_IDS = [
+  "politician_cleanup",
+  "journalist_inflate",
+  "journalist_publish",
+  "mafia_racket",
+  "mafia_cleanup",
+  "military_sanction",
+  "military_inspection",
+  "military_roof_seize",
+  "fraudster_cleanup",
+  "fraudster_crypto_scam",
+  "capitalist_claim",
+  "mafia_lock",
+  "politician_deal",
+  "politician_veto",
+] as const;
+
+export const powerLabels: Record<string, string> = {};
+for (const key of POWER_IDS) {
+  Object.defineProperty(powerLabels, key, { enumerable: true, get: () => tg(`power.${key}.label`) });
+}
 
 /* Что делает каждая активная способность и во что обходится.
  *
@@ -50,88 +60,13 @@ export const powerLabels: Record<string, string> = {
  * делает, ни почему она серая, ни чего ему не хватает. Текст здесь — описание, а не правило:
  * все числа, по которым способность разрешается, приходят из движка в `game.role_powers`.
  */
-export const powerDescriptions: Record<string, { what: string; cost: string }> = {
-  capitalist_claim: {
-    what:
-      "Ставит вашу метку на карту рынка. Помеченная карта считается вашей: даёт доход, входит в " +
-      "синергию района, засчитывается в условия проектов и открывает серые операции — но остаётся " +
-      "в продаже, и любой может купить её у вас из-под носа. Очков за неё вы не получаете. " +
-      "Метка одна: новая снимает предыдущую, при потере роли снимается сама.",
-    cost: "действие + 1 скандал",
-  },
-  politician_cleanup: {
-    what: "Снимает один свой скандал. Дешевле обычного антикризисного PR, но тоже стоит действие.",
-    cost: "действие + 2◆",
-  },
-  politician_deal: {
-    what:
-      "Любой район на ваш выбор до конца раунда считается вашим: открывает проекты и серые " +
-      "операции этого квартала и входит в синергию. Район не обязательно должен у вас быть.",
-    cost: "3◆ + 1 скандал, действие не тратится, раз в ход",
-  },
-  politician_veto: {
-    what:
-      "Закрывает проект на доске: пока вето стоит, взять его можете только вы. Проект уходит " +
-      "с доски по обычному расписанию и уносит вето с собой. Вето одно, его видят все.",
-    cost: "действие + 3◆",
-  },
-  journalist_inflate: {
-    what:
-      "Один скандал сопернику — и один вам: раздувая историю, вы пачкаетесь сами. Крыша цели " +
-      "гасит эффект целиком и тратится, тогда и вашего скандала не будет.",
-    cost: "бесплатно, действие не тратится, раз в ход",
-  },
-  journalist_publish: {
-    what: "Два скандала сопернику и без отдачи по вам. Крыша цели гасит публикацию целиком.",
-    cost: "действие + 3◆, раз в ход",
-  },
-  fraudster_cleanup: {
-    what: "Снимает один свой скандал даром — сама роль их и производит.",
-    cost: "действие",
-  },
-  fraudster_crypto_scam: {
-    what:
-      "Забирает четверть кошелька у каждого соперника разом. Крыша защищает своего владельца " +
-      "и тратится. Обходится в пять скандалов — весь бюджет роли, если не собран движок из " +
-      "объектов и проектов, снижающих скандалы от серых операций.",
-    cost: "действие + 5 скандалов, раз в ход",
-  },
-  mafia_racket: {
-    what:
-      "Дань с одного соперника: деньги по вашим объектам Серого сектора, влияние — по " +
-      "Административному кварталу. Без своего объекта Администрации приносит ещё и скандал вам. " +
-      "Крыша цели гасит рэкет и тратится.",
-    cost: "действие, раз в ход",
-  },
-  mafia_cleanup: {
-    what: "Хоронит сразу два своих скандала. Нужен свой объект Административного квартала.",
-    cost: "действие + 3$",
-  },
-  mafia_lock: {
-    what:
-      "Серая метка на карту рынка: до конца раунда её не купит никто, кроме вас. Снять нельзя — " +
-      "метку убирает только смена раунда. Видят все.",
-    cost: "1 Крыша, действие не тратится, раз в ход",
-  },
-  military_sanction: {
-    what:
-      "Лестница по счётчику скандалов цели: с двух — деньги, с трёх — деньги и влияние, " +
-      "с четырёх — ещё и роль. Скандал цели не снимается. Крыша гасит санкцию и тратится.",
-    cost: "действие, раз в ход",
-  },
-  military_inspection: {
-    what:
-      "Скандал каждому сопернику, у кого есть объект Серого сектора. Бьёт по району, а не по " +
-      "игроку, поэтому отсидеться тихо нельзя. Крыша отвечает за своего владельца и тратится.",
-    cost: "действие",
-  },
-  military_roof_seize: {
-    what:
-      "Забирает одну Крышу у соперника и ставит её себе. Крыша от этого не защищает — иначе " +
-      "способность нельзя было бы применить к тем, у кого она есть.",
-    cost: "действие + 3◆",
-  },
-};
+export const powerDescriptions: Record<string, { what: string; cost: string }> = {};
+for (const key of POWER_IDS) {
+  Object.defineProperty(powerDescriptions, key, {
+    enumerable: true,
+    get: () => ({ what: tg(`power.${key}.what`), cost: tg(`power.${key}.cost`) }),
+  });
+}
 
 /* Чего не хватает. Ключи приходят из движка вместе с have/needed — клиент только подписывает. */
 export function powerGateText(
@@ -140,51 +75,20 @@ export function powerGateText(
 ): string {
   const district = meta.districts.find(item => item.id === gate.district)?.title ?? gate.district;
   const asset = meta.assets.find(item => item.id === gate.asset_id)?.title ?? gate.asset_id;
-  switch (gate.key) {
-    case "action":
-      return "нет действий в этом ходу";
-    case "once_per_turn":
-      return "уже использовано в этом ходу";
-    case "influence":
-      return `нужно ${gate.needed}◆, у вас ${gate.have}`;
-    case "money":
-      return `нужно ${gate.needed}$, у вас ${gate.have}`;
-    case "own_scandal":
-      return "нет своего скандала, который можно снять";
-    case "scandal_room":
-      return "скандал приведёт к потере роли";
-    case "roof":
-      return "нужна Крыша, у вас её нет";
-    case "roof_room":
-      return "предел Крыш достигнут — некуда положить";
-    case "district":
-      return `нужен ваш объект района «${district}»`;
-    case "own_asset":
-      return `нужен ваш объект «${asset}»`;
-    case "market_slot":
-      return "все слоты рынка уже помечены вами";
-    case "project_slot":
-      return "на доске нет проекта без вашего вето";
-    case "rival":
-      return "нет соперников";
-    case "dirty_rival":
-      return "ни у кого из соперников нет 2+ скандалов";
-    case "grey_rival":
-      return "ни у кого из соперников нет объекта Серого сектора";
-    case "roofed_rival":
-      return "ни у кого из соперников нет Крыши";
-    default:
-      return `${gate.key}: ${gate.have}/${gate.needed}`;
-  }
+  const known = [
+    "action", "once_per_turn", "influence", "money", "own_scandal", "scandal_room", "roof", "roof_room",
+    "district", "own_asset", "market_slot", "project_slot", "rival", "dirty_rival", "grey_rival", "roofed_rival",
+  ];
+  const values = { have: gate.have, needed: gate.needed, district, asset, key: gate.key };
+  return tg(`gate.${known.includes(gate.key) ? gate.key : "other"}`, values);
 }
 
-export const greyOperationLabels: Record<string, string> = {
-  smear: "Вброс",
-  crypto: "Памп и дамп",
-  roof_break: "Пробить крышу",
-  datacenter: "Взлом",
-  influence_broker: "Слив компромата",
-};
+const GREY_IDS = ["smear", "crypto", "roof_break", "datacenter", "influence_broker"] as const;
+
+export const greyOperationLabels: Record<string, string> = {};
+for (const key of GREY_IDS) {
+  Object.defineProperty(greyOperationLabels, key, { enumerable: true, get: () => tg(`grey.${key}.label`) });
+}
 
 // Mirrors `CityEngine.GREY_OPERATION_DISTRICTS`: an operation is unlocked by any active object of
 // these districts, not by one card out of 71. Kept next to the labels because the object cards have
@@ -213,38 +117,27 @@ function pumpDrain(meta: CityMeta, round: number): number {
   return (meta.scoring?.pump_drain_base ?? 2) + Math.floor(round / 2);
 }
 
-export const greyOperationInfo: Record<string, { asset: string; effect: (round: number, meta: CityMeta) => string; chance: number; failure: string }> = {
-  smear: {
-    asset: "Сеть анонимных каналов",
-    effect: () => "по 1 скандалу каждому сопернику",
-    chance: 60,
-    failure: "Единственный ход в игре, который бьёт по всем троим сразу — поэтому шанс у него ниже, чем у соседей. Крыша каждого соперника считается отдельно: она гасит его скандал и тратится. Одна операция может снять сразу три Крыши.",
-  },
-  crypto: {
-    asset: "Городская криптобиржа",
-    effect: (round, meta) => `забрать у каждого соперника до ${pumpDrain(meta, round)}$`,
-    chance: 45,
-    failure: "Деньги не появляются из воздуха — они переходят к вам из чужих кошельков, поэтому операция тем сильнее, чем больше игроков за столом. Крыша каждого соперника считается отдельно: она спасает его деньги и тратится.",
-  },
-  roof_break: {
-    asset: "Бригада поджигателей",
-    effect: (_round, meta) => `снять с цели все Крыши, +${meta.scoring?.roof_break_point_per_roof ?? 1} очко за каждую`,
-    chance: 60,
-    failure: "Единственная атака, которую Крыша не гасит — она по Крыше и бьёт. Доступна, только если у цели есть хотя бы одна Крыша. Крыша отражает 59% всех направленных атак в игре, так что это способ вскрыть игрока, который спрятался за защитой.",
-  },
-  datacenter: {
-    asset: "Нелегальный дата-центр",
-    effect: (round, meta) => `украсть у цели до ${hackSteal(meta, round)}◆`,
-    chance: 40,
-    failure: "Влияние — самый дефицитный ресурс, поэтому шанс здесь самый низкий, а размер кражи растёт с раундом. Крыша цели тратится и полностью отменяет кражу.",
-  },
-  influence_broker: {
-    asset: "Торговец компроматом",
-    effect: () => "снять роль с цели",
-    chance: 60,
-    failure: "Цель теряет роль: −3 очка, весь её пассив, а место освобождается по свободной цене, а не по цене переворота. Доступна, только если у цели есть роль. Крыша цели тратится и полностью гасит слив.",
-  },
-};
+const greyChance: Record<string, number> = { smear: 60, crypto: 45, roof_break: 60, datacenter: 40, influence_broker: 60 };
+
+export const greyOperationInfo: Record<
+  string,
+  { effect: (round: number, meta: CityMeta) => string; chance: number; failure: string }
+> = {};
+for (const key of GREY_IDS) {
+  Object.defineProperty(greyOperationInfo, key, {
+    enumerable: true,
+    get: () => ({
+      effect: (round: number, meta: CityMeta) =>
+        tg(`grey.${key}.effect`, {
+          money: pumpDrain(meta, round),
+          influence: hackSteal(meta, round),
+          points: meta.scoring?.roof_break_point_per_roof ?? 1,
+        }),
+      chance: greyChance[key],
+      failure: tg(`grey.${key}.note`),
+    }),
+  });
+}
 
 const capacityCosts: Record<number, number> = { 3: 6, 4: 10, 5: 15 };
 
@@ -343,29 +236,10 @@ export function cleanupPowerFor(role: string | null): string | undefined {
 }
 
 export function cleanupOffer(power: string | undefined, meta: CityMeta): { label: string; tooltip: string } {
-  const base = `Базовый вариант — антикризисный PR: 1 действие и ${crisisPrInfluence(meta)}◆ за один скандал.`;
-  switch (power) {
-    case "politician_cleanup":
-      return {
-        label: "🧯 Урегулировать скандал: 2◆ → −1⚠",
-        tooltip: `Способность Политика: 1 действие и 2◆ за один скандал — на 1◆ дешевле, чем у остальных. ${base}`,
-      };
-    case "fraudster_cleanup":
-      return {
-        label: "🧯 Замести следы: бесплатно → −1⚠",
-        tooltip: `Способность Афериста: 1 действие и ничего больше за один скандал. У роли четыре действия за ход, так что чистка обходится дешевле всех в игре. ${base}`,
-      };
-    case "mafia_cleanup":
-      return {
-        label: "🧯 Замять дело: 3$ → −2⚠",
-        tooltip: `Способность Мафиози: 1 действие и 3$ снимают сразу два скандала. Нужен активный объект Административного квартала — без него кнопка предлагает базовый вариант. ${base}`,
-      };
-    default:
-      return {
-        label: `🧯 Антикризисный PR: ${crisisPrInfluence(meta)}◆ → −1⚠`,
-        tooltip: `Потратить 1 действие и ${crisisPrInfluence(meta)}◆, чтобы снять 1 свой скандал. Цена в влиянии, а не в деньгах: деньги слишком дёшевы в очках, чтобы скандал что-то значил. Роли Политика, Афериста и Мафиози чистят скандалы дешевле — эта же кнопка подставит их цену.`,
-      };
-  }
+  const cost = crisisPrInfluence(meta);
+  const base = tg("cleanup.base", { cost });
+  const key = power && ["politician_cleanup", "fraudster_cleanup", "mafia_cleanup"].includes(power) ? power : "default";
+  return { label: tg(`cleanup.${key}.label`, { cost }), tooltip: tg(`cleanup.${key}.tooltip`, { cost, base }) };
 }
 
 export function actionCardCost(meta: CityMeta): number {
@@ -381,59 +255,33 @@ export function projectRequirementText(project: ProjectMeta, meta: CityMeta): st
   const requirement = project.requirement ?? { type: "none" };
   const count = requirement.count ?? 1;
   const districtTitle = (id?: string): string => meta.districts.find(item => item.id === id)?.title ?? id ?? "";
-  switch (requirement.type) {
-    case "none": return "без условия";
-    case "assets": return `объектов не меньше ${count}`;
-    case "role": return "нужна любая роль";
-    case "max_scandals": return `скандалов не больше ${count}`;
-    case "district_objects": return `объектов в «${districtTitle(requirement.district)}» не меньше ${count}`;
-    case "district_depth": return `не меньше ${count} объектов в одном районе`;
-    case "distinct_districts": return `объекты в ${count} разных районах`;
-    case "tag_objects": return `объектов с тегом «${tagLabel(requirement.tag ?? "")}» не меньше ${count}`;
-    default: return requirement.type;
-  }
+  const known = ["none", "assets", "role", "max_scandals", "district_objects", "district_depth", "distinct_districts", "tag_objects"];
+  if (!known.includes(requirement.type)) return requirement.type;
+  return tg(`requirement.${requirement.type}`, {
+    count,
+    district: districtTitle(requirement.district),
+    tag: tagLabel(requirement.tag ?? ""),
+  });
 }
 
-/* Теги в каталоге — служебные id. Игроку показываются русские названия: и на карточке объекта,
- * и в условии проекта, иначе «объекты с тегом government» не найти глазами на доске. */
-export const tagLabels: Record<string, string> = {
-  finance: "Финансы",
-  grey: "Серое",
-  government: "Управление",
-  production: "Производство",
-  politics: "Политика",
-  security: "Безопасность",
-  tech: "Технологии",
-  service: "Сервис",
-  infrastructure: "Инфраструктура",
-  data: "Данные",
-  logistics: "Логистика",
-  media: "Медиа",
-  energy: "Энергетика",
-  ai: "ИИ",
-  legal: "Право",
-  office: "Офис",
-  crypto: "Крипто",
-  contract: "Контракты",
-  lobby: "Лобби",
-};
+/* Теги в каталоге — служебные id. Игроку показываются названия на его языке: и на карточке
+ * объекта, и в условии проекта, иначе «объекты с тегом government» не найти глазами на доске. */
+export const tagLabels = labelTable("tag", [
+  "finance", "grey", "government", "production", "politics", "security", "tech", "service", "infrastructure",
+  "data", "logistics", "media", "energy", "ai", "legal", "office", "crypto", "contract", "lobby",
+]);
 
 export const tagLabel = (tag: string): string => tagLabels[tag] ?? tag;
 
-const perkLabels: Record<string, (value: number) => string> = {
-  passiveMoney: value => `+${value}$ в каждый раунд`,
-  passiveInfluence: value => `+${value}◆ в каждый раунд`,
-  scandalReduction: value => `−${value} скандал в начале хода`,
-  greyScandalReduction: value => `−${value} скандал от серых операций`,
-  turnRoof: () => "+1 Крыша в начале каждого хода",
-  roofCapacity: value => `+${value} к пределу Крыш`,
-  extraInvestmentActions: () => "+1 инвестиционное действие в начале хода",
-};
+const PERK_KEYS = [
+  "passiveMoney", "passiveInfluence", "scandalReduction", "greyScandalReduction", "turnRoof", "roofCapacity",
+  "extraInvestmentActions",
+];
 
 export function projectPerkText(project: ProjectMeta): string {
   const entries = Object.entries(project.perk ?? {});
-  if (entries.length === 0) return "без постоянного бонуса";
-  return entries.map(([key, value]) => perkLabels[key]?.(value) ?? `${key} ${value}`).join(", ");
+  if (entries.length === 0) return tg("perk.none");
+  return entries.map(([key, value]) => (PERK_KEYS.includes(key) ? tg(`perk.${key}`, { value }) : `${key} ${value}`)).join(", ");
 }
 
 // Market prices arrive precomputed from the engine (`market.price`); `asset.cost` is only the
@@ -450,8 +298,8 @@ function roofCost(player: PlayerState, game: GameState): number {
 }
 
 function capacityLabel(player: PlayerState): string {
-  if (player.capacity >= 6) return "Максимум 6 слотов";
-  return `Слот ${player.capacity + 1}: ${capacityCosts[player.capacity] ?? "?"}$`;
+  if (player.capacity >= 6) return tg("capacity.max");
+  return tg("capacity.next", { slot: player.capacity + 1, cost: capacityCosts[player.capacity] ?? "?" });
 }
 
 interface LabelContext {
@@ -473,55 +321,61 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
   const role = roles.get(stringValue(payload.role_id));
   const project = projects.get(stringValue(payload.project_id));
   if (action.type === "basic_action") {
-    if (payload.kind === "work") return "Городской заказ: +2$";
+    if (payload.kind === "work") return tg("action.work");
     if (payload.kind === "patronage") {
       const deal = patronage(meta);
-      return `Патронаж: ${deal.money}$ → ${deal.points} очка`;
+      return tg("action.patronage", deal);
     }
     if (payload.kind === "lobbying") {
       const deal = lobbying(meta);
-      return `Лоббирование: ${deal.influence}◆ → ${deal.points} очка`;
+      return tg("action.lobbying", deal);
     }
     const tier = campaignTier(meta, payload.spend);
-    return tier ? `Кампания: ${tier.spend}$ → ${tier.gain}◆` : "Кампания";
+    return tier ? tg("action.campaign", tier) : tg("action.campaignPlain");
   }
-  if (action.type === "end_turn") return "Завершить ход";
-  if (action.type === "reroll_projects") return `Пересобрать доску проектов (${projectRerollMoney(meta)}$ + действие)`;
+  if (action.type === "end_turn") return tg("action.endTurn");
+  if (action.type === "reroll_projects") return tg("action.rerollProjects", { money: projectRerollMoney(meta) });
   if (action.type === "city_project") {
     // Хартия снимает требования проекта, но один раз за партию, и об этом нужно
     // предупредить до клика: обратно право не вернуть.
-    const waiver = payload.use_waiver === true ? " · по Хартии, без требований" : "";
+    const waiver = payload.use_waiver === true ? tg("action.waiver") : "";
     return project
-      ? `«${project.title}» · ${project.cost_influence}◆+${project.cost_money}$ → ${project.points} очков${waiver}`
-      : `Городской проект${waiver}`;
+      ? tg("action.project", {
+          title: project.title,
+          influence: project.cost_influence,
+          money: project.cost_money,
+          points: project.points,
+          waiver,
+        })
+      : tg("action.projectPlain", { waiver });
   }
   if (action.type === "buy_capacity") return capacityLabel(player);
-  if (action.type === "buy_roof") return `Купить Крышу (${roofCost(player, game)}$)`;
+  if (action.type === "buy_roof") return tg("action.buyRoof", { cost: roofCost(player, game) });
   // The engine charges influence, not money: CRISIS_PR_INFLUENCE, not the old 4$ price.
-  if (action.type === "crisis_pr") return `Антикризисный PR: ${crisisPrInfluence(meta)}◆ → −1⚠`;
+  if (action.type === "crisis_pr") return tg("action.crisisPr", { cost: crisisPrInfluence(meta) });
   if (action.type === "claim_role") return `${role?.icon ?? "🏷️"} ${role?.title ?? payload.role_id}`;
   if (action.type === "buy_asset") {
     const marketItem = game.market.find(item => item.uid === payload.market_uid);
-    return `Купить «${assets.get(marketItem?.card_id ?? "")?.title ?? "объект"}»`;
+    return tg("action.buyAsset", { title: assets.get(marketItem?.card_id ?? "")?.title ?? tg("action.object") });
   }
   if (action.type === "sell_asset") {
     const owned = player.assets.find(item => item.uid === payload.asset_uid);
     const asset = assets.get(owned?.card_id ?? "");
     const points = asset ? assetPoints(asset) : 0;
-    return `Продать «${asset?.title ?? "объект"}» за ${points}$ (−${points} очков)`;
+    return tg("action.sellAsset", { title: asset?.title ?? tg("action.object"), points });
   }
   if (action.type === "market_refresh") {
     const marketItem = game.market.find(item => item.uid === payload.market_uid);
-    return `Пересдать «${assets.get(marketItem?.card_id ?? "")?.title ?? "слот"}»`;
+    return tg("action.refresh", { title: assets.get(marketItem?.card_id ?? "")?.title ?? tg("action.slot") });
   }
-  if (action.type === "buy_action_card") return `Купить «${cards.get(stringValue(payload.card_id))?.title ?? payload.card_id}»`;
+  if (action.type === "buy_action_card") return tg("action.buyCard", { title: cards.get(stringValue(payload.card_id))?.title ?? payload.card_id });
   if (action.type === "convert_action_card") {
     const back = cardDiscardValue(meta);
-    return payload.into === "money" ? `Продать карту → +${back}$` : `Сбросить карту → +${back}◆`;
+    return payload.into === "money" ? tg("action.sellCard", { value: back }) : tg("action.discardCard", { value: back });
   }
   if (action.type === "play_action_card") {
     const held = player.hand?.find(item => item.uid === payload.card_uid);
-    const title = cards.get(held?.card_id ?? "")?.title ?? "Карта";
+    const title = cards.get(held?.card_id ?? "")?.title ?? tg("action.card");
     /* Карты, где игрок всё равно выбрал бы свой максимум, район больше не спрашивают:
      * движок берёт лучший сам и присылает посчитанную сумму. Печатаем её, иначе кнопка
      * «Разыграть» не говорит, ради чего её жмут. */
@@ -532,7 +386,7 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
     const detail = target ? ` → ${target.name}`
       : district ? ` · ${district.title}`
       : role ? ` · ${role.title}`
-      : project ? ` · «${project.title}» (${project.cost_money}$ → ${project.points} очков)`
+      : project ? tg("action.cardProject", { title: project.title, money: project.cost_money, points: project.points })
       : auto;
     return `${title}${detail}`;
   }
@@ -540,50 +394,16 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
     return `${greyOperationLabels[stringValue(payload.asset_id)] ?? payload.asset_id}${target ? ` → ${target.name}` : ""}`;
   }
   if (action.type === "use_role_power") {
-    const details = target ? ` → ${target.name}` : district ? ` · ${district.title}` : role ? ` · ${role.title}` : payload.amount ? ` · ${payload.amount}⚠` : payload.method ? ` · ${payload.method === "roof" ? "Крышей" : "деньгами"}` : "";
+    const details = target ? ` → ${target.name}` : district ? ` · ${district.title}` : role ? ` · ${role.title}` : payload.amount ? ` · ${payload.amount}⚠` : payload.method ? ` · ${payload.method === "roof" ? tg("action.byRoof") : tg("action.byMoney")}` : "";
     return `${powerLabels[stringValue(payload.power)] ?? payload.power}${details}`;
   }
   return action.type;
 }
 
-const eventVerbs: Record<string, string> = {
-  game_created: "Партия началась",
-  turn_started: "начинает ход",
-  turn_ended: "завершает ход",
-  round_started: "Начался новый раунд",
-  round_settled: "Город выплатил доходы",
-  basic_action: "выполняет городское действие",
-  city_project_taken: "забирает городской проект",
-  project_board_rotated: "Доска проектов обновилась",
-  project_board_redealt: "пересобирает доску проектов",
-  turn_order_set: "Порядок хода определён",
-  role_takeover_blocked: "не смог перехватить роль",
-  role_stripped: "сливает компромат и снимает роль",
-  roof_bought: "покупает Крышу",
-  crisis_pr: "проводит антикризисный PR",
-  military_sanction: "вводит санкции",
-  military_inspection: "приходит с проверкой",
-  roof_seized: "отбирает Крышу",
-  market_claimed: "ставит метку на карту рынка",
-  market_locked: "закрывает слот серой меткой",
-  market_refreshed: "пересдаёт слот рынка",
-  project_vetoed: "накладывает право вето",
-  capacity_bought: "расширяет бизнес",
-  asset_bought: "покупает объект",
-  asset_sold: "продаёт объект",
-  asset_replaced: "меняет объект",
-  role_claimed: "получает роль",
-  role_taken: "захватывает роль",
-  action_card_bought: "покупает карту действия",
-  action_card_played: "разыгрывает карту",
-  action_card_converted: "конвертирует карту",
-  market_rotated: "Рынок объектов обновился",
-  grey_operation: "проводит серую операцию",
-  role_power_used: "использует способность роли",
-  scandal_limit_reached: "доходит до предела скандалов",
-  player_jailed: "арестован",
-  game_finished: "Партия завершена",
-};
+const eventVerbs = labelTable("event.verbs", [
+  "round_settled", "project_board_rotated", "turn_order_set", "role_takeover_blocked", "asset_replaced",
+  "role_taken", "grey_operation", "role_power_used", "game_finished",
+]);
 
 // Colours assigned to players by seat order.
 const playerColors = ["#9fc4d1", "#91c5a5", "#d9a17e", "#ca91b8", "#d9bd78", "#b9a2d4"];
@@ -661,18 +481,18 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
 
   switch (event.type) {
     case "game_created":
-      return [txt("🎬 Партия началась")];
+      return [txt(tg("event.gameCreated"))];
     case "turn_started": {
       const actions = numberValue(data.actions);
       return lead(
-        txt(` начинает ход · раунд ${numberValue(data.round_number)} · `),
+        txt(tg("event.turnStarted", { round: numberValue(data.round_number) })),
         num(`${actions}⚡`, "neutral"),
       );
     }
     case "turn_ended":
-      return lead(txt(" завершает ход"));
+      return lead(txt(tg("event.turnEnded")));
     case "round_started":
-      return [txt(`▶️ Новый раунд ${numberValue(data.round_number)}`)];
+      return [txt(tg("event.roundStarted", { round: numberValue(data.round_number) }))];
     case "round_settled": {
       // `incomes` holds operations ± tribute only; the wallet also moves by the journalist payout
       // and the bridge-loan repayment. `income_sources` is the full breakdown, so sum that.
@@ -689,9 +509,9 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       // После последнего раунда выплаты нет: движок присылает нули, и строка из четырёх «+0$»
       // читалась бы как сбой, а не как правило.
       if (numberValue(data.round_number) >= game.max_rounds && ids.every(id => paid(id) === 0 && gained(id) === 0)) {
-        return [txt(`💰 Раунд ${numberValue(data.round_number)} — последний: выплаты за него нет`)];
+        return [txt(tg("event.lastRound", { round: numberValue(data.round_number) }))];
       }
-      const segments: LogSegment[] = [txt(`💰 Выплаты за раунд ${numberValue(data.round_number)}: `)];
+      const segments: LogSegment[] = [txt(tg("event.payouts", { round: numberValue(data.round_number) }))];
       ids.forEach((playerId, index) => {
         if (index > 0) segments.push(txt(", "));
         segments.push(playerSeg(game, playerId), txt(" "), signed(paid(playerId), "$"));
@@ -703,34 +523,34 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
     case "basic_action":
       if (data.kind === "patronage") {
         return lead(
-          txt(" вкладывается в город ("),
-          num(`${numberValue(data.spend)}$→${numberValue(data.gain)} очка`, "good"),
-          txt(`, стало ${numberValue(data.money)}$)`),
+          txt(tg("event.patronage")),
+          num(tg("event.patronageGain", { spend: numberValue(data.spend), gain: numberValue(data.gain) }), "good"),
+          txt(tg("event.nowMoney", { value: numberValue(data.money) })),
         );
       }
       if (data.kind === "lobbying") {
         return lead(
-          txt(" лоббирует свои интересы ("),
-          num(`${numberValue(data.spend)}◆→${numberValue(data.gain)} очка`, "good"),
-          txt(`, стало ${numberValue(data.influence)}◆)`),
+          txt(tg("event.lobbying")),
+          num(tg("event.lobbyingGain", { spend: numberValue(data.spend), gain: numberValue(data.gain) }), "good"),
+          txt(tg("event.nowInfluence", { value: numberValue(data.influence) })),
         );
       }
       return data.kind === "work"
-        ? lead(txt(" берёт городской заказ ("), num("+2$", "good"), txt(`, стало ${numberValue(data.money)}$)`))
+        ? lead(txt(tg("event.work")), num("+2$", "good"), txt(tg("event.nowMoney", { value: numberValue(data.money) })))
         : lead(
-            txt(" проводит кампанию ("),
+            txt(tg("event.campaign")),
             num(`${numberValue(data.spend)}$→${numberValue(data.gain)}◆`, "good"),
-            txt(`, стало ${numberValue(data.influence)}◆)`),
+            txt(tg("event.nowInfluence", { value: numberValue(data.influence) })),
           );
     case "city_project_taken": {
       const project = meta.projects.find(item => item.id === stringValue(data.project_id));
       return lead(
-        txt(` забирает проект «${project?.title ?? stringValue(data.project_id)}» (`),
+        txt(tg("event.projectTaken", { title: project?.title ?? stringValue(data.project_id) })),
         signed(-numberValue(data.cost_influence), "◆"),
         txt(" "),
         signed(-numberValue(data.cost_money), "$"),
         txt(" → "),
-        num(`+${numberValue(data.points)} очков`, "good"),
+        num(tg("event.points", { count: numberValue(data.points) }), "good"),
         txt(")"),
       );
     }
@@ -738,8 +558,8 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       const project = meta.projects.find(item => item.id === stringValue(data.expired_project_id));
       const title = project?.title ?? stringValue(data.expired_project_id);
       // Rotation recycles: the card goes under the deck, it does not leave the game.
-      const tail = txt(`🏗️ Проект «${title}» уходит под низ колоды`);
-      return event.actor_id ? lead(txt(` обновляет доску проектов («${title}» под низ колоды)`)) : [tail];
+      const tail = txt(tg("event.projectRotated", { title }));
+      return event.actor_id ? lead(txt(tg("event.projectRotatedBy", { title }))) : [tail];
     }
     case "project_board_redealt": {
       // A full re-deal, so naming one card would be misleading: the whole board changed.
@@ -747,14 +567,14 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
         .map(id => meta.projects.find(item => item.id === id)?.title ?? id)
         .join(", ");
       return lead(
-        txt(" пересобирает доску проектов ("),
+        txt(tg("event.projectRedealt")),
         signed(-numberValue(data.cost_money), "$"),
-        txt(` и действие) → ${titles}`),
+        txt(tg("event.projectRedealtTail", { titles })),
       );
     }
     case "turn_order_set": {
       const order = (data.order as string[]) ?? [];
-      const segments: LogSegment[] = [txt("🔀 Порядок хода (отстающий первым): ")];
+      const segments: LogSegment[] = [txt(tg("event.turnOrder"))];
       order.forEach((playerId, index) => {
         if (index > 0) segments.push(txt(" → "));
         segments.push(playerSeg(game, playerId));
@@ -762,17 +582,17 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       return segments;
     }
     case "capacity_bought":
-      return lead(txt(` расширяет бизнес до ${numberValue(data.capacity)} слотов (`), signed(-numberValue(data.cost), "$"), txt(")"));
+      return lead(txt(tg("event.capacity", { count: numberValue(data.capacity) })), signed(-numberValue(data.cost), "$"), txt(")"));
     case "roof_bought":
-      return lead(txt(" покупает Крышу ("), signed(-numberValue(data.cost), "$"), txt(`, крыш: ${numberValue(data.roofs)})`));
+      return lead(txt(tg("event.roofBought")), signed(-numberValue(data.cost), "$"), txt(tg("event.roofBoughtTail", { count: numberValue(data.roofs) })));
     case "military_sanction": {
       const stripped = stringValue(data.role_id);
       const roleTitle = meta.roles.find(item => item.id === stripped)?.title;
-      const tail: LogSegment[] = [txt(" вводит санкции против "), playerSeg(game, stringValue(data.target_id))];
+      const tail: LogSegment[] = [txt(tg("event.sanction")), playerSeg(game, stringValue(data.target_id))];
       tail.push(txt(` (${numberValue(data.scandals)}⚠): `));
       tail.push(num(`−${numberValue(data.money)}$`, "bad"));
       if (numberValue(data.influence)) tail.push(txt(", "), num(`−${numberValue(data.influence)}◆`, "bad"));
-      if (roleTitle) tail.push(txt(` и роль «${roleTitle}» снята`));
+      if (roleTitle) tail.push(txt(tg("event.sanctionRole", { role: roleTitle })));
       return lead(...tail);
     }
     case "military_inspection": {
@@ -781,39 +601,39 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       // Крыша ate three of them.
       const reached = Array.isArray(data.target_ids) ? data.target_ids.map(stringValue) : [];
       const hit = new Set(Array.isArray(data.scandalised_ids) ? data.scandalised_ids.map(stringValue) : []);
-      const tail: LogSegment[] = [txt(" приходит с проверкой в Серый сектор: ")];
+      const tail: LogSegment[] = [txt(tg("event.inspection"))];
       reached.forEach((targetId, index) => {
         if (index > 0) tail.push(txt(", "));
         tail.push(playerSeg(game, targetId));
-        tail.push(hit.has(targetId) ? num(" +1⚠", "bad") : txt(" (Крыша)"));
+        tail.push(hit.has(targetId) ? num(" +1⚠", "bad") : txt(tg("event.inspectionRoof")));
       });
       return lead(...tail);
     }
     case "roof_seized":
       return lead(
-        txt(" отбирает Крышу у "),
+        txt(tg("event.roofSeized")),
         playerSeg(game, stringValue(data.target_id)),
-        txt("; теперь у него "),
-        num(`${numberValue(data.roofs)} Крыш`, "good"),
+        txt(tg("event.roofSeizedTail")),
+        num(`${numberValue(data.roofs)}🛡`, "good"),
       );
     case "market_claimed":
-      return lead(txt(` ставит метку на «${asset ?? assetId}»: карта работает на него, но остаётся в продаже`));
+      return lead(txt(tg("event.marketClaimed", { title: asset ?? assetId })));
     case "market_locked":
-      return lead(txt(` закрывает «${asset ?? assetId}» серой меткой: до конца раунда её не купит никто другой`));
+      return lead(txt(tg("event.marketLocked", { title: asset ?? assetId })));
     case "market_refreshed":
-      return lead(txt(` пересдаёт слот рынка: «${asset ?? assetId}» уходит в низ колоды`));
+      return lead(txt(tg("event.marketRefreshed", { title: asset ?? assetId })));
     case "project_vetoed": {
       const vetoed = meta.projects.find(item => item.id === stringValue(data.project_id));
-      return lead(txt(` накладывает вето на «${vetoed?.title ?? stringValue(data.project_id)}»`));
+      return lead(txt(tg("event.vetoed", { title: vetoed?.title ?? stringValue(data.project_id) })));
     }
     case "crisis_pr":
-      return lead(txt(" антикризисный PR ("), signed(-numberValue(data.cost), "◆"), txt(", "), num("−1⚠", "good"), txt(`, осталось ${numberValue(data.scandals)}⚠)`));
+      return lead(txt(tg("event.crisisPr")), signed(-numberValue(data.cost), "◆"), txt(", "), num("−1⚠", "good"), txt(tg("event.crisisPrTail", { count: numberValue(data.scandals) })));
     case "asset_bought":
       // Deltas expose the grey-tag scandal and the purchase bonuses, which have no events of their own.
-      return lead(txt(` покупает «${asset ?? assetId}» за `), num(`${numberValue(data.cost)}$`, "bad"), ...deltas);
+      return lead(txt(tg("event.assetBought", { title: asset ?? assetId })), num(`${numberValue(data.cost)}$`, "bad"), ...deltas);
     case "asset_sold": {
       const tail: LogSegment[] = [
-        txt(` продаёт «${asset ?? "объект"}» за `),
+        txt(tg("event.assetSold", { title: asset ?? tg("action.object") })),
         num(`${numberValue(data.value)}$`, "good"),
       ];
       // The token is freed by the sale; without this line it silently vanished from the board.
@@ -821,56 +641,56 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
     }
     case "role_claimed":
     case "role_taken": {
-      const tail: LogSegment[] = [txt(` получает роль «${role ?? roleId}» (`), signed(-numberValue(data.cost), "◆"), txt(")")];
+      const tail: LogSegment[] = [txt(tg("event.roleClaimed", { role: role ?? roleId })), signed(-numberValue(data.cost), "◆"), txt(")")];
       const prev = stringValue(data.previous_holder_id);
-      if (prev) tail.push(txt(" — перехват у "), playerSeg(game, prev));
+      if (prev) tail.push(txt(tg("event.roleTakeover")), playerSeg(game, prev));
       return lead(...tail);
     }
     case "role_takeover_blocked":
-      return lead(txt(` не смог захватить «${role ?? roleId}» — блок (${data.by === "roof" ? "Крыша" : "запрет"})`));
+      return lead(txt(tg("event.roleBlocked", { role: role ?? roleId, by: data.by === "roof" ? tg("event.blockedByRoof") : tg("event.blockedOther") })));
     case "action_card_bought":
-      return lead(txt(` вытягивает карту «${card ?? cardId}» (`), signed(-numberValue(data.cost), "$"), txt(", −1◆)"));
+      return lead(txt(tg("event.cardBought", { title: card ?? cardId })), signed(-numberValue(data.cost), "$"), txt(tg("event.cardBoughtTail")));
     case "free_action_card_drawn":
-      return lead(txt(` бесплатно получает карту «${card ?? cardId}»`));
+      return lead(txt(tg("event.cardFree", { title: card ?? cardId })));
     case "action_card_played": {
-      const tail: LogSegment[] = [txt(` разыгрывает «${card ?? cardId}»`)];
-      if (target) tail.push(txt(" против "), playerSeg(game, targetId));
-      if (data.deferred) tail.push(txt(" (ждёт решения Крыши)"));
+      const tail: LogSegment[] = [txt(tg("event.cardPlayed", { title: card ?? cardId }))];
+      if (target) tail.push(txt(tg("event.against")), playerSeg(game, targetId));
+      if (data.deferred) tail.push(txt(tg("event.cardDeferred")));
       return lead(...tail, ...deltas);
     }
     case "action_card_converted": {
       const value = numberValue(data.value) || 1;
-      return lead(txt(` сбрасывает «${card ?? cardId}» → `), num(`+${value}${data.into === "money" ? "$" : "◆"}`, "good"));
+      return lead(txt(tg("event.cardDiscarded", { title: card ?? cardId })), num(`+${value}${data.into === "money" ? "$" : "◆"}`, "good"));
     }
     // "targeted_card_resolved" was dropped in 1.9.0: action_card_played already carries the
     // deltas of the whole play, so the sub-event printed every hit a second time.
     case "targeted_effect_blocked":
       // The actor of this event is the defender: one token now answers every kind of attack.
-      return lead(txt(" отражает атаку Крышей"));
+      return lead(txt(tg("event.blocked")));
     case "role_stripped":
       return lead(
-        txt(" сливает компромат на "),
+        txt(tg("event.roleStripped")),
         playerSeg(game, stringValue(data.target_id)),
-        txt(` — роль «${role ?? roleId}» потеряна, место освободилось`),
+        txt(tg("event.roleStrippedTail", { role: role ?? roleId })),
       );
     // Both of these must be announced: with only the scandal counter as a trace, a player
     // discovers a lost role by noticing their passive income has stopped.
     case "scandal_limit_reached": {
       const limit = numberValue(data.limit) || 5;
       const roleTitle = meta.roles.find(item => item.id === stringValue(data.role_id))?.title;
-      const tail: LogSegment[] = [txt(` набирает ${limit}⚠ — `)];
-      tail.push(roleTitle ? txt(`роль «${roleTitle}» потеряна`) : txt("роли уже не было"));
+      const tail: LogSegment[] = [txt(tg("event.scandalLimit", { limit }))];
+      tail.push(roleTitle ? txt(tg("event.roleLost", { role: roleTitle })) : txt(tg("event.noRole")));
       if (data.jailed) {
-        tail.push(txt(", арест: следующий ход укорочен, скандалы сброшены до "), num("3⚠", "neutral"), txt(", Крыша снята"));
+        tail.push(txt(tg("event.jailed")), num("3⚠", "neutral"), txt(tg("event.jailedTail")));
       }
       return lead(...tail);
     }
     case "player_jailed":
       // The arrest itself is reported by scandal_limit_reached, which knows the real limit —
       // it is 6 for everybody but the journalist, who survives one scandal longer.
-      return lead(txt(" арестован прямо в свой ход: оставшиеся действия сгорают"));
+      return lead(txt(tg("event.jailedNow")));
     case "market_rotated":
-      return [txt("🔄 Рынок объектов обновился")];
+      return [txt(tg("event.marketRotated"))];
     case "grey_operation_resolved": {
       const chance = Math.round(numberValue(data.chance) * 100);
       const tail: LogSegment[] = [txt(` ${greyOperationLabels[assetId] ?? assetId}`)];
@@ -878,11 +698,11 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       tail.push(txt(": "));
       // A blocked run is not a failed one: the roll came in, the Крыша ate it. Reading it as
       // "провал" hid why the operation paid nothing.
-      if (data.blocked) tail.push(num("погашено Крышей", "bad"));
-      else tail.push(data.success ? num("успех", "good") : num("провал", "bad"));
+      if (data.blocked) tail.push(num(tg("event.greyBlocked"), "bad"));
+      else tail.push(data.success ? num(tg("event.greySuccess"), "good") : num(tg("event.greyFailure"), "bad"));
       tail.push(txt(` (${chance}%)`));
       const points = numberValue(data.points);
-      if (points) tail.push(txt(" "), num(`+${points} ${points >= 5 ? "очков" : "очка"}`, "good"));
+      if (points) tail.push(txt(" "), num(tg("event.points", { count: points }), "good"));
       return lead(...tail, ...deltas);
     }
     case "role_power_used": {
@@ -894,7 +714,7 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
     case "game_finished": {
       const scores = (data.scores as Record<string, unknown>) ?? {};
       const winnerId = stringValue(data.winner_id);
-      return [txt("🏆 Партия завершена · победитель "), playerSeg(game, winnerId), txt(` (${numberValue(scores[winnerId])} очков)`)];
+      return [txt(tg("event.gameFinished")), playerSeg(game, winnerId), txt(tg("event.gameFinishedTail", { count: numberValue(scores[winnerId]) }))];
     }
     default: {
       const verb = eventVerbs[event.type] ?? event.type.split("_").join(" ");
@@ -911,79 +731,31 @@ function describeEvent(event: DomainEvent, game: GameState, meta: CityMeta): str
 
 // One row per source in the round forecast. `total` is rendered separately, and a zero row is kept
 // on screen greyed out: "объекты +0◆" is the answer to "why is my influence not growing".
-const forecastLabels: Record<string, string> = {
-  objects: "🏢 Объекты",
-  projects: "🏗️ Проекты",
-  residents: "🏘️ Влияние с жителей",
-  journalist: "📰 Публикации",
-  debt: "🏦 Кредит",
-  rating: "⭐ Рейтинг",
-  industrial: "🏭 Промышленный ресурс",
-};
+const forecastLabels = labelTable("forecast", [
+  "objects", "projects", "residents", "journalist", "debt", "rating", "industrial",
+]);
 
 // One row per perk of the viewer's role. `unit` is what the number means, and the second string is
 // the sentence shown when a foreign district would raise the ceiling — a perk that quietly pays
 // less is the same invisibility bug we fixed on the project board.
-const rolePerkLabels: Record<string, { label: string; unit: string; hint: string }> = {
-  capitalist_objects: { label: "Доход с каждого объекта", unit: "$/раунд", hint: "+1$ за каждый ваш активный объект" },
-  capitalist_industrial_influence: {
-    label: "Влияние с Промзоны",
-    unit: "◆/раунд",
-    hint: "+1◆ за каждый ваш объект Промзоны — купите объект Промзоны, чтобы включить",
-  },
-  politician_residents: {
-    label: "Влияние с жителей",
-    unit: "◆/раунд",
-    hint: "+1◆ за каждый жилой объект на столе, включая чужие",
-  },
-  journalist_money: {
-    label: "Деньги за чужие скандалы",
-    unit: "$/раунд",
-    hint: "1$ за каждый чужой скандал, 2$ при вашем объекте Делового центра",
-  },
-  journalist_rating: {
-    label: "Влияние за свои скандалы",
-    unit: "◆/раунд",
-    hint: "+1◆ за каждый ваш скандал, без потолка — нужен хотя бы один объект Спального района",
-  },
-  fraudster_actions: { label: "Четыре действия за ход", unit: "", hint: "Больше, чем у любой другой роли" },
-  fraudster_chance: {
-    label: "Бонус к шансу серых операций",
-    unit: "%",
-    hint: "+30% к любой серой операции, без условий",
-  },
-  mafia_racket_money: {
-    label: "Деньги рэкета",
-    unit: "$",
-    hint: "2$ плюс 2$ за каждый ваш объект Серого сектора (+5$ если цель лидер)",
-  },
-  mafia_racket_influence: {
-    label: "Влияние рэкета",
-    unit: "◆",
-    hint: "1◆ за каждый ваш объект Административного квартала",
-  },
-  mafia_roofs: { label: "Предел Крыш", unit: "", hint: "2 вместо 1, и каждая на 1$ дешевле" },
-  military_sanction_targets: {
-    label: "Цели для санкции",
-    unit: "",
-    hint: "Соперники с 2+ скандалами: 2 — деньги, 3 — деньги и влияние, 4 — ещё и роль",
-  },
-  military_inspection_targets: {
-    label: "Проверка достанет",
-    unit: "соперников",
-    hint: "Соперники с объектом Серого сектора получат по скандалу; за Крышей — гасится",
-  },
-  military_seize_targets: {
-    label: "Крыши под перехват",
-    unit: "",
-    hint: "У кого есть Крыша: 3◆ и действие — забрать одну себе, Крыша не защищает",
-  },
-  role_district_income: {
-    label: "Профильный район",
-    unit: "$/раунд",
-    hint: "+1$ к доходу каждого вашего объекта профильного района",
-  },
-};
+const ROLE_PERK_KEYS = [
+  "capitalist_objects", "capitalist_industrial_influence", "politician_residents", "journalist_money",
+  "journalist_rating", "fraudster_actions", "fraudster_chance", "mafia_racket_money", "mafia_racket_influence",
+  "mafia_roofs", "military_sanction_targets", "military_inspection_targets", "military_seize_targets",
+  "role_district_income",
+];
+
+const rolePerkLabels: Record<string, { label: string; unit: string; hint: string }> = {};
+for (const key of ROLE_PERK_KEYS) {
+  Object.defineProperty(rolePerkLabels, key, {
+    enumerable: true,
+    get: () => ({
+      label: tg(`rolePerk.${key}.label`),
+      unit: tg(`rolePerk.${key}.unit`, { defaultValue: "" }),
+      hint: tg(`rolePerk.${key}.hint`),
+    }),
+  });
+}
 
 export interface RolePerkRow {
   key: string;
@@ -1002,15 +774,15 @@ export function rolePerkRows(game: GameState, meta: CityMeta): RolePerkRow[] {
     const locked = perk.value === 0 || (perk.potential !== undefined && perk.value < perk.potential);
     const need = perk.needs ? districts.get(perk.needs) ?? perk.needs : "";
     const text = label.unit
-      ? `${perk.value}${label.unit}${ceiling > perk.value ? ` (может быть ${ceiling}${label.unit})` : ""}`
+      ? `${perk.value}${label.unit}${ceiling > perk.value ? tg("rolePerk.canBe", { value: `${ceiling}${label.unit}` }) : ""}`
       : perk.value > 0
-        ? "работает"
-        : "не работает";
+        ? tg("rolePerk.works")
+        : tg("rolePerk.off");
     return [{
       key: perk.key,
       label: label.label,
       text,
-      hint: need ? `${label.hint}. Район-ключ: ${need}.` : label.hint,
+      hint: need ? tg("rolePerk.keyDistrict", { hint: label.hint, district: need }) : label.hint,
       locked,
     }];
   });
@@ -1031,34 +803,40 @@ export function buildGameLogMarkdown(room: RoomView, meta: CityMeta, version: st
   if (!game) return "";
   const ranked = [...game.players].sort((a, b) => scoreOf(game, b) - scoreOf(game, a));
   const lines = [
-    `# Город влияния — журнал партии «${room.name}»`,
+    tg("log.title", { name: room.name }),
     "",
-    `- Версия сборки: v${version}`,
-    `- Правила: ${game.rules_version ?? "—"} · контент: ${game.content_version ?? "—"}`,
-    `- Раунд: ${game.round_number}/${game.max_rounds} · состояние: ${game.status}`,
-    `- Записей в хронике: ${game.event_log.length}`,
+    tg("log.build", { version }),
+    tg("log.rules", { rules: game.rules_version ?? "—", content: game.content_version ?? "—" }),
+    tg("log.round", { round: game.round_number, max: game.max_rounds, status: game.status }),
+    tg("log.entries", { count: game.event_log.length }),
     "",
-    "## Итоги",
+    tg("log.results"),
     "",
-    "| # | Игрок | Очки | Проекты | Объекты | Роль | Деньги | Влияние | Скандалы |",
+    tg("log.table"),
     "|---|---|---:|---:|---:|---:|---:|---:|---:|",
   ];
   ranked.forEach((player, index) => {
     const score = game.score_breakdown?.[player.id];
-    const role = meta.roles.find(item => item.id === player.role)?.title ?? "без роли";
+    const role = meta.roles.find(item => item.id === player.role)?.title ?? tg("log.noRole");
     lines.push(
-      `| ${index + 1} | ${player.name}${player.is_bot ? ` (бот ${difficultyLabels[player.difficulty] ?? player.difficulty})` : ""} · ${role} `
+      `| ${index + 1} | ${player.name}${player.is_bot ? tg("log.bot", { level: difficultyLabels[player.difficulty] ?? player.difficulty }) : ""} · ${role} `
       + `| ${scoreOf(game, player)} | ${score?.projects ?? 0} | ${score?.assets ?? 0} | ${score?.role ?? 0} `
       + `| ${score?.money ?? 0} (${player.money}$) | ${score?.influence ?? 0} (${player.influence}◆) | ${score?.scandals ?? 0} |`,
     );
   });
-  lines.push("", "## Портфели", "");
+  lines.push("", tg("log.portfolios"), "");
   for (const player of ranked) {
     const owned = player.assets.map(item => meta.assets.find(asset => asset.id === item.card_id)?.title ?? item.card_id);
     const projects = player.projects.map(id => meta.projects.find(item => item.id === id)?.title ?? id);
-    lines.push(`### ${player.name}`, "", `- Объекты: ${owned.join(", ") || "нет"}`, `- Проекты: ${projects.join(", ") || "нет"}`, "");
+    lines.push(
+      `### ${player.name}`,
+      "",
+      tg("log.assets", { list: owned.join(", ") || tg("log.none") }),
+      tg("log.projects", { list: projects.join(", ") || tg("log.none") }),
+      "",
+    );
   }
-  lines.push("## Хроника", "");
+  lines.push(tg("log.chronicle"), "");
   // Oldest first: the chronicle on screen is newest-first for reading, but a log to analyse has to
   // run in the direction the game actually went.
   game.event_log.forEach(event => lines.push(`${event.seq}. ${describeEvent(event, game, meta)}`));
@@ -1112,14 +890,7 @@ const districtRoleMap: Record<string, string> = Object.fromEntries(
 
 /* Короткие имена районов для ярлыков. Полные названия («Административный квартал») занимают
  * ячейку целиком и не оставляют места числу, ради которого строка и существует. */
-const districtShort: Record<string, string> = {
-  residential: "Спальный",
-  business: "Деловой",
-  industrial: "Промзона",
-  tech: "Технокластер",
-  government: "Администрация",
-  shadows: "Серый сектор",
-};
+const districtShort = labelTable("districtShort", ["residential", "business", "industrial", "tech", "government", "shadows"]);
 
 /** Build the full, numeric breakdown of an object's bonuses for its card. */
 export function assetEffectLines(
@@ -1155,8 +926,8 @@ export function assetEffectLines(
     const synergy = districtSynergyValue(count);
     if (synergy > 0) {
       push(
-        `+${synergy}$ синергия района «${districtTitle(asset.district)}» (${count}/4)`,
-        `Район ${count}/4: +${synergy}$`,
+        tg("effect.synergyText", { value: synergy, district: districtTitle(asset.district), count }),
+        tg("effect.synergyShort", { value: synergy, count }),
         true,
         "district",
       );
@@ -1168,8 +939,8 @@ export function assetEffectLines(
       /* «Мафиози: район +1$», а не «Мафиози +1$»: у двенадцати объектов есть ещё и своя
        * доплата той же роли, и два одинаковых ярлыка в таблице читались бы как задвоение. */
       push(
-        `+1$ пока вы «${roleTitle(synergyRole)}» (синергия сектора)`,
-        `${roleTitle(synergyRole)}: район +1$`,
+        tg("effect.sectorText", { role: roleTitle(synergyRole) }),
+        tg("effect.sectorShort", { role: roleTitle(synergyRole) }),
         hasRole(synergyRole),
         "sector",
       );
@@ -1179,8 +950,8 @@ export function assetEffectLines(
     const synergyInfluence = numberValue(effects.synergyInfluence);
     if (synergyInfluence) {
       push(
-        `+${synergyInfluence}◆/раунд, когда район собран полностью (${count}/4)`,
-        `+${synergyInfluence}◆ при 4/4`,
+        tg("effect.fullDistrictText", { value: synergyInfluence, count }),
+        tg("effect.fullDistrictShort", { value: synergyInfluence }),
         count >= 4,
       );
     }
@@ -1191,16 +962,18 @@ export function assetEffectLines(
     const roleOk = !influenceBonus.role || hasRole(influenceBonus.role);
     const districtOk = !influenceBonus.district || hasLink(influenceBonus.district);
     const cond = [
-      influenceBonus.district ? `объект «${districtTitle(influenceBonus.district)}»` : "",
-      influenceBonus.role ? `роль «${roleTitle(influenceBonus.role)}»` : "",
-    ].filter(Boolean).join(" и ");
+      influenceBonus.district ? tg("effect.influenceCondDistrict", { district: districtTitle(influenceBonus.district) }) : "",
+      influenceBonus.role ? tg("effect.influenceCondRole", { role: roleTitle(influenceBonus.role) }) : "",
+    ].filter(Boolean).join(tg("effect.and"));
     const label = [
       influenceBonus.district ? short(influenceBonus.district) : "",
       influenceBonus.role ? roleTitle(influenceBonus.role) : "",
     ].filter(Boolean).join(" + ");
     push(
-      `+${influenceBonus.value}◆/раунд${cond ? ` при наличии ${cond}` : ""}`,
-      label ? `${label}: +${influenceBonus.value}◆` : `+${influenceBonus.value}◆/раунд`,
+      tg("effect.influenceText", { value: influenceBonus.value, cond: cond ? tg("effect.influenceCond", { cond }) : "" }),
+      label
+        ? tg("effect.influenceShort", { label, value: influenceBonus.value })
+        : tg("effect.influenceShortPlain", { value: influenceBonus.value }),
       roleOk && districtOk,
     );
   }
@@ -1215,14 +988,14 @@ export function assetEffectLines(
       const count = Math.max(0, districtCount(owner, districtBonus.district, assets) - adjust + virtual);
       const per = districtBonus.value;
       push(
-        `+${per}$ за каждый объект «${districtTitle(districtBonus.district)}» · сейчас ${count} → +${per * count}$`,
-        `${short(districtBonus.district)} ×${count}: +${per * count}$`,
+        tg("effect.perObjectText", { value: per, district: districtTitle(districtBonus.district), count, total: per * count }),
+        tg("effect.perObjectShort", { district: short(districtBonus.district), count, total: per * count }),
         count > 0,
       );
     } else {
       push(
-        `+${districtBonus.value}$ при наличии объекта «${districtTitle(districtBonus.district)}»`,
-        `${short(districtBonus.district)} +${districtBonus.value}$`,
+        tg("effect.linkText", { value: districtBonus.value, district: districtTitle(districtBonus.district) }),
+        tg("effect.linkShort", { value: districtBonus.value, district: short(districtBonus.district) }),
         hasLink(districtBonus.district),
       );
     }
@@ -1231,79 +1004,71 @@ export function assetEffectLines(
   const roleBonus = effects.roleBonus as { role: string; value: number } | undefined;
   if (roleBonus) {
     push(
-      `+${roleBonus.value}$ пока вы «${roleTitle(roleBonus.role)}»`,
-      `${roleTitle(roleBonus.role)} +${roleBonus.value}$`,
+      tg("effect.roleText", { value: roleBonus.value, role: roleTitle(roleBonus.role) }),
+      tg("effect.roleShort", { value: roleBonus.value, role: roleTitle(roleBonus.role) }),
       hasRole(roleBonus.role),
     );
   }
   for (const bonus of (effects.roleBonuses as { role: string; value: number }[] | undefined) ?? []) {
     push(
-      `+${bonus.value}$ пока вы «${roleTitle(bonus.role)}»`,
-      `${roleTitle(bonus.role)} +${bonus.value}$`,
+      tg("effect.roleText", { value: bonus.value, role: roleTitle(bonus.role) }),
+      tg("effect.roleShort", { value: bonus.value, role: roleTitle(bonus.role) }),
       hasRole(bonus.role),
     );
   }
   for (const link of (effects.districtLinks as { district: string; value: number }[] | undefined) ?? []) {
     push(
-      `+${link.value}$ при наличии «${districtTitle(link.district)}»`,
-      `${short(link.district)} +${link.value}$`,
+      tg("effect.linkText", { value: link.value, district: districtTitle(link.district) }),
+      tg("effect.linkShort", { value: link.value, district: short(link.district) }),
       hasLink(link.district),
     );
   }
 
   /* Постоянные способности: полная фраза для поповера, ярлык для ячейки карточки. */
   const passive: [string, string][] = [];
-  if (numberValue(effects.extraActions)) passive.push([`+1 действие в начале хода`, `+1 действие/ход`]);
-  if (numberValue(effects.extraInvestmentActions))
-    passive.push([`+1 инвестиционное действие в начале хода`, `+1 инвест. действие`]);
-  if (numberValue(effects.turnRoof)) passive.push([`+1 Крыша в начале каждого хода`, `+1 Крыша/ход`]);
-  if (numberValue(effects.roofCapacity))
-    passive.push([
-      `+${numberValue(effects.roofCapacity)} к пределу Крыш`,
-      `лимит Крыш +${numberValue(effects.roofCapacity)}`,
-    ]);
+  const pair = (key: string, options?: Record<string, unknown>): [string, string] => [
+    tg(`effect.${key}`, options),
+    tg(`effect.${key}Short`, options),
+  ];
+  if (numberValue(effects.extraActions)) passive.push(pair("extraActions"));
+  if (numberValue(effects.extraInvestmentActions)) passive.push(pair("extraInvestment"));
+  if (numberValue(effects.turnRoof)) passive.push(pair("turnRoof"));
+  if (numberValue(effects.roofCapacity)) passive.push(pair("roofCapacity", { value: numberValue(effects.roofCapacity) }));
   if (numberValue(effects.scandalReduction))
-    passive.push([
-      `−${numberValue(effects.scandalReduction)} скандал в начале хода`,
-      `−${numberValue(effects.scandalReduction)} скандал/ход`,
-    ]);
+    passive.push(pair("scandalReduction", { value: numberValue(effects.scandalReduction) }));
   if (numberValue(effects.greyScandalReduction))
-    passive.push([
-      `−${numberValue(effects.greyScandalReduction)} скандала от серых операций`,
-      `−${numberValue(effects.greyScandalReduction)}⚠ от серых`,
-    ]);
-  if (numberValue(effects.turnCard)) passive.push([`+1 карта действий в начале хода`, `+1 карта/ход`]);
-  if (numberValue(effects.marketRefresh))
-    passive.push([`Раз в раунд без действия: пересдать карту рынка`, `Пересдача рынка`]);
-  if (numberValue(effects.projectWaiver))
-    passive.push([`Раз за партию: проект без выполнения условия`, `Проект без условия`]);
+    passive.push(pair("greyReduction", { value: numberValue(effects.greyScandalReduction) }));
+  if (numberValue(effects.turnCard)) passive.push(pair("turnCard"));
+  if (numberValue(effects.marketRefresh)) passive.push(pair("marketRefresh"));
+  if (numberValue(effects.projectWaiver)) passive.push(pair("projectWaiver"));
   if (typeof effects.districtDouble === "string")
     passive.push([
-      `Каждый ваш объект «${districtTitle(effects.districtDouble)}» считается за два`,
-      `${short(effects.districtDouble)} ×2`,
+      tg("effect.districtDouble", { district: districtTitle(effects.districtDouble) }),
+      tg("effect.districtDoubleShort", { district: short(effects.districtDouble) }),
     ]);
   if (numberValue(effects.takeoverCompensation))
-    passive.push([
-      `+${numberValue(effects.takeoverCompensation)}◆, если у вас перехватят роль`,
-      `+${numberValue(effects.takeoverCompensation)}◆ за перехват`,
-    ]);
+    passive.push(pair("takeover", { value: numberValue(effects.takeoverCompensation) }));
   for (const [text, label] of passive) push(text, label, true, "passive");
 
   const purchase = effects.purchase as
     | { money?: number; influence?: number; roofs?: number; card?: boolean; scandals?: number }
     | undefined;
   if (purchase) {
+    // Две формы: полная для окна и короткая для ячейки карточки (Крыша — значком, карта — одним словом).
     const parts: string[] = [];
-    if (purchase.money) parts.push(`${purchase.money > 0 ? "+" : "−"}${Math.abs(purchase.money)}$`);
-    if (purchase.influence) parts.push(`+${purchase.influence}◆`);
-    if (purchase.roofs) parts.push(`+${purchase.roofs} Крыша`);
-    if (purchase.card) parts.push(`карта действия`);
-    if (purchase.scandals) parts.push(`+${purchase.scandals} скандал`);
-    // Ярлык без слова «действия»: в ячейке от него остаётся многоточие, а смысл несёт число.
-    const brief = parts.map(part => part.replace(" Крыша", "🛡").replace("карта действия", "карта"));
+    const brief: string[] = [];
+    const add = (full: string, short = full) => {
+      parts.push(full);
+      brief.push(short);
+    };
+    if (purchase.money) add(`${purchase.money > 0 ? "+" : "−"}${Math.abs(purchase.money)}$`);
+    if (purchase.influence) add(`+${purchase.influence}◆`);
+    if (purchase.roofs) add(tg("effect.purchaseRoof", { count: purchase.roofs }), `+${purchase.roofs}🛡`);
+    if (purchase.card) add(tg("effect.purchaseCard"), tg("effect.purchaseCardShort"));
+    if (purchase.scandals) add(tg("effect.purchaseScandal", { count: purchase.scandals }));
     if (parts.length) push(
-      `При покупке: ${parts.join(", ")}`,
-      `Покупка: ${brief.join(", ")}`,
+      tg("effect.purchase", { parts: parts.join(", ") }),
+      tg("effect.purchaseShort", { parts: brief.join(", ") }),
       false,
       "purchase",
     );

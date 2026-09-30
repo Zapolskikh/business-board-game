@@ -2,6 +2,8 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./online/App";
 import "./styles.css";
+// Язык определяется до первого рендера: иначе страница мигнёт английским, а потом переключится.
+import "./i18n";
 
 // Галерея состояний нового интерфейса живёт на /dev. Какой из двух экранов открывается
 // на остальных адресах, решает App.tsx: в production старый, в dev — v2.

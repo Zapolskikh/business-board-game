@@ -1,3 +1,4 @@
+import { tr } from "../../i18n";
 import { forwardRef, type CSSProperties, type ReactNode } from "react";
 import type { Availability } from "../lib/actions";
 
@@ -121,7 +122,7 @@ export function ActionButton({
           * и справка пропадала именно тогда, когда она нужна. Недоступность видна по
           * затемнению, нехватка ресурса — по красному числу в самой цене, точная причина —
           * в подсказке при наведении. */}
-        {spent ? "уже в этом ходу" : cost}
+        {spent ? tr("game", "ui.common.spent") : cost}
       </small>
     </button>
   );

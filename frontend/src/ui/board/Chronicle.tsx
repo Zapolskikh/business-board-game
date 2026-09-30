@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { ReactNode } from "react";
 import { describeEventSegments } from "../../online/gameUi";
 import { useGameLogExport } from "../../online/gameLogExport";
@@ -24,10 +25,11 @@ export function Chronicle({
   /** В /dev нет серверной сессии; сама хроника работает, сетевые кнопки экспорта — нет. */
   exportEnabled?: boolean;
 }) {
+  const { t } = useTranslation("game");
   const events = [...game.event_log].reverse();
 
   return (
-    <Modal open={open} onClose={onClose} title="📜 Хроника партии" subtitle={`${events.length} событий`}>
+    <Modal open={open} onClose={onClose} title={t("ui.chronicle.title")} subtitle={t("ui.chronicle.events", { count: events.length })}>
       {/* Выгрузка доступна и по ходу партии, не только на финише: комнаты истекают
         * вместе со всем, что в них произошло, и невыгруженная партия пропадает совсем.
         *
@@ -73,13 +75,14 @@ export function Chronicle({
             </li>
           );
         })}
-        {events.length === 0 && <li className="text-ink-dim">Пока ничего не произошло.</li>}
+        {events.length === 0 && <li className="text-ink-dim">{t("ui.chronicle.empty")}</li>}
       </ol>
     </Modal>
   );
 }
 
 function ExportBar({ game, meta }: { game: GameState; meta: CityMeta }) {
+  const { t } = useTranslation("game");
   const { roomId, password, playerId } = useSession();
   /* Хроника живёт внутри <GameGate>, где партия уже загружена; запасной вариант нужен типам. */
   const room = (useRoom().data ?? { game, revision: game.revision }) as RoomView;
@@ -89,18 +92,18 @@ function ExportBar({ game, meta }: { game: GameState; meta: CityMeta }) {
 
   return (
     <div className="mb-2.5 flex flex-wrap items-center gap-1.5 border-b border-line pb-2.5">
-      <ExportButton onClick={() => void copy()} title="Скопировать журнал партии в буфер обмена">
-        📋 Копировать
+      <ExportButton onClick={() => void copy()} title={t("ui.chronicle.copyTitle")}>
+        {t("ui.chronicle.copy")}
       </ExportButton>
-      <ExportButton onClick={download} title="Скачать читаемый журнал партии в формате Markdown">
-        💾 Скачать .md
+      <ExportButton onClick={download} title={t("ui.chronicle.mdTitle")}>
+        {t("ui.chronicle.md")}
       </ExportButton>
       {replayable && (
         <ExportButton
           onClick={() => void downloadJournal(roomId, password, playerId)}
-          title="Скачать полный журнал: сид, все команды и финальный снапшот — по нему партию можно точно воспроизвести"
+          title={t("ui.chronicle.jsonTitle")}
         >
-          🧾 Скачать .json
+          {t("ui.chronicle.json")}
         </ExportButton>
       )}
       {status && <small className="w-full text-3xs text-good">{status}</small>}

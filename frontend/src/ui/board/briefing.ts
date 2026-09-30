@@ -1,3 +1,4 @@
+import { tr } from "../../i18n";
 import { useEffect, useRef, useState } from "react";
 import { describeEventSegments, numberValue, stringValue, type LogSegment } from "../../online/gameUi";
 import type { CityMeta, DomainEvent, GameState, PlayerState } from "../../online/types";
@@ -98,16 +99,16 @@ function toneOf(delta: number, positiveIsGood: boolean): BriefingTone {
   return delta > 0 === positiveIsGood ? "good" : "bad";
 }
 
-const STAT_ROWS: { key: keyof BriefingSnapshot; label: string; icon: string; positiveIsGood: boolean }[] = [
-  { key: "money", label: "Деньги", icon: "$", positiveIsGood: true },
-  { key: "influence", label: "Влияние", icon: "◆", positiveIsGood: true },
-  { key: "score", label: "Очки", icon: "★", positiveIsGood: true },
-  { key: "scandals", label: "Скандалы", icon: "⚠", positiveIsGood: false },
-  { key: "roofs", label: "Крыши", icon: "🛡", positiveIsGood: true },
-  { key: "assets", label: "Объекты", icon: "🏢", positiveIsGood: true },
-  { key: "projects", label: "Проекты", icon: "🏗", positiveIsGood: true },
-  { key: "capacity", label: "Ёмкость города", icon: "📐", positiveIsGood: true },
-  { key: "debt", label: "Долг", icon: "🏦", positiveIsGood: false },
+const STAT_ROWS: { key: keyof BriefingSnapshot; icon: string; positiveIsGood: boolean }[] = [
+  { key: "money", icon: "$", positiveIsGood: true },
+  { key: "influence", icon: "◆", positiveIsGood: true },
+  { key: "score", icon: "★", positiveIsGood: true },
+  { key: "scandals", icon: "⚠", positiveIsGood: false },
+  { key: "roofs", icon: "🛡", positiveIsGood: true },
+  { key: "assets", icon: "🏢", positiveIsGood: true },
+  { key: "projects", icon: "🏗", positiveIsGood: true },
+  { key: "capacity", icon: "📐", positiveIsGood: true },
+  { key: "debt", icon: "🏦", positiveIsGood: false },
 ];
 
 /** Кого задело событие: движок кладёт цель то в `target_id`, то в список. */
@@ -172,35 +173,42 @@ export function buildBriefing(
     const from = snapshot[row.key] as number;
     const to = now[row.key] as number;
     if (from === to) continue;
-    stats.push({ key: row.key, label: row.label, icon: row.icon, from, to, tone: toneOf(to - from, row.positiveIsGood) });
+    stats.push({
+      key: row.key,
+      label: tr("game", `ui.briefing.stat.${row.key}`),
+      icon: row.icon,
+      from,
+      to,
+      tone: toneOf(to - from, row.positiveIsGood),
+    });
   }
 
   const flags: BriefingFlag[] = [];
   const roleTitle = (id: string | null) => (id ? meta.roles.find(role => role.id === id)?.title ?? id : null);
   if (snapshot.role && !now.role) {
-    flags.push({ key: "role-lost", text: `Роль «${roleTitle(snapshot.role)}» потеряна`, tone: "bad" });
+    flags.push({ key: "role-lost", text: tr("game", "ui.briefing.roleLost", { role: roleTitle(snapshot.role) }), tone: "bad" });
   } else if (snapshot.role && now.role && snapshot.role !== now.role) {
-    flags.push({ key: "role-changed", text: `Роль сменилась: «${roleTitle(snapshot.role)}» → «${roleTitle(now.role)}»`, tone: "neutral" });
+    flags.push({ key: "role-changed", text: tr("game", "ui.briefing.roleChanged", { from: roleTitle(snapshot.role), to: roleTitle(now.role) }), tone: "neutral" });
   } else if (!snapshot.role && now.role) {
-    flags.push({ key: "role-gained", text: `Получена роль «${roleTitle(now.role)}»`, tone: "good" });
+    flags.push({ key: "role-gained", text: tr("game", "ui.briefing.roleGained", { role: roleTitle(now.role) }), tone: "good" });
   }
   if (snapshot.markedCard && !now.markedCard) {
-    flags.push({ key: "mark-lost", text: "Метка капиталиста снята — карта больше не работает на вас", tone: "bad" });
+    flags.push({ key: "mark-lost", text: tr("game", "ui.briefing.markLost"), tone: "bad" });
   }
   if (now.lockedSlots < snapshot.lockedSlots) {
-    flags.push({ key: "lock-lost", text: "Метка мафиози снята — слот рынка снова открыт для всех", tone: "bad" });
+    flags.push({ key: "lock-lost", text: tr("game", "ui.briefing.lockLost"), tone: "bad" });
   }
   if (now.roofs < snapshot.roofs) {
     const lost = snapshot.roofs - now.roofs;
-    flags.push({ key: "roof-lost", text: `Крыш снято: ${lost}`, tone: "bad" });
+    flags.push({ key: "roof-lost", text: tr("game", "ui.briefing.roofLost", { count: lost }), tone: "bad" });
   }
   if (now.jailTurns > snapshot.jailTurns) {
-    flags.push({ key: "jail", text: `Арест: пропуск ходов — ${now.jailTurns}`, tone: "bad" });
+    flags.push({ key: "jail", text: tr("game", "ui.briefing.jail"), tone: "bad" });
   } else if (snapshot.jailTurns > 0 && now.jailTurns === 0) {
-    flags.push({ key: "jail-out", text: "Арест окончен — вы снова в игре", tone: "good" });
+    flags.push({ key: "jail-out", text: tr("game", "ui.briefing.jailOut"), tone: "good" });
   }
   if (now.scandals >= me.scandal_limit) {
-    flags.push({ key: "scandal-limit", text: `Скандалов ${now.scandals} из ${me.scandal_limit} — порог достигнут`, tone: "bad" });
+    flags.push({ key: "scandal-limit", text: tr("game", "ui.briefing.scandalLimit", { have: now.scandals, limit: me.scandal_limit }), tone: "bad" });
   }
 
   const lines: BriefingLine[] = [];

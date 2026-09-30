@@ -1,3 +1,4 @@
+import { tr } from "../i18n";
 import { useCallback, useState } from "react";
 import { cityApi } from "./api";
 import { buildGameLogMarkdown } from "./gameUi";
@@ -30,16 +31,16 @@ export function useGameLogExport(room: RoomView, meta: CityMeta) {
   const copy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(text());
-      setStatus("Журнал скопирован в буфер");
+      setStatus(tr("game", "ui.chronicle.copied"));
     } catch {
       // Буфер закрыт вне https и без жеста пользователя — в этом случае файл всё ещё доступен.
-      setStatus("Скопировать не удалось — скачайте файл");
+      setStatus(tr("game", "ui.chronicle.copyFailed"));
     }
   }, [text]);
 
   const download = useCallback(() => {
     save(text(), "md");
-    setStatus("Журнал сохранён (.md)");
+    setStatus(tr("game", "ui.chronicle.savedMd"));
   }, [save, text]);
 
   /* Сид и список команд — то, что делает партию воспроизводимой, а не просто читаемой.
@@ -49,9 +50,9 @@ export function useGameLogExport(room: RoomView, meta: CityMeta) {
       try {
         const journal = await cityApi.journal(roomId, password, playerId);
         save(JSON.stringify(journal, null, 2), "json");
-        setStatus("Полный журнал сохранён (.json) — партию можно переиграть");
+        setStatus(tr("game", "ui.chronicle.savedJson"));
       } catch (reason) {
-        setStatus(reason instanceof Error ? reason.message : "Журнал недоступен");
+        setStatus(reason instanceof Error ? reason.message : tr("game", "ui.chronicle.unavailable"));
       }
     },
     [save],

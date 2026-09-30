@@ -27,6 +27,8 @@ PLAYER_FRAME = PRESETS / "Obrázek ChatGPT 29. 9. 2026 17_34_40-1.png"
 UI_PARTS = PRESETS / "Obrázek ChatGPT 29. 9. 2026 17_34_23-3.png"
 PROJECT_ART = KIT / "background-atlas.png"
 PROJECT_ICONS = KIT / "icon-atlas.png"
+STUDIO_LOGO = PRESETS / "imbapewpew _logo.png"
+BRAND_OUT = ROOT / "frontend" / "src" / "online" / "assets"
 
 
 def save(image: Image.Image, name: str, quality: int = 82) -> None:
@@ -148,5 +150,43 @@ def main() -> None:
     save(plaque.resize((160, round(160 * plaque.size[1] / plaque.size[0])), Image.LANCZOS), "price-plaque")
 
 
+def studio_logo() -> None:
+    """Логотип студии без кремового фона, в двух вариантах: как есть и для тёмной страницы.
+
+    Главная страница почти чёрная, и тёмно-фиолетовая надпись на ней пропадает. В тёмном
+    варианте светлеет только надпись справа от монстрика: глаза и рот у него того же тёмного
+    цвета, и перекрашивать весь логотип целиком нельзя.
+    """
+    rgb = np.array(Image.open(STUDIO_LOGO).convert("RGB")).astype(float)
+    paper = np.median(rgb[:20, :20].reshape(-1, 3), axis=0)
+    distance = np.abs(rgb - paper).sum(2)
+    # Мягкий край: полностью прозрачно на цвете бумаги, полностью видно чуть дальше от него.
+    alpha = np.clip((distance - 18) / 40, 0, 1)
+    ys, xs = np.nonzero(alpha > 0.05)
+    top, bottom, left, right = ys.min() - 6, ys.max() + 7, xs.min() - 6, xs.max() + 7
+    rgb, alpha = rgb[top:bottom, left:right], alpha[top:bottom, left:right]
+
+    # Цвет краёв восстанавливается из смеси с бумагой, иначе вокруг букв остаётся светлый ореол.
+    safe = np.maximum(alpha, 1e-3)[..., None]
+    pure = np.clip((rgb - paper * (1 - safe)) / safe, 0, 255)
+
+    BRAND_OUT.mkdir(parents=True, exist_ok=True)
+    width = 560
+    for name, colors in [("studio-logo", pure), ("studio-logo-light", None)]:
+        if colors is None:
+            colors = pure.copy()
+            # Надпись начинается правее монстрика; там всё тёмное становится кремовым.
+            text = np.zeros(alpha.shape, bool)
+            text[:, int(alpha.shape[1] * 0.33):] = True
+            dark = text & (pure.sum(2) < 330)
+            colors[dark] = [244, 238, 226]
+        image = Image.fromarray(np.dstack([colors, alpha * 255]).astype(np.uint8), "RGBA")
+        image = image.resize((width, round(width * image.size[1] / image.size[0])), Image.LANCZOS)
+        path = BRAND_OUT / f"{name}.png"
+        image.save(path, optimize=True)
+        print(f"{path.relative_to(ROOT)}  {image.size[0]}x{image.size[1]}  {path.stat().st_size // 1024} KB")
+
+
 if __name__ == "__main__":
     main()
+    studio_logo()

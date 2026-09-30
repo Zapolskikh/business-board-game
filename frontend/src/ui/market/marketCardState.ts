@@ -1,3 +1,4 @@
+import { tr } from "../../i18n";
 import { marketPrice, stringValue } from "../../online/gameUi";
 import type { AssetMeta, GameState, LegalAction, MarketAsset, PlayerState } from "../../online/types";
 
@@ -58,19 +59,19 @@ export function marketCardState({
 export function marketCardReason(state: MarketCardState): string {
   switch (state.kind) {
     case "buyable":
-      return `Купить за ${state.price}$`;
+      return tr("game", "ui.buy.buy", { price: state.price });
     case "buying":
-      return "Покупка…";
+      return tr("game", "ui.buy.buying");
     case "not-your-turn":
-      return "Сейчас не ваш ход";
+      return tr("game", "ui.buy.notYourTurn");
     case "no-actions":
-      return "Действия на этот ход закончились";
+      return tr("game", "ui.buy.noActions");
     case "no-slot":
-      return "Нет свободного слота — продайте объект или расширьте город";
+      return tr("game", "ui.buy.noSlot");
     case "no-money":
-      return `Не хватает ${state.missing}$`;
+      return tr("game", "ui.buy.noMoney", { missing: state.missing });
     case "unavailable":
-      return "Сейчас недоступно";
+      return tr("game", "ui.buy.unavailable");
   }
 }
 

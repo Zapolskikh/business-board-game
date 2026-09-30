@@ -1,0 +1,193 @@
+{
+  "brand": {
+    "mark": "CI",
+    "title": "City of Influence",
+    "tagline": "board strategy game"
+  },
+  "nav": {
+    "about": "About",
+    "feedback": "Feedback",
+    "home": "← Home"
+  },
+  "presence": {
+    "rooms_one": "{{count}} room online",
+    "rooms_other": "{{count}} rooms online",
+    "serverUp": "server is up"
+  },
+  "hero": {
+    "eyebrow": "Strategy · 2–4 players",
+    "titleLine1": "Build the city.",
+    "titleLine2": "Take the influence.",
+    "lead": "Join an open room or create your own. You can set up the rest in the lobby with the other players.",
+    "rounds": "rounds per game",
+    "actions": "actions per turn",
+    "districts": "city districts"
+  },
+  "rooms": {
+    "eyebrow": "Games",
+    "title": "Open rooms",
+    "waiting_one": "{{count}} waiting for players",
+    "waiting_other": "{{count}} waiting for players",
+    "refresh": "↻ Refresh",
+    "refreshing": "Refreshing…",
+    "emptyTitle": "No rooms yet",
+    "emptyText": "Create the first one — it will show up here right away.",
+    "status": {
+      "waiting": "Waiting for players",
+      "playing": "Game in progress",
+      "finished": "Game over"
+    },
+    "updated": "updated at {{time}}",
+    "updatedRecently": "updated recently",
+    "seatsLabel": "{{players}} of {{capacity}} seats taken",
+    "humans_one": "{{count}} person",
+    "humans_other": "{{count}} people",
+    "open": "Open",
+    "remove": "Delete room",
+    "removeNamed": "Delete room {{name}}"
+  },
+  "create": {
+    "eyebrow": "New game",
+    "title": "Create a room",
+    "badge": "1 minute",
+    "name": "Room name",
+    "namePlaceholder": "For example, Friday game",
+    "password": "Room password",
+    "passwordPlaceholder": "At least 4 characters",
+    "passwordHint": "You need it to set up the seats and start the game.",
+    "players": "Players",
+    "rounds": "Rounds",
+    "advanced": "More settings",
+    "rolePrice": "Role price",
+    "rolePriceHint": "How much influence a free role costs.",
+    "submit": "Create and go to the lobby →",
+    "submitting": "Creating…",
+    "hintMissing": "Enter a name and a password (4+ characters).",
+    "hintReady": "All set."
+  },
+  "delete": {
+    "eyebrow": "Please confirm",
+    "title": "Delete “{{name}}”?",
+    "text": "The room and the whole game will be gone for good.",
+    "password": "Room password",
+    "passwordPlaceholder": "Enter the password",
+    "cancel": "Cancel",
+    "confirm": "Delete",
+    "deleting": "Deleting…"
+  },
+  "lobby": {
+    "back": "← Rooms",
+    "allRooms": "← All rooms",
+    "loading": "Loading the room…",
+    "status": {
+      "waiting": "Lobby is open",
+      "playing": "Game in progress",
+      "finished": "Game over"
+    },
+    "roomCode": "Room code",
+    "eyebrow": "Getting ready",
+    "titleWaiting": "Pick a seat and fill the table",
+    "titleRunning": "Go back to your seat",
+    "leadWaiting": "People and bots can play together. To start, you need at least two players, and at least one of them must be a person.",
+    "leadRunning": "The game is already running. Enter the password and pick your seat.",
+    "seatsEyebrow": "The table",
+    "seatsTitle": "Seats",
+    "seatsTaken": "{{players}} / {{capacity}} taken",
+    "accessEyebrow": "You",
+    "accessTitle": "Join the room",
+    "accessReady": "ready",
+    "accessNeedPassword": "password needed",
+    "playerName": "Your name",
+    "playerNamePlaceholder": "How others will see you",
+    "defaultName": "Player",
+    "password": "Room password",
+    "passwordPlaceholder": "To join and change settings",
+    "accessNote": "Pick a free seat. If you are coming back to a game, click your old seat.",
+    "readyEyebrow": "Ready?",
+    "readyWaiting": "Can we start?",
+    "readyRunning": "The game has started",
+    "checkPassword": "Password entered",
+    "checkPlayers": "At least two players",
+    "checkHuman": "At least one person at the table",
+    "start": "Start the game →",
+    "wait": "Please wait…",
+    "resume": "Back to the game →",
+    "pickSeatFirst": "First pick your seat.",
+    "meetChecks": "Tick all the boxes above and the button will turn on."
+  },
+  "seat": {
+    "kind": {
+      "empty": "free",
+      "bot": "bot",
+      "mine": "your seat",
+      "human": "player"
+    },
+    "emptyTitle": "Free seat",
+    "anyRole": "any role",
+    "youAreHere": "You are at the table",
+    "humanPlayer": "Human player",
+    "emptyHint": "Take it yourself or add a bot",
+    "confirmed": "✓ This is your seat",
+    "sitHere": "Sit here",
+    "returnHere": "Go back to this seat",
+    "take": "Take this seat",
+    "addBot": "Add a bot",
+    "removeBot": "Remove bot",
+    "botModel": "Bot",
+    "preferredRole": "Favourite role",
+    "anyRoleOption": "Any role",
+    "saveBot": "Save",
+    "placeBot": "Add bot"
+  },
+  "about": {
+    "eyebrow": "About",
+    "title": "A board game I am making myself",
+    "p1": "Hi! City of Influence is my own board game. I make it in my free time, just because I love it. My dream is to see it one day as a real box on the table.",
+    "p2Strong": "The game is completely free",
+    "p2": " and it will stay free: no ads and no paid advantages. Everyone plays on equal terms.",
+    "p3Start": "If you like the game and want to help, you can support the project with any amount. All the money will go to ",
+    "p3Strong": "printing the first batch of the board game",
+    "p3End": ": the cards, the board and the box.",
+    "p4": "Your opinion means a lot to me. Found a bug, something is unclear, or you have an idea? Please write to me on the feedback page — I read every message.",
+    "thanks": "Thank you for playing!",
+    "write": "✉ Send feedback",
+    "close": "Close"
+  },
+  "feedback": {
+    "eyebrow": "Feedback",
+    "title": "Tell me what you think",
+    "lead": "Here you can report a bug, share an idea or just tell me how you like the game. I read every message. Leave a contact and I will try to reply.",
+    "support": "Like the project? You can support it — the money goes to printing the board game.",
+    "kindLegend": "What is it about",
+    "kinds": {
+      "bug": {
+        "title": "I found a bug",
+        "hint": "Something is broken or works wrong",
+        "placeholder": "What happened, and what did you do just before? If you remember the round, the role or the card — even better."
+      },
+      "idea": {
+        "title": "I have an idea",
+        "hint": "Something to add or change",
+        "placeholder": "What would you add to the game or do differently?"
+      },
+      "other": {
+        "title": "Just saying hi",
+        "hint": "Thoughts, questions, anything",
+        "placeholder": "Write it just as it is — I really want to know."
+      }
+    },
+    "message": "Message",
+    "contact": "How can I reach you — if you want a reply",
+    "contactPlaceholder": "Email or @telegram, optional",
+    "trap": "Website",
+    "send": "Send",
+    "sending": "Sending…",
+    "note": "We also send the game version and your browser type — it helps to find bugs.",
+    "errorTooMany": "Too many messages in a row. Please wait a minute and try again.",
+    "errorFailed": "Could not send. Check your internet and try again — your text is still here.",
+    "doneTitle": "Thank you! Your message arrived",
+    "doneText": "It really helps to make the game better.",
+    "writeMore": "Write another",
+    "toHome": "Home"
+  }
+}

@@ -1,3 +1,4 @@
+import { tr } from "../../i18n";
 import * as Dialog from "@radix-ui/react-dialog";
 import type { ReactNode } from "react";
 
@@ -35,7 +36,7 @@ export function Modal({
           <div className="flex min-w-0 items-baseline gap-2 border-b border-line px-3.5 py-2.5">
             <Dialog.Title className="min-w-0 flex-1 truncate text-sm font-bold">{title}</Dialog.Title>
             {subtitle && <span className="shrink-0 text-2xs text-ink-dim">{subtitle}</span>}
-            <Dialog.Close className="px-1 text-base text-ink-dim hover:text-ink" aria-label="Закрыть">
+            <Dialog.Close className="px-1 text-base text-ink-dim hover:text-ink" aria-label={tr("game", "ui.common.close")}>
               ✕
             </Dialog.Close>
           </div>
@@ -82,7 +83,7 @@ export function DetailsModal({
           <Dialog.Title className="sr-only">{label}</Dialog.Title>
           <Dialog.Close
             className="absolute right-2.5 top-2 z-10 px-1 text-base text-ink-dim hover:text-ink"
-            aria-label="Закрыть"
+            aria-label={tr("game", "ui.common.close")}
           >
             ✕
           </Dialog.Close>

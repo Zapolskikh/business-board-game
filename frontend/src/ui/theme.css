@@ -427,3 +427,467 @@
   0%, 100% { filter: drop-shadow(0 0 2px rgb(224 188 114 / 0.55)); }
   50% { filter: drop-shadow(0 0 7px rgb(224 188 114 / 0.95)); }
 }
+
+/* ── Книга города (правила) ──────────────────────────────────────────────────
+ * Переплёт из тёмной кожи с золотым тиснением, внутри две страницы пергамента: слева закладки,
+ * справа глава. Палитра своя и от темы доски не зависит — книга одна и та же на любом столе.
+ * Текст глав приходит строкой из rulesDocument.ts, поэтому его теги стилизуются здесь. */
+@layer components {
+  .ui-v2.rules-book {
+    --book-ink: #2b2118;
+    --color-ink: #2b2118;
+    --book-muted: #6a5a47;
+    --book-rule: rgb(120 94 58 / 0.3);
+    --book-gold: #b8914a;
+    --book-paper: #f6edda;
+    --book-good: #2f6b48;
+    --book-bad: #9b3a43;
+    gap: 0;
+    padding: 14px;
+    border-radius: 14px;
+    color: var(--book-ink);
+    background:
+      radial-gradient(circle at 30% 20%, rgb(255 255 255 / 0.06), transparent 60%),
+      linear-gradient(135deg, #4a2c1c 0%, #2e1a10 100%);
+    box-shadow:
+      inset 0 0 0 2px #7a5530,
+      inset 0 0 0 5px #2a170d,
+      inset 0 0 0 6px rgb(212 175 105 / 0.55),
+      0 24px 60px rgb(0 0 0 / 0.6);
+  }
+
+  .ui-v2 .rules-book-toc,
+  .ui-v2 .rules-book-page {
+    background:
+      radial-gradient(ellipse at 50% 0%, rgb(255 255 255 / 0.5), transparent 70%),
+      linear-gradient(180deg, #f8f0de 0%, #efe2c6 100%);
+  }
+  .ui-v2 .rules-book-toc {
+    border-radius: 8px 0 0 8px;
+    /* Корешок: тень к центру разворота. */
+    box-shadow: inset -14px 0 18px -14px rgb(80 50 20 / 0.45);
+    padding: 18px 10px 14px 14px;
+  }
+  .ui-v2 .rules-book-page {
+    border-radius: 0 8px 8px 0;
+    box-shadow: inset 14px 0 18px -14px rgb(80 50 20 / 0.45);
+  }
+
+  .ui-v2 .rules-book-title {
+    padding: 0 6px 12px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--book-rule);
+    text-align: center;
+  }
+  .ui-v2 .rules-book-title h2,
+  .ui-v2 .rules-book-title [id] {
+    color: var(--book-ink);
+  }
+  .ui-v2 .rules-book-title p {
+    margin-top: 2px;
+    color: var(--book-muted);
+    font: italic 12px/1.3 Georgia, serif;
+  }
+
+  .ui-v2 .rules-book-toc ol {
+    list-style: none;
+  }
+
+  /* Поиск: поле как строка на полях книги, результаты — выписки со ссылкой на главу. */
+  .ui-v2 .rules-book-search {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px;
+    margin: 0 2px 10px;
+    padding: 5px 9px;
+    border: 1px solid var(--book-rule);
+    border-radius: 8px;
+    background: rgb(255 253 246 / 0.75);
+    color: var(--book-muted);
+  }
+  .ui-v2 .rules-book-search:focus-within {
+    border-color: var(--book-gold);
+    box-shadow: 0 0 0 2px rgb(184 145 74 / 0.25);
+  }
+  .ui-v2 .rules-book-search input {
+    min-width: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: var(--book-ink);
+    font: 14px Georgia, serif;
+  }
+  .ui-v2 .rules-book-search input::placeholder { color: #9a8a72; font-style: italic; }
+  .ui-v2 .rules-book-search input::-webkit-search-cancel-button { display: none; }
+  .ui-v2 .rules-book-search button {
+    padding: 0 4px;
+    border-radius: 4px;
+    color: var(--book-muted);
+    font-size: 12px;
+  }
+  .ui-v2 .rules-book-search button:hover { color: var(--book-ink); background: rgb(184 145 74 / 0.18); }
+
+  .ui-v2 .rules-book-results { display: grid; align-content: start; gap: 6px; padding-right: 2px; }
+  .ui-v2 .rules-book-results-count {
+    margin: 0 4px 2px;
+    color: var(--book-muted);
+    font: italic 12px Georgia, serif;
+  }
+  .ui-v2 .rules-book-result {
+    display: grid;
+    gap: 4px;
+    padding: 8px 10px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    color: var(--book-ink);
+    text-align: left;
+  }
+  .ui-v2 .rules-book-result:hover { background: rgb(184 145 74 / 0.12); }
+  .ui-v2 .rules-book-result[aria-current="page"] {
+    border-color: rgb(184 145 74 / 0.45);
+    background: rgb(184 145 74 / 0.16);
+  }
+  .ui-v2 .rules-book-result-head {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr) auto;
+    align-items: center;
+    font: 700 13px Georgia, serif;
+  }
+  .ui-v2 .rules-book-result-head small {
+    padding: 0 6px;
+    border-radius: 8px;
+    background: rgb(184 145 74 / 0.22);
+    color: #6b4a14;
+    font: 600 10.5px "Bahnschrift", sans-serif;
+  }
+  .ui-v2 .rules-book-snippet {
+    display: block;
+    color: #5b4c3b;
+    font: 12px/1.45 Georgia, serif;
+  }
+
+  /* Подсветка совпадений — маркер по бумаге, одинаковый в выписках и в тексте главы. */
+  .ui-v2 mark.rules-hit {
+    padding: 0 1px;
+    border-radius: 2px;
+    background: rgb(240 198 92 / 0.6);
+    color: inherit;
+    box-shadow: 0 0 0 1px rgb(200 150 40 / 0.35);
+  }
+
+  .ui-v2 .rules-book-tab {
+    display: grid;
+    grid-template-columns: 22px 20px minmax(0, 1fr);
+    align-items: center;
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 6px;
+    color: var(--book-ink);
+    font: 600 13px/1.25 Georgia, serif;
+    text-align: left;
+    transition: background-color 0.12s;
+  }
+  .ui-v2 .rules-book-tab:hover {
+    background: rgb(184 145 74 / 0.14);
+  }
+  .ui-v2 .rules-book-tab[aria-current="page"] {
+    background: linear-gradient(90deg, rgb(184 145 74 / 0.32), rgb(184 145 74 / 0.08));
+    box-shadow: inset 3px 0 0 var(--book-gold);
+  }
+  .ui-v2 .rules-book-tab-num {
+    color: var(--book-muted);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ui-v2 .rules-book-chapter-head {
+    position: relative;
+    padding: 18px 56px 10px 34px;
+    border-bottom: 1px solid var(--book-rule);
+  }
+  .ui-v2 .rules-book-chapter-head > span {
+    color: var(--book-muted);
+    font: italic 12px Georgia, serif;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .ui-v2 .rules-book-chapter-head h2 {
+    margin-top: 2px;
+    font-size: 26px;
+    line-height: 1.15;
+  }
+  .ui-v2 .rules-book-close {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    color: var(--book-muted);
+    font-size: 16px;
+  }
+  .ui-v2 .rules-book-close:hover {
+    background: rgb(184 145 74 / 0.18);
+    color: var(--book-ink);
+  }
+
+  .ui-v2 .rules-book-footer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    padding: 8px 34px 12px;
+    border-top: 1px solid var(--book-rule);
+    color: var(--book-muted);
+    font: 12px Georgia, serif;
+  }
+  .ui-v2 .rules-book-footer button {
+    overflow: hidden;
+    padding: 5px 10px;
+    border-radius: 6px;
+    color: var(--book-ink);
+    font: 600 13px Georgia, serif;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ui-v2 .rules-book-footer button:last-child {
+    text-align: right;
+  }
+  .ui-v2 .rules-book-footer button:enabled:hover {
+    background: rgb(184 145 74 / 0.18);
+  }
+  .ui-v2 .rules-book-footer button:disabled {
+    visibility: hidden;
+  }
+
+  /* ── Текст главы ── */
+  .ui-v2 .rules-book-text {
+    padding: 16px 34px 24px;
+    font: 14.5px/1.62 Georgia, "Times New Roman", serif;
+    color: var(--book-ink);
+  }
+  .ui-v2 .rules-book-text > * + * {
+    margin-top: 10px;
+  }
+  .ui-v2 .rules-book-text p { margin-bottom: 10px; }
+  .ui-v2 .rules-book-text b,
+  .ui-v2 .rules-book-text strong { color: #1a120b; }
+  .ui-v2 .rules-book-text h3 {
+    margin: 22px 0 6px;
+    font: 700 18px/1.25 Georgia, serif;
+    color: var(--book-ink);
+  }
+  .ui-v2 .rules-book-text h3[style*="--district"] {
+    padding-bottom: 4px;
+    border-bottom: 2px solid color-mix(in srgb, var(--district) 70%, transparent);
+    color: color-mix(in srgb, var(--district) 45%, #1c150d);
+  }
+  .ui-v2 .rules-book-text h4 {
+    margin: 0 0 4px;
+    font: 700 14.5px Georgia, serif;
+  }
+  .ui-v2 .rules-book-text ul,
+  .ui-v2 .rules-book-text ol {
+    margin: 0 0 12px;
+    padding-left: 22px;
+  }
+  .ui-v2 .rules-book-text ul { list-style: disc; }
+  .ui-v2 .rules-book-text ol { list-style: decimal; }
+  .ui-v2 .rules-book-text li { margin: 4px 0; }
+  .ui-v2 .rules-book-text li::marker { color: var(--book-gold); }
+  .ui-v2 .rules-book-text code {
+    padding: 0 5px;
+    border: 1px solid var(--book-rule);
+    border-radius: 4px;
+    background: rgb(255 255 255 / 0.5);
+    font: 13px ui-monospace, Consolas, monospace;
+  }
+
+  .ui-v2 .rules-book-text .cols {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+  }
+  .ui-v2 .rules-book-text .box,
+  .ui-v2 .rules-book-text .kpi > div {
+    padding: 12px 14px;
+    border: 1px solid var(--book-rule);
+    border-radius: 8px;
+    background: rgb(255 252 244 / 0.6);
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+  .ui-v2 .rules-book-text .box p:last-child { margin-bottom: 0; }
+  .ui-v2 .rules-book-text .kpi {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+    margin: 12px 0;
+  }
+  .ui-v2 .rules-book-text .kpi > div { text-align: center; }
+  .ui-v2 .rules-book-text .kpi b {
+    display: block;
+    font-size: 21px;
+    color: #7a5520;
+  }
+  .ui-v2 .rules-book-text .kpi span {
+    color: var(--book-muted);
+    font-size: 12.5px;
+  }
+
+  /* Советы и предупреждения — поля на полях страницы, а не цветные плашки. */
+  .ui-v2 .rules-book-text .tip,
+  .ui-v2 .rules-book-text .warn,
+  .ui-v2 .rules-book-text .role-advice,
+  .ui-v2 .rules-book-text .role-warning {
+    margin: 12px 0;
+    padding: 10px 14px;
+    border-left: 3px solid var(--book-good);
+    border-radius: 0 8px 8px 0;
+    background: rgb(47 107 72 / 0.08);
+    font-size: 13.5px;
+  }
+  .ui-v2 .rules-book-text .warn,
+  .ui-v2 .rules-book-text .role-warning {
+    border-left-color: var(--book-bad);
+    background: rgb(155 58 67 / 0.08);
+  }
+
+  /* Таблицы каталога: ширина страницы — предел, длинный текст переносится, а не уезжает вбок. */
+  .ui-v2 .rules-book-text table {
+    width: 100%;
+    margin: 8px 0 18px;
+    border-collapse: collapse;
+    font: 13px/1.45 Georgia, serif;
+  }
+  .ui-v2 .rules-book-text th {
+    padding: 6px 8px;
+    border-bottom: 2px solid var(--book-rule);
+    color: var(--book-muted);
+    font: 600 11px "Bahnschrift", "Segoe UI", sans-serif;
+    letter-spacing: 0.05em;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .ui-v2 .rules-book-text td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--book-rule);
+    vertical-align: top;
+    overflow-wrap: anywhere;
+  }
+  .ui-v2 .rules-book-text tbody tr:nth-child(even) td { background: rgb(255 255 255 / 0.28); }
+  .ui-v2 .rules-book-text td.num {
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .ui-v2 .rules-book-text td.name { min-width: 170px; overflow-wrap: normal; }
+  .ui-v2 .rules-book-text td.effect { color: #4a3d30; }
+  .ui-v2 .rules-book-text td.name .badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: 8px;
+    background: var(--rarity, #aeb6bd);
+    color: #1c150d;
+    font: 600 10px "Bahnschrift", sans-serif;
+    vertical-align: 1px;
+  }
+  .ui-v2 .rules-book-text td.name .tags {
+    display: block;
+    color: var(--book-muted);
+    font-size: 11.5px;
+  }
+  .ui-v2 .rules-book-text tr.rarity-common { --rarity: #cfd4d8; }
+  .ui-v2 .rules-book-text tr.rarity-uncommon { --rarity: #a9d6b8; }
+  .ui-v2 .rules-book-text tr.rarity-rare { --rarity: #a9cbe6; }
+  .ui-v2 .rules-book-text tr.rarity-epic { --rarity: #cdb6e6; }
+  .ui-v2 .rules-book-text tr.rarity-legendary { --rarity: #ebcf8d; }
+  .ui-v2 .rules-book-text tr.tone-deal td.name b { color: var(--book-good); }
+  .ui-v2 .rules-book-text tr.tone-attack td.name b { color: var(--book-bad); }
+  .ui-v2 .rules-book-text tr.tone-defence td.name b { color: #2c5a82; }
+  .ui-v2 .rules-book-text .district-desc { color: var(--book-muted); font-size: 13.5px; }
+  .ui-v2 .rules-book-text .rarity-ladder { columns: 2; }
+
+  /* Роли — отдельные листы-вкладыши с цветом роли. */
+  .ui-v2 .rules-book-text .role-grid { display: grid; gap: 16px; }
+  .ui-v2 .rules-book-text .role-card {
+    --role-ink: color-mix(in srgb, var(--role) 45%, #1c150d);
+    padding: 0 16px 14px;
+    border: 1px solid var(--book-rule);
+    border-top: 4px solid var(--role);
+    border-radius: 8px;
+    background: rgb(255 252 244 / 0.62);
+  }
+  .ui-v2 .rules-book-text .role-card-head {
+    margin: 0 -16px 12px;
+    padding: 12px 16px 10px;
+    border-bottom: 1px solid var(--book-rule);
+    background: color-mix(in srgb, var(--role) 14%, transparent);
+  }
+  .ui-v2 .rules-book-text .role-card-head h3 {
+    margin: 0 0 2px;
+    color: var(--role-ink);
+    font-size: 21px;
+  }
+  .ui-v2 .rules-book-text .role-card-head p { margin: 0; color: var(--book-muted); font-size: 13.5px; }
+  .ui-v2 .rules-book-text .role-details {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: 18px;
+  }
+  .ui-v2 .rules-book-text .role-card h4 {
+    color: var(--role-ink);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .ui-v2 .rules-book-text .role-card h5 { margin: 0 0 4px; font: 700 15px Georgia, serif; }
+  .ui-v2 .rules-book-text .role-card p,
+  .ui-v2 .rules-book-text .role-card li { font-size: 13.5px; line-height: 1.5; }
+  .ui-v2 .rules-book-text .role-power-guide {
+    margin-bottom: 8px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--role) 45%, transparent);
+    border-radius: 7px;
+    background: rgb(255 255 255 / 0.45);
+  }
+  .ui-v2 .rules-book-text .role-power-guide p { margin: 4px 0 0; }
+  .ui-v2 .rules-book-text .role-power-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    color: var(--book-muted);
+  }
+  .ui-v2 .rules-book-text .role-power-meta span {
+    padding: 3px 7px;
+    border-radius: 5px;
+    background: rgb(184 145 74 / 0.1);
+  }
+
+  @media (max-width: 760px) {
+    .ui-v2.rules-book { padding: 8px; }
+    .ui-v2 .rules-book-toc {
+      border-radius: 8px 8px 0 0;
+      padding: 10px;
+      box-shadow: inset 0 -10px 14px -12px rgb(80 50 20 / 0.45);
+    }
+    .ui-v2 .rules-book-page { border-radius: 0 0 8px 8px; box-shadow: none; }
+    .ui-v2 .rules-book-title { display: none; }
+    .ui-v2 .rules-book-toc li { flex: none; }
+    .ui-v2 .rules-book-search { margin-bottom: 6px; }
+    .ui-v2 .rules-book-results { max-height: 34dvh; }
+    .ui-v2 .rules-book-tab { grid-template-columns: auto auto; gap: 4px; white-space: nowrap; }
+    .ui-v2 .rules-book-tab > span:last-child { display: none; }
+    .ui-v2 .rules-book-chapter-head { padding: 12px 48px 8px 16px; }
+    .ui-v2 .rules-book-chapter-head h2 { font-size: 20px; }
+    .ui-v2 .rules-book-text { padding: 12px 16px 18px; font-size: 14px; }
+    .ui-v2 .rules-book-footer { padding: 6px 12px 10px; }
+    .ui-v2 .rules-book-text .role-details,
+    .ui-v2 .rules-book-text .role-power-meta { grid-template-columns: 1fr; }
+    .ui-v2 .rules-book-text .rarity-ladder { columns: 1; }
+    /* На телефоне таблица шире экрана неизбежна — тогда скролл только у неё, не у страницы. */
+    .ui-v2 .rules-book-text table { display: block; overflow-x: auto; }
+  }
+}

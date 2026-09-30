@@ -1,7 +1,7 @@
+import { useTranslation } from "react-i18next";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useThemeStyle } from "../lib/theme";
 import { scoreOf } from "../../online/gameUi";
-import { buildRulesHtml } from "../../online/rulesDocument";
 import type { CityMeta, GameState, LegalAction } from "../../online/types";
 import { ActionsPanel } from "../actions/ActionsPanel";
 import { CityPanel } from "../city/CityPanel";
@@ -14,6 +14,7 @@ import type { ActionContext } from "../lib/actions";
 import { indexMaps } from "../lib/board";
 import { useCommand, useGame, useLegalActions, useMe, useMeta, useRoom } from "../lib/session";
 import { Chronicle } from "./Chronicle";
+import { RulesBook } from "./RulesBook";
 import { ChronicleRail } from "./ChronicleRail";
 import { useTurnBriefing } from "./briefing";
 import { TurnBriefingModal } from "./TurnBriefing";
@@ -54,6 +55,9 @@ export function BoardView({
   /** Подключённая партия разрешает сетевой экспорт хроники; /dev работает без сессии. */
   liveSession?: boolean;
 }) {
+  // Хук перевода на корне доски: смена языка перерисовывает всё дерево, и подписи из
+  // gameUi (они берут язык в момент вызова) обновляются вместе с компонентами.
+  const { t } = useTranslation("game");
   const index = useMemo(() => indexMaps(meta), [meta]);
   const [chronicle, setChronicle] = useState(false);
   const [score, setScore] = useState(false);
@@ -183,24 +187,17 @@ export function BoardView({
 
       <TurnBriefingModal briefing={briefing} onClose={closeBriefing} />
 
-      <DetailsModal open={score} onClose={() => setScore(false)} label="Счёт и доход">
+      <DetailsModal open={score} onClose={() => setScore(false)} label={t("ui.finish.scoreModal")}>
         <ScoreDetails game={game} me={context.me} meta={meta} />
       </DetailsModal>
 
-      <Modal open={rules} onClose={() => setRules(false)} title="📖 Правила" width={720}>
-        <div
-          className="[&_h2]:mb-1 [&_h2]:mt-3 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:text-ink
-            [&_h3]:mb-1 [&_h3]:mt-2 [&_h3]:font-semibold [&_h3]:text-ink
-            [&_li]:mb-0.5 [&_li]:ml-4 [&_li]:list-disc [&_p]:mb-2 [&_strong]:text-ink"
-          dangerouslySetInnerHTML={{ __html: buildRulesHtml(meta, game.role_price) }}
-        />
-      </Modal>
+      <RulesBook open={rules} onClose={() => setRules(false)} meta={meta} rolePrice={game.role_price} />
 
       <Modal
         open={game.status === "finished" && finishOpen}
         onClose={() => setFinishOpen(false)}
-        title="🏁 Партия окончена"
-        subtitle={`${game.round_number} раундов`}
+        title={t("ui.finish.title")}
+        subtitle={t("ui.finish.rounds", { count: game.round_number })}
         footer={
           <button
             type="button"
@@ -208,7 +205,7 @@ export function BoardView({
             className="w-full rounded-md border border-line bg-panel-2 px-2 py-2 text-center text-xs
               hover:border-accent"
           >
-            ← Вернуться в комнаты
+            {t("ui.finish.back")}
           </button>
         }
       >
@@ -221,7 +218,7 @@ export function BoardView({
               <b className="w-5 text-points">{position + 1}.</b>
               <b className="flex-1 text-ink">{player.name}</b>
               <span className="text-ink-dim">
-                {index.roles.get(player.role ?? "")?.title ?? "без роли"}
+                {index.roles.get(player.role ?? "")?.title ?? t("ui.finish.noRole")}
               </span>
               <b className="text-sm text-points">{scoreOf(game, player)}</b>
             </li>

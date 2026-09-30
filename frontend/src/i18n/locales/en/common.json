@@ -1,0 +1,46 @@
+{
+  "language": {
+    "label": "Language",
+    "ru": "Русский",
+    "en": "English",
+    "cs": "Čeština"
+  },
+  "app": {
+    "loadingCatalog": "Loading the game…",
+    "loadingTable": "Setting up the table…",
+    "loadingGame": "Loading the game…",
+    "gameNotStarted": "The game has not started yet",
+    "backToRooms": "← Back to rooms",
+    "connectionError": "No connection",
+    "serverDown": "The game server is not responding",
+    "retry": "Try again"
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "roomUnavailable": "This room is not available",
+    "joinFailed": "Could not join",
+    "loadRooms": "Could not load the rooms",
+    "createRoom": "Could not create the room",
+    "deleteRoom": "Could not delete the room",
+    "wrongPassword": "Wrong room password",
+    "notFound": "Room not found — it may have closed",
+    "conflict": "Someone was faster. Updating…",
+    "tooMany": "Too many requests. Please wait a minute.",
+    "server": "Server error. Please try again a bit later."
+  },
+  "difficulty": {
+    "easy": "Easy",
+    "medium": "Medium",
+    "hard": "Hard",
+    "expert": "Reborn"
+  },
+  "support": {
+    "donate": "Support us on {{site}}",
+    "soon": "soon",
+    "soonTitle": "{{site}} — page coming soon"
+  },
+  "studio": {
+    "presents": "presents",
+    "makes": "Made by"
+  }
+}

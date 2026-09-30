@@ -1,3 +1,4 @@
+import { errorText } from "../../i18n/errors";
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import {
   QueryClient,
@@ -136,6 +137,7 @@ export function useCommand(): CommandHandle {
     send: mutation.mutate,
     pending: mutation.isPending ? mutation.variables : undefined,
     isPending: mutation.isPending,
-    error: mutation.error instanceof Error ? mutation.error.message : "",
+    // Сервер отвечает фразой для разработчика; игроку — понятный текст на его языке.
+    error: mutation.error ? errorText(mutation.error) : "",
   };
 }

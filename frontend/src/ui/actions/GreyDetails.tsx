@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   greyOperationDistricts,
   greyOperationInfo,
@@ -26,19 +27,16 @@ export function GreyDetails({
   context: ActionContext;
   onAction: (action: LegalAction) => void;
 }) {
+  const { t } = useTranslation("game");
   const spent = usedThisTurn(game, "grey_operation_used");
   const success = meta.scoring?.grey_success_scandals ?? 1;
   const failure = meta.scoring?.grey_failure_scandals ?? 2;
 
   return (
     <>
-      <PopoverHeader title="🌒 Серые операции" subtitle={spent ? "уже проведена" : "одна за ход"} />
+      <PopoverHeader title={t("ui.grey.title")} subtitle={spent ? t("ui.grey.spent") : t("ui.grey.once")} />
       <PopoverBody>
-        <p className="mb-2">
-          Операцию открывает любой ваш <strong>активный</strong> объект нужного района — роль не нужна,
-          заблокированный объект не считается. Одна операция за ход, попытка тратится и при провале:
-          успех даёт {success} скандал себе, провал — {failure}. Свои скандалы Крыша не гасит.
-        </p>
+        <p className="mb-2">{t("ui.grey.intro", { success, failure })}</p>
 
         <div className="grid gap-1">
           {Object.entries(greyOperationLabels).map(([operationId, label]) => {
@@ -59,8 +57,8 @@ export function GreyDetails({
                   key={operationId}
                   icon="🌒"
                   title={label}
-                  hint={spent ? "операция в этом ходу уже была" : `нужен активный объект: ${gates}`}
-                  right={`${chance}% · ${points}оч`}
+                  hint={spent ? t("ui.grey.spentHint") : t("ui.grey.needHint", { districts: gates })}
+                  right={t("ui.grey.chance", { chance, points })}
                   disabled
                 />
               );
@@ -76,7 +74,7 @@ export function GreyDetails({
                   icon="🌒"
                   title={target ? `${label} → ${target.name}` : label}
                   hint={info.effect(game.round_number, meta)}
-                  right={`${chance}% · ${points}оч`}
+                  right={t("ui.grey.chance", { chance, points })}
                   onClick={() => onAction(action)}
                 />
               );

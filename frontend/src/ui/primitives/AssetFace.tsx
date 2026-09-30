@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import { tr } from "../../i18n";
 import type { CSSProperties, ReactNode } from "react";
 import { rarityLabels, tagLabel, type AssetEffectLine } from "../../online/gameUi";
 import { useIsPortrait } from "../lib/layout";
@@ -63,8 +65,8 @@ export function assetFaceSummary(asset: AssetMeta, lines: AssetEffectLine[]): As
   const influence = asset.influence + (purchase.influence ?? 0);
   if (influence) oneTime.push(`+${influence}◆`);
   if (purchase.money) oneTime.push(`${purchase.money > 0 ? "+" : "−"}${Math.abs(purchase.money)}$`);
-  if (purchase.roofs) oneTime.push(`+${purchase.roofs} Крыша`);
-  if (purchase.card) oneTime.push("+карта");
+  if (purchase.roofs) oneTime.push(tr("game", "ui.asset.roof", { count: purchase.roofs }));
+  if (purchase.card) oneTime.push(tr("game", "ui.asset.card"));
 
   const passive = lines.filter(line => line.kind === "passive");
   return {
@@ -93,12 +95,6 @@ const bulletTone: Record<NonNullable<AssetBullet["tone"]>, string> = {
   dim: "text-ink-dim",
 };
 
-const conditionWord = (count: number): string =>
-  count % 10 === 1 && count % 100 !== 11
-    ? "условие"
-    : [2, 3, 4].includes(count % 10) && ![12, 13, 14].includes(count % 100)
-      ? "условия"
-      : "условий";
 
 const signed = (value: number, unit: string): string => `${value >= 0 ? "+" : "−"}${Math.abs(value)}${unit}`;
 
@@ -123,6 +119,7 @@ export function AssetFace({
   owned?: boolean;
 }) {
   const portrait = useIsPortrait();
+  const { t } = useTranslation("game");
   const summary = assetFaceSummary(asset, lines);
   const points = asset.points ?? 0;
   const star = projectIcon("score");
@@ -175,7 +172,7 @@ export function AssetFace({
             className={`asset-price card-serif grid h-[21px] min-w-[40px] place-items-center px-1.5 text-[13px]
               leading-none ${price.short ? "text-bad" : ""}`}
             style={pricePlaque ? { backgroundImage: `url(${pricePlaque})` } : undefined}
-            title={price.short ? "Не хватает денег" : "Цена для вас"}
+            title={price.short ? t("ui.asset.priceShort") : t("ui.asset.priceMine")}
           >
             {price.value}$
           </b>
@@ -192,7 +189,7 @@ export function AssetFace({
           data-rarity={asset.rarity}
           className="asset-ribbon flex h-[17px] items-center gap-0.5 px-2.5 text-[8px] font-bold uppercase"
           style={ribbon ? { backgroundImage: `url(${ribbon})` } : undefined}
-          title={`Редкость: ${rarity}`}
+          title={t("ui.asset.rarity", { rarity })}
         >
           {gem && <img src={gem} alt="" className="size-2.5" />}
           {rarity}
@@ -209,9 +206,9 @@ export function AssetFace({
         {summary.hidden > 0 && (
           <span
             className="ml-auto shrink-0 whitespace-nowrap font-semibold text-[var(--card-district)]"
-            title="Условия карты, которые сейчас не выполнены. Все формулировки — по нажатию на карточку."
+            title={t("ui.asset.conditionsTitle")}
           >
-            ↗ ещё {summary.hidden} {conditionWord(summary.hidden)}
+            {t("ui.asset.conditions", { count: summary.hidden })}
           </span>
         )}
       </span>
@@ -220,31 +217,31 @@ export function AssetFace({
         * Пустое поле приглушено, а не убрано — шесть карт сравниваются одним взглядом. */}
       <span className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-1.5">
         <span className="asset-fields grid min-h-0 min-w-0 grid-cols-2 grid-rows-2 overflow-hidden rounded-md">
-          <Field icon={projectIcon("money")} empty={income.money === 0} title="Деньги за раунд" label="$ / раунд">
+          <Field icon={projectIcon("money")} empty={income.money === 0} title={t("ui.asset.moneyTitle")} label={t("ui.asset.moneyEmpty")}>
             <b className="text-[13px] text-money">{signed(income.money, "$")}</b>
-            <small>/ раунд</small>
+            <small>{t("ui.asset.perRound")}</small>
           </Field>
           <Field
             icon={statIcon("influence")}
             empty={summary.oneTime.length === 0}
             faded={owned}
-            label="разово"
-            title={owned ? "Получено при покупке" : "Получите сразу при покупке"}
+            label={t("ui.asset.oneTime")}
+            title={owned ? t("ui.asset.oneTimeOwned") : t("ui.asset.oneTimeMarket")}
           >
             <b className="min-w-0 overflow-hidden text-ellipsis text-[12px] text-influence">
               {summary.oneTime.length ? summary.oneTime.join(", ") : "—"}
             </b>
-            <small>{owned ? "получено" : "сразу"}</small>
+            <small>{owned ? t("ui.asset.received") : t("ui.asset.now")}</small>
           </Field>
-          <Field icon={projectIcon("influence")} empty={income.influence === 0} title="Влияние за раунд" label="◆ / раунд">
+          <Field icon={projectIcon("influence")} empty={income.influence === 0} title={t("ui.asset.influenceTitle")} label={t("ui.asset.influenceEmpty")}>
             <b className="text-[13px] text-influence">{signed(income.influence, "◆")}</b>
-            <small>/ раунд</small>
+            <small>{t("ui.asset.perRound")}</small>
           </Field>
           <Field
             icon={projectIcon("unique")}
             empty={summary.unique.length === 0}
-            label="особый бонус"
-            title={summary.uniqueText.join("\n") || "Особого бонуса нет"}
+            label={t("ui.asset.unique")}
+            title={summary.uniqueText.join("\n") || t("ui.asset.noUnique")}
           >
             <b className="line-clamp-2 min-w-0 text-[10px] leading-[1.15] whitespace-normal text-[var(--color-badge)]">
               {summary.unique.length ? summary.unique.join(" · ") : "—"}
@@ -273,10 +270,10 @@ export function AssetFace({
 
       {/* Очки и район — нижняя строка карточки. */}
       <span className="asset-footer grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2 pt-1">
-        <span className="flex items-center gap-1 whitespace-nowrap" title="Очки в финальный счёт">
+        <span className="flex items-center gap-1 whitespace-nowrap" title={t("ui.asset.pointsTitle")}>
           {star && <img src={star} alt="" className="size-4" />}
           <b className="card-serif text-[15px] leading-none">{points}</b>
-          <small className="text-2xs text-ink-muted">очков</small>
+          <small className="text-2xs text-ink-muted">{t("ui.asset.points")}</small>
         </span>
         <span className="flex min-w-0 items-center justify-end gap-1 overflow-hidden border-l border-line pl-2
           text-2xs font-semibold text-[var(--card-district)]">

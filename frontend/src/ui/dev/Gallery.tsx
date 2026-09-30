@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import type { GameState, LegalAction, MarketAsset } from "../../online/types";
 import { BoardView } from "../board/Board";
 import type { ActionContext } from "../lib/actions";
-import { ME, meta, scenarios, type ScenarioName } from "./fixtures";
+import { ME, meta as fixtureMeta, scenarios, type ScenarioName } from "./fixtures";
+import { useLocalizedMeta } from "../../i18n/catalog";
 import "../theme.css";
 
 /* Галерея состояний.
@@ -27,6 +28,7 @@ const spares: MarketAsset[] = [
 ];
 
 export function Gallery() {
+  const meta = useLocalizedMeta(fixtureMeta);
   const [name, setName] = useState<ScenarioName>(initialScenario);
   const [pendingUid, setPendingUid] = useState<string | null>(query.has("pending") ? "__first__" : null);
   const [rotations, setRotations] = useState(0);

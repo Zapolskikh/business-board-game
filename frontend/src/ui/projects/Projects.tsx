@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { AnimatePresence, motion } from "motion/react";
 import { forwardRef, type CSSProperties } from "react";
 import { projectPerkText, projectRequirementText, projectRerollMoney } from "../../online/gameUi";
@@ -25,6 +26,7 @@ export function Projects({
   context: ActionContext;
   onAction: (action: LegalAction) => void;
 }) {
+  const { t } = useTranslation("game");
   const portrait = useIsPortrait();
   const reroll = resolve(context, "reroll_projects");
   const rerolled = usedThisTurn(game, "projects_rerolled");
@@ -48,10 +50,10 @@ export function Projects({
         * остальное — размер колоды, длинная подпись кнопки — уходит: это справка, а не решение. */}
       <div className={`flex items-baseline gap-2 overflow-hidden px-0.5 pb-[2px] ${zoneRule}`}>
         <h2 className={sectionTitle}>
-          {portrait ? "Проекты" : "Городские проекты"}
+          {portrait ? t("ui.projects.titleShort") : t("ui.projects.title")}
         </h2>
         <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[10.5px] text-ink-dim">
-          {mine.length ? `ваши: ${mine.length} · ${minePoints} очков` : "у вас пока ни одного"}
+          {mine.length ? t("ui.projects.mine", { count: mine.length, points: minePoints }) : t("ui.projects.none")}
         </span>
         <button
           type="button"
@@ -59,20 +61,20 @@ export function Projects({
           onClick={() => reroll.kind === "ready" && onAction(reroll.action)}
           title={
             rerolled
-              ? "Пересборка уже была в этом ходу"
+              ? t("ui.projects.rerolled")
               : reroll.kind === "blocked"
                 ? reroll.reason
-                : "Все четыре проекта уходят в колоду и раздаются заново. Доска общая — меняется у всех."
+                : t("ui.projects.rerollHint")
           }
           className="ml-auto shrink-0 rounded-[10px] border border-line bg-panel-2 px-1.5 py-0.5
             text-3xs whitespace-nowrap text-ink-muted enabled:hover:border-accent disabled:opacity-45"
         >
-          🔄 {portrait ? "" : "Пересобрать · "}
+          🔄 {portrait ? "" : t("ui.projects.reroll")}
           {projectRerollMoney(meta)}$ + ⚡
         </button>
         {!portrait && (
           <span className="whitespace-nowrap text-[10.5px] text-ink-dim">
-            в колоде {game.project_deck_count}
+            {t("ui.projects.deck", { count: game.project_deck_count })}
           </span>
         )}
       </div>
@@ -120,7 +122,7 @@ export function Projects({
               >
                 <CardPopover
                   side="bottom"
-                  label={`${project.title} — подробности`}
+                  label={t("ui.projects.details", { title: project.title })}
                   content={
                     <ProjectDetails
                       project={project}
@@ -157,7 +159,7 @@ export function Projects({
         </AnimatePresence>
         {game.project_board.length === 0 && (
           <p className="col-span-full py-3 text-center text-2xs text-ink-dim">
-            Проекты в городе закончились.
+            {t("ui.projects.empty")}
           </p>
         )}
       </div>
@@ -201,6 +203,7 @@ const ProjectCard = forwardRef<
    * очками и цена с прогрессом. Текст условия и постоянный бонус уезжают в поповер — иначе
    * четыре проекта съедают треть экрана, которой не хватает рынку. */
   const portrait = useIsPortrait();
+  const { t } = useTranslation("game");
 
   /* Слои по комплекту из presets: фон категории с рамкой, отдельная иконка награды, текст
    * и сегментированный прогресс. Надписи в фон не запечены, поэтому данные — только из движка. */
@@ -231,8 +234,8 @@ const ProjectCard = forwardRef<
             }`}
             title={
               veto === "mine"
-                ? "Ваше вето: проект закрыт для всех остальных"
-                : "Вето политика: этот проект можете взять не вы"
+                ? t("ui.projects.vetoMine")
+                : t("ui.projects.vetoTheirs")
             }
           >
             ⛔
@@ -241,15 +244,15 @@ const ProjectCard = forwardRef<
         {leaving && (
           <span
             className="rounded bg-[#ead5ae] px-1 text-3xs text-[var(--color-warning)]"
-            title="Уходит в конце раунда"
+            title={t("ui.projects.leaving")}
           >
             ⏳
           </span>
         )}
-        <span className="flex shrink-0 items-center gap-0.5 whitespace-nowrap" title={`${project.points} очков`}>
+        <span className="flex shrink-0 items-center gap-0.5 whitespace-nowrap" title={t("ui.projects.points", { count: project.points })}>
           {star && <img src={star} alt="" className="size-[15px]" />}
           <b className="project-card-title text-[15px] leading-none">{project.points}</b>
-          {!portrait && <small className="text-3xs text-ink-dim">оч</small>}
+          {!portrait && <small className="text-3xs text-ink-dim">{t("ui.projects.ptsShort")}</small>}
         </span>
       </span>
 
@@ -260,7 +263,7 @@ const ProjectCard = forwardRef<
           {icon && <img src={icon} alt="" className="size-[20px] shrink-0 object-contain" />}
           <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[11.5px] font-semibold
             text-[var(--project-ink)]">
-            {kind === "points" ? "Только победные очки" : perk}
+            {kind === "points" ? t("ui.projects.onlyPoints") : perk}
           </span>
         </span>
       )}
@@ -271,7 +274,7 @@ const ProjectCard = forwardRef<
             met ? "font-semibold text-good" : "text-ink-muted"
           }`}
         >
-          {met ? "✓ " : "Условие: "}
+          {met ? "✓ " : t("ui.projects.condition")}
           {projectRequirementText(project, meta)}
         </span>
       )}
@@ -281,7 +284,7 @@ const ProjectCard = forwardRef<
       <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
         {standing && <ProjectProgress standing={standing} compact={portrait} />}
         <span className="project-card-plate ml-auto shrink-0 whitespace-nowrap !pl-1.5 text-[11.5px] font-bold"
-          title="Цена проекта">
+          title={t("ui.projects.price")}>
           <span className={shortInfluence ? "text-bad" : "text-influence"}>{project.cost_influence}◆</span>
           {" + "}
           <span className={shortMoney ? "text-bad" : "text-money"}>{project.cost_money}$</span>
@@ -296,11 +299,16 @@ const ProjectCard = forwardRef<
 function ProjectProgress({ standing, compact }: { standing: NonNullable<Standing>; compact: boolean }) {
   const total = standing.binary ? 1 : Math.max(1, standing.needed);
   const done = standing.binary ? (standing.met ? 1 : 0) : Math.min(standing.have, total);
-  const label = standing.binary ? (standing.met ? "готово" : "нет") : `${standing.have}/${standing.needed}`;
+  const { t } = useTranslation("game");
+  const label = standing.binary
+    ? standing.met
+      ? t("ui.projects.ready")
+      : t("ui.projects.notReady")
+    : `${standing.have}/${standing.needed}`;
   return (
     <span
       role="progressbar"
-      aria-label="Выполнение условия"
+      aria-label={t("ui.projects.progress")}
       aria-valuemin={0}
       aria-valuemax={total}
       aria-valuenow={done}
@@ -347,23 +355,24 @@ function ProjectDetails({
   veto?: LegalAction;
   onVeto: (action: LegalAction) => void;
 }) {
+  const { t } = useTranslation("game");
   return (
     <>
-      <PopoverHeader title={project.title} subtitle={`${project.points} очков`} />
+      <PopoverHeader title={project.title} subtitle={t("ui.projects.points", { count: project.points })} />
       <PopoverBody>
         <KeyValue
           rows={[
-            ["Цена", `${project.cost_influence}◆ + ${project.cost_money}$ + ⚡`],
-            ["Требование", projectRequirementText(project, meta)],
+            [t("ui.projects.priceRow"), `${project.cost_influence}◆ + ${project.cost_money}$ + ⚡`],
+            [t("ui.projects.requirement"), projectRequirementText(project, meta)],
             [
-              "Ваш прогресс",
+              t("ui.projects.yourProgress"),
               standing ? (
                 <span className={standing.met ? "text-good" : "text-gold"}>
                   {standing.binary
                     ? standing.met
-                      ? "выполнено"
-                      : "не выполнено"
-                    : `${standing.have} из ${standing.needed}`}
+                      ? t("ui.projects.met")
+                      : t("ui.projects.notMet")
+                    : t("ui.projects.ofNeeded", { have: standing.have, needed: standing.needed })}
                 </span>
               ) : (
                 "—"
@@ -373,13 +382,10 @@ function ProjectDetails({
         />
         <p className="mb-2">{project.text}</p>
         <p className="mb-2">
-          <strong>🎁 Постоянный перк:</strong> {projectPerkText(project)}
+          <strong>{t("ui.projects.perk")}</strong> {projectPerkText(project)}
         </p>
-        <p className="mb-2">
-          Проект уникален: кто взял — тот и забрал очки, остальным он больше недоступен. Доска общая
-          и меняется у всех сразу.
-        </p>
-        {leaving && <p className="text-gold">⏳ Уходит в конце раунда — уйдёт в низ колоды.</p>}
+        <p className="mb-2">{t("ui.projects.unique")}</p>
+        {leaving && <p className="text-gold">{t("ui.projects.leavingNote")}</p>}
       </PopoverBody>
       <PopoverFooter>
         {/* Вето жмут на самом проекте: список из четырёх строк «Цель» в правой панели не сказал
@@ -391,7 +397,7 @@ function ProjectDetails({
             className="mb-1 rounded-md border border-line bg-panel-2 px-2 py-2 text-center text-xs
               font-semibold hover:border-accent"
           >
-            ⛔ Право вето — закрыть проект всем остальным (действие + 3◆)
+            {t("ui.projects.veto")}
           </button>
         )}
         <button
@@ -402,9 +408,9 @@ function ProjectDetails({
             font-semibold text-good disabled:border-line disabled:bg-panel-2 disabled:text-ink-muted disabled:opacity-60"
         >
           {state.kind === "ready"
-            ? `Взять · ${project.cost_influence}◆ + ${project.cost_money}$`
+            ? t("ui.projects.take", { influence: project.cost_influence, money: project.cost_money })
             : state.kind === "pending"
-              ? "Берём…"
+              ? t("ui.projects.taking")
               : state.reason}
         </button>
       </PopoverFooter>

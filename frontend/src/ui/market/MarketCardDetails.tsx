@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { assetEffectLines, assetPoints, districtCount } from "../../online/gameUi";
 import type {
   AssetMeta,
@@ -49,6 +50,8 @@ export function MarketCardDetails({
   const after: PlayerState = { ...me, assets: [...me.assets, { uid: `preview:${item.uid}`, card_id: asset.id }] };
   const lines = assetEffectLines(asset, after, meta, assets, { includeSynergy: true });
   const blocked = state.kind !== "buyable" && state.kind !== "buying";
+  const { t } = useTranslation("game");
+  const sign = (value: number) => (value >= 0 ? "+" : "−");
   const objectLines = lines.filter(line => line.kind !== "district" && line.kind !== "sector");
   const districtLines = lines.filter(line => line.kind === "district" || line.kind === "sector");
 
@@ -67,49 +70,50 @@ export function MarketCardDetails({
           </p>
         )}
         <dl className="mb-2 grid grid-cols-[auto_1fr] gap-x-2.5 gap-y-0.5">
-          <dt className="text-ink-dim">Район</dt>
+          <dt className="text-ink-dim">{t("ui.market.districtRow")}</dt>
           <dd className="font-medium text-ink">
-            {district?.icon} {district?.title} · у вас {owned} из 4
+            {district?.icon} {district?.title} · {t("ui.market.districtValue", { count: owned })}
           </dd>
-          <dt className="text-ink-dim">Цена вам</dt>
+          <dt className="text-ink-dim">{t("ui.market.priceRow")}</dt>
           <dd className="font-semibold text-gold">
             {state.price}${" "}
             {item.price !== undefined && item.price !== asset.cost && (
-              <span className="text-ink-dim">(базовая {asset.cost}$)</span>
+              <span className="text-ink-dim">{t("ui.market.basePrice", { cost: asset.cost })}</span>
             )}
           </dd>
-          <dt className="text-ink-dim">В финальный счёт</dt>
-          <dd className="font-semibold text-points">{points} очков</dd>
-          <dt className="text-ink-dim">Доход</dt>
+          <dt className="text-ink-dim">{t("ui.market.scoreRow")}</dt>
+          <dd className="font-semibold text-points">{t("ui.market.scoreValue", { count: points })}</dd>
+          <dt className="text-ink-dim">{t("ui.market.incomeRow")}</dt>
           <dd className="font-medium text-money">
             {item.preview ? (
               <>
-                {item.preview.money >= 0 ? "+" : "−"}{Math.abs(item.preview.money)}$ за раунд
+                {sign(item.preview.money)}{Math.abs(item.preview.money)}$ {t("ui.market.perRound")}
                 {item.preview.influence !== 0 && (
-                  <span className="text-influence"> · {item.preview.influence > 0 ? "+" : "−"}{Math.abs(item.preview.influence)}◆ за раунд</span>
+                  <span className="text-influence">
+                    {" · "}{sign(item.preview.influence)}{Math.abs(item.preview.influence)}◆ {t("ui.market.perRound")}
+                  </span>
                 )}
                 <span className="block text-2xs font-normal text-ink-dim">
-                  Прибавка ко всему доходу: вместе с синергиями, которые покупка включит в вашем городе.
-                  Напечатано на карте: +{asset.income}$.
+                  {t("ui.market.incomeNote", { printed: asset.income })}
                 </span>
               </>
             ) : (
-              <>+{asset.income}$ за раунд</>
+              <>+{asset.income}$ {t("ui.market.perRound")}</>
             )}
           </dd>
           {asset.influence > 0 && (
             <>
-              <dt className="text-ink-dim">Сразу</dt>
-              <dd className="font-medium text-influence">+{asset.influence}◆ при покупке</dd>
+              <dt className="text-ink-dim">{t("ui.market.nowRow")}</dt>
+              <dd className="font-medium text-influence">{t("ui.market.nowValue", { value: asset.influence })}</dd>
             </>
           )}
         </dl>
 
-        <EffectList title="Свойства объекта" lines={objectLines} />
-        <EffectList title="Правила района" lines={districtLines} />
+        <EffectList title={t("ui.market.properties")} lines={objectLines} />
+        <EffectList title={t("ui.market.districtRules")} lines={districtLines} />
 
         {item.leaving && (
-          <p className="text-[var(--color-warning)]">⏳ Слот уходит в конце раунда: карта вернётся в низ колоды.</p>
+          <p className="text-[var(--color-warning)]">{t("ui.market.leavingNote")}</p>
         )}
       </PopoverBody>
 
@@ -123,8 +127,8 @@ export function MarketCardDetails({
               font-semibold hover:border-accent"
           >
             {mark.payload.power === "mafia_lock"
-              ? "🔒 Серая метка — закрыть слот всем, кроме себя (Крыша)"
-              : "🏷️ Метка — карта работает на вас (действие + скандал)"}
+              ? t("ui.market.lock")
+              : t("ui.market.mark")}
           </button>
         )}
         {/* Пересдача стоит рядом с покупкой не случайно: это второй ответ на тот же
@@ -135,7 +139,7 @@ export function MarketCardDetails({
             className="mb-1 rounded-md border border-line bg-panel-2 px-2 py-2 text-center text-xs
               font-semibold hover:border-accent"
           >
-            🔁 Пересдать слот — раз в раунд, без действия
+            {t("ui.market.refresh")}
           </button>
         )}
         <button

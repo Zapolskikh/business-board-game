@@ -1,0 +1,199 @@
+{
+  "brand": {
+    "mark": "MV",
+    "title": "Město vlivu",
+    "tagline": "desková strategie"
+  },
+  "nav": {
+    "about": "O projektu",
+    "feedback": "Zpětná vazba",
+    "home": "← Domů"
+  },
+  "presence": {
+    "rooms_one": "{{count}} místnost online",
+    "rooms_few": "{{count}} místnosti online",
+    "rooms_many": "{{count}} místnosti online",
+    "rooms_other": "{{count}} místností online",
+    "serverUp": "server běží"
+  },
+  "hero": {
+    "eyebrow": "Strategie · 2–4 hráči",
+    "titleLine1": "Postavte město.",
+    "titleLine2": "Získejte vliv.",
+    "lead": "Připojte se do otevřené místnosti, nebo si založte vlastní. Zbytek nastavíte v lobby spolu s ostatními hráči.",
+    "rounds": "kol za hru",
+    "actions": "akce za tah",
+    "districts": "čtvrtí ve městě"
+  },
+  "rooms": {
+    "eyebrow": "Hry",
+    "title": "Otevřené místnosti",
+    "waiting_one": "{{count}} čeká na hráče",
+    "waiting_few": "{{count}} čekají na hráče",
+    "waiting_many": "{{count}} čeká na hráče",
+    "waiting_other": "{{count}} čeká na hráče",
+    "refresh": "↻ Obnovit",
+    "refreshing": "Obnovujeme…",
+    "emptyTitle": "Zatím žádné místnosti",
+    "emptyText": "Založte první — hned se tu objeví.",
+    "status": {
+      "waiting": "Čeká na hráče",
+      "playing": "Hra běží",
+      "finished": "Hra skončila"
+    },
+    "updated": "aktualizováno v {{time}}",
+    "updatedRecently": "aktualizováno nedávno",
+    "seatsLabel": "Obsazeno {{players}} z {{capacity}} míst",
+    "humans_one": "{{count}} člověk",
+    "humans_few": "{{count}} lidé",
+    "humans_many": "{{count}} lidí",
+    "humans_other": "{{count}} lidí",
+    "open": "Otevřít",
+    "remove": "Smazat místnost",
+    "removeNamed": "Smazat místnost {{name}}"
+  },
+  "create": {
+    "eyebrow": "Nová hra",
+    "title": "Založit místnost",
+    "badge": "1 minuta",
+    "name": "Název místnosti",
+    "namePlaceholder": "Třeba Páteční hra",
+    "password": "Heslo místnosti",
+    "passwordPlaceholder": "Aspoň 4 znaky",
+    "passwordHint": "S ním můžete nastavit místa a spustit hru.",
+    "players": "Hráčů",
+    "rounds": "Kol",
+    "advanced": "Další nastavení",
+    "rolePrice": "Cena role",
+    "rolePriceHint": "Kolik vlivu stojí volná role.",
+    "submit": "Založit a jít do lobby →",
+    "submitting": "Zakládáme…",
+    "hintMissing": "Zadejte název a heslo (aspoň 4 znaky).",
+    "hintReady": "Vše připraveno."
+  },
+  "delete": {
+    "eyebrow": "Potvrzení",
+    "title": "Smazat „{{name}}“?",
+    "text": "Místnost i celá hra zmizí navždy.",
+    "password": "Heslo místnosti",
+    "passwordPlaceholder": "Zadejte heslo",
+    "cancel": "Zrušit",
+    "confirm": "Smazat",
+    "deleting": "Mažeme…"
+  },
+  "lobby": {
+    "back": "← Místnosti",
+    "allRooms": "← Všechny místnosti",
+    "loading": "Načítáme místnost…",
+    "status": {
+      "waiting": "Lobby je otevřené",
+      "playing": "Hra běží",
+      "finished": "Hra skončila"
+    },
+    "roomCode": "Kód místnosti",
+    "eyebrow": "Příprava",
+    "titleWaiting": "Vyberte si místo a doplňte stůl",
+    "titleRunning": "Vraťte se na své místo",
+    "leadWaiting": "Hrát mohou lidé i boti dohromady. Ke spuštění jsou potřeba aspoň dva hráči a aspoň jeden z nich musí být člověk.",
+    "leadRunning": "Hra už běží. Zadejte heslo a vyberte své místo.",
+    "seatsEyebrow": "Herní stůl",
+    "seatsTitle": "Místa",
+    "seatsTaken": "{{players}} / {{capacity}} obsazeno",
+    "accessEyebrow": "Vy",
+    "accessTitle": "Vstup do místnosti",
+    "accessReady": "hotovo",
+    "accessNeedPassword": "chybí heslo",
+    "playerName": "Vaše jméno",
+    "playerNamePlaceholder": "Jak vás uvidí ostatní",
+    "defaultName": "Hráč",
+    "password": "Heslo místnosti",
+    "passwordPlaceholder": "Pro vstup a nastavení",
+    "accessNote": "Vyberte volné místo. Pokud se vracíte do hry, klikněte na své dřívější místo.",
+    "readyEyebrow": "Připravenost",
+    "readyWaiting": "Můžeme začít?",
+    "readyRunning": "Hra už začala",
+    "checkPassword": "Heslo je zadané",
+    "checkPlayers": "Aspoň dva hráči",
+    "checkHuman": "U stolu sedí člověk",
+    "start": "Spustit hru →",
+    "wait": "Počkejte…",
+    "resume": "Zpět do hry →",
+    "pickSeatFirst": "Nejdřív si vyberte místo.",
+    "meetChecks": "Splňte podmínky výše a tlačítko se zapne."
+  },
+  "seat": {
+    "kind": {
+      "empty": "volné",
+      "bot": "bot",
+      "mine": "vaše místo",
+      "human": "hráč"
+    },
+    "emptyTitle": "Volné místo",
+    "anyRole": "jakákoli role",
+    "youAreHere": "Už sedíte u stolu",
+    "humanPlayer": "Hráč — člověk",
+    "emptyHint": "Obsaďte ho sami, nebo přidejte bota",
+    "confirmed": "✓ Tohle je vaše místo",
+    "sitHere": "Sednout sem",
+    "returnHere": "Vrátit se na místo",
+    "take": "Obsadit místo",
+    "addBot": "Přidat bota",
+    "removeBot": "Odebrat bota",
+    "botModel": "Bot",
+    "preferredRole": "Oblíbená role",
+    "anyRoleOption": "Jakákoli role",
+    "saveBot": "Uložit",
+    "placeBot": "Přidat bota"
+  },
+  "about": {
+    "eyebrow": "O projektu",
+    "title": "Desková hra, kterou dělám sám",
+    "p1": "Ahoj! Město vlivu je moje vlastní desková hra. Dělám ji ve volném čase, protože mě to baví. Moc bych ji jednou chtěl vidět jako skutečnou krabici na stole.",
+    "p2Strong": "Hra je úplně zdarma",
+    "p2": " a zdarma i zůstane: bez reklam a bez placených výhod. Všichni hrají za stejných podmínek.",
+    "p3Start": "Pokud se vám hra líbí a chcete pomoct, můžete projekt podpořit jakoukoli částkou. Všechny peníze půjdou na ",
+    "p3Strong": "tisk první série deskové verze",
+    "p3End": ": karty, herní plán a krabici.",
+    "p4": "Moc mi záleží na vašem názoru. Našli jste chybu, něco je nejasné, nebo máte nápad? Napište mi prosím přes zpětnou vazbu — čtu každou zprávu.",
+    "thanks": "Díky, že hrajete!",
+    "write": "✉ Napsat zpětnou vazbu",
+    "close": "Zavřít"
+  },
+  "feedback": {
+    "eyebrow": "Zpětná vazba",
+    "title": "Napište, jak se vám hra líbí",
+    "lead": "Tady můžete nahlásit chybu, navrhnout nápad nebo se jen podělit o dojmy. Čtu každou zprávu. Když necháte kontakt, pokusím se odpovědět.",
+    "support": "Líbí se vám projekt? Můžete ho podpořit — peníze půjdou na tisk deskové verze.",
+    "kindLegend": "O čem je zpráva",
+    "kinds": {
+      "bug": {
+        "title": "Našel jsem chybu",
+        "hint": "Něco se rozbilo nebo nefunguje správně",
+        "placeholder": "Co se stalo a co jste dělali těsně předtím? Když si pamatujete kolo, roli nebo kartu — ještě lepší."
+      },
+      "idea": {
+        "title": "Mám nápad",
+        "hint": "Co přidat nebo změnit",
+        "placeholder": "Co byste do hry přidali nebo udělali jinak?"
+      },
+      "other": {
+        "title": "Jen tak napsat",
+        "hint": "Dojmy, otázky, cokoli",
+        "placeholder": "Pište, jak to cítíte — opravdu mě to zajímá."
+      }
+    },
+    "message": "Zpráva",
+    "contact": "Jak vás zastihnu — pokud chcete odpověď",
+    "contactPlaceholder": "E-mail nebo @telegram, nepovinné",
+    "trap": "Web",
+    "send": "Odeslat",
+    "sending": "Odesíláme…",
+    "note": "Spolu se zprávou se pošle i verze hry a typ prohlížeče — pomůže to najít chybu.",
+    "errorTooMany": "Příliš mnoho zpráv za sebou. Počkejte chvilku a zkuste to znovu.",
+    "errorFailed": "Nepodařilo se odeslat. Zkontrolujte internet a zkuste to znovu — text zůstal zachovaný.",
+    "doneTitle": "Díky! Zpráva dorazila",
+    "doneText": "Opravdu to pomáhá udělat hru lepší.",
+    "writeMore": "Napsat další",
+    "toHome": "Domů"
+  }
+}

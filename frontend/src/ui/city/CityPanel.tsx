@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { forwardRef, type ForwardedRef } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { assetEffectLines, assetPoints, districtCount, districtSynergyValue } from "../../online/gameUi";
@@ -31,19 +32,19 @@ export function CityPanel({
   const locked = Math.max(0, total - me.capacity);
   const capacity = resolve(context, "buy_capacity");
   const portrait = useIsPortrait();
+  const { t } = useTranslation("game");
 
   return (
     <Panel rows zone="city">
       <SectionHead
-        title="Мой город"
+        title={t("ui.city.title")}
         /* «Продажа бесплатна» читалось как «отдаёте объект даром»: два игрока подряд решили,
          * что возврата нет вовсе. Бесплатным было действие, а не сделка — теперь так и написано,
          * и цена возврата стоит рядом, потому что это половина, а не полная цена. */
         meta={
           portrait
-            ? `${me.assets.length}/${me.capacity} · всего ${total}`
-            : `${me.assets.length} / ${me.capacity} занято · всего слотов ${total}` +
-              ` · продажа не требует действия, возврат — половина цены`
+            ? t("ui.city.metaShort", { used: me.assets.length, capacity: me.capacity, total })
+            : t("ui.city.meta", { used: me.assets.length, capacity: me.capacity, total })
         }
       />
       {/* Панель сразу в полный рост: все шесть слотов занимают своё место с первого раунда,
@@ -70,7 +71,7 @@ export function CityPanel({
               >
                 <CardPopover
                   side="top"
-                  label={`${asset.title} — подробности`}
+                  label={t("ui.city.details", { title: asset.title })}
                   content={
                     <OwnedDetails
                       uid={owned.uid}
@@ -108,8 +109,8 @@ export function CityPanel({
             className="empty-slot grid place-content-center justify-items-center gap-1 rounded-card
               px-[7px] py-1.5 text-ink-dim"
           >
-            <b className="card-serif text-[13px]">Слот {me.assets.length + position + 1}</b>
-            <span className="text-3xs">Свободно</span>
+            <b className="card-serif text-[13px]">{t("ui.city.slot", { number: me.assets.length + position + 1 })}</b>
+            <span className="text-3xs">{t("ui.city.free")}</span>
           </div>
         ))}
 
@@ -133,15 +134,15 @@ export function CityPanel({
                 next && capacity.kind === "blocked"
                   ? capacity.reason
                   : next
-                    ? "Открыть слот"
-                    : "Сначала откройте предыдущий слот"
+                    ? t("ui.city.openSlot")
+                    : t("ui.city.openPrevious")
               }
               className="empty-slot grid place-content-center justify-items-center gap-[3px] rounded-card
                 px-[7px] py-1.5 enabled:hover:bg-panel-3 disabled:opacity-60"
             >
-              <b className="card-serif text-[13px]">🔒 Слот {slot + 1}</b>
+              <b className="card-serif text-[13px]">{t("ui.city.lockedSlot", { number: slot + 1 })}</b>
               <span className="rounded border border-line bg-panel-2 px-2 py-0.5 text-2xs text-ink">
-                Открыть · <b className={short ? "font-bold text-bad" : ""}>{price ?? "?"}$</b>
+                {t("ui.city.open")}<b className={short ? "font-bold text-bad" : ""}>{price ?? "?"}$</b>
               </span>
             </button>
           );
@@ -176,18 +177,19 @@ const OwnedSlot = forwardRef(function OwnedSlot({
 }, ref: ForwardedRef<HTMLButtonElement>) {
   const value = assetPoints(asset);
   const portrait = useIsPortrait();
+  const { t } = useTranslation("game");
   const districtSynergy = districtSynergyValue(owns);
   const bullets: AssetBullet[] = [
     {
       key: "district",
       icon: "▦",
-      text: `район ${owns}/4${districtSynergy > 0 ? ` +${districtSynergy}$` : ""}`,
+      text: `${t("ui.city.district", { count: owns })}${districtSynergy > 0 ? ` +${districtSynergy}$` : ""}`,
       tone: owns >= 2 ? "good" : undefined,
-      title: "Ваши объекты этого района. Синергия включается на 2 и на 4.",
+      title: t("ui.city.districtTitle"),
     },
     /* Возврат при продаже равен очкам объекта. Продажа — единственный способ освободить слот,
      * когда все шесть заняты, поэтому цена стоит на лице, а не только в окне. */
-    { key: "sell", icon: "💰", text: `${value}$`, tone: "dim", title: `Продажа за ${value}$ — не тратит действие` },
+    { key: "sell", icon: "💰", text: `${value}$`, tone: "dim", title: t("ui.city.sellTitle", { value }) },
   ];
   return (
     <button
@@ -225,6 +227,7 @@ function OwnedDetails({
   sellState: ReturnType<typeof resolve>;
   onSell: () => void;
 }) {
+  const { t } = useTranslation("game");
   const value = assetPoints(asset);
   const lines = assetEffectLines(asset, context.me, meta, index.assets, { includeSynergy: true });
   const objectLines = lines.filter(line => line.kind !== "district" && line.kind !== "sector");
@@ -237,26 +240,26 @@ function OwnedDetails({
       <PopoverBody>
         <KeyValue
           rows={[
-            ["Район", `${districtIcon ?? ""} ${districtTitle ?? asset.district} · у вас ${owns} из 4`],
             [
-              "Доход",
+              t("ui.city.districtRow"),
+              t("ui.city.districtValue", { icon: districtIcon ?? "", title: districtTitle ?? asset.district, count: owns }),
+            ],
+            [
+              t("ui.city.incomeRow"),
               (() => {
                 const share = context.me.asset_yields?.[uid];
-                return share
-                  ? `+${share.money}$${share.influence ? ` и +${share.influence}◆` : ""} за раунд сейчас · напечатано +${asset.income}$`
-                  : `+${asset.income}$ за раунд`;
+                if (!share) return t("ui.city.incomePrinted", { money: asset.income });
+                const values = { money: share.money, influence: share.influence, printed: asset.income };
+                return share.influence ? t("ui.city.incomeNowInfluence", values) : t("ui.city.incomeNow", values);
               })(),
             ],
-            ["В счёт", `${value} очков`],
-            ["Продажа", `${value}$ — половина цены · не требует действия`],
+            [t("ui.city.scoreRow"), t("ui.city.scoreValue", { count: value })],
+            [t("ui.city.saleRow"), t("ui.city.saleValue", { value })],
           ]}
         />
-        <EffectList title="Свойства объекта" lines={objectLines} />
-        <EffectList title="Правила района" lines={districtLines} />
-        <p>
-          Продажа возвращает ровно столько, сколько объект даёт очков, — смысл только в том, что
-          покупается вместо. Слот освобождается сразу, действие не тратится.
-        </p>
+        <EffectList title={t("ui.city.properties")} lines={objectLines} />
+        <EffectList title={t("ui.city.districtRules")} lines={districtLines} />
+        <p>{t("ui.city.saleNote")}</p>
       </PopoverBody>
       <PopoverFooter>
         <button
@@ -267,9 +270,9 @@ function OwnedDetails({
             font-semibold text-bad enabled:hover:border-bad disabled:opacity-50"
         >
           {sellState.kind === "ready"
-            ? `Продать за ${value}$`
+            ? t("ui.city.sell", { value })
             : sellState.kind === "pending"
-              ? "Продаём…"
+              ? t("ui.city.selling")
               : sellState.reason}
         </button>
       </PopoverFooter>

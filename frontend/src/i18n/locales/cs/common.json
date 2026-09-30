@@ -1,0 +1,46 @@
+{
+  "language": {
+    "label": "Jazyk",
+    "ru": "Русский",
+    "en": "English",
+    "cs": "Čeština"
+  },
+  "app": {
+    "loadingCatalog": "Načítáme hru…",
+    "loadingTable": "Připravujeme herní stůl…",
+    "loadingGame": "Načítáme hru…",
+    "gameNotStarted": "Hra ještě nezačala",
+    "backToRooms": "← Zpět do místností",
+    "connectionError": "Bez připojení",
+    "serverDown": "Herní server neodpovídá",
+    "retry": "Zkusit znovu"
+  },
+  "errors": {
+    "generic": "Něco se nepovedlo. Zkuste to znovu.",
+    "roomUnavailable": "Místnost není dostupná",
+    "joinFailed": "Nepodařilo se připojit",
+    "loadRooms": "Nepodařilo se načíst místnosti",
+    "createRoom": "Nepodařilo se vytvořit místnost",
+    "deleteRoom": "Nepodařilo se smazat místnost",
+    "wrongPassword": "Špatné heslo místnosti",
+    "notFound": "Místnost nenalezena — možná už skončila",
+    "conflict": "Někdo byl rychlejší. Aktualizujeme…",
+    "tooMany": "Příliš mnoho požadavků. Počkejte chvilku.",
+    "server": "Chyba serveru. Zkuste to prosím za chvíli."
+  },
+  "difficulty": {
+    "easy": "Lehký",
+    "medium": "Střední",
+    "hard": "Těžký",
+    "expert": "Reborn"
+  },
+  "support": {
+    "donate": "Podpořit na {{site}}",
+    "soon": "brzy",
+    "soonTitle": "{{site}} — stránka bude brzy"
+  },
+  "studio": {
+    "presents": "uvádí",
+    "makes": "Hru dělá"
+  }
+}

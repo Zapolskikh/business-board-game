@@ -1,3 +1,4 @@
+import { tr } from "../../i18n";
 import type { GameState, PlayerState, PowerPreview } from "../../online/types";
 
 /* Без этого выбор цели — гадание: список показывает очки соперника, но не то, сколько
@@ -21,7 +22,7 @@ export function previewGain(preview: PowerPreview | undefined): string {
   if (preview.influence) parts.push(`${preview.influence}◆`);
   if (preview.scandals) parts.push(`⚠+${preview.scandals}`);
   if (preview.roofs) parts.push(`🛡−${preview.roofs}`);
-  if (preview.strips_role) parts.push("снимет роль");
+  if (preview.strips_role) parts.push(tr("game", "ui.preview.stripsRole"));
   return parts.join(" · ");
 }
 
@@ -29,8 +30,8 @@ export function previewGain(preview: PowerPreview | undefined): string {
 export function previewCost(preview: PowerPreview | undefined): string {
   if (!preview) return "";
   const parts: string[] = [];
-  if (preview.self_scandals) parts.push(`вам ⚠+${preview.self_scandals}`);
-  if (preview.leader_bonus) parts.push("лидер — удвоено");
+  if (preview.self_scandals) parts.push(tr("game", "ui.preview.selfScandals", { count: preview.self_scandals }));
+  if (preview.leader_bonus) parts.push(tr("game", "ui.preview.leader"));
   return parts.join(" · ");
 }
 
@@ -46,7 +47,7 @@ export function targetStats(
     ? [`${target.influence}◆`, `${target.money}$`]
     : [`${target.money}$`, `${target.influence}◆`];
   parts.push(`⚠${target.scandals}/${target.scandal_limit}`);
-  parts.push(`🛡${target.roofs}${target.roofs > 0 && blockedByRoof ? " — погасит" : ""}`);
+  parts.push(`🛡${target.roofs}${target.roofs > 0 && blockedByRoof ? tr("game", "ui.preview.roofBlocks") : ""}`);
   return parts.join(" · ");
 }
 

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useThemeStyle } from "../lib/theme";
 import { useState, type ReactNode } from "react";
@@ -27,23 +28,24 @@ export function MobileFrame({
   left: ReactNode;
   right: ReactNode;
 }) {
+  const { t } = useTranslation("game");
   const [open, setOpen] = useState<Side | null>(null);
 
   return (
     <div className="grid min-h-0 grid-cols-[24px_minmax(0,1fr)_24px] gap-1">
-      <EdgeTab side="left" label="Игроки и хроника" glyph="👥" onOpen={() => setOpen("left")} />
+      <EdgeTab side="left" label={t("ui.mobile.left")} glyph="👥" onOpen={() => setOpen("left")} />
 
       {/* Центр никуда не едет: он ровно между язычками и ровно по высоте экрана. `overflow-hidden`
         * здесь страховка, а не прокрутка — если содержимое всё же окажется шире, оно обрежется,
         * а не начнёт ездить по горизонтали вместе со всей доской. */}
       <div className="min-h-0 min-w-0 overflow-hidden">{center}</div>
 
-      <EdgeTab side="right" label="Действия и рука" glyph="⚡" onOpen={() => setOpen("right")} />
+      <EdgeTab side="right" label={t("ui.mobile.right")} glyph="⚡" onOpen={() => setOpen("right")} />
 
-      <Sheet side="left" label="Игроки и хроника" open={open === "left"} onClose={() => setOpen(null)}>
+      <Sheet side="left" label={t("ui.mobile.left")} open={open === "left"} onClose={() => setOpen(null)}>
         {left}
       </Sheet>
-      <Sheet side="right" label="Действия и рука" open={open === "right"} onClose={() => setOpen(null)}>
+      <Sheet side="right" label={t("ui.mobile.right")} open={open === "right"} onClose={() => setOpen(null)}>
         {right}
       </Sheet>
     </div>
@@ -99,13 +101,14 @@ function Sheet({
 }) {
   // Шторка рендерится порталом вне доски, поэтому тему ей нужно дать самой.
   const theme = useThemeStyle();
+  const { t } = useTranslation("game");
   return (
     <Dialog.Root open={open} modal={false} onOpenChange={next => !next && onClose()}>
       <Dialog.Portal>
         {open && (
           <button
             type="button"
-            aria-label="Закрыть панель"
+            aria-label={t("ui.mobile.closePanel")}
             onClick={onClose}
             className="fixed inset-0 z-40 bg-[#0009]"
           />
@@ -129,9 +132,9 @@ function Sheet({
             </Dialog.Title>
             <Dialog.Close
               className="rounded-md border border-line bg-panel-2 px-2 py-1 text-[11px] text-ink-muted"
-              aria-label="Закрыть"
+              aria-label={t("ui.mobile.close")}
             >
-              {side === "left" ? "‹ Скрыть" : "Скрыть ›"}
+              {side === "left" ? t("ui.mobile.hideLeft") : t("ui.mobile.hideRight")}
             </Dialog.Close>
           </div>
           {/* Панели внутри — те же самые, что и на широком столе, и они рассчитывают на высоту

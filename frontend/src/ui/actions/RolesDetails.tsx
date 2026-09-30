@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { rolePerkRows } from "../../online/gameUi";
 import type { CityMeta, GameState, LegalAction } from "../../online/types";
 import { findAction, turnBlock, type ActionContext } from "../lib/actions";
@@ -20,6 +21,7 @@ export function RolesDetails({
   context: ActionContext;
   onAction: (action: LegalAction) => void;
 }) {
+  const { t } = useTranslation("game");
   const me = context.me;
   const perks = rolePerkRows(game, meta);
   const free = meta.roles.filter(role => !game.players.some(player => player.role === role.id)).length;
@@ -32,21 +34,22 @@ export function RolesDetails({
           🏷️
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="text-[17px] font-extrabold leading-tight text-ink">Роли города</h2>
-          <p className="mt-0.5 text-[11.5px] text-ink-muted">
-            Свободно <strong className="text-ink">{free}</strong> из {meta.roles.length}
-          </p>
+          <h2 className="text-[17px] font-extrabold leading-tight text-ink">{t("ui.roles.title")}</h2>
+          <p className="mt-0.5 text-[11.5px] text-ink-muted">{t("ui.roles.free", { free, total: meta.roles.length })}</p>
         </div>
       </header>
 
       <div className="grid gap-3 px-4 py-3.5">
         <section className="grid gap-1.5 rounded-lg border border-line bg-panel-2 px-3 py-2.5 text-[12px] leading-[1.45] text-ink-muted min-[720px]:grid-cols-[1fr_auto] min-[720px]:items-center min-[720px]:gap-5">
           <p>
-            Свободная роль стоит <strong className="text-influence">{game.role_price}◆</strong>, захват занятой —
-            <strong className="text-influence"> {game.role_price * 3}◆</strong>. Любая смена роли тратит одно действие.
+            {t("ui.roles.priceStart")}
+            <strong className="text-influence">{game.role_price}◆</strong>
+            {t("ui.roles.priceMiddle")}
+            <strong className="text-influence">{game.role_price * 3}◆</strong>
+            {t("ui.roles.priceEnd")}
           </p>
           <p className="text-warning min-[720px]:max-w-[330px]">
-            Крыша владельца отменяет захват: влияние вернётся, но действие и Крыша будут потрачены.
+            {t("ui.roles.roofNote")}
           </p>
         </section>
 
@@ -57,14 +60,14 @@ export function RolesDetails({
             const mine = me.role === role.id;
             const price = holder ? game.role_price * 3 : game.role_price;
             const state = mine ? "mine" : holder ? "occupied" : "free";
-            const status = mine ? "Ваша роль" : holder ? `У ${holder.name}` : "Свободна";
+            const status = mine ? t("ui.roles.mine") : holder ? t("ui.roles.holder", { name: holder.name }) : t("ui.roles.freeState");
             const actionHint = mine
-              ? "Уже выбрана"
+              ? t("ui.roles.already")
               : claim
                 ? holder
-                  ? "Захватить роль"
-                  : "Выбрать роль"
-                : turnBlocked ?? "Недоступно сейчас";
+                  ? t("ui.roles.take")
+                  : t("ui.roles.pick")
+                : turnBlocked ?? t("ui.roles.unavailable");
 
             return (
               <button
@@ -109,11 +112,11 @@ export function RolesDetails({
 
                 <span className="col-span-2 grid gap-2 border-t border-line pt-2 text-[12px] leading-[1.48]">
                   <span className="grid grid-cols-1 gap-1 min-[480px]:grid-cols-[82px_minmax(0,1fr)] min-[480px]:gap-2">
-                    <b className="text-ink-dim">Пассивно</b>
+                    <b className="text-ink-dim">{t("ui.roles.passive")}</b>
                     <span className="text-ink-muted">{role.passive}</span>
                   </span>
                   <span className="grid grid-cols-1 gap-1 min-[480px]:grid-cols-[82px_minmax(0,1fr)] min-[480px]:gap-2">
-                    <b className="text-ink-dim">Способности</b>
+                    <b className="text-ink-dim">{t("ui.roles.powers")}</b>
                     <span className="text-ink-muted">{role.power}</span>
                   </span>
                 </span>
@@ -125,7 +128,7 @@ export function RolesDetails({
         {me.role && perks.length > 0 && (
           <section className="rounded-lg border border-good/60 bg-[#101a15] px-3 py-2.5">
             <h3 className="text-[13.5px] font-extrabold text-ink">
-              Сейчас работает · {index.roles.get(me.role)?.title}
+              {t("ui.roles.working", { role: index.roles.get(me.role)?.title ?? "" })}
             </h3>
             <div className="mt-2 grid gap-1.5 min-[680px]:grid-cols-2">
               {perks.map(perk => (
@@ -143,7 +146,7 @@ export function RolesDetails({
 
         {!me.role && (
           <p className="rounded-lg border border-warning/50 bg-[#1b1510] px-3 py-2.5 text-[12px] font-semibold leading-[1.4] text-warning">
-            У вас нет роли. В начале каждого вашего хода один скандал снимается автоматически, но ролевых доходов и способностей нет.
+            {t("ui.roles.noRole")}
           </p>
         )}
       </div>

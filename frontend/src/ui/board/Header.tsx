@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import { LanguagePicker } from "../../i18n/LanguagePicker";
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import type { CityMeta, GameState, PlayerState } from "../../online/types";
 import { CardPopover } from "../primitives/CardPopover";
@@ -90,13 +92,14 @@ export function Header({
   const income = game.round_forecast;
   /* Подпись у кнопки есть всегда — на узком экране она уезжает в aria-label, а не пропадает.
    * Кнопки те же самые: разница только в том, показывать ли слово рядом со значком. */
+  const { t } = useTranslation("game");
   const caption = (text: string) => (compact ? "" : ` ${text}`);
 
   if (compact) {
     return (
       <header className="grid gap-1 rounded-panel border border-line bg-topbar px-1.5 py-1">
         <div className="flex items-center gap-1.5">
-          <b className="text-[12px] font-extrabold">Город влияния</b>
+          <b className="text-[12px] font-extrabold">{t("ui.header.title")}</b>
           <span className="text-3xs whitespace-nowrap text-ink-muted">
             {game.round_number}/{game.max_rounds}
           </span>
@@ -121,9 +124,9 @@ export function Header({
     <header className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-panel
       bg-topbar px-3 py-1.5">
       <div className="flex items-baseline gap-2.5">
-        <b className="card-serif text-[19px]">Город влияния</b>
+        <b className="card-serif text-[19px]">{t("ui.header.title")}</b>
         <span className="text-[11px] text-ink-muted">
-          Раунд {game.round_number} / {game.max_rounds}
+          {t("ui.header.round", { round: game.round_number, max: game.max_rounds })}
         </span>
         <em className="text-3xs not-italic text-ink-dim">{roomName}</em>
       </div>
@@ -149,24 +152,24 @@ export function Header({
     return (
       <>
         <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
-          <Res label="Очки" className="text-points">★ {score}</Res>
+          <Res label={t("ui.header.points")} className="text-points">★ {score}</Res>
         </CardPopover>
         <Sep />
         <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
-          <Res label="Деньги" className="text-money">● {me.money}$</Res>
+          <Res label={t("ui.header.money")} className="text-money">● {me.money}$</Res>
         </CardPopover>
         <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
-          <Res label="Влияние" className="text-influence">◆ {me.influence}</Res>
+          <Res label={t("ui.header.influence")} className="text-influence">◆ {me.influence}</Res>
         </CardPopover>
         <Sep />
         <CardPopover side="bottom" align="center" content={<DefenceDetails game={game} me={me} />}>
-          <Res label="Крыши" className="text-defence">
+          <Res label={t("ui.header.roofs")} className="text-defence">
             🛡 {me.roofs}
             <span className="text-2xs font-normal text-ink-dim">/{me.roof_limit}</span>
           </Res>
         </CardPopover>
         <CardPopover side="bottom" align="center" content={<DefenceDetails game={game} me={me} />}>
-          <Res label="Скандалы" className={risky ? "text-warning" : "text-ink-muted"}>
+          <Res label={t("ui.header.scandals")} className={risky ? "text-warning" : "text-ink-muted"}>
             <span className={risky ? "text-[var(--color-warning)]" : undefined}>
               ⚠ {me.scandals}
               <span className="text-2xs font-normal text-ink-dim">/{scandalLimit(me)}</span>
@@ -175,8 +178,8 @@ export function Header({
         </CardPopover>
         <Sep />
         <CardPopover side="bottom" align="center" content={<ActionsDetails game={game} />}>
-          <Res label="Действия">
-            {!compact && "Действия"}
+          <Res label={t("ui.header.actions")}>
+            {!compact && t("ui.header.actions")}
             <span className="ml-0.5 flex gap-[3px]">
               {Array.from({ length: Math.max(3, game.actions_left) }).map((_, index) => (
                 <i
@@ -202,40 +205,40 @@ export function Header({
             <img src={roleIcon(me.role ?? undefined)} alt="" className="size-[18px]" />
           </span>
           <span className="grid min-w-0 gap-px">
-            <span className="text-[8px] font-semibold uppercase tracking-[0.1em] text-ink-dim">Ваша роль</span>
+            <span className="text-[8px] font-semibold uppercase tracking-[0.1em] text-ink-dim">{t("ui.header.yourRole")}</span>
             <b className="overflow-hidden text-ellipsis whitespace-nowrap text-[11.5px] text-ink">
-              {role?.title ?? "Без роли"}
+              {role?.title ?? t("ui.header.noRole")}
             </b>
           </span>
         </div>
         <Sep />
         <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
-          <HudStat label="Счёт" className="text-points"><Icon src={projectIcon("score")} />{score}</HudStat>
+          <HudStat label={t("ui.header.score")} className="text-points"><Icon src={projectIcon("score")} />{score}</HudStat>
         </CardPopover>
         <Sep />
         <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
-          <HudStat label="Ресурсы">
+          <HudStat label={t("ui.header.resources")}>
             <span className="flex items-center gap-0.5 text-money"><Icon src={statIcon("money")} />{me.money}$</span>
             <span className="flex items-center gap-0.5 text-influence"><Icon src={statIcon("influence")} />{me.influence}</span>
           </HudStat>
         </CardPopover>
         <Sep />
         <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
-          <HudStat label="Доход раунда">
+          <HudStat label={t("ui.header.income")}>
             <span className="text-money">+{income?.money.total ?? 0}$</span>
             <span className="text-influence">+{income?.influence.total ?? 0}◆</span>
           </HudStat>
         </CardPopover>
         <Sep />
         <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
-          <HudStat label="Город">
+          <HudStat label={t("ui.header.city")}>
             <span className="text-good">▦ {me.assets.length}/{me.capacity}</span>
             <span className="text-points">🏛 {me.projects.length}</span>
           </HudStat>
         </CardPopover>
         <Sep />
         <CardPopover side="bottom" align="center" content={<DefenceDetails game={game} me={me} />}>
-          <HudStat label="Защита">
+          <HudStat label={t("ui.header.defence")}>
             <span className="flex items-center gap-0.5 text-defence">
               <Icon src={statIcon("roof")} />{me.roofs}/{me.roof_limit}
             </span>
@@ -246,7 +249,7 @@ export function Header({
         </CardPopover>
         <Sep />
         <CardPopover side="bottom" align="end" content={<ActionsDetails game={game} />}>
-          <HudStat label="Действия">
+          <HudStat label={t("ui.header.actions")}>
             <span className="flex gap-[3px]">
               {Array.from({ length: Math.max(3, game.actions_left) }).map((_, index) => (
                 <i
@@ -268,18 +271,19 @@ export function Header({
     return (
       <>
         <ThemePicker className={shape} compact={compact} />
+        <LanguagePicker className={`text-ink ${shape}`} compact />
         {/* Счёт и доход — в шапке, рядом с остальными моими числами, а не в панели
           * действий: справа должно остаться то, что можно нажать в свой ход. */}
-        <button type="button" onClick={onScore} aria-label="Счёт и доход" className={shape}>
-          🏆{caption("Счёт и доход")}
+        <button type="button" onClick={onScore} aria-label={t("ui.header.scoreButton")} className={shape}>
+          🏆{caption(t("ui.header.scoreButton"))}
         </button>
         <button
           type="button"
           onClick={onChronicle}
-          aria-label="Хроника"
+          aria-label={t("ui.header.chronicle")}
           className={`relative ${shape}`}
         >
-          📜{caption("Хроника")}
+          📜{caption(t("ui.header.chronicle"))}
           {unseenEvents > 0 && (
             <b className="absolute -right-1.5 -top-1.5 min-w-4 rounded-[9px] bg-bad px-1 text-center
               text-3xs font-bold text-[#2a0a0a]">
@@ -287,11 +291,11 @@ export function Header({
             </b>
           )}
         </button>
-        <button type="button" onClick={onRules} aria-label="Правила" className={shape}>
-          📖{caption("Правила")}
+        <button type="button" onClick={onRules} aria-label={t("ui.header.rules")} className={shape}>
+          📖{caption(t("ui.header.rules"))}
         </button>
-        <button type="button" onClick={onExit} aria-label="Вернуться в комнаты" className={shape}>
-          ←{caption("Комнаты")}
+        <button type="button" onClick={onExit} aria-label={t("ui.header.backToRooms")} className={shape}>
+          ←{caption(t("ui.header.rooms"))}
         </button>
       </>
     );
@@ -311,6 +315,7 @@ export function StatusBar({
   busy: boolean;
   error: string;
 }) {
+  const { t } = useTranslation("game");
   const base = "flex h-[26px] items-center gap-2 rounded-md border px-2.5 text-[11.5px]";
 
   if (error) {
@@ -325,19 +330,19 @@ export function StatusBar({
     return (
       <div className={`${base} border-[#34507a] bg-[#1a2740] text-[#bcd6f5]`}>
         <span className="size-2.5 animate-spin rounded-full border-2 border-accent border-r-transparent" />
-        <span>Сервер выполняет команду и ходы ботов…</span>
+        <span>{t("ui.header.busy")}</span>
       </div>
     );
   }
   if (game.status === "finished") {
     return (
-      <div className={`${base} border-[#6b5518] bg-[#2a2411] text-gold`}>🏁 Партия окончена</div>
+      <div className={`${base} border-[#6b5518] bg-[#2a2411] text-gold`}>{t("ui.header.finished")}</div>
     );
   }
   if (me.jail_turns > 0) {
     return (
       <div className={`${base} border-[#7d3c45] bg-[#2a1519] text-[#ffb3b3]`}>
-        🚔 Тюрьма: пропускаете ходов {me.jail_turns}
+        {t("ui.header.jailed")}
       </div>
     );
   }
@@ -347,19 +352,20 @@ export function StatusBar({
 /* Тема — личная настройка, её меняют в любой момент партии. Обычный select: он доступен с
  * клавиатуры и на телефоне открывает родной список, а тем всего пять. */
 function ThemePicker({ className, compact }: { className: string; compact: boolean }) {
+  const { t } = useTranslation("game");
   const theme = useTheme();
   return (
-    <label className={`flex cursor-pointer items-center gap-1 ${className}`} title="Тема оформления">
+    <label className={`flex cursor-pointer items-center gap-1 ${className}`} title={t("ui.header.theme")}>
       🎨
       <select
-        aria-label="Тема оформления"
+        aria-label={t("ui.header.theme")}
         value={theme}
         onChange={event => setTheme(event.target.value as ThemeId)}
         className={`cursor-pointer bg-transparent text-ink outline-none ${compact ? "w-4" : ""}`}
       >
         {themes.map(item => (
           <option key={item.id} value={item.id} className="bg-panel-2 text-ink">
-            {item.title}
+            {t(`ui.themes.${item.id}`)}
           </option>
         ))}
       </select>

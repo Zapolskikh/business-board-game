@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { AnimatePresence, motion } from "motion/react";
 import type { CSSProperties } from "react";
 import { actionCardCost, actionLabel, cardDiscardValue } from "../../online/gameUi";
@@ -30,6 +31,7 @@ export function Hand({
   context: ActionContext;
   onAction: (action: LegalAction) => void;
 }) {
+  const { t } = useTranslation("game");
   const me = context.me;
   const hand = me.hand ?? [];
   const draw = resolve(context, "buy_action_card");
@@ -38,18 +40,18 @@ export function Hand({
 
   return (
     <Panel rows>
-      <SectionHead title="Рука" meta={`${hand.length} / 3 · колода ${game.action_deck_count}`} />
+      <SectionHead title={t("ui.hand.title")} meta={t("ui.hand.meta", { count: hand.length, deck: game.action_deck_count })} />
       <div className="grid min-h-0 grid-rows-[auto_repeat(3,minmax(0,1fr))] gap-1">
         <button
           type="button"
           data-ui="draw-card-button"
           disabled={draw.kind !== "ready"}
           onClick={() => draw.kind === "ready" && onAction(draw.action)}
-          title={draw.kind === "blocked" ? draw.reason : "Тянет две случайные карты из колоды"}
+          title={draw.kind === "blocked" ? draw.reason : t("ui.hand.drawHint")}
           className="grid gap-px rounded-md border border-good/60 bg-panel-2 px-[7px] py-[5px]
             enabled:hover:bg-panel-3 disabled:border-line disabled:opacity-45"
         >
-          <b className="text-[11.5px] text-good">+ Вытянуть 2 карты</b>
+          <b className="text-[11.5px] text-good">{t("ui.hand.draw")}</b>
           {/* Цена всегда на кнопке, а не вместо неё причина отказа: без цены нельзя
             * решить, копить ли на карты или на объект. Красным — тот ресурс, которого не хватает. */}
           <small className="text-3xs text-ink-muted">
@@ -80,7 +82,7 @@ export function Hand({
               >
                 <CardPopover
                   side="left"
-                  label={`${card.title} — варианты`}
+                  label={t("ui.hand.variants", { title: card.title })}
                   content={
                     <HandCardDetails
                       held={held}
@@ -108,7 +110,7 @@ export function Hand({
                     </b>
                     <small className="overflow-hidden text-ellipsis whitespace-nowrap text-3xs text-ink-muted">
                       {preview ? (
-                        <b className="font-semibold text-money">сейчас {preview.money}$</b>
+                        <b className="font-semibold text-money">{t("ui.hand.now", { money: preview.money })}</b>
                       ) : (
                         card.text
                       )}
@@ -125,7 +127,7 @@ export function Hand({
             key={`empty-${position}`}
             className="empty-slot grid place-content-center rounded-md text-2xs text-ink-dim"
           >
-            пусто
+            {t("ui.hand.empty")}
           </div>
         ))}
       </div>
@@ -154,6 +156,7 @@ function HandCardDetails({
   converted: boolean;
   onAction: (action: LegalAction) => void;
 }) {
+  const { t } = useTranslation("game");
   const labelContext = {
     game,
     meta,
@@ -174,27 +177,29 @@ function HandCardDetails({
 
   return (
     <>
-      <PopoverHeader title={card.title} subtitle={card.tone} />
+      <PopoverHeader title={card.title} subtitle={t(`ui.hand.tone.${card.tone as "deal" | "attack" | "defence"}`, { defaultValue: card.tone })} />
       <PopoverBody>
         <p className="mb-2 text-ink">{card.text}</p>
         {game.card_previews?.[card.id] && (
           <p className="mb-2 text-money">
-            Сейчас это {game.card_previews[card.id].money}$
             {game.card_previews[card.id].district
-              ? ` — район ${index.districts.get(game.card_previews[card.id].district!)?.title ?? ""}`
-              : " — у вас пока нет объектов"}
-            .
+              ? t("ui.hand.previewDistrict", {
+                  money: game.card_previews[card.id].money,
+                  district: index.districts.get(game.card_previews[card.id].district!)?.title ?? "",
+                })
+              : t("ui.hand.previewNone", { money: game.card_previews[card.id].money })}
           </p>
         )}
         <p className="mb-2">
-          Розыгрыш и сброс бесплатны и не тратят действие, и <strong>сколько угодно за ход</strong>:
-          лимит стоит на покупке — одна покупка карт за ход.
+          {t("ui.hand.freeStart")}
+          <strong>{t("ui.hand.freeStrong")}</strong>
+          {t("ui.hand.freeEnd")}
         </p>
 
         {variants.length > 0 ? (
           <>
             <p className="mb-1 font-medium text-ink">
-              {variants.length > 1 ? "Выберите вариант" : "Разыграть"}
+              {variants.length > 1 ? t("ui.hand.pick") : t("ui.hand.play")}
             </p>
             <div className="grid gap-1">
               {variants.map((action, position) => (
@@ -209,7 +214,7 @@ function HandCardDetails({
           </>
         ) : (
           <p className="mb-2 text-gold">
-            {played ? "Карта в этом ходу уже разыграна." : "Разыграть сейчас нельзя."}
+            {played ? t("ui.hand.played") : t("ui.hand.cantPlay")}
           </p>
         )}
       </PopoverBody>
@@ -222,7 +227,7 @@ function HandCardDetails({
             className="rounded-md border border-line bg-panel-2 px-2 py-2 text-center text-xs
               enabled:hover:border-accent disabled:opacity-45"
           >
-            {converted ? "Сброс уже был" : `Сбросить за ${discardValue}$`}
+            {converted ? t("ui.hand.discarded") : t("ui.hand.discard", { value: discardValue })}
           </button>
           <button
             type="button"
@@ -231,7 +236,7 @@ function HandCardDetails({
             className="rounded-md border border-line bg-panel-2 px-2 py-2 text-center text-xs
               enabled:hover:border-accent disabled:opacity-45"
           >
-            {converted ? "—" : `Сбросить за ${discardValue}◆`}
+            {converted ? "—" : t("ui.hand.discardInfluence", { value: discardValue })}
           </button>
         </div>
       </PopoverFooter>

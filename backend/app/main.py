@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.city_api import router as city_router
+from app.feedback import router as feedback_router
 from app.http_middleware import harden_http
 from city_rooms.errors import (
     RoomAccessError,
@@ -58,6 +59,7 @@ async def room_validation(_request: object, exc: RoomValidationError) -> JSONRes
 
 
 app.include_router(city_router)
+app.include_router(feedback_router)
 
 
 @app.get("/")

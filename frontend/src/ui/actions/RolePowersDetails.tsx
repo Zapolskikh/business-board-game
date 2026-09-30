@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { powerDescriptions, powerGateText, powerLabels, rolePerkRows } from "../../online/gameUi";
 import type { CityMeta, GameState, LegalAction } from "../../online/types";
 import { PopoverBody, PopoverHeader } from "../primitives/CardPopover";
@@ -26,6 +27,7 @@ export function RolePowersDetails({
   context: ActionContext;
   onAction: (action: LegalAction) => void;
 }) {
+  const { t } = useTranslation("game");
   const me = context.me;
   const role = me.role ? index.roles.get(me.role) : undefined;
   const perks = rolePerkRows(game, meta);
@@ -38,12 +40,12 @@ export function RolePowersDetails({
   if (!role) {
     return (
       <>
-        <PopoverHeader title="⚡ Возможности роли" subtitle="роли нет" />
+        <PopoverHeader title={t("ui.powers.title")} subtitle={t("ui.powers.noRoleSubtitle")} />
         <PopoverBody>
           <p className="text-warning">
-            У вас нет роли. Без роли один скандал снимается сам в начале хода, но пассивных
-            доходов и активных способностей нет. Роль стоит <strong>{game.role_price}◆</strong> и
-            берётся из справочника ролей.
+            {t("ui.powers.noRoleStart")}
+            <strong>{game.role_price}◆</strong>
+            {t("ui.powers.noRoleEnd")}
           </p>
         </PopoverBody>
       </>
@@ -52,11 +54,11 @@ export function RolePowersDetails({
 
   return (
     <>
-      <PopoverHeader title={`${role.icon} ${role.title}`} subtitle="возможности роли" />
+      <PopoverHeader title={`${role.icon} ${role.title}`} subtitle={t("ui.powers.subtitle")} />
       <PopoverBody>
         <p className="mb-2">{role.passive}</p>
 
-        <p className="mb-1 font-medium text-ink">Пассивные перки</p>
+        <p className="mb-1 font-medium text-ink">{t("ui.roles.passive")}</p>
         {perks.length > 0 ? (
           <>
             <EffectList
@@ -66,14 +68,14 @@ export function RolePowersDetails({
               }))}
             />
             <p className="mb-2 text-2xs text-ink-dim">
-              {perks.find(perk => perk.locked)?.hint ?? "Все перки работают на полную."}
+              {perks.find(perk => perk.locked)?.hint ?? t("ui.powers.allPerks")}
             </p>
           </>
         ) : (
-          <p className="mb-2 text-ink-dim">У этой роли нет пассивных перков.</p>
+          <p className="mb-2 text-ink-dim">{t("ui.powers.noPerks")}</p>
         )}
 
-        <p className="mb-1 font-medium text-ink">Активные способности</p>
+        <p className="mb-1 font-medium text-ink">{t("ui.powers.active")}</p>
         {statuses.length > 0 ? (
           <div className="mb-2 grid gap-1.5">
             {statuses.map(status => {
@@ -102,14 +104,14 @@ export function RolePowersDetails({
                           : "bg-[#17231c] text-good"
                       }`}
                     >
-                      {status.spends_action ? "⚡ действие" : "без действия"}
+                      {status.spends_action ? t("ui.powers.action") : t("ui.powers.noAction")}
                     </span>
                   </div>
 
                   {description && (
                     <>
                       <p className="mt-0.5 text-2xs leading-snug text-ink-muted">{description.what}</p>
-                      <p className="mt-0.5 text-2xs text-[var(--color-badge)]">Цена: {description.cost}</p>
+                      <p className="mt-0.5 text-2xs text-[var(--color-badge)]">{t("ui.powers.price", { cost: description.cost })}</p>
                     </>
                   )}
 
@@ -134,19 +136,16 @@ export function RolePowersDetails({
                         text-2xs font-semibold text-ink enabled:hover:border-accent
                         disabled:cursor-default disabled:text-ink-muted"
                     >
-                      {single ? "Применить" : `Доступна · выбор цели: ${options.length}`}
+                      {single ? t("ui.powers.apply") : t("ui.powers.choose", { count: options.length })}
                     </button>
                   )}
                 </div>
               );
             })}
-            <p className="text-2xs text-ink-dim">
-              Способности с выбором цели применяются там, где эта цель нарисована: по игрокам —
-              кнопкой в правой панели, по картам рынка и проектам — прямо на самой карточке.
-            </p>
+            <p className="text-2xs text-ink-dim">{t("ui.powers.where")}</p>
           </div>
         ) : (
-          <p className="text-ink-dim">У этой роли нет активных способностей.</p>
+          <p className="text-ink-dim">{t("ui.powers.noPowers")}</p>
         )}
       </PopoverBody>
     </>
