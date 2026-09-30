@@ -9,8 +9,8 @@ import type {
   PlayerState,
 } from "../../online/types";
 import { PopoverBody, PopoverFooter, PopoverHeader } from "../primitives/CardPopover";
-import { EffectList } from "../primitives/atoms";
-import { ResourceText } from "../primitives/ResourceIcon";
+import { ResourceIcon, ResourceText } from "../primitives/ResourceIcon";
+import type { ResourceIcon as ResourceIconName } from "../assets/cards";
 import { marketCardReason, type MarketCardState } from "./marketCardState";
 
 /* Содержимое поповера карточки рынка.
@@ -53,8 +53,20 @@ export function MarketCardDetails({
   const blocked = state.kind !== "buyable" && state.kind !== "buying";
   const { t } = useTranslation("game");
   const sign = (value: number) => (value >= 0 ? "+" : "−");
-  const objectLines = lines.filter(line => line.kind !== "district" && line.kind !== "sector");
-  const districtLines = lines.filter(line => line.kind === "district" || line.kind === "sector");
+  const ruleLines = lines.filter(line => line.kind !== "purchase");
+  const purchase = (asset.effects?.purchase ?? {}) as {
+    money?: number;
+    influence?: number;
+    roofs?: number;
+    card?: boolean;
+    scandals?: number;
+  };
+  const purchaseInfluence = asset.influence + (purchase.influence ?? 0);
+  const purchaseRewards: { icon: ResourceIconName; value: string }[] = [];
+  if (purchaseInfluence) purchaseRewards.push({ icon: "influence", value: `+${purchaseInfluence}` });
+  if (purchase.money) purchaseRewards.push({ icon: "money", value: `${sign(purchase.money)}${Math.abs(purchase.money)}` });
+  if (purchase.roofs) purchaseRewards.push({ icon: "roof", value: `+${purchase.roofs}` });
+  if (purchase.scandals) purchaseRewards.push({ icon: "scandal", value: `+${purchase.scandals}` });
 
   return (
     <>
@@ -70,51 +82,70 @@ export function MarketCardDetails({
             ⛔ {marketCardReason(state)}
           </p>
         )}
-        <dl className="mb-2 grid grid-cols-[auto_1fr] gap-x-2.5 gap-y-0.5">
+        <dl className="mb-2 grid grid-cols-[auto_1fr] gap-x-2.5 gap-y-1">
           <dt className="text-ink-dim">{t("ui.market.districtRow")}</dt>
           <dd className="font-medium text-ink">
             {district?.icon} {district?.title} · {t("ui.market.districtValue", { count: owned })}
           </dd>
           <dt className="text-ink-dim">{t("ui.market.priceRow")}</dt>
-          <dd className="font-semibold text-gold">
-            <ResourceText>{`${state.price}$`}</ResourceText>{" "}
-            {item.price !== undefined && item.price !== asset.cost && (
-              <span className="text-ink-dim">{t("ui.market.basePrice", { cost: asset.cost })}</span>
-            )}
-          </dd>
+          <dd className="flex items-center gap-1 font-semibold text-gold"><ResourceIcon name="money" />{state.price}</dd>
           <dt className="text-ink-dim">{t("ui.market.scoreRow")}</dt>
-          <dd className="font-semibold text-points">{t("ui.market.scoreValue", { count: points })}</dd>
+          <dd className="flex items-center gap-1 font-semibold text-points"><ResourceIcon name="score" />{points}</dd>
+          <dt className="text-ink-dim">{t("ui.market.saleRow")}</dt>
+          <dd className="flex items-center gap-1 font-semibold text-money"><ResourceIcon name="money" />{points}</dd>
           <dt className="text-ink-dim">{t("ui.market.incomeRow")}</dt>
-          <dd className="font-medium text-money">
-            {item.preview ? (
-              <>
-                <ResourceText>{`${sign(item.preview.money)}${Math.abs(item.preview.money)}$`}</ResourceText> {t("ui.market.perRound")}
-                {item.preview.influence !== 0 && (
-                  <span className="text-influence">
-                    {" · "}<ResourceText>{`${sign(item.preview.influence)}${Math.abs(item.preview.influence)}◆`}</ResourceText> {t("ui.market.perRound")}
-                  </span>
-                )}
-                <span className="block text-2xs font-normal text-ink-dim">
-                  {t("ui.market.incomeNote", { printed: asset.income })}
-                </span>
-              </>
-            ) : (
-              <><ResourceText>{`+${asset.income}$`}</ResourceText> {t("ui.market.perRound")}</>
+          <dd className="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-medium">
+            <span className="flex items-center gap-1 text-money">
+              <ResourceIcon name="money" />{sign(item.preview?.money ?? asset.income)}{Math.abs(item.preview?.money ?? asset.income)}
+            </span>
+            {item.preview?.influence !== undefined && item.preview.influence !== 0 && (
+              <span className="flex items-center gap-1 text-influence">
+                <ResourceIcon name="influence" />{sign(item.preview.influence)}{Math.abs(item.preview.influence)}
+              </span>
             )}
+            <span className="text-ink-muted">{t("ui.market.perRound")}</span>
           </dd>
-          {asset.influence > 0 && (
+          {(purchaseRewards.length > 0 || purchase.card) && (
             <>
-              <dt className="text-ink-dim">{t("ui.market.nowRow")}</dt>
-              <dd className="font-medium text-influence"><ResourceText>{t("ui.market.nowValue", { value: asset.influence })}</ResourceText></dd>
+              <dt className="text-ink-dim">{t("ui.market.purchaseRow")}</dt>
+              <dd className="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-medium">
+                {purchaseRewards.map((reward, index) => (
+                  <span
+                    key={index}
+                    className={`flex items-center gap-1 ${
+                      reward.icon === "money" ? "text-money" :
+                      reward.icon === "influence" ? "text-influence" :
+                      reward.icon === "roof" ? "text-defence" : "text-bad"
+                    }`}
+                  >
+                    <ResourceIcon name={reward.icon} />{reward.value}
+                  </span>
+                ))}
+                {purchase.card && <span className="text-ink-muted">{t("effect.purchaseCard")}</span>}
+              </dd>
             </>
           )}
         </dl>
 
-        <EffectList title={t("ui.market.properties")} lines={objectLines} />
-        <EffectList title={t("ui.market.districtRules")} lines={districtLines} />
+        {ruleLines.length > 0 && (
+          <section className="mb-2">
+            <p className="mb-1 font-semibold text-ink">{t("ui.market.districtRules")}</p>
+            <ul className="grid gap-0.5">
+              {ruleLines.map((line, index) => (
+                <li key={index} className={`flex items-start gap-1.5 ${line.active ? "text-good" : "text-ink-dim"}`}>
+                  <span aria-hidden="true">•</span>
+                  <span><ResourceText>{line.text}</ResourceText>{line.boosted && <span className="ml-1 text-gold">⚙×2</span>}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {item.leaving && (
-          <p className="text-[var(--color-warning)]">{t("ui.market.leavingNote")}</p>
+          <p className="flex items-start gap-1.5 font-semibold text-[var(--color-warning)]">
+            <span aria-hidden="true" className="text-lg leading-none">⏳</span>
+            <span>{t("ui.market.leavingNote")}</span>
+          </p>
         )}
       </PopoverBody>
 

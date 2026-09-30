@@ -369,7 +369,6 @@
       "price": "Project price", "ready": "done", "notReady": "no", "progress": "Condition progress", "priceRow": "Price",
       "requirement": "Condition", "yourProgress": "Your progress", "met": "done", "notMet": "not done",
       "ofNeeded": "{{have}} of {{needed}}", "perk": "🎁 Lasting bonus:",
-      "unique": "One project for everyone: whoever takes it gets the points, and nobody else can take it. The board is shared and changes for everyone at once.",
       "leavingNote": "⏳ Leaves at the end of the round — to the bottom of the deck.",
       "veto": "⛔ Veto — close the project for everyone else (action + 3◆)",
       "take": "Take · {{influence}}◆ + {{money}}$", "taking": "Taking…"
@@ -378,10 +377,10 @@
       "roof": "+{{count}} Protection", "card": "+card",
       "conditions_one": "↗ {{count}} more condition", "conditions_other": "↗ {{count}} more conditions",
       "conditionsTitle": "Card conditions that are not met right now. Click the card for all the details.",
-      "priceShort": "Not enough money", "priceMine": "Your price", "rarity": "Rarity: {{rarity}}",
+      "priceShort": "Not enough money", "priceMine": "Price", "rarity": "Rarity: {{rarity}}",
       "moneyTitle": "Money per round", "moneyEmpty": "/ round", "perRound": "/ round", "oneTime": "one-time",
-      "oneTimeOwned": "Received when bought", "oneTimeMarket": "You get it right when you buy", "received": "received",
-      "now": "now", "influenceTitle": "Influence per round", "influenceEmpty": "/ round", "unique": "special bonus",
+      "oneTimeOwned": "Received when bought", "oneTimeMarket": "Given when purchased", "received": "received",
+      "now": "on purchase", "influenceTitle": "Influence per round", "influenceEmpty": "/ round", "unique": "special bonus",
       "noUnique": "No special bonus", "pointsTitle": "Points in the final score", "points": "points"
     },
     "city": {
@@ -406,11 +405,9 @@
       "lockedTitle": "Mobster's grey hold: only they can buy this slot until the end of the round",
       "district": "district {{count}}/4", "districtTitle": "Your businesses in this district. Synergy starts at 2 and at 4.",
       "details": "{{title}} — details", "districtRow": "District", "districtValue": "you have {{count}} of 4",
-      "priceRow": "Your price", "basePrice": "(normally {{cost}}$)", "scoreRow": "Final score", "scoreValue": "{{count}} pts",
-      "incomeRow": "Income", "perRound": "per round",
-      "incomeNote": "This is how much your whole income will grow — including the synergy this purchase turns on in your city. Printed on the card: +{{printed}}$.",
-      "nowRow": "Right away", "nowValue": "+{{value}}◆ when you buy it", "properties": "Business effects",
-      "districtRules": "District rules", "leavingNote": "⏳ This slot leaves at the end of the round: the card goes under the deck.",
+      "priceRow": "Price", "scoreRow": "Score", "saleRow": "Sale value", "incomeRow": "Income", "perRound": "per round",
+      "purchaseRow": "When purchased",
+      "districtRules": "District conditions", "leavingNote": "The card leaves the market and returns to the deck at the end of the round.",
       "lock": "🔒 Grey hold — only you can buy this slot (1 Protection)",
       "mark": "🏷️ Claim — the card works for you (action + scandal)",
       "refresh": "🔁 Re-deal the slot — once per round, no action"

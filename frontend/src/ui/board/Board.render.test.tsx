@@ -86,6 +86,12 @@ describe("BoardView", () => {
       ),
     );
     expect(details).toContain("Нет свободного слота");
+    expect(details).toContain("Стоимость продажи");
+    expect(details).toContain("stat-score.webp");
+    expect(details).toContain("Условия района");
+    expect(details).not.toContain("На столько вырастет весь ваш доход");
+    expect(details).not.toContain("Цена для вас");
+    expect(details).not.toContain("В счёт");
   });
 
   it("на чужом ходу подсвечивает ровно одну карточку вместо отдельной строки статуса", () => {
@@ -97,6 +103,14 @@ describe("BoardView", () => {
 
   it("не занимает место строкой «Ваш ход»", () => {
     expect(render("Богатый ход")).not.toContain("Ваш ход");
+  });
+
+  it("на карточках рынка оставляет только заметные часы уходящего слота", () => {
+    const html = render("Богатый ход");
+
+    expect(html).toContain("text-2xl font-black");
+    expect(html).toContain("aria-label=\"Слот уходит в конце раунда\"");
+    expect(html).not.toContain("район 0/4");
   });
 
   it("переживает игрока без роли, без карт и без объектов", () => {

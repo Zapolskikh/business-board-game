@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { motion } from "motion/react";
-import { assetEffectLines, districtCount } from "../../online/gameUi";
+import { assetEffectLines } from "../../online/gameUi";
 import type {
   AssetMeta,
   CityMeta,
@@ -52,9 +52,6 @@ export function MarketCard({
   /** Пересдача слота «Маркет-мейкером» — тоже только когда движок её предлагает. */
   refresh?: LegalAction;
 }) {
-  const owned = district ? districtCount(me, district.id, assets) : 0;
-  const claimedByMe = item.claimed_by === me.id;
-  const lockedForMe = Boolean(item.locked_by) && item.locked_by !== me.id;
   const portrait = useIsPortrait();
   const { t } = useTranslation("game");
 
@@ -65,36 +62,11 @@ export function MarketCard({
   // Без зрителя (галерея, наблюдатель) превью нет — остаётся напечатанный доход.
   const income = item.preview ?? { money: asset.income, influence: 0 };
 
-  /* Метки обеих ролей публичны и меняют решение «покупать ли», поэтому стоят на лице. */
+  /* На лице оставляем только часовую метку уходящего слота; остальные детали доступны в окне. */
   const bullets: AssetBullet[] = [];
   if (item.leaving) {
     bullets.push({ key: "leaving", icon: "⏳", text: t("ui.market.leaving"), tone: "warn", title: t("ui.market.leavingTitle") });
   }
-  if (item.claimed_by) {
-    bullets.push({
-      key: "claim",
-      icon: "🏷",
-      text: claimedByMe ? t("ui.market.claimMine") : t("ui.market.claim"),
-      tone: claimedByMe ? "good" : undefined,
-      title: claimedByMe ? t("ui.market.claimMineTitle") : t("ui.market.claimTitle"),
-    });
-  }
-  if (item.locked_by) {
-    bullets.push({
-      key: "lock",
-      icon: "🔒",
-      text: lockedForMe ? t("ui.market.locked") : t("ui.market.lockedMine"),
-      tone: lockedForMe ? "bad" : "good",
-      title: t("ui.market.lockedTitle"),
-    });
-  }
-  bullets.push({
-    key: "district",
-    icon: "▦",
-    text: t("ui.market.district", { count: owned }),
-    tone: owned >= 2 ? "good" : undefined,
-    title: t("ui.market.districtTitle"),
-  });
 
   return (
     <CardPopover

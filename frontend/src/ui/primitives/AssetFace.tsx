@@ -155,10 +155,16 @@ export function AssetFace({
         </span>
         <span className="flex items-center gap-1 overflow-hidden text-3xs whitespace-nowrap text-ink-dim">
           {bullets.map(bullet => (
-            <span key={bullet.key} title={bullet.title} className={bullet.tone ? bulletTone[bullet.tone] : ""}>
-              <ResourceText>{bullet.icon}</ResourceText>
-              <ResourceText>{bullet.text}</ResourceText>
-            </span>
+            bullet.key === "leaving" ? (
+              <span key={bullet.key} title={bullet.title} aria-label={bullet.title} className="text-2xl font-black leading-none text-warning drop-shadow-[0_0_4px_rgba(221,163,109,0.8)]">
+                {bullet.icon}
+              </span>
+            ) : (
+              <span key={bullet.key} title={bullet.title} className={bullet.tone ? bulletTone[bullet.tone] : ""}>
+                <ResourceText>{bullet.icon}</ResourceText>
+                <ResourceText>{bullet.text}</ResourceText>
+              </span>
+            )
           ))}
         </span>
       </>
@@ -270,17 +276,23 @@ export function AssetFace({
         {bullets.length > 0 && (
           <ul className="grid content-center gap-0.5 text-3xs leading-tight">
             {bullets.map(bullet => (
-              <li
-                key={bullet.key}
-                title={bullet.title}
-                className={`flex items-center gap-1 whitespace-nowrap font-semibold ${
-                  bullet.tone ? bulletTone[bullet.tone] : "text-ink-muted"
-                }`}
-              >
-                <span className="text-ink-dim">•</span>
-                <span><ResourceText>{bullet.icon}</ResourceText></span>
-                <ResourceText>{bullet.text}</ResourceText>
-              </li>
+              bullet.key === "leaving" ? (
+                <li key={bullet.key} title={bullet.title} aria-label={bullet.title} className="text-2xl font-black leading-none text-warning drop-shadow-[0_0_4px_rgba(221,163,109,0.8)]">
+                  {bullet.icon}
+                </li>
+              ) : (
+                <li
+                  key={bullet.key}
+                  title={bullet.title}
+                  className={`flex items-center gap-1 whitespace-nowrap font-semibold ${
+                    bullet.tone ? bulletTone[bullet.tone] : "text-ink-muted"
+                  }`}
+                >
+                  <span className="text-ink-dim">•</span>
+                  <span><ResourceText>{bullet.icon}</ResourceText></span>
+                  <ResourceText>{bullet.text}</ResourceText>
+                </li>
+              )
             ))}
           </ul>
         )}

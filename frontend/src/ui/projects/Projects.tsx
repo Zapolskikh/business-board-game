@@ -279,7 +279,7 @@ const ProjectCard = forwardRef<
         * «✓» у прогресса значит «условие выполнено», а не «можно купить». */}
       <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
         {standing && <ProjectProgress standing={standing} compact={portrait} />}
-        <span className="project-card-plate ml-auto shrink-0 whitespace-nowrap !pl-1.5 text-[11.5px] font-bold"
+        <span className="project-card-price ml-auto shrink-0 whitespace-nowrap !pl-1.5 text-[11.5px] font-bold"
           title={t("ui.projects.price")}>
           <span className={shortInfluence ? "text-bad" : "text-influence"}><ResourceText>{`${project.cost_influence}◆`}</ResourceText></span>
           {" + "}
@@ -376,12 +376,14 @@ function ProjectDetails({
             ],
           ]}
         />
-        <p className="mb-2"><ResourceText>{project.text}</ResourceText></p>
         <p className="mb-2">
           <strong>{t("ui.projects.perk")}</strong> <ResourceText>{projectPerkText(project)}</ResourceText>
         </p>
-        <p className="mb-2">{t("ui.projects.unique")}</p>
         {leaving && <p className="text-gold">{t("ui.projects.leavingNote")}</p>}
+        <hr className="my-3 border-line" />
+        <p className="mb-2 italic text-ink-muted">
+          «<ResourceText>{project.text}</ResourceText>»
+        </p>
       </PopoverBody>
       <PopoverFooter>
         {/* Вето жмут на самом проекте: список из четырёх строк «Цель» в правой панели не сказал

@@ -369,7 +369,6 @@
       "price": "Cena projektu", "ready": "hotovo", "notReady": "ne", "progress": "Plnění podmínky", "priceRow": "Cena",
       "requirement": "Podmínka", "yourProgress": "Váš postup", "met": "splněno", "notMet": "nesplněno",
       "ofNeeded": "{{have}} z {{needed}}", "perk": "🎁 Trvalý bonus:",
-      "unique": "Jeden projekt pro všechny: kdo ho vezme, získá body, a nikdo jiný už ho vzít nemůže. Deska je společná a mění se všem najednou.",
       "leavingNote": "⏳ Odchází na konci kola — na spodek balíčku.",
       "veto": "⛔ Veto — zavřít projekt pro všechny ostatní (akce + 3◆)",
       "take": "Vzít · {{influence}}◆ + {{money}}$", "taking": "Bereme…"
@@ -379,10 +378,10 @@
       "conditions_one": "↗ ještě {{count}} podmínka", "conditions_few": "↗ ještě {{count}} podmínky",
       "conditions_many": "↗ ještě {{count}} podmínky", "conditions_other": "↗ ještě {{count}} podmínek",
       "conditionsTitle": "Podmínky karty, které teď nejsou splněné. Všechny podrobnosti po kliknutí na kartu.",
-      "priceShort": "Nemáte dost peněz", "priceMine": "Vaše cena", "rarity": "Vzácnost: {{rarity}}",
+      "priceShort": "Nemáte dost peněz", "priceMine": "Cena", "rarity": "Vzácnost: {{rarity}}",
       "moneyTitle": "Peníze za kolo", "moneyEmpty": "/ kolo", "perRound": "/ kolo", "oneTime": "jednorázově",
-      "oneTimeOwned": "Získáno při koupi", "oneTimeMarket": "Dostanete hned při koupi", "received": "získáno",
-      "now": "hned", "influenceTitle": "Vliv za kolo", "influenceEmpty": "/ kolo", "unique": "zvláštní bonus",
+      "oneTimeOwned": "Získáno při koupi", "oneTimeMarket": "Dáno při koupi", "received": "získáno",
+      "now": "při koupi", "influenceTitle": "Vliv za kolo", "influenceEmpty": "/ kolo", "unique": "zvláštní bonus",
       "noUnique": "Bez zvláštního bonusu", "pointsTitle": "Body do konečného skóre", "points": "bodů"
     },
     "city": {
@@ -407,11 +406,9 @@
       "lockedTitle": "Šedá blokace Mafiána: do konce kola může toto místo koupit jen on",
       "district": "čtvrť {{count}}/4", "districtTitle": "Vaše podniky v této čtvrti. Synergie začíná při 2 a při 4.",
       "details": "{{title}} — podrobnosti", "districtRow": "Čtvrť", "districtValue": "máte {{count}} ze 4",
-      "priceRow": "Vaše cena", "basePrice": "(běžně {{cost}}$)", "scoreRow": "Do konečného skóre", "scoreValue": "{{count}} b.",
-      "incomeRow": "Příjem", "perRound": "za kolo",
-      "incomeNote": "O tolik vzroste celý váš příjem — včetně synergie, kterou tato koupě zapne ve vašem městě. Na kartě je napsáno: +{{printed}}$.",
-      "nowRow": "Hned", "nowValue": "+{{value}}◆ při koupi", "properties": "Vlastnosti podniku",
-      "districtRules": "Pravidla čtvrti", "leavingNote": "⏳ Toto místo odchází na konci kola: karta půjde pod balíček.",
+      "priceRow": "Cena", "scoreRow": "Body", "saleRow": "Prodejní cena", "incomeRow": "Příjem", "perRound": "za kolo",
+      "purchaseRow": "Při koupi",
+      "districtRules": "Podmínky čtvrti", "leavingNote": "Karta opustí trh a na konci kola se vrátí do balíčku.",
       "lock": "🔒 Šedá blokace — koupit to místo budete moct jen vy (1 Ochrana)",
       "mark": "🏷️ Zábor — karta pracuje pro vás (akce + skandál)",
       "refresh": "🔁 Znovu rozdat místo — jednou za kolo, bez akce"
