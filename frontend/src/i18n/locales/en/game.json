@@ -47,7 +47,7 @@
     "mafia_cleanup": { "label": "Hush it up", "what": "Removes two of your scandals at once. You need a Government Quarter business.", "cost": "action + 3$" },
     "mafia_lock": {
       "label": "Grey hold",
-      "what": "A hold on a market card: until the end of the round, nobody but you can buy it. You have one hold: a new one moves the old one. It is removed by the new round or by a Market Maker re-deal. Everyone can see it.",
+      "what": "A hold on a market card: until the end of the next round, nobody but you can buy it. You have one hold: a new one moves the old one. It is removed by the end of the next round, by the card leaving the market or by a Market Maker re-deal. Everyone can see it.",
       "cost": "1 Protection, no action, once per turn"
     },
     "military_sanction": {
@@ -174,7 +174,7 @@
     "roofSeized": " takes Protection from ",
     "roofSeizedTail": "; Protection now: ",
     "marketClaimed": " claims “{{title}}”: the card works for them, but it can still be bought",
-    "marketLocked": " puts a grey hold on “{{title}}”: nobody else can buy it until the end of the round",
+    "marketLocked": " puts a grey hold on “{{title}}”: nobody else can buy it until the end of the next round",
     "marketRefreshed": " re-deals a market slot: “{{title}}” goes under the deck",
     "vetoed": " vetoes “{{title}}”",
     "crisisPr": " crisis PR (",
@@ -362,7 +362,9 @@
       "titleShort": "Projects", "title": "City projects", "mine": "yours: {{count}} · {{points}} pts",
       "none": "you have no projects yet", "rerolled": "The board was already re-dealt this turn",
       "rerollHint": "All four projects go back to the deck, and four new ones come out. The board is shared — it changes for everyone.",
-      "reroll": "Re-deal · ", "details": "{{title}} — details",
+      "reroll": "Re-deal · ",
+      "rerollTitle": "Re-deal the project board?", "rerollPrice": "Price: {{money}}$ and one action. This cannot be undone.",
+      "rerollConfirm": "Re-deal", "details": "{{title}} — details",
       "empty": "The city has run out of projects.", "vetoMine": "Your veto: the project is closed for everyone else",
       "vetoTheirs": "Politician's veto: only they can take this project", "leaving": "Leaves at the end of the round",
       "points": "{{count}} pts", "ptsShort": "pts", "onlyPoints": "Victory points only", "condition": "Condition: ",
@@ -387,7 +389,9 @@
       "title": "My city", "metaShort": "{{used}}/{{capacity}} · {{total}} total",
       "meta": "{{used}} / {{capacity}} used · {{total}} slots total · selling costs no action, you get half the price",
       "details": "{{title}} — details", "slot": "Slot {{number}}", "free": "Free", "openSlot": "Open the slot",
-      "openPrevious": "First open the previous slot", "lockedSlot": "🔒 Slot {{number}}", "open": "Open · ",
+      "openPrevious": "First open the previous slot",
+      "openTitle": "Open slot {{number}}?", "openHint": "The slot expands your city for good: you can place one more business in it.",
+      "openPrice": "Price: {{money}}$ and one action. The money is not refunded.", "openConfirm": "Open the slot", "lockedSlot": "🔒 Slot {{number}}", "open": "Open · ",
       "district": "district {{count}}/4", "districtTitle": "Your businesses in this district. Synergy starts at 2 and at 4.",
       "sellTitle": "Sell for {{value}}$ — costs no action", "districtRow": "District",
       "districtValue": "{{icon}} {{title}} · you have {{count}} of 4", "incomeRow": "Income",
@@ -402,7 +406,7 @@
       "leaving": "leaving", "leavingTitle": "This slot leaves at the end of the round", "claimMine": "your claim",
       "claim": "claim", "claimMineTitle": "Your claim: the card already works for you",
       "claimTitle": "Capitalist's claim: the card works for them", "locked": "on hold", "lockedMine": "your hold",
-      "lockedTitle": "Mobster's grey hold: only they can buy this slot until the end of the round",
+      "lockedTitle": "Mobster's grey hold: only they can buy this slot until the end of the next round",
       "district": "district {{count}}/4", "districtTitle": "Your businesses in this district. Synergy starts at 2 and at 4.",
       "details": "{{title}} — details", "districtRow": "District", "districtValue": "you have {{count}} of 4",
       "priceRow": "Price", "scoreRow": "Score", "saleRow": "Sale value", "incomeRow": "Income", "perRound": "per round",
@@ -449,7 +453,7 @@
     "roles": {
       "title": "City roles", "free": "{{free}} of {{total}} free", "priceStart": "A free role costs ",
       "priceMiddle": ", taking a role from someone costs ", "priceEnd": ". Taking a role costs one action.",
-      "roofNote": "The holder's Protection stops a takeover: your influence comes back, but the action is spent, and the holder uses up their Protection.",
+      "roofNote": "While the holder has Protection, their role cannot be taken. Remove the Protection first.", "protected": "Protected",
       "mine": "Your role", "holder": "Held by {{name}}", "freeState": "Free", "already": "Already yours", "take": "Take the role",
       "pick": "Pick the role", "unavailable": "Not now", "passive": "Bonuses", "powers": "Powers", "working": "Working now · {{role}}",
       "noRole": "You have no role. At the start of each turn one scandal goes away by itself, but there are no role bonuses or powers."
@@ -468,7 +472,7 @@
       "savedMd": "Log saved (.md)", "savedJson": "Full log saved (.json) — the game can be replayed", "unavailable": "The log is not available",
       "rail": "Log", "railNew": "{{count}} new · open", "railAll": "{{count}} events · open", "railOpen": "Open the full log"
     },
-    "common": { "spent": "already this turn", "close": "Close", "details": "Details" },
+    "common": { "spent": "already this turn", "close": "Close", "details": "Details", "cancel": "Cancel" },
     "block": {
       "finished": "The game is over", "turnOf": "{{name}} is playing now", "notYourTurn": "It is not your turn",
       "jailed": "Arrested: only 1 action this turn", "noActions": "No actions left this turn", "unavailable": "Not available now"

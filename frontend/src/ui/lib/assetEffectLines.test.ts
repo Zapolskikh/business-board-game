@@ -131,9 +131,9 @@ describe("assetEffectLines", () => {
     const summary = assetFaceSummary(card, lines);
 
     // Напечатанное влияние и влияние покупки движок начисляет одним моментом.
-    expect(summary.oneTime).toEqual(["+3◆", "+2$", "+1 Крыша", "+карта"]);
+    expect(summary.oneTime).toEqual(["+3◆", "+2$", "+1 Защита", "+карта"]);
     expect(summary.oneTimeInfluence).toBe(3);
-    expect(summary.unique).toEqual(["+1 Крыша/ход", "лимит Крыш +1"]);
+    expect(summary.unique).toEqual(["+1 Защита/ход", "лимит Защиты +1"]);
     // Условие «при наличии Администрации» не выполнено — оно и есть скрытое.
     expect(summary.hidden).toBe(1);
   });

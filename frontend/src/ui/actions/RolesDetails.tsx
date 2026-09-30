@@ -68,7 +68,7 @@ export function RolesDetails({
                 ? holder
                   ? t("ui.roles.take")
                   : t("ui.roles.pick")
-                : turnBlocked ?? t("ui.roles.unavailable");
+                : turnBlocked ?? (holder && holder.roofs > 0 ? t("ui.roles.protected") : t("ui.roles.unavailable"));
 
             return (
               <button

@@ -62,7 +62,7 @@ def test_stale_revision_is_rejected() -> None:
         )
 
 
-def test_role_takeover_costs_triple_and_roof_blocks_it() -> None:
+def test_role_takeover_costs_triple_and_roof_closes_the_seat() -> None:
     engine = CityEngine()
     state = game()
     attacker = state.current_player
@@ -71,14 +71,19 @@ def test_role_takeover_costs_triple_and_roof_blocks_it() -> None:
     defender.roofs = 1
     attacker.influence = 20
 
-    result = engine.apply(state, command(state, "claim_role", {"role_id": "capitalist"}))
+    # A holder with a Крыша cannot be bought out: the seat is not offered and a direct claim fails.
+    assert not any(
+        action["type"] == "claim_role" and action["payload"]["role_id"] == "capitalist"
+        for action in engine.legal_actions(state, attacker.id)
+    )
+    with pytest.raises(IllegalActionError, match="roof protects the role"):
+        engine.apply(state, command(state, "claim_role", {"role_id": "capitalist"}))
 
-    # A blocked takeover refunds the influence: paying full price for nothing was a silent tax.
-    assert result.state.current_player.influence == 20
-    assert result.state.current_player.role is None
-    assert result.state.player_by_id(defender.id).role == "capitalist"
-    assert result.state.player_by_id(defender.id).roofs == 0
-    assert result.events[0].type == "role_takeover_blocked"
+    defender.roofs = 0
+    result = engine.apply(state, command(state, "claim_role", {"role_id": "capitalist"}))
+    assert result.state.current_player.influence == 20 - state.role_price * 3
+    assert result.state.current_player.role == "capitalist"
+    assert result.state.player_by_id(defender.id).role is None
 
 
 def test_player_cannot_act_out_of_turn() -> None:

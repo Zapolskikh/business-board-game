@@ -31,7 +31,7 @@
     "mafia": {
       "title": "Mafián",
       "passive": "Podniky v Šedé zóně: +1$. Ochrana stojí o 1$ méně a můžete mít 2, ne 1.",
-      "power": "Výpalné (jednou za tah, 1 akce, potřebujete podnik v Šedé zóně): vezměte cíli peníze a vliv; Ochrana cíle to zastaví. Ututlat: 1 akce a 3$ → −2 skandály (potřebujete podnik ve Vládní čtvrti). Šedá blokace (jednou za tah, 1 Ochrana, bez akce): do konce kola může místo na trhu koupit jen vy."
+      "power": "Výpalné (jednou za tah, 1 akce, potřebujete podnik v Šedé zóně): vezměte cíli peníze a vliv; Ochrana cíle to zastaví. Ututlat: 1 akce a 3$ → −2 skandály (potřebujete podnik ve Vládní čtvrti). Šedá blokace (jednou za tah, 1 Ochrana, bez akce): do konce příštího kola může místo na trhu koupit jen vy."
     },
     "military": {
       "title": "Bezpečák",
@@ -113,20 +113,20 @@
     "shadow_logistics": { "title": "Stínová logistická síť", "text": "+1$ za každou z těchto čtvrtí, kde máte podnik: Průmyslová zóna, Tech klastr, Vládní čtvrť. Celá čtvrť (4 podniky): +1◆ za kolo." }
   },
   "action_cards": {
-    "audit": { "title": "Neohlášená kontrola", "text": "Cíl ztratí 4$ + 1$ za každé odehrané kolo. Když nemá dost peněz, dostane skandál." },
+    "audit": { "title": "Neohlášená kontrola", "text": "Cíl ztratí (4 + číslo kola)$. Když nemá dost peněz, dostane skandál." },
     "leak": { "title": "Únik dat", "text": "Cíl dostane 1 skandál." },
-    "hostile": { "title": "Nepřátelské převzetí", "text": "Cíl ztratí 3$, vy dostanete 2$. Obě částky rostou o 1$ za každé odehrané kolo." },
+    "hostile": { "title": "Nepřátelské převzetí", "text": "Cíl ztratí (3 + číslo kola)$ a vy dostanete stejnou částku." },
     "vote": { "title": "Vyslovení nedůvěry", "text": "Držitel role ztratí 3◆. Když nemá dost vlivu, ztratí roli." },
     "controlled_leak": { "title": "Řízený únik", "text": "Vy dostanete 1 skandál, cíl 2." },
     "blackmail": { "title": "Politické vydírání", "text": "Cíl ztratí 2◆, vy dostanete 1◆." },
     "leader_expose": { "title": "Odhalit lídra", "text": "Cíl dostane skandál. Pokud je to lídr, dostanete 2◆." },
-    "disinformation": { "title": "Dezinformace", "text": "Cíl ztratí 1◆ a 2$ + 1$ za každé odehrané kolo." },
+    "disinformation": { "title": "Dezinformace", "text": "Cíl ztratí 1◆ a (2 + číslo kola)$." },
     "kompromat": { "title": "Kompromat", "text": "Cíl dostane 2 skandály." },
     "surveillance": { "title": "Sledování", "text": "Cíl dostane 1 skandál." },
     "smear_campaign": { "title": "Očerňující kampaň", "text": "Vy dostanete 1 skandál, cíl 2." },
-    "grant": { "title": "Inovační grant", "text": "Dostanete 7$ + 1$ za každé odehrané kolo. Když máte podnik s AI — navíc 1◆." },
+    "grant": { "title": "Inovační grant", "text": "Dostanete (7 + číslo kola)$. Když máte podnik s AI — navíc 1◆." },
     "bridge_loan": { "title": "Překlenovací úvěr", "text": "Dostanete 10$ hned a na konci kola vrátíte 4$." },
-    "tender": { "title": "Městská zakázka", "text": "2$ za každý váš podnik ve vaší největší čtvrti (vybere se sama). Nejvýš 10$ + 1$ za každé odehrané kolo." },
+    "tender": { "title": "Městská zakázka", "text": "2$ za každý váš podnik ve vaší největší čtvrti (vybere se sama). Nejvýš (10 + číslo kola)$." },
     "campaign": { "title": "Mediální kampaň", "text": "Utraťte 2$ a získejte 4◆." },
     "market_subsidy": { "title": "Investiční dotace", "text": "Váš další podnik v tomto tahu stojí o 4$ méně." },
     "upgrade_subsidy": { "title": "Mecenášství", "text": "Zaplaťte 12$ a získejte +4 body do konečného skóre. Místo není potřeba." },

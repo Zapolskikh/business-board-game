@@ -122,7 +122,7 @@ export function ActionsPanel({
                 key={position}
                 src={statIcon("actions")}
                 alt=""
-                className={`size-3 object-contain ${position < game.actions_left ? "" : "opacity-30 grayscale"}`}
+                className={`size-4 object-contain ${position < game.actions_left ? "" : "opacity-30 grayscale"}`}
               />
             ))}
           </span>
@@ -130,8 +130,8 @@ export function ActionsPanel({
       </Panel>
 
       <Panel>
-        <div className="px-0.5 text-3xs uppercase tracking-[0.08em] text-ink-dim">{t("ui.actions.basic")}</div>
-        <div className="mt-1.5 grid grid-cols-2 gap-1">
+        <div className="px-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-dim">{t("ui.actions.basic")}</div>
+        <div className="mt-2 grid grid-cols-2 gap-1.5">
           <ActionButton
             label={t("ui.actions.work")}
             cost={<><span className="font-semibold text-money"><ResourceText>+2$</ResourceText></span>{t("ui.actions.workCost")}</>}
@@ -214,10 +214,10 @@ export function ActionsPanel({
 
       {role && powers.length > 0 && (
         <Panel>
-          <div className="px-0.5 text-3xs uppercase tracking-[0.08em] text-ink-dim">
+          <div className="px-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-dim">
             {t("ui.actions.powers", { icon: role.icon, role: role.title })}
           </div>
-          <div className="mt-1.5 grid grid-cols-2 gap-1">
+          <div className="mt-2 grid grid-cols-2 gap-1.5">
             {powers.map(power => (
               <PowerButton
                 key={power}
@@ -238,7 +238,7 @@ export function ActionsPanel({
         * Открываются окнами по центру, а не поповерами сбоку: в них таблицы на всю ширину
         * — в узкой колонке они не помещались. Содержимое то же самое, компоненты общие. */}
       <Panel rows>
-        <div className="grid content-start gap-1 overflow-auto p-px">
+        <div className="grid content-start gap-1.5 overflow-auto p-px">
           <DrawerRow
             icon="🏷️"
             title={t("ui.actions.roles")}
@@ -247,7 +247,7 @@ export function ActionsPanel({
           />
 
           <DrawerRow
-            icon={<ResourceIcon name="actions" size="18px" />}
+            icon={<ResourceIcon name="actions" size="22px" />}
             title={t("ui.actions.rolePowers")}
             hint={role ? t("ui.actions.rolePowersHint") : t("ui.actions.rolePowersNone")}
             onClick={() => setDrawer("powers")}
@@ -435,17 +435,17 @@ function PowerButton({
     >
       <button
         type="button"
-          className={`grid min-w-0 gap-px rounded-md border bg-panel-2 px-[7px] py-[5px]
+          className={`grid min-w-0 gap-0.5 rounded-md border bg-panel-2 px-2 py-1.5
           hover:bg-panel-3 ${danger ? "border-bad/50 hover:border-bad" : "border-line hover:border-line-2"}`}
       >
         <b
-          className={`overflow-hidden text-ellipsis whitespace-nowrap text-[11.5px] font-semibold ${
+          className={`overflow-hidden text-ellipsis whitespace-nowrap text-[14px] font-semibold ${
             danger ? "text-bad" : "text-ink"
           }`}
         >
           {label}
         </b>
-        <small className="text-3xs text-ink-muted">
+        <small className="text-[11.5px] text-ink-muted">
           {spendsAction ? t("ui.actions.targetPick") : t("ui.actions.targetPickFree")}
         </small>
       </button>

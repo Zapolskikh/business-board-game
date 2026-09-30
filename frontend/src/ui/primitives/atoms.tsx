@@ -103,19 +103,19 @@ export function ActionButton({
       disabled={!ready}
       onClick={onClick}
       title={state.kind === "blocked" ? state.reason : undefined}
-      className={`grid min-w-0 gap-px rounded-md border border-line bg-panel-2 px-[7px] py-[5px]
+      className={`grid min-w-0 gap-0.5 rounded-md border border-line bg-panel-2 px-2 py-1.5
         data-[state=ready]:border-line-2 enabled:hover:border-accent enabled:hover:bg-panel-3
         data-[state=blocked]:opacity-35
         data-[state=pending]:animate-pulse
         data-[state=spent]:border-bad/40 data-[state=spent]:opacity-65
         ${tone === "danger" ? "border-bad/50" : ""}`}
     >
-      <b className={`overflow-hidden text-ellipsis whitespace-nowrap text-[11.5px] font-semibold ${
+      <b className={`overflow-hidden text-ellipsis whitespace-nowrap text-[14px] font-semibold ${
         tone === "danger" ? "text-bad" : "text-ink"
       }`}>
         {label}
       </b>
-      <small className={`overflow-hidden text-ellipsis whitespace-nowrap text-3xs ${
+      <small className={`overflow-hidden text-ellipsis whitespace-nowrap text-[11.5px] ${
         spent ? "text-bad" : "text-ink-muted"
       }`}>
         {/* Всегда цена действия, а не причина отказа. Правила учат по тому, что делает
@@ -151,27 +151,27 @@ export const DrawerRow = forwardRef<
       type="button"
       data-ui="drawer-row"
       onClick={onClick}
-      className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[7px]
-        rounded-md border border-line bg-panel-2 px-2 py-[7px] hover:border-line-2 hover:bg-panel-3"
+      className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5
+        rounded-md border border-line bg-panel-2 px-2.5 py-2 hover:border-line-2 hover:bg-panel-3"
       {...rest}
     >
-      <span>{icon}</span>
+      <span className="text-[20px] leading-none">{icon}</span>
       <span className="min-w-0">
-        <b className="block text-xs font-semibold text-ink">{title}</b>
-        <small className="block overflow-hidden text-ellipsis whitespace-nowrap text-3xs text-ink-muted">
+        <b className="block text-[14px] font-semibold text-ink">{title}</b>
+        <small className="block overflow-hidden text-ellipsis whitespace-nowrap text-[11.5px] text-ink-muted">
           {hint}
         </small>
       </span>
       {badge !== undefined ? (
         <span
-          className={`rounded-lg px-1.5 text-3xs ${
+          className={`rounded-lg px-2 py-0.5 text-[11px] ${
             badgeOn ? "bg-panel text-good" : "bg-panel-3 text-ink-muted"
           }`}
         >
           {badge}
         </span>
       ) : (
-        <span className="text-ink-dim">›</span>
+        <span className="text-[18px] text-ink-dim">›</span>
       )}
     </button>
   );

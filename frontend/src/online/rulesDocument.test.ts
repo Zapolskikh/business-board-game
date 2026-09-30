@@ -20,26 +20,39 @@ describe("buildRulesBook", () => {
   });
 
   it("не показывает служебные id тегов вместо названий", () => {
-    const economy = book.find(chapter => chapter.id === "economy")!;
-    expect(economy.html).not.toContain("<code>finance</code>");
-    expect(economy.html).toContain("«Финансы»");
+    const districts = book.find(chapter => chapter.id === "districts")!;
+    expect(districts.html).not.toContain("<code>finance</code>");
+    expect(districts.html).toContain("«Финансы»");
   });
 
-  it("начинается с обзора и показывает общие доски и разметку карты проекта", () => {
+  it("идёт по печатным правилам: обзор, скриншоты интерфейса, значки у терминов и ролей", () => {
     expect(book[0].id).toBe("intro");
-    expect(book[0].html).toContain("рынок общие");
+    expect(book[0].html).toContain("рынок с его объектами");
+    expect(book[0].html).toContain('class="rules-shot"');
     expect(book[0].html).toContain('class="rules-resource-icon"');
     expect(book[0].html).not.toContain("◆");
     expect(book[0].html).not.toContain("⚠");
+    expect(book[0].html).toContain(`Всего ${meta.assets.length} карточек`);
 
-    const market = book.find(chapter => chapter.id === "flow")!;
-    expect(market.html).toContain(`${meta.assets.length} карт объектов`);
-    expect(market.html).toContain("самых старых слота");
+    const flow = book.find(chapter => chapter.id === "flow")!;
+    // «действия» в тексте несут значок молнии и не отрываются от него при переносе.
+    expect(flow.html).toMatch(/<span class="rules-term">действия<img class="rules-resource-icon"/);
+    expect(flow.html).toContain("Крайний левый проект");
 
-    const projects = book.find(chapter => chapter.id === "projects")!;
-    expect(projects.html).toContain("rules-project-card");
-    expect(projects.html).toContain("самый старый проект слева");
-    expect(projects.html).toContain("правый слот");
+    const roles = book.find(chapter => chapter.id === "roles")!;
+    expect(roles.html).toContain('class="rules-role-badge"');
+    expect(roles.html).toContain('class="rules-role-icon"');
+    expect(roles.html).toContain("отобрать его роль нельзя");
+
+    const end = book.find(chapter => chapter.id === "end")!;
+    expect(end.html).toContain("купивший больше городских проектов");
+  });
+
+  it("не ставит значки в заголовках, таблицах и названиях в кавычках", () => {
+    const memo = book.find(chapter => chapter.id === "memo")!;
+    expect(memo.html).not.toContain('class="rules-term"');
+    const scandals = book.find(chapter => chapter.id === "scandals")!;
+    expect(scandals.html).toContain("«Чистка»");
   });
 });
 

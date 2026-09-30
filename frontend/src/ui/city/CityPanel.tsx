@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { forwardRef, type ForwardedRef } from "react";
+import { forwardRef, useState, type ForwardedRef } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { assetEffectLines, assetPoints, districtCount, districtSynergyValue } from "../../online/gameUi";
 import type { AssetMeta, AssetYield, CityMeta, DistrictMeta, LegalAction, OwnedAsset } from "../../online/types";
@@ -10,6 +10,7 @@ import { EffectList, KeyValue, Panel, SectionHead } from "../primitives/atoms";
 import { resolve, type ActionContext } from "../lib/actions";
 import { maxCapacity, type Indexes } from "../lib/board";
 import { ResourceText } from "../primitives/ResourceIcon";
+import { ConfirmModal } from "../primitives/Modal";
 
 /* Мой город: занятые слоты, свободные и закрытые.
  *
@@ -32,6 +33,9 @@ export function CityPanel({
   const free = Math.max(0, me.capacity - me.assets.length);
   const locked = Math.max(0, total - me.capacity);
   const capacity = resolve(context, "buy_capacity");
+  /* Слот стоит дорого, а замок легко задеть мимоходом, поэтому покупка идёт через окно. */
+  const [confirmSlot, setConfirmSlot] = useState(false);
+  const nextSlotPrice = meta.scoring?.capacity_costs?.[String(me.capacity)];
   const portrait = useIsPortrait();
   const { t } = useTranslation("game");
 
@@ -130,7 +134,7 @@ export function CityPanel({
               key={`locked-${position}`}
               type="button"
               disabled={!ready}
-              onClick={() => capacity.kind === "ready" && onAction(capacity.action)}
+              onClick={() => capacity.kind === "ready" && setConfirmSlot(true)}
               title={
                 next && capacity.kind === "blocked"
                   ? capacity.reason
@@ -149,6 +153,16 @@ export function CityPanel({
           );
         })}
       </div>
+      <ConfirmModal
+        open={confirmSlot}
+        onClose={() => setConfirmSlot(false)}
+        onConfirm={() => capacity.kind === "ready" && onAction(capacity.action)}
+        title={t("ui.city.openTitle", { number: me.capacity + 1 })}
+        price={t("ui.city.openPrice", { money: nextSlotPrice ?? "?" })}
+        confirmLabel={t("ui.city.openConfirm")}
+      >
+        {t("ui.city.openHint")}
+      </ConfirmModal>
     </Panel>
   );
 }

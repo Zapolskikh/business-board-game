@@ -1,13 +1,15 @@
 import type { RoleGuide, RulesChapter, RulesContext, TableLabels } from "../rulesDocument";
 
-/* The rule book in English. Plain words, short sentences — readable at B1 level. Numbers come from ctx. */
+/* The rule book in English — the same chapters and wording as the Russian printed rules, without
+ * the screenshots (the interface on them is Russian). Numbers come from ctx; the icons next to
+ * terms are added by rulesTerms.ts. Plain words, short sentences — readable at B1 level. */
 
 const labels: TableLabels = {
   asset: "Business",
   price: "Price",
   income: "Income/round",
   influence: "◆ at once",
-  effect: "What it does",
+  effect: "Property",
   roleNote: role => `Role of this district: <b>${role}</b> (+1$ for each business here).`,
   card: "Card",
   type: "Type",
@@ -18,196 +20,206 @@ const labels: TableLabels = {
   project: "Project",
   points: "Points",
   condition: "Condition",
-  perk: "Lasting bonus",
-  roleHeads: { perks: "Lasting bonuses", powers: "Powers", cost: "Cost", limit: "Limit", effect: "Effect", tip: "Tip", warning: "Important" },
+  perk: "Bonus",
+  roleHeads: { perks: "Always", powers: "Powers", cost: "Cost", limit: "Limit", effect: "Effect", tip: "Tip", warning: "Important" },
   onMarketFrom: round => `on the market from round ${round}`,
   and: " and ",
 };
 
 const roles: Record<string, RoleGuide> = {
   capitalist: {
-    style: "The money role: more money from every business and influence from factories.",
+    style: "The money role: more money from every business. <b>District synergy:</b> Business District, Industrial Zone.",
     perks: [
-      "<b>Each of your businesses: +1$.</b> Any business, not only in the Business District.",
-      "<b>Own district — Business District:</b> its businesses give +1$ more.",
-      "<b>Influence from the Industrial Zone:</b> +1◆ at the end of the round for each of your Industrial Zone businesses. This is the role's only influence.",
+      "Each of your businesses gives +1$.",
+      "Business District businesses give +1$ more.",
+      "At the end of the round you get 1◆ for each of your Industrial Zone businesses.",
     ],
     powers: [
       {
-        name: "Place a claim",
-        cost: "1 action and 1⚠",
-        limit: "one claim: a new one removes the old one",
-        effect: "A market card works for you as if it were yours: it gives income, counts for synergy and projects, and unlocks shady deals. But anyone can still buy it, it gives no points and takes no slot. The claim is gone when you lose the role.",
+        name: "🏷️ Place a claim",
+        cost: "1 action and 1 scandal",
+        limit: "only one claim: a new one removes the old one",
+        effect: "Mark a business on the market. It works for you as if it were yours: it brings income, counts for synergy and project conditions, and unlocks shady deals. It gives no points and takes no slot. Any player can still buy it. The claim is gone if you lose the role. The claim does not change the market cycle: an old claimed business still leaves the table.",
       },
     ],
   },
   politician: {
-    style: "The control role: influence from homes all over the city and cheap scandal cleanup.",
+    style: "The control role: influence from homes all over the city and cheap scandal cleanup. <b>District synergy:</b> Government Quarter, Residential Area.",
     perks: [
-      "<b>Own district — Government Quarter:</b> each of your businesses there gives +1$.",
-      "<b>Influence from residents:</b> +1◆ at the end of the round for each residential business on the table — yours and other players'.",
+      "Government Quarter businesses give +1$.",
+      "At the end of the round you get 1◆ for each Residential Area business in a slot — yours and other players'.",
     ],
     powers: [
-      { name: "Settle a scandal", cost: "1 action and 2◆", limit: "as many as your actions allow", effect: "Removes 1 of your scandals." },
+      { name: "Settle a scandal", cost: "1 action and 2◆", limit: "can be repeated", effect: "Remove 1 of your scandals." },
       {
         name: "Make a deal",
-        cost: "3◆ and 1⚠; you need a Grey Sector business",
-        limit: "once per turn, no action",
-        effect: "Until the end of the round, any district you pick counts as yours: for projects, shady deals and synergy.",
+        cost: "3◆ and 1 scandal, no action; you need a Grey Sector business",
+        limit: "once per turn",
+        effect: "Rent any district (see “District rent”).",
       },
       {
         name: "Veto",
         cost: "1 action and 3◆",
-        limit: "one veto, everyone can see it",
-        effect: "Only you can take a project on the board. When the project leaves the board, the veto leaves with it. It is gone when you lose the role.",
+        limit: "only one veto",
+        effect: "Pick a project on the board: only you can take it, other players can no longer get it. Everyone can see the veto. It is removed when the project leaves the board or you lose the role.",
       },
     ],
   },
   journalist: {
-    style: "The scandal role: other players' scandals bring money, your own bring influence.",
+    style: "The scandal role: other players' scandals bring money, your own bring influence. <b>District synergy:</b> Business District, Residential Area.",
     perks: [
-      "<b>Money from other scandals:</b> at the end of the round, 1$ for each rival scandal, or 2$ if you have a Business District business. It counts what is left at payout time.",
-      "<b>Influence from your own scandals:</b> at the end of the round, +1◆ for each of your scandals, with no cap. Only works if you have at least one Residential Area business.",
-      "<b>Scandal limit — 6⚠.</b> You lose the role at 6⚠, not 5⚠. Arrest comes at 7⚠.",
-      "The role has no district of its own.",
+      "At the end of the round you get 1$ for each rival scandal, or 2$ if you have at least one Business District business.",
+      "At the end of the round you get 1◆ for each of your scandals if you have at least one Residential Area business.",
+      "Your scandal limit is 1 higher: you lose the role at 6 scandals and are arrested at 7.",
     ],
     powers: [
       {
         name: "Blow up a story",
         cost: "free, no action",
         limit: "once per turn",
-        effect: "1⚠ to you and to the rival you pick. If the target has Protection, it stops the whole hit — then you get no scandal either.",
+        effect: "You and the rival you pick each get 1 scandal. If the rival's Protection stops the hit, you do not get your scandal either.",
       },
-      {
-        name: "Publish an exposé",
-        cost: "1 action and 3◆",
-        limit: "once per turn",
-        effect: "2⚠ to a rival, nothing to you. The target's Protection stops the whole thing, but your action and influence are spent.",
-      },
+      { name: "Publish an exposé", cost: "1 action and 3◆", limit: "once per turn", effect: "The rival gets 2 scandals." },
     ],
-    warning: "A rival's Protection stops both the story and the exposé. At 6⚠ you lose the role, at 7⚠ you are arrested. Without the role, your limit is 5⚠ again.",
   },
   fraudster: {
-    style: "The risky role: more actions and strong shady deals.",
+    style: "The risky role: more actions and safer shady deals. <b>District synergy:</b> Tech Cluster.",
     perks: [
-      "<b>Four actions per turn</b> instead of three.",
-      "<b>Own district — Tech Cluster:</b> each of your businesses there gives +1$.",
-      "<b>Shady deals:</b> +30% chance of success, but no more than 90%.",
+      "<b>4 actions</b> per turn instead of 3.",
+      "Tech Cluster businesses give +1$.",
+      "Your shady deals have a 30% higher chance of success.",
     ],
     powers: [
-      { name: "Cover your tracks", cost: "1 action", limit: "as many as your actions allow", effect: "Removes 1 of your scandals." },
+      { name: "Cover your tracks", cost: "1 action", limit: "can be repeated", effect: "Remove 1 of your scandals." },
       {
         name: "Crypto scam",
-        cost: "1 action; you need your own City Crypto Exchange",
+        cost: "1 action; you need your own “City Crypto Exchange”",
         limit: "once per turn",
-        effect: "Takes 25% of every rival's money (Protection keeps its owner safe) and gives you 5⚠. Businesses and projects that lower scandals from shady deals lower these too.",
+        effect: "Take 25% of each rival's money. You get 5 scandals. Effects that lower scandals from shady deals lower these too.",
       },
     ],
   },
   mafia: {
-    style: "The power role: income from the Grey Sector, a racket and cheap Protection.",
+    style: "The power role: a racket and cheap Protection. <b>District synergy:</b> Grey Sector.",
     perks: [
-      "<b>Own district — Grey Sector:</b> each of your businesses there gives +1$.",
-      "<b>Protection</b> costs 1$ less, and you can hold two, not one.",
+      "Grey Sector businesses give +1$.",
+      "Protection costs you 1$ less, and you can hold 2 Protection instead of one.",
     ],
     powers: [
       {
         name: "Racket",
         cost: "1 action; you need a Grey Sector business",
         limit: "once per turn",
-        effect: "The target gives you money: 2$ + 2$ for each of your Grey Sector businesses + the round number divided by 3 (rounded down), and +5$ more if the target is the leader. And influence: 1◆ for each of your Government Quarter businesses. Never more than the target has. The target's Protection cancels the racket. If you have no Government business, you get 1⚠.",
+        effect: "Pick a rival. They give you money: 2$, another 2$ for each of your Grey Sector businesses, and the round number divided by 3. If the target is the leader, add 5$ more. The target also gives you 1◆ for each of your Government Quarter businesses. The target cannot give more than they have. If you have no Government Quarter business, you get 1 scandal.",
       },
-      { name: "Hush it up", cost: "1 action and 3$; you need a Government business", limit: "as many as your actions allow", effect: "Removes up to 2 of your scandals." },
       {
-        name: "Grey hold",
-        cost: "1 Protection",
-        limit: "once per turn, no action",
-        effect: "Until the end of the round, only you can buy a market slot. You have one hold: a new one moves the old one. It is removed by the end of the round or by a Market Maker re-deal.",
+        name: "Hush it up",
+        cost: "1 action and 3$; you need a Government Quarter business",
+        limit: "can be repeated",
+        effect: "Remove up to 2 of your scandals.",
+      },
+      {
+        name: "🔒 Grey hold",
+        cost: "1 Protection, no action",
+        limit: "once per turn",
+        effect: "Mark a business on the market: until the end of the next round, only you can buy it. Only one grey hold: a new one replaces the old one. The hold is removed at the end of the next round.",
       },
     ],
   },
   military: {
-    style: "The punishing role: hits players who have many scandals.",
-    perks: [
-      "<b>Own district — Industrial Zone:</b> each of your businesses there gives +1$.",
-      "Sanctions look at the target's scandals, and Inspection creates those scandals.",
-    ],
+    style: "The punishing role: hits players with many scandals. <b>District synergy:</b> Industrial Zone.",
+    perks: ["Industrial Zone businesses give +1$."],
     powers: [
       {
         name: "Sanctions",
         cost: "1 action",
-        limit: "once per turn; the target needs at least 2⚠",
-        effect: "If the target has Protection, they lose it — and that's all. Without Protection: at 2⚠ the target gives you up to (3 + round number)$; at 3⚠ — also influence; at 4⚠ — they also lose their role. The target keeps their scandals.",
+        limit: "once per turn; the target needs at least 2 scandals",
+        effect: "The more scandals the target has, the harder the hit: 2 scandals — the target gives you up to (3 + round number)$; 3 scandals — also up to (2 + round number ÷ 4)◆; 4 scandals or more — they also lose their role. The target keeps their scandals.",
       },
       {
         name: "Inspection",
         cost: "1 action",
-        limit: "as many as your actions allow; you need a rival with a Grey Sector business",
-        effect: "A scandal to every rival who has a Grey Sector business. Protection keeps its owner safe and is used up.",
+        limit: "can be repeated; you need at least one rival with a Grey Sector business",
+        effect: "Each rival with a Grey Sector business gets 1 scandal.",
       },
       {
         name: "Take Protection",
         cost: "1 action and 3◆",
-        limit: "you need a rival with Protection and room for it",
-        effect: "One Protection of a rival becomes yours. Protection does not defend against this.",
+        limit: "you need room for Protection",
+        effect: "Take 1 Protection from a rival.",
       },
     ],
-    warning: "The target's Protection stops sanctions completely. And the target may clean up scandals on their own turn.",
   },
 };
 
 export function bookEn(ctx: RulesContext): RulesChapter[] {
-  const { n, rolePrice } = ctx;
-  const campaign = n.campaign.map(tier => `<b>${tier.spend}$ → ${tier.gain}◆</b>`).join(", ");
-  const selfCards = ctx.list(ctx.selfTargetCards, labels.and) || "Some scandal cards";
-  const capacity = n.capacityCosts.map(cost => `${cost}$`).join(" → ");
-  const tags = ["finance", "data", "logistics", "production", "security", "government"].map(tag => `“${ctx.e(ctx.tag(tag))}”`).join(", ");
+  const { n, rolePrice, meta } = ctx;
+  const [slot4, slot5, slot6] = n.capacityCosts;
+  const campaign = n.campaign[0] ?? { spend: 5, gain: 3 };
+  const selfCards = ctx.list(ctx.selfTargetCards, labels.and) || "some scandal cards";
   return [
     {
       id: "intro",
       icon: "🏙️",
-      title: "Welcome to the city",
+      title: "About the game",
       html: `
-      <p><i>City of Influence</i> is a game about building a strong network across the city and outscoring your rivals. Buy businesses, build up districts, use roles and powers, then claim city projects.</p>
-      <div class="tip"><b>Your goal:</b> finish the last round with more points than anyone else. Projects, businesses, a role, some actions, and leftover money and influence score points; scandals take points away.</div>
-      <p><b>The city and market are shared.</b> Everyone sees the same six market offers and ${n.projectBoardSize} projects. Buying a business or taking a project changes the table for all players. A project belongs to the first player who pays its price and meets its condition.</p>
-      <p><b>How a game flows:</b> spend actions on choices during your turn; at round end, the city pays income and some offers change. Plan your growth a few rounds ahead, but do not wait too long on a project a rival can take.</p>
-      <div class="box"><h4>Resource symbols in this book</h4><p><b>$ means money</b>, <b>◆ means influence</b>, and <b>⚠ means scandal</b>. The same symbols are used for prices, effects, and scoring.</p></div>
-      `,
-    },
-    {
-      id: "goal",
-      icon: "🏆",
-      title: "Goal and points",
-      html: `
-      <p>The player with the most points at the end wins. You get points from:</p>
-      <ul>
-        <li><b>City projects</b> — 1 to 9 points, usually 6–7. The biggest source of points.</li>
-        <li><b>Businesses</b> — half the business price, rounded down. The number is on the card (<b>★ N points</b>).</li>
-        <li><b>Role</b> — +3 points if you have a role at the end.</li>
-        <li><b>Other points</b> — patronage (<b>${n.patronage.money}$ → ${n.patronage.points}</b>), lobbying (<b>${n.lobbying.influence}◆ → ${n.lobbying.points}</b>) and cards that buy points. Patronage and lobbying — once per turn each.</li>
-        <li><b>💵 Money ($)</b> — 1 point for every <b>${n.moneyPerPoint}$</b>.</li>
-        <li><b>◆ Influence</b> — 1 point for every <b>${n.influencePerPoint}◆</b>.</li>
-        <li><b>⚠ Scandals</b> — minus 1 point for each.</li>
+      <div class="tip"><b>The player with the most points after the last round wins.</b> There are many ways to score, but the main sources are the market with its businesses and the city projects.</div>
+      <p>You buy businesses in six districts of the city, pick a role with special powers and take city projects before your rivals. The business market and the project board are shared: what you take, others will not get.</p>
+      <p>2–4 players take part. The standard game has 15 rounds, a role costs ${rolePrice}◆, and everyone starts with 10$ and 2◆. (You can change these values before each game, but then the game may be a little less balanced.)</p>
+      <h3>Symbols</h3>
+      <ul data-terms="off">
+        <li>$ <b>Money</b> — to buy businesses, slots, projects, action cards and Protection.</li>
+        <li>◆ <b>Influence</b> — for roles, projects and role powers.</li>
+        <li>⚠ <b>Scandals</b> — each one left at the end of the game costs 1 point. The maximum is 6. Watch them closely: many scandals can cause trouble (see “Scandals and arrest”).</li>
+        <li>🛡 <b>Protection</b> — protects you from harmful effects aimed at you (see “Protection”).</li>
+        <li>★ <b>Score</b> — really the only thing that matters after the last round: the player with the most points wins.</li>
+        <li>⚡ <b>Actions</b> — your turn is made of them (see “Round and turn”).</li>
       </ul>
-      <div class="tip"><b>Where to look:</b> your score in parts and your next income open with the “Score and income” button at the top.</div>
+      <h3>What is on the table</h3>
+      <ul>
+        <li><b>Market</b> — 6 businesses you can buy. The rest lie in the market deck. ${meta.assets.length} cards in total.</li>
+        <li><b>Project board</b> — ${n.projectBoardSize} city projects. The rest lie in the project deck. ${meta.projects.length} cards in total.</li>
+        <li><b>Action card deck</b> — ${meta.action_cards.length * 2} cards: ${meta.action_cards.length} different cards, two copies of each.</li>
+        <li><b>Your city</b> — the businesses you bought. Each business takes one <b>slot</b>.</li>
+        <li><b>Hand</b> — the cards you bought and can play.</li>
+      </ul>
       `,
     },
     {
-      id: "flow",
-      icon: "⏳",
-      title: "Turns and rounds",
+      id: "market",
+      icon: "🏪",
+      title: "Market businesses",
       html: `
-      <p>In every round, all players take turns. <b>The player with the fewest points goes first</b>, the leader goes last. The order is set again every round. If points are equal, the player who went later last round goes earlier. The player panel shows whose turn it is.</p>
-      <div class="kpi">
-        <div><b>3</b><span>actions per turn for everyone</span></div>
-        <div><b>4</b><span>actions for the Hustler</span></div>
-        <div><b>1</b><span>action in the turn after an arrest</span></div>
-      </div>
-      <p>Actions are spent on buying, roles, projects, cards, shady deals and defence. <b>No action needed</b> to sell a business, play or discard cards. Unused actions are lost at the end of the turn.</p>
-      <p><b>End of the round.</b> Businesses pay income, influence is added, role bonuses work, and the bridge loan is paid back. When the next round opens, turn order is set again, the action deck is shuffled, part of the market changes and one project on the board is replaced.</p>
-      <p><b>There is no payout after the last round.</b> During the whole last round, “Score and income” shows a zero payout: spend your money and influence right away. The bridge loan is still paid back.</p>
-      <div class="tip"><b>The market has six slots and a deck of ${ctx.meta.assets.length} business cards.</b> The deck is shuffled, so offers appear in random order. When a business is bought, the next available card from the shuffled deck immediately fills its slot. At the start of each new round, the <b>${n.rotation} oldest slots</b> marked ⏳ go to the bottom of the deck and are replaced. There is no other market rotation during a round (except the Market Maker power).</div>
+      <h3>Buying and selling</h3>
+      <p>To buy a business, spend 1 action, pay the price and put the business into a free slot of your city. A business gives points, income and sometimes special bonuses.</p>
+      <p>An empty place on the market is filled at once by the next business from the deck.</p>
+      <p>You can sell a business with no action. You get half of its price back, and the slot is free again.</p>
+      <h3>My city</h3>
+      <p>You start with 3 slots. The fourth slot costs ${slot4}$, the fifth ${slot5}$, the sixth ${slot6}$. 6 slots at most. Opening a slot takes 1 action.</p>
+      <h3>Income</h3>
+      <p>A business card on the market shows the total income and the bonuses you will get when you buy it, with all the synergies and conditions you have right now.</p>
+      <p>To see the details and the bonuses that are not shown yet, click the card.</p>
+      <p>A card in your slot shows its income live: if you meet an extra condition or lose it, the card changes at once.</p>
+      `,
+    },
+    {
+      id: "districts",
+      icon: "🗺",
+      title: "Districts and rarity",
+      html: `
+      <h3>Districts and synergy</h3>
+      <p>The city has six districts: ${ctx.list(meta.districts.map(district => ctx.e(district.title)), labels.and)}. The more businesses you have in one district, the more passive income each of them brings:</p>
+      <ul>
+        <li><b>2–3 businesses</b> in a district: each gives +1$.</li>
+        <li><b>4 businesses or more</b>: each gives +2$. Such a district is <b>full</b>: epic and legendary businesses of a full district also give +1◆ at the end of each round.</li>
+      </ul>
+      <h3>District rent</h3>
+      <p>Some effects give you <b>district rent</b>: until the end of the round the chosen district counts as if you had 1 more business there. Rent counts for synergy, project conditions, shady deals and role powers. Lasting role bonuses do not see it — they count only real businesses. You can have only one rent: a new one replaces the old one.</p>
+      <h3>Tags and rarity</h3>
+      <p>Every business card has <b>tags</b>: ${["finance", "data", "logistics", "production"].map(tag => `“${ctx.e(ctx.tag(tag))}”`).join(", ")} and others. Many project conditions check them.</p>
+      <p><b>Rarity</b> sets the price of a business and the round when it comes to the market:</p>
+      ${ctx.html.rarityLadder(labels)}
+      <p>Rarer and more expensive businesses give more points (the number is on the card) and stronger synergies. Legendary cards can give unique bonuses that can change how the game goes.</p>
       `,
     },
     {
@@ -215,67 +227,48 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
       icon: "🏛",
       title: "City projects",
       html: `
-      <p>The board of ${n.projectBoardSize} projects is shared by all players. A project is not reserved for whoever saw it first or met its condition first: the first player to spend the action and resources to take it gets it. After that, it belongs only to them.</p>
-      ${ctx.html.projectExample({ heading: "Read a real project card", caption: "The example uses a card from the game catalogue.", title: "Name", points: "Points", condition: "Condition", price: "Price", reward: "Lasting reward", action: "1 action" })}
+      <p>A project belongs to nobody: it goes to whoever first meets the condition and pays the price.</p>
+      <p>There are 4 kinds of projects (you can tell them by the card back):</p>
       <ul>
-        <li><b>Price</b> — the influence and money on the card, plus 1 action.</li>
-        <li><b>Condition</b> — something you must already have: businesses in a district, businesses with a tag, a number of businesses, few scandals or any role.</li>
-        <li><b>Reward</b> — points at the end and a lasting bonus, for example +2$ or +2◆ every round. Nobody can take the bonus away.</li>
-        <li><b>Project rotation</b> — at the start of each new round, the <b>oldest project on the left</b>, marked ⏳, goes to the bottom of the deck. The others shift left, and the next card from the shuffled deck enters at the right.</li>
-        <li><b>Re-deal the board</b> — ${n.reroll}$ and 1 action, once per turn: all projects go back to the deck and a new board is dealt.</li>
+        <li><b>Plain</b> — gives only points.</li>
+        <li>A project that gives money every round.</li>
+        <li>A project that gives influence every round.</li>
+        <li>A project that gives a unique bonus.</li>
       </ul>
-      <p>When someone takes a project, a new one appears immediately in the rightmost position. If you have enough actions and resources, you can take several available projects in one turn. The project deck is shuffled when the whole board is re-dealt; normal rotation draws the next card from the deck.</p>
-      `,
-    },
-    {
-      id: "resources",
-      icon: "💰",
-      title: "Resources",
-      html: `
-      <div class="cols">
-        <div class="box"><h4>💵 Money ($)</h4><p>For buying, slots, projects, cards and defence. At the end, ${n.moneyPerPoint}$ = 1 point. Patronage: ${n.patronage.money}$ → ${n.patronage.points} points, once per turn.</p></div>
-        <div class="box"><h4>◆ Influence</h4><p>For roles, projects and powers. At the end, ${n.influencePerPoint}◆ = 1 point. Lobbying: ${n.lobbying.influence}◆ → ${n.lobbying.points} points, once per turn. You get influence from businesses with “+◆ per round”, project bonuses and some roles. You can also buy it — that is “Exchange”.</p></div>
-        <div class="box"><h4>🔁 Exchange</h4><p>1 action: ${campaign}.</p></div>
-        <div class="box"><h4>⚠ Scandals</h4><p>Minus a point for each. At 5⚠ you lose your role; at 6⚠ you are arrested. The Journalist has one more: role at 6⚠, arrest at 7⚠. Remove 1⚠: <b>${n.crisisPr}◆ and 1 action</b> (crisis PR). If you have no role, 1⚠ goes away by itself at the start of your turn.</p></div>
-        <div class="box"><h4>🛡️ Protection</h4><p>Defence <b>against other players</b>: stops a card, a racket, sanctions, a hack and an attempt to take your role. It does not save you from your own choices, like a failed shady deal.</p></div>
-        <div class="box"><h4>🏢 Slots</h4><p>You start with 3 slots, 6 at most. A new slot costs ${capacity}.</p></div>
-        <div class="box"><h4>🃏 Action cards</h4><p>Buying: 1 action, ${n.cardCost}$ and 1◆ — you take <b>two random</b> cards. Once per turn, 3 cards in hand at most. You can play and discard as many as you like. A discard gives ${n.discard}$ or ${n.discard}◆.</p></div>
-        <div class="box"><h4>🏷️ Selling a business</h4><p><b>No action.</b> You get half the business price — the same number of points it was giving. The slot is free at once.</p></div>
-      </div>
-      `,
-    },
-    {
-      id: "economy",
-      icon: "🏢",
-      title: "Business income",
-      html: `
-      <p>At the end of the round, each business pays <b>the income on its card + synergy</b>.</p>
+      <p>The price of a project depends on how hard it is and on its bonus.</p>
+      ${ctx.html.projectExample({ heading: "A real project card", caption: "The example comes from the game catalogue.", title: "Name", points: "Points", condition: "Condition", price: "Price", reward: "Lasting bonus", action: "1 action" })}
       <ul>
-        <li><b>The income on the card</b> does not grow. To earn more, buy a stronger business or build up a district.</li>
-        <li><b>District synergy</b>: with 2 businesses in a district, each gives +1$; with 4, each gives +2$.</li>
-        <li><b>District role</b>: five districts have their own role, which gives +1$ for each business in that district.</li>
-        <li><b>Full district</b>: with 4 businesses in a district, the epic and legendary businesses there give +1◆ more per round.</li>
-        <li><b>Card effects</b>: bonuses written on the card itself.</li>
+        <li><b>Points</b> — added to your score at the end of the game.</li>
+        <li><b>Condition</b> — what you must already have: businesses in a certain district, businesses with a tag, a number of businesses, few scandals or any role. The bar under the condition shows how close you are.</li>
+        <li><b>Price</b> — influence and money.</li>
+        <li><b>Lasting bonus</b> — the project gives a bonus that stays until the end of the game.</li>
       </ul>
-      <p>The influence ◆ on a card is <b>one-time</b>: you get it when you buy. On a market card, the income is shown as how much your whole income grows — including the synergy this purchase turns on.</p>
-      <p><b>Tags</b> (${tags}…) are written on the cards. Many project conditions check them.</p>
+      <h3>How to take a project</h3>
+      <p>Meet the condition, spend 1 action and pay the price. A new project comes to the empty place at once.</p>
+      <h3>Re-deal the board</h3>
+      <p>Once per turn you can spend 1 action and ${n.reroll}$: all ${n.projectBoardSize} projects go back to the deck, the deck is shuffled, and ${n.projectBoardSize} new projects come out.</p>
       `,
     },
     {
-      id: "districts",
-      icon: "🗺",
-      title: "Districts and synergy",
+      id: "flow",
+      icon: "⏳",
+      title: "Round and turn",
       html: `
-      <p>The city has six districts. The more of your businesses are in a district, the more <b>each</b> business there gives:</p>
-      <div class="kpi">
-        <div><b>2 businesses</b><span>+1$ each</span></div>
-        <div><b>4 businesses</b><span>+2$ each</span></div>
-        <div><b>District role</b><span>+1$ each</span></div>
-      </div>
-      <p>District roles:</p>
-      ${ctx.html.districtRoles()}
-      <p>The Residential Area has no role of its own.</p>
-      <div class="box"><h4>🏙 Renting a district</h4><p>The Rezoning card and the Politician's “Make a deal” power make the chosen district count as if you had 1 more business there, until the end of the round. This works for project conditions, shady deals, role powers and synergy. It does not work for lasting role bonuses: they only count what you built. You can rent only one district: a new one replaces the old one.</p></div>
+      <h3>Turn order</h3>
+      <p>In each round every player takes one turn. The player with the fewest points goes first. The <b>leader</b> — the player with the most points — goes last. With equal points, whoever went later in the last round goes earlier.</p>
+      <p>The first player of the game is random.</p>
+      <h3>Actions</h3>
+      <p>On your turn you get <b>3 actions</b>. Almost everything is paid with actions: buying a business, a slot, cards or Protection, taking a project or a role, a shady deal, most role powers. Selling businesses, playing and discarding cards are free. The full list is in the “Cheat sheet”.</p>
+      <p>Unused actions are lost at the end of the turn.</p>
+      <h3>End of the round</h3>
+      <p>When everyone has had a turn, the round ends. Every player gets the income of their businesses, and then all “at the end of the round” and “every round” effects work — of roles, projects, businesses and cards.</p>
+      <p>Then a new round starts:</p>
+      <ol>
+        <li>The turn order is set again by points.</li>
+        <li>The ${n.rotation} businesses that have been on the market the longest (marked ⏳) leave the table, and new ones from the deck take their place. The old businesses go to the bottom of the deck.</li>
+        <li>The leftmost project (marked ⏳) goes to the bottom of the project deck. The other projects move one place left, and a new project from the deck is added last.</li>
+      </ol>
+      <div class="warn"><b>There is no income after the last round.</b> Everything you would earn at the end of the last round is zero, so spend your money and influence during the last round.</div>
       `,
     },
     {
@@ -283,14 +276,17 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
       icon: "🎭",
       title: "Roles",
       html: `
-      <p>A role gives lasting bonuses and powers. You can have only one role. A role at the end of the game gives <b>+3 points</b>.</p>
-      <div class="cols">
-        <div class="box"><h4>How to get one</h4><p>A free role: <b>${rolePrice}◆</b> and 1 action. Another player's role: <b>${rolePrice * 3}◆</b> and 1 action. They lose the role, and your old role becomes free.</p></div>
-        <div class="box"><h4>Defence</h4><p>The holder's Protection stops a takeover and is used up. You get your influence back, but not the action. The Lobbying Bureau gives the old holder 2◆ if their role is taken after all.</p></div>
-        <div class="box"><h4>Powers</h4><p>Each power has its own cost and limit. “No action” means your action counter does not go down.</p></div>
-      </div>
+      <p>A role gives lasting bonuses and powers. You can have only one role. If you have a role at the end of the game, it gives 3 points.</p>
+      <h3>How to take a role</h3>
+      <p>A free role costs 1 action and ${rolePrice}◆. Another player's role costs 1 action and ${rolePrice * 3}◆: they lose it. When a player loses a role, anyone can take it again for ${rolePrice}◆.</p>
+      <p><b>If the holder of a role has Protection, their role cannot be taken.</b></p>
+      <p>With 5 scandals or more you cannot take a role.</p>
+      <h3>Losing a role</h3>
+      <p>You lose your role automatically when you reach 5 or more scandals.</p>
+      <p>Other players can try to take your role away with different game mechanics, like shady deals or the Enforcer's powers, or push you with scandals.</p>
+      <h3>Powers</h3>
+      <p>Each power has its own cost and its own limit. “No action” means the power does not use up the actions of your turn.</p>
       ${ctx.html.roleCards(roles, labels)}
-      <div class="warn"><b>Losing a role:</b> with 5⚠ you can't take a role (even as the Journalist). When you reach your scandal limit, you lose the role at once. One more 1⚠ — arrest.</div>
       `,
     },
     {
@@ -298,21 +294,19 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
       icon: "🕶",
       title: "Shady deals",
       html: `
-      <p>A <b>district</b> unlocks a shady deal: you need any of your businesses in the right district, no role needed. A deal costs 1 action, <b>only one per turn</b>. The Grey Sector unlocks all five, the Tech Cluster — Pump and dump and Hack, the Government Quarter — Leak dirt.</p>
+      <p>A shady deal is unlocked by a district: it is enough to have one business in the right district. A deal costs 1 action, and you can make only one per turn.</p>
       <table>
-        <thead><tr><th>Deal</th><th>District</th><th>Chance</th><th>What it does on success</th><th>Points</th></tr></thead>
+        <thead><tr><th>Deal</th><th>Business needed</th><th>Chance</th><th>Effect on success</th><th>★</th></tr></thead>
         <tbody>
-          <tr><td class="name"><b>Dirty rumours</b></td><td>Grey Sector</td><td class="num">${n.greyChance("smear", 60)}%</td><td><b>1⚠ to every rival</b></td><td class="num">+${n.greyPoints("smear", 2)}</td></tr>
-          <tr><td class="name"><b>Pump and dump</b></td><td>Tech Cluster, Grey Sector</td><td class="num">${n.greyChance("crypto", 45)}%</td><td>take up to (${n.pumpBase} + round/2)$ <b>from every rival</b></td><td class="num">+${n.greyPoints("crypto", 2)}</td></tr>
-          <tr><td class="name"><b>Break Protection</b></td><td>Grey Sector</td><td class="num">${n.greyChance("roof_break", 60)}%</td><td>remove <b>all</b> the target's Protection, +${n.roofBreakPoint} point for each</td><td class="num">+${n.greyPoints("roof_break", 2)}</td></tr>
-          <tr><td class="name"><b>Hack</b></td><td>Tech Cluster, Grey Sector</td><td class="num">${n.greyChance("datacenter", 40)}%</td><td>steal up to (${n.hackBase} + round/3)◆ from the target</td><td class="num">+${n.greyPoints("datacenter", 3)}</td></tr>
-          <tr><td class="name"><b>Leak dirt</b></td><td>Grey Sector, Government</td><td class="num">${n.greyChance("influence_broker", 60)}%</td><td>the target <b>loses their role</b></td><td class="num">+${n.greyPoints("influence_broker", 3)}</td></tr>
+          <tr><td class="name"><b>Dirty rumours</b></td><td>Grey Sector</td><td class="num">${n.greyChance("smear", 60)}%</td><td>Each rival gets 1⚠</td><td class="num">+${n.greyPoints("smear", 2)}</td></tr>
+          <tr><td class="name"><b>Pump and dump</b></td><td>Tech Cluster or Grey Sector</td><td class="num">${n.greyChance("crypto", 45)}%</td><td>Take up to (${n.pumpBase} + round number ÷ 2)$ from each rival</td><td class="num">+${n.greyPoints("crypto", 2)}</td></tr>
+          <tr><td class="name"><b>Break Protection</b></td><td>Grey Sector</td><td class="num">${n.greyChance("roof_break", 60)}%</td><td>Remove all the target's Protection and get ${n.roofBreakPoint}★ for each one removed</td><td class="num">+${n.greyPoints("roof_break", 2)}</td></tr>
+          <tr><td class="name"><b>Hack</b></td><td>Tech Cluster or Grey Sector</td><td class="num">${n.greyChance("datacenter", 40)}%</td><td>Take up to (${n.hackBase} + round number ÷ 3)◆ from the target</td><td class="num">+${n.greyPoints("datacenter", 3)}</td></tr>
+          <tr><td class="name"><b>Leak dirt</b></td><td>Government Quarter or Grey Sector</td><td class="num">${n.greyChance("influence_broker", 60)}%</td><td>The target loses their role</td><td class="num">+${n.greyPoints("influence_broker", 3)}</td></tr>
         </tbody>
       </table>
-      <p><b>One rule for all deals.</b> Success: the effect happens, you get the points and <b>${n.greySuccess} scandal</b>. Failure: nothing happens, but you get <b>${n.greyFailure} scandals</b>. The action is spent either way. Divisions in the formulas are rounded down.</p>
-      <p>The Hustler gets +30% chance (no more than 90%). Some businesses and projects lower scandals from deals by 1 — on success and on failure.</p>
-      <div class="box"><h4>The target's Protection</h4><p>The target's Protection stops the deal and is used up, even on success. You still get the points and your own scandal. Dirty rumours and Pump hit all rivals, and each one's Protection counts separately. <b>Protection does not stop “Break Protection”</b> — that deal is aimed at Protection itself.</p></div>
-      <div class="box"><h4>Protection does not stop your own scandals</h4><p>The scandal for your shady deal or crypto scam always comes, even if you have Protection.</p></div>
+      <p><b>Success:</b> the effect works, you get the points from the table and ${n.greySuccess} scandal. <b>Failure:</b> the effect does not work, and you get ${n.greyFailure} scandals. The action is spent either way. Divisions in the formulas are rounded down.</p>
+      <p>The target's Protection stops the effect, but you still get the points for success and your own scandal. Dirty rumours and Pump and dump hit all rivals at once, so each rival's Protection works on its own. Break Protection is not stopped by Protection: it is aimed exactly at it.</p>
       `,
     },
     {
@@ -320,35 +314,29 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
       icon: "⚠",
       title: "Scandals and arrest",
       html: `
-      <div class="kpi">
-        <div><b>0–4⚠</b><span>minus a point for each, you play as normal</span></div>
-        <div><b>5⚠</b><span>you lose your role at once</span></div>
-        <div><b>6⚠</b><span>arrest: scandals drop to 3⚠, you lose your role and 1 Protection</span></div>
-      </div>
-      <p><b>Arrest:</b> you have only 1 action in your next turn. If the arrest happens during your turn, the turn ends at once and your remaining actions are lost. If you have no role, 1⚠ goes away by itself at the start of your turn.</p>
-      <p>You can remove scandals with one “Clean up” button — it shows the price for your role. Each option costs 1 action, and you can repeat it:</p>
-      <div class="kpi">
-        <div><b>${n.crisisPr}◆</b><span>−1⚠ · crisis PR, for everyone</span></div>
-        <div><b>2◆</b><span>−1⚠ · Politician</span></div>
-        <div><b>—</b><span>−1⚠ · Hustler, just the action</span></div>
-        <div><b>3$</b><span>−2⚠ · Mobster, needs a Government business</span></div>
-      </div>
-      <p>Defence cards also remove scandals. Protection stops <b>all</b> scandals from one hit by another player at once.</p>
+      <p>Each scandal left at the end of the game costs 1 point. While you have fewer than 5 scandals, nothing else happens.</p>
+      <ul>
+        <li><b>5 scandals:</b> you lose your role at once and cannot take a new one.</li>
+        <li><b>6 scandals:</b> arrest.</li>
+      </ul>
+      <h3>Arrest</h3>
+      <p>When you are arrested, your scandals drop to 3, and you lose your role and 1 Protection. On your next turn you have only 1 action. If you are arrested on your own turn, the turn ends at once.</p>
+      <h3>How to get rid of scandals</h3>
+      <p><b>Crisis PR</b> is open to everyone: 1 action and ${n.crisisPr}◆ remove 1 scandal. You can repeat it while you have actions and influence. Roles, action cards, businesses and projects give other ways — it is written on them. In the game all your ways are under the “Clean up” button.</p>
+      <p>If you have no role, 1 scandal goes away by itself at the start of each of your turns.</p>
       `,
     },
     {
       id: "roofs",
       icon: "🛡",
-      title: "Protection and defence",
+      title: "Protection",
       html: `
-      <ul>
-        <li>Protection stops any hit on you from a rival <b>by itself</b>: a card, a racket, sanctions, a shady deal, a role takeover, scandals. 1 Protection is used up, and the whole hit is cancelled.</li>
-        <li>Protection does not save you from your own choices: the scandal for your shady deal and for the crypto scam always comes.</li>
-        <li>With Controlled Leak and Smear Campaign you only get your own scandal if the hit lands. If the target's Protection stopped it, nothing happens to you.</li>
-        <li>Any hit uses up Protection, so you can first strip a rival with a cheap attack and then hit hard.</li>
-        <li>Buying Protection: 1 action and <code>3$ + (round − 1)/2</code>, rounded down. The Mobster pays 1$ less. You can hold 1 Protection, the Mobster 2. Some businesses and projects raise the limit.</li>
-        <li>All three defence cards give the same Protection.</li>
-      </ul>
+      <p>Protection saves you from one hit by a rival: an attack card, a role power or a shady deal. When you are attacked, Protection works by itself: you lose 1 Protection, and the whole hit is cancelled, with all the scandals it would bring you.</p>
+      <p><b>While you have Protection, nobody can take your role.</b> The Protection is not used up by this.</p>
+      <p>The attacker does not get back what they spent on the hit, unless the hit says otherwise.</p>
+      <p>Protection does not save you from your own actions. You always get the scandal for your own shady deal or crypto scam.</p>
+      <h3>How to get Protection</h3>
+      <p>Buy it for 1 action and <code>3$ + (round number − 1) ÷ 2</code>. You can hold only 1 Protection. Some roles, businesses and projects raise this limit or give Protection for free.</p>
       `,
     },
     {
@@ -356,10 +344,58 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
       icon: "🃏",
       title: "Action cards",
       html: `
-      <p>Buying: <b>1 action</b>, ${n.cardCost}$ and 1◆ — you take <b>two</b> random cards. Only <b>once per turn</b>. The deck has two copies of each card. You can hold 3 cards at most.</p>
-      <p><b>You can play and discard as many as you like</b>, without an action. A discard gives ${n.discard}$ or ${n.discard}◆.</p>
-      <p><b>Some cards can target yourself:</b> ${selfCards}. This is a move for the Journalist, who needs their own scandals. Your Protection does not stop a hit on yourself, and you get no attacker bonuses for it.</p>
+      <p>Once per turn you can spend 1 action, ${n.cardCost}$ and 1◆ and take <b>2 random cards</b> from the deck. You can hold no more than 3 cards. If you already have 2 cards, you only draw up to 3.</p>
+      <p>You can play and discard cards as much as you like, with no action. For each discarded card you get ${n.discard}$ or ${n.discard}◆, your choice.</p>
+      <p>The deck has two copies of each card. “Round number” means the number of the current round: in round 5, add 5.</p>
+      <p>Attacks are played on a rival. You can play ${selfCards} on yourself.</p>
       ${ctx.html.cardTable(labels)}
+      `,
+    },
+    {
+      id: "end",
+      icon: "🏆",
+      title: "End of the game",
+      html: `
+      <p>The game ends after the last round. There is no income for it. Count the points:</p>
+      <ul>
+        <li><b>Projects</b> — points from the cards, 1 to 9 per project.</li>
+        <li><b>Businesses</b> — half the price of each business. The number is printed on the card.</li>
+        <li><b>Role</b> — 3 points if you have one.</li>
+        <li><b>Points earned during the game</b> — for patronage, lobbying, action cards and shady deals.</li>
+        <li><b>Money</b> — 1 point for every ${n.moneyPerPoint}$.</li>
+        <li><b>Influence</b> — 1 point for every ${n.influencePerPoint}◆.</li>
+        <li><b>Scandals</b> — minus 1 point for each.</li>
+      </ul>
+      <div class="tip">The player with the most points wins. <b>With equal points, the player who bought more city projects wins.</b></div>
+      `,
+    },
+    {
+      id: "memo",
+      icon: "📋",
+      title: "Cheat sheet",
+      html: `
+      <p>What you can do on your turn:</p>
+      <table>
+        <thead><tr><th>Move</th><th>Cost</th><th>Limits</th></tr></thead>
+        <tbody>
+          <tr><td class="name">Buy a business</td><td>1⚡ + price</td><td>A free slot is needed</td></tr>
+          <tr><td class="name">Sell a business</td><td>No action</td><td>Get half the price</td></tr>
+          <tr><td class="name">Buy a slot</td><td>1⚡ + ${n.capacityCosts.join(" / ")}$</td><td>6 slots at most</td></tr>
+          <tr><td class="name">Take a project</td><td>1⚡ + project price</td><td>Condition met</td></tr>
+          <tr><td class="name">Re-deal the project board</td><td>1⚡ + ${n.reroll}$</td><td>Once per turn</td></tr>
+          <tr><td class="name">Take a free role</td><td>1⚡ + ${rolePrice}◆</td><td>Fewer than 5⚠</td></tr>
+          <tr><td class="name">Take another player's role</td><td>1⚡ + ${rolePrice * 3}◆</td><td>Fewer than 5⚠, the holder has no Protection🛡</td></tr>
+          <tr><td class="name">Take 2 action cards</td><td>1⚡ + ${n.cardCost}$ + 1◆</td><td>Once per turn, up to 3 cards in hand</td></tr>
+          <tr><td class="name">Play or discard a card</td><td>No action</td><td>Discard: ${n.discard}$ or ${n.discard}◆</td></tr>
+          <tr><td class="name">Shady deal</td><td>1⚡</td><td>One per turn</td></tr>
+          <tr><td class="name">Buy Protection</td><td>1⚡ + 3$ + (round − 1) ÷ 2</td><td>Up to your Protection🛡 limit</td></tr>
+          <tr><td class="name">Crisis PR</td><td>1⚡ + ${n.crisisPr}◆</td><td>Removes 1⚠</td></tr>
+          <tr><td class="name">Exchange</td><td>1⚡ + ${campaign.spend}$</td><td>Get ${campaign.gain}◆</td></tr>
+          <tr><td class="name">Patronage</td><td>1⚡ + ${n.patronage.money}$</td><td>Get ${n.patronage.points}★, once per turn</td></tr>
+          <tr><td class="name">Lobbying</td><td>1⚡ + ${n.lobbying.influence}◆</td><td>Get ${n.lobbying.points}★, once per turn</td></tr>
+          <tr><td class="name">Role power</td><td>See the role</td><td>See the role</td></tr>
+        </tbody>
+      </table>
       `,
     },
     {
@@ -367,7 +403,7 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
       icon: "📜",
       title: "All projects",
       html: `
-      <p>The whole deck is in the game, but only four projects are on the board at a time, in random order.</p>
+      <p>${n.projectBoardSize} projects from the deck lie on the board at the same time.</p>
       ${ctx.html.projectTable(labels)}
       `,
     },
@@ -376,9 +412,8 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
       icon: "📚",
       title: "All businesses",
       html: `
-      <p>Rarity is a price level and the round when the card can appear on the market. More expensive does not mean more income: the income on the card is similar for all rarities. The difference is in points (half the price) and in the card's effects. Epic and legendary businesses in a full district give +1◆ more per round.</p>
+      <p>The “◆ at once” column is the influence you get when you buy. The full-district bonus (+1◆ per round for epic and legendary businesses) is not repeated in the tables.</p>
       ${ctx.html.rarityLadder(labels)}
-      <p>Below are all businesses by district.</p>
       ${ctx.html.assetTables(labels)}
       `,
     },
@@ -388,14 +423,35 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
       title: "Tips",
       html: `
       <ol>
-        <li><b>Look at the projects before you buy.</b> Projects give the most points, and their conditions tell you which businesses you need.</li>
-        <li><b>Income beats savings.</b> A good business pays every round, and money is worth very little at the end.</li>
-        <li><b>Build up districts.</b> 2 businesses in a district turn on synergy, 4 give double synergy and +1◆ on epic and legendary ones.</li>
-        <li><b>Pick a role that fits your plan</b>, not “the strongest one”.</li>
-        <li><b>Keep scandals under control</b> and don't get close to the limit without a reason.</li>
-        <li><b>The last player goes first</b> and picks first on the market and among the projects.</li>
-        <li><b>At the end, spend everything</b> on projects, businesses and points: there is no payout after the last round.</li>
+        <li><b>Look at the projects before you buy businesses.</b> Projects bring the most points, and their conditions tell you what to buy.</li>
+        <li><b>Income beats savings.</b> A good business brings money every round, and at the end money is worth almost nothing.</li>
+        <li><b>Build districts.</b> 2 businesses in a district turn on synergy, 4 double it.</li>
+        <li><b>Pick a role for your strategy</b>, not the one that looks strongest.</li>
+        <li><b>Watch your scandals.</b> Do not go near the limit without a reason: the Enforcer hits harder the more you have.</li>
+        <li><b>Remove Protection first.</b> Protection stops any hit, so a cheap attack can “strip” a rival before a serious one.</li>
+        <li><b>The Journalist likes their own scandals.</b> ${selfCards} can be played on yourself.</li>
+        <li><b>The player who is behind goes first</b> and picks first on the market and among the projects.</li>
+        <li><b>In the last round, spend everything</b> on projects, businesses and points: there is no income after it.</li>
       </ol>
+      `,
+    },
+    {
+      id: "glossary",
+      icon: "📖",
+      title: "Glossary",
+      html: `
+      <table>
+        <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td class="name"><b>District rent</b></td><td>Until the end of the round a district counts as if you had 1 more business there. See “District rent”.</td></tr>
+          <tr><td class="name"><b>Full district</b></td><td>A district where you have 4 businesses or more.</td></tr>
+          <tr><td class="name"><b>Leader</b></td><td>The player with the most points★. Goes last.</td></tr>
+          <tr><td class="name"><b>Protection</b></td><td>Protection🛡 from one hit by a rival. See “Protection”.</td></tr>
+          <tr><td class="name"><b>Round number</b></td><td>The number of the current round. In round 5 it is 5.</td></tr>
+          <tr><td class="name"><b>Slot</b></td><td>A place for one business. 3 at the start, 6 at most.</td></tr>
+          <tr><td class="name"><b>Synergy</b></td><td>Extra income for 2 or more businesses in one district.</td></tr>
+        </tbody>
+      </table>
       `,
     },
   ];

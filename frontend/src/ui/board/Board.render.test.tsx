@@ -87,7 +87,7 @@ describe("BoardView", () => {
     );
     expect(details).toContain("Нет свободного слота");
     expect(details).toContain("Стоимость продажи");
-    expect(details).toContain("stat-score.webp");
+    expect(details).toContain("project-icon-points.webp");
     expect(details).toContain("Условия района");
     expect(details).not.toContain("На столько вырастет весь ваш доход");
     expect(details).not.toContain("Цена для вас");

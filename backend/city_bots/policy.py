@@ -509,10 +509,6 @@ def _strategic_action_bonus(
             # for a middling one in round three, paying influence and an action for a downgrade.
             gain -= _role_utility(engine, state, player, player.role)
         bonus += gain * 0.5
-        holder = engine.role_holder(state, role_id)
-        if holder is not None and profile.planning and holder.roofs > 0:
-            # The defence is face-up, so a blocked takeover is a knowingly wasted action.
-            bonus -= 6.0
         if role_id == preferred:
             bonus += 12 * profile.role_focus
         elif preferred is not None:

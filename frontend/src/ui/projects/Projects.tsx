@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { AnimatePresence, motion } from "motion/react";
-import { forwardRef, type CSSProperties } from "react";
+import { forwardRef, useState, type CSSProperties } from "react";
 import { projectPerkText, projectRequirementText, projectRerollMoney } from "../../online/gameUi";
 import type { CityMeta, GameState, LegalAction, ProjectMeta } from "../../online/types";
 import { CardPopover, PopoverBody, PopoverFooter, PopoverHeader } from "../primitives/CardPopover";
@@ -10,6 +10,7 @@ import type { Indexes } from "../lib/board";
 import { useIsPortrait } from "../lib/layout";
 import { projectArt, projectIcon, projectKind, statIcon } from "../assets/cards";
 import { ResourceText } from "../primitives/ResourceIcon";
+import { ConfirmModal } from "../primitives/Modal";
 
 /* Доска проектов. Общая для всех: кто взял — тот и забрал, остальным проект недоступен.
  * Поэтому карточка на доске показывает только цену и прогресс, а «почему» — в поповере.
@@ -31,6 +32,7 @@ export function Projects({
   const portrait = useIsPortrait();
   const reroll = resolve(context, "reroll_projects");
   const rerolled = usedThisTurn(game, "projects_rerolled");
+  const [confirmReroll, setConfirmReroll] = useState(false);
   const mine = context.me.projects
     .map(id => index.projects.get(id))
     .filter((project): project is ProjectMeta => Boolean(project));
@@ -56,10 +58,12 @@ export function Projects({
         <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[10.5px] text-ink-dim">
           {mine.length ? t("ui.projects.mine", { count: mine.length, points: minePoints }) : t("ui.projects.none")}
         </span>
+        {/* Та же рамка, что у кнопок действий справа: пересборка — такое же действие хода.
+          * Нажатие только открывает подтверждение: доска общая и меняется у всех сразу. */}
         <button
           type="button"
           disabled={reroll.kind !== "ready"}
-          onClick={() => reroll.kind === "ready" && onAction(reroll.action)}
+          onClick={() => reroll.kind === "ready" && setConfirmReroll(true)}
           title={
             rerolled
               ? t("ui.projects.rerolled")
@@ -67,12 +71,25 @@ export function Projects({
                 ? reroll.reason
                 : t("ui.projects.rerollHint")
           }
-          className="ml-auto shrink-0 rounded-[10px] border border-line bg-panel-2 px-1.5 py-0.5
-            text-3xs whitespace-nowrap text-ink-muted enabled:hover:border-accent disabled:opacity-45"
+          className="ml-auto flex shrink-0 items-center gap-1 self-center rounded-md border border-line-2 bg-panel-2
+            px-2.5 py-1 text-[12.5px] font-semibold whitespace-nowrap text-ink enabled:hover:border-accent
+            enabled:hover:bg-panel-3 disabled:opacity-45"
         >
-          🔄 {portrait ? "" : t("ui.projects.reroll")}
-          <ResourceText>{`${projectRerollMoney(meta)}$ + ⚡`}</ResourceText>
+          <span aria-hidden="true">🔄</span>
+          {portrait ? "" : t("ui.projects.reroll")}
+          <span className="text-money"><ResourceText>{`${projectRerollMoney(meta)}$`}</ResourceText></span>
+          <span className="text-ink-muted">+ <ResourceText>⚡</ResourceText></span>
         </button>
+        <ConfirmModal
+          open={confirmReroll}
+          onClose={() => setConfirmReroll(false)}
+          onConfirm={() => reroll.kind === "ready" && onAction(reroll.action)}
+          title={t("ui.projects.rerollTitle")}
+          price={t("ui.projects.rerollPrice", { money: projectRerollMoney(meta) })}
+          confirmLabel={t("ui.projects.rerollConfirm")}
+        >
+          {t("ui.projects.rerollHint")}
+        </ConfirmModal>
       </div>
 
       {/* 90% ширины: проектов всегда четыре, и на всю колонку карточки растягивались

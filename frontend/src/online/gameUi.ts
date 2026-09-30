@@ -179,6 +179,13 @@ export function scoreOf(game: GameState, player: PlayerState): number {
   return game.final_scores?.[player.id] ?? game.score_breakdown?.[player.id]?.total ?? 0;
 }
 
+/** Места за столом, как их считает движок: при равных очках выше тот, у кого больше проектов. */
+export function rankPlayers(game: GameState): PlayerState[] {
+  return [...game.players].sort(
+    (a, b) => scoreOf(game, b) - scoreOf(game, a) || b.projects.length - a.projects.length,
+  );
+}
+
 // Scoring rates come from the engine via `/meta`; the fallbacks only cover a stale cached meta.
 // Scoring rates come from the engine via `/meta`; the fallbacks only cover a stale cached meta.
 export function moneyPerPoint(meta: CityMeta): number {
@@ -801,7 +808,7 @@ export function forecastRows(row: Record<string, number> | undefined): ForecastR
 export function buildGameLogMarkdown(room: RoomView, meta: CityMeta, version: string): string {
   const game = room.game;
   if (!game) return "";
-  const ranked = [...game.players].sort((a, b) => scoreOf(game, b) - scoreOf(game, a));
+  const ranked = rankPlayers(game);
   const lines = [
     tg("log.title", { name: room.name }),
     "",

@@ -1,6 +1,7 @@
 import { tr } from "../../i18n";
 import * as Dialog from "@radix-ui/react-dialog";
 import type { ReactNode } from "react";
+import { ResourceText } from "./ResourceIcon";
 
 /* Модалка — для того, чему поповера мало: хроника, правила, финальный счёт.
  * Как и с поповером, Radix здесь единственное место, знающее про библиотеку.
@@ -45,6 +46,62 @@ export function Modal({
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+  );
+}
+
+/* Подтверждение дорогого действия. Отдельное окно, а не второй клик по той же кнопке:
+ * случайный двойной клик не должен проходить, а игрок успевает прочитать цену. */
+export function ConfirmModal({
+  open,
+  onClose,
+  onConfirm,
+  title,
+  price,
+  confirmLabel,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  /** Строка с ценой — выделяется отдельно, ради неё окно и показывают. */
+  price: string;
+  confirmLabel: string;
+  children: ReactNode;
+}) {
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={title}
+      width={420}
+      footer={
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-line bg-panel-2 px-3 py-1.5 text-[13px] hover:bg-panel-3"
+          >
+            {tr("game", "ui.common.cancel")}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onConfirm();
+              onClose();
+            }}
+            className="primary-button rounded-md px-3.5 py-1.5 text-[13px] font-semibold"
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      }
+    >
+      <div className="grid gap-2 text-[13px]">
+        <p>{children}</p>
+        <p className="font-semibold text-ink"><ResourceText>{price}</ResourceText></p>
+      </div>
+    </Modal>
   );
 }
 

@@ -1925,16 +1925,16 @@ def test_one_token_answers_a_takeover_a_leak_and_a_scandal() -> None:
     # The deed leads, the fallout follows: «использует силу» and then «отражает атаку Крышей».
     assert [event.type for event in state.event_log[-2:]] == ["role_power_used", "targeted_effect_blocked"]
 
-    # A role takeover: the token goes, the attacker's influence comes back.
+    # A role takeover is not absorbed at all: while the token stands the seat cannot be bought.
     state = make_state()
     attacker = state.current_player
     holder = rival_of(state, attacker)
     holder.role = "capitalist"
     holder.roofs = 1
     attacker.influence = 30
-    state = run(engine, state, "claim_role", {"role_id": "capitalist"})
-    attacker, holder = state.player_by_id(attacker.id), state.player_by_id(holder.id)
-    assert (holder.role, holder.roofs, attacker.influence) == ("capitalist", 0, 30)
+    with pytest.raises(IllegalActionError, match="roof protects the role"):
+        run(engine, state, "claim_role", {"role_id": "capitalist"})
+    assert (holder.role, holder.roofs, attacker.influence) == ("capitalist", 1, 30)
 
     # And the compromat leak, which needs no card of its own.
     state = make_state()
@@ -2187,7 +2187,7 @@ ROLE_POWER_KEYWORDS = {
     "mafia_lock": "Серая метка",
     "military_sanction": "Санкц",
     "military_inspection": "Проверка",
-    "military_roof_seize": "Отобрать Крышу",
+    "military_roof_seize": "Отобрать Защиту",
 }
 
 
@@ -2265,3 +2265,48 @@ def test_owned_yields_add_up_to_the_objects_row() -> None:
     yields = [engine.owned_yield(state, player, owned) for owned in player.assets]
     forecast = engine.round_forecast(state, player)
     assert sum(item["money"] for item in yields) == forecast["money"]["objects"]
+
+
+def test_a_grey_mark_holds_through_the_next_round() -> None:
+    """The mark lasts until the end of the round after the one it was placed in."""
+    engine = CityEngine()
+    state = make_state()
+    mafia = state.current_player
+    rival = rival_of(state, mafia)
+    mafia.role = "mafia"
+    mafia.roofs = 1
+    placed_in = state.round_number
+    uid = state.market[-1].uid
+    state = run(engine, state, "use_role_power", {"power": "mafia_lock", "market_uid": uid})
+    item = next(entry for entry in state.market if entry.uid == uid)
+    rival = state.player_by_id(rival.id)
+
+    assert item.locked_round == placed_in + 1
+    assert engine.market_locked_for(state, item, rival)
+    state.round_number = placed_in + 1
+    assert engine.market_locked_for(state, item, rival)
+    state.round_number = placed_in + 2
+    assert not engine.market_locked_for(state, item, rival)
+
+
+def test_a_tie_goes_to_whoever_took_more_city_projects() -> None:
+    engine = CityEngine()
+    state = make_state()
+    first, second = state.players
+    for player in state.players:
+        player.money = player.influence = player.scandals = 0
+        player.assets = []
+        player.role = None
+        player.bonus_points = 0
+    project_ids = list(state.project_board[:3])
+    points = [engine.project(project_id).points for project_id in project_ids]
+    # Same score, different number of projects: one big project against two smaller ones.
+    first.projects = [project_ids[0]]
+    second.projects = project_ids[1:3]
+    first.bonus_points = sum(points[1:3]) - points[0] if sum(points[1:3]) > points[0] else 0
+    second.bonus_points = points[0] - sum(points[1:3]) if points[0] > sum(points[1:3]) else 0
+    assert engine.score(first) == engine.score(second)
+
+    assert engine.ranking(state)[0].id == second.id
+    state.players.reverse()
+    assert engine.ranking(state)[0].id == second.id

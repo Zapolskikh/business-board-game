@@ -15,6 +15,12 @@ import { themes, type ThemeId } from "../themes";
 const Icon = ({ src }: { src: string | undefined }) =>
   src ? <img src={src} alt="" className="size-4 shrink-0" /> : null;
 
+/* Корона тяжелее снизу, чем монеты: по геометрическому центру она читается ниже соседа,
+ * поэтому в строке с деньгами её поднимаем на пиксель. */
+const Crown = () => (
+  <img src={statIcon("influence")} alt="" className="size-4 shrink-0 -translate-y-px" />
+);
+
 type ButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
   children: ReactNode;
   label: string;
@@ -49,11 +55,11 @@ const HudStat = forwardRef<HTMLButtonElement, ButtonProps>(function HudStat(
       ref={ref}
       type="button"
       aria-label={label}
-      className={`grid min-w-0 content-center gap-px px-2.5 py-1 text-left hover:bg-panel-3 ${className}`}
+      className={`grid min-w-0 content-center gap-0.5 px-3 py-1.5 text-left hover:bg-panel-3 ${className}`}
       {...rest}
     >
-      <span className="text-[8px] font-semibold uppercase tracking-[0.1em] text-ink-dim">{label}</span>
-      <span className="flex items-center gap-1.5 whitespace-nowrap text-[12.5px] font-bold">{children}</span>
+      <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-ink-dim">{label}</span>
+      <span className="flex items-center gap-2 whitespace-nowrap text-[14px] leading-none font-bold">{children}</span>
     </button>
   );
 });
@@ -134,8 +140,8 @@ export function Header({
         data-ui="player-hud"
         /* Пергамент с золотой каймой — «табличка» игрока, как карточки на столе. Токены
          * `.game-card` переводят текст и цвета смысла на тёмные, под бумагу. */
-        className="game-card hud-plate flex min-w-0 max-w-[780px] items-stretch justify-self-center overflow-hidden
-          rounded-lg"
+        className="game-card hud-plate flex min-w-0 max-w-[780px] items-stretch self-stretch justify-self-center
+          overflow-hidden rounded-lg"
       >
         {dashboard()}
       </div>
@@ -190,14 +196,14 @@ export function Header({
   function dashboard() {
     return (
       <>
-        <div className="flex min-w-[112px] items-center gap-2 px-2.5 py-1">
-          <span className="player-card-avatar grid size-7 shrink-0 place-items-center rounded-full
+        <div className="flex min-w-[120px] items-center gap-2 px-3 py-1.5">
+          <span className="player-card-avatar grid size-8 shrink-0 place-items-center rounded-full
             [--player-color:#c9a55a] [border-width:2px]">
-            <img src={roleIcon(me.role ?? undefined)} alt="" className="size-[18px]" />
+            <img src={roleIcon(me.role ?? undefined)} alt="" className="size-5" />
           </span>
           <span className="grid min-w-0 gap-px">
-            <span className="text-[8px] font-semibold uppercase tracking-[0.1em] text-ink-dim">{t("ui.header.yourRole")}</span>
-            <b className="overflow-hidden text-ellipsis whitespace-nowrap text-[11.5px] text-ink">
+            <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-ink-dim">{t("ui.header.yourRole")}</span>
+            <b className="overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-ink">
               {role?.title ?? t("ui.header.noRole")}
             </b>
           </span>
@@ -209,22 +215,19 @@ export function Header({
         <Sep />
         <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
           <HudStat label={t("ui.header.resources")}>
-            <span className="flex items-center gap-0.5 text-money"><ResourceText>{`${me.money}$`}</ResourceText></span>
-            <span className="flex items-center gap-0.5 text-influence"><Icon src={statIcon("influence")} />{me.influence}</span>
+            <span className="flex items-center gap-0.5 text-money">{me.money}<Icon src={statIcon("money")} /></span>
+            <span className="flex items-center gap-0.5 text-influence">{me.influence}<Crown /></span>
           </HudStat>
         </CardPopover>
         <Sep />
         <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
           <HudStat label={t("ui.header.income")}>
-            <span className="text-money"><ResourceText>{`+${income?.money.total ?? 0}$`}</ResourceText></span>
-            <span className="text-influence"><ResourceText>{`+${income?.influence.total ?? 0}◆`}</ResourceText></span>
-          </HudStat>
-        </CardPopover>
-        <Sep />
-        <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
-          <HudStat label={t("ui.header.city")}>
-            <span className="text-good">▦ {me.assets.length}/{me.capacity}</span>
-            <span className="text-points">🏛 {me.projects.length}</span>
+            <span className="flex items-center gap-0.5 text-money">
+              +{income?.money.total ?? 0}<Icon src={statIcon("money")} />
+            </span>
+            <span className="flex items-center gap-0.5 text-influence">
+              +{income?.influence.total ?? 0}<Crown />
+            </span>
           </HudStat>
         </CardPopover>
         <Sep />

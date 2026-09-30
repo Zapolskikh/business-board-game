@@ -8,14 +8,17 @@ against an agreement its players never made. Every bump and the reasoning behind
 
 SCHEMA_VERSION = 1
 
-# Bumped whenever a rule changes what a snapshot means. 1.14.0: zoning now opens the mafia racket
-# and the politician's deal (active powers read the rented district, role passives still do not),
-# and the city tender picks the largest district itself instead of asking.
-RULES_VERSION = "city-1.14.0"
+# Bumped whenever a rule changes what a snapshot means. 1.15.0: a holder with a Крыша cannot be
+# bought out of their role at all, the mafia's grey mark lasts through the next round, and a tie
+# goes to whoever took more city projects.
+RULES_VERSION = "city-1.15.0"
 
 # Bumped whenever the catalog changes, even if no rule moved: card texts are part of the agreement
-# too. 2026-09-30: removed the unsupported cash-exchange purchase payout.
-CONTENT_VERSION = "city-content-2026-09-30"
+# too. 2026-09-30: removed the unsupported cash-exchange purchase payout. 2026-09-30b: «Судебный
+# запрет» no longer promises to absorb a takeover — a Крыша now closes the seat instead.
+# 2026-10-01: «Крыша» is «Защита» in every Russian text; round-scaled cards say «номер раунда»
+# (which is what the engine always added) instead of «за каждый прошедший раунд».
+CONTENT_VERSION = "city-content-2026-10-01"
 
 DISTRICT_IDS = (
     "residential",

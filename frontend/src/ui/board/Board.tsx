@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useThemeStyle } from "../lib/theme";
-import { scoreOf } from "../../online/gameUi";
+import { rankPlayers, scoreOf } from "../../online/gameUi";
 import type { CityMeta, GameState, LegalAction } from "../../online/types";
 import { ActionsPanel } from "../actions/ActionsPanel";
 import { CityPanel } from "../city/CityPanel";
@@ -74,7 +74,7 @@ export function BoardView({
   const { briefing, close: closeBriefing } = useTurnBriefing(game, context.me, meta);
 
   const ranking = useMemo(
-    () => [...game.players].sort((left, right) => scoreOf(game, right) - scoreOf(game, left)),
+    () => rankPlayers(game),
     [game],
   );
 

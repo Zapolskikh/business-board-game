@@ -16,7 +16,7 @@ POWER_LABELS = {
     "mafia_racket": "рэкет",
     "mafia_cleanup": "замять дело",
     "military_sanction": "санкции",
-    "military_roof_sweep": "массовая зачистка крыш",
+    "military_roof_sweep": "массовая зачистка защиты",
     "fraudster_cleanup": "очистка следов",
     "fraudster_crypto_scam": "криптоскам",
 }
@@ -47,7 +47,7 @@ FREE_POWERS = frozenset(
 GREY_LABELS = {
     "smear": "вброс: скандал каждому сопернику",
     "crypto": "памп и дамп: забрать деньги у всех соперников",
-    "roof_break": "пробить крышу: снять всю защиту цели",
+    "roof_break": "пробить защиту: снять всю защиту цели",
     "datacenter": "взлом: украсть влияние у цели",
     "influence_broker": "слив компромата: снять роль с цели",
 }
@@ -373,7 +373,7 @@ def describe_event(event: dict[str, Any], game: dict[str, Any], catalog: Catalog
         # the generic key=value tail.
         role_id = data.get("role_id")
         lost = f"роль {catalog.role_title(str(role_id))} потеряна" if role_id else "роли уже не было"
-        jail = ", арест: следующий ход укорочен, скандалы сброшены до 3⚠, Крыша снята" if data.get("jailed") else ""
+        jail = ", арест: следующий ход укорочен, скандалы сброшены до 3⚠, Защита снята" if data.get("jailed") else ""
         return f"{head} набрал {data.get('limit')}⚠ — {lost}{jail}"
     if kind == "game_finished":
         scores = data.get("scores") or {}
@@ -571,7 +571,7 @@ def render_state(
         f"{int(row['spend'])}$→{int(row['gain'])}◆" for row in catalog.scoring.get("campaign_tiers") or []
     )
     lines.append(
-        f"    цены сейчас: Крыша {roof_price(game, me)}$ · "
+        f"    цены сейчас: Защита {roof_price(game, me)}$ · "
         f"две карты {card_cost}$+1◆ и действие · "
         f"пересборка доски проектов {project_reroll}$ и действие · "
         + (f"кампания {tiers} за одно действие · " if tiers else "")

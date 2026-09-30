@@ -47,7 +47,7 @@
     "mafia_cleanup": { "label": "Ututlat", "what": "Smaže najednou dva vaše skandály. Potřebujete podnik ve Vládní čtvrti.", "cost": "akce + 3$" },
     "mafia_lock": {
       "label": "Šedá blokace",
-      "what": "Blokace na kartu z trhu: do konce kola ji nikdo kromě vás nekoupí. Blokaci máte jen jednu: nová přesune tu starou. Zruší ji nové kolo nebo nové rozdání slotu Tvůrcem trhu. Všichni ji vidí.",
+      "what": "Blokace na kartu z trhu: do konce příštího kola ji nikdo kromě vás nekoupí. Blokaci máte jen jednu: nová přesune tu starou. Zruší ji konec příštího kola, odchod karty z trhu nebo nové rozdání slotu Tvůrcem trhu. Všichni ji vidí.",
       "cost": "1 Ochrana, bez akce, jednou za tah"
     },
     "military_sanction": {
@@ -174,7 +174,7 @@
     "roofSeized": " bere Ochranu hráči ",
     "roofSeizedTail": "; teď má Ochran: ",
     "marketClaimed": " zabírá „{{title}}“: karta pracuje pro něj, ale pořád jde koupit",
-    "marketLocked": " dává šedou blokaci na „{{title}}“: do konce kola ji nikdo jiný nekoupí",
+    "marketLocked": " dává šedou blokaci na „{{title}}“: do konce příštího kola ji nikdo jiný nekoupí",
     "marketRefreshed": " znovu rozdává místo na trhu: „{{title}}“ jde pod balíček",
     "vetoed": " dává veto na „{{title}}“",
     "crisisPr": " krizové PR (",
@@ -362,7 +362,9 @@
       "titleShort": "Projekty", "title": "Městské projekty", "mine": "vaše: {{count}} · {{points}} b.",
       "none": "zatím nemáte žádný projekt", "rerolled": "Deska už byla v tomto tahu znovu rozdána",
       "rerollHint": "Všechny čtyři projekty jdou zpět do balíčku a vyjdou čtyři nové. Deska je společná — mění se všem.",
-      "reroll": "Znovu rozdat · ", "details": "{{title}} — podrobnosti",
+      "reroll": "Znovu rozdat · ",
+      "rerollTitle": "Znovu rozdat desku projektů?", "rerollPrice": "Cena: {{money}}$ a jedna akce. Nelze vrátit zpět.",
+      "rerollConfirm": "Znovu rozdat", "details": "{{title}} — podrobnosti",
       "empty": "Ve městě došly projekty.", "vetoMine": "Vaše veto: projekt je pro ostatní zavřený",
       "vetoTheirs": "Veto Politika: tento projekt může vzít jen on", "leaving": "Odchází na konci kola",
       "points": "{{count}} b.", "ptsShort": "b.", "onlyPoints": "Jen vítězné body", "condition": "Podmínka: ",
@@ -388,7 +390,9 @@
       "title": "Moje město", "metaShort": "{{used}}/{{capacity}} · celkem {{total}}",
       "meta": "{{used}} / {{capacity}} obsazeno · celkem {{total}} míst · prodej nestojí akci, dostanete polovinu ceny",
       "details": "{{title}} — podrobnosti", "slot": "Místo {{number}}", "free": "Volné", "openSlot": "Otevřít místo",
-      "openPrevious": "Nejdřív otevřete předchozí místo", "lockedSlot": "🔒 Místo {{number}}", "open": "Otevřít · ",
+      "openPrevious": "Nejdřív otevřete předchozí místo",
+      "openTitle": "Otevřít místo {{number}}?", "openHint": "Místo natrvalo rozšíří vaše město: můžete do něj postavit další podnik.",
+      "openPrice": "Cena: {{money}}$ a jedna akce. Peníze se nevracejí.", "openConfirm": "Otevřít místo", "lockedSlot": "🔒 Místo {{number}}", "open": "Otevřít · ",
       "district": "čtvrť {{count}}/4", "districtTitle": "Vaše podniky v této čtvrti. Synergie začíná při 2 a při 4.",
       "sellTitle": "Prodat za {{value}}$ — nestojí akci", "districtRow": "Čtvrť",
       "districtValue": "{{icon}} {{title}} · máte {{count}} ze 4", "incomeRow": "Příjem",
@@ -403,7 +407,7 @@
       "leaving": "odchází", "leavingTitle": "Toto místo odchází na konci kola", "claimMine": "váš zábor",
       "claim": "zábor", "claimMineTitle": "Váš zábor: karta už pracuje pro vás",
       "claimTitle": "Zábor Kapitalisty: karta pracuje pro něj", "locked": "blokováno", "lockedMine": "vaše blokace",
-      "lockedTitle": "Šedá blokace Mafiána: do konce kola může toto místo koupit jen on",
+      "lockedTitle": "Šedá blokace Mafiána: do konce příštího kola může toto místo koupit jen on",
       "district": "čtvrť {{count}}/4", "districtTitle": "Vaše podniky v této čtvrti. Synergie začíná při 2 a při 4.",
       "details": "{{title}} — podrobnosti", "districtRow": "Čtvrť", "districtValue": "máte {{count}} ze 4",
       "priceRow": "Cena", "scoreRow": "Body", "saleRow": "Prodejní cena", "incomeRow": "Příjem", "perRound": "za kolo",
@@ -450,7 +454,7 @@
     "roles": {
       "title": "Role ve městě", "free": "Volných {{free}} z {{total}}", "priceStart": "Volná role stojí ",
       "priceMiddle": ", vzít roli jinému hráči stojí ", "priceEnd": ". Vzít roli stojí jednu akci.",
-      "roofNote": "Ochrana držitele převzetí zastaví: vliv se vám vrátí, ale akce propadne a držiteli se spotřebuje Ochrana.",
+      "roofNote": "Dokud má držitel Ochranu, jeho roli vzít nelze. Nejdřív mu Ochranu odeberte.", "protected": "Chráněno Ochranou",
       "mine": "Vaše role", "holder": "Má ji {{name}}", "freeState": "Volná", "already": "Už je vaše", "take": "Vzít roli",
       "pick": "Vybrat roli", "unavailable": "Teď ne", "passive": "Bonusy", "powers": "Schopnosti", "working": "Teď funguje · {{role}}",
       "noRole": "Nemáte roli. Na začátku každého tahu jeden skandál sám zmizí, ale bonusy a schopnosti role nemáte."
@@ -470,7 +474,7 @@
       "savedMd": "Záznam uložen (.md)", "savedJson": "Celý záznam uložen (.json) — hru jde zopakovat", "unavailable": "Záznam není dostupný",
       "rail": "Kronika", "railNew": "{{count}} nových · otevřít", "railAll": "{{count}} událostí · otevřít", "railOpen": "Otevřít celou kroniku"
     },
-    "common": { "spent": "už v tomto tahu", "close": "Zavřít", "details": "Podrobnosti" },
+    "common": { "spent": "už v tomto tahu", "close": "Zavřít", "details": "Podrobnosti", "cancel": "Zrušit" },
     "block": {
       "finished": "Hra skončila", "turnOf": "Teď hraje {{name}}", "notYourTurn": "Teď nejste na tahu",
       "jailed": "Zatčení: v tomto tahu jen 1 akce", "noActions": "V tomto tahu už nemáte akce", "unavailable": "Teď nedostupné"

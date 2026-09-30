@@ -40,8 +40,10 @@ export const roleIcon = (role: string | undefined): string | undefined =>
 
 export type ResourceIcon = "money" | "influence" | "actions" | "scandal" | "roof" | "score";
 
+/* Очки везде рисуются лавровым венком с карточек проектов: медаль из листа игроков
+ * читалась как ещё одна монета рядом с деньгами. */
 export const statIcon = (stat: ResourceIcon): string | undefined =>
-  art(`stat-${stat}`);
+  stat === "score" ? art("project-icon-points") : art(`stat-${stat}`);
 
 export const playerFrame = art("player-frame");
 

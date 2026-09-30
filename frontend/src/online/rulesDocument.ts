@@ -14,7 +14,9 @@ import {
   rarityLabels,
   tagLabel,
 } from "./gameUi";
-import { projectArt, projectIcon, projectKind, statIcon } from "../ui/assets/cards";
+import { projectArt, projectIcon, projectKind, roleIcon, statIcon } from "../ui/assets/cards";
+import { rulesShot, type RulesShot } from "../ui/assets/rules";
+import { annotateTerms } from "./rulesTerms";
 import { resourceIconsInHtml } from "../ui/primitives/ResourceIcon";
 import { bookRu } from "./rules/ru";
 import { bookEn } from "./rules/en";
@@ -117,6 +119,12 @@ export interface RulesContext {
   list: (items: string[], and: string) => string;
   selfTargetCards: string[];
   html: {
+    /** Скриншот интерфейса во всю ширину страницы. */
+    shot: (name: RulesShot, alt: string) => string;
+    /** Скриншот слева, относящийся к нему текст справа. */
+    figure: (name: RulesShot, alt: string, body: string) => string;
+    /** Маленький скриншот прямо в строке текста: кнопка, цена, молнии действий. */
+    inlineShot: (name: RulesShot, alt: string) => string;
     rarityLadder: (labels: TableLabels) => string;
     districtRoles: () => string;
     assetTables: (labels: TableLabels) => string;
@@ -147,16 +155,25 @@ function context(meta: CityMeta, rolePrice: number): RulesContext {
   const districtTitle = (id: string) => meta.districts.find(district => district.id === id)?.title ?? id;
   const scoring = meta.scoring;
 
+  const roleBadge = (role: RoleMeta): string => {
+    const src = roleIcon(role.id);
+    return src ? `<img class="rules-role-badge" src="${e(src)}" alt="">` : e(role.icon);
+  };
+  const shotImg = (name: RulesShot, alt: string, className: string): string => {
+    const src = rulesShot(name);
+    return src ? `<img class="${className}" src="${e(src)}" alt="${e(alt)}">` : "";
+  };
+
   const roleCard = (role: RoleMeta, guide: RoleGuide | undefined, labels: TableLabels): string => {
     if (!guide) {
       return `<article class="role-card" style="--role:${e(role.color)}">
-        <header class="role-card-head"><h3>${e(role.icon)} ${e(role.title)}</h3></header>
+        <header class="role-card-head"><h3>${roleBadge(role)} ${e(role.title)}</h3></header>
         <p>${e(role.passive)}</p><p>${e(role.power)}</p></article>`;
     }
     const heads = labels.roleHeads;
     return `
     <article class="role-card" style="--role:${e(role.color)}">
-      <header class="role-card-head"><h3>${e(role.icon)} ${e(role.title)}</h3><p>${guide.style}</p></header>
+      <header class="role-card-head"><h3>${roleBadge(role)} ${e(role.title)}</h3><p>${guide.style}</p></header>
       <div class="role-details">
         <div class="role-perks"><h4>${heads.perks}</h4><ul>${guide.perks.map(perk => `<li>${perk}</li>`).join("")}</ul></div>
         <div class="role-powers-guide"><h4>${heads.powers}</h4>${guide.powers.map(power => `
@@ -202,6 +219,15 @@ function context(meta: CityMeta, rolePrice: number): RulesContext {
     list: listJoin,
     selfTargetCards: meta.action_cards.filter(card => card.self_target).map(card => `«${e(card.title)}»`),
     html: {
+      shot: (name, alt) => {
+        const img = shotImg(name, alt, "rules-shot");
+        return img ? `<figure class="rules-shot-figure">${img}</figure>` : "";
+      },
+      figure: (name, alt, body) => {
+        const img = shotImg(name, alt, "rules-shot");
+        return img ? `<figure class="rules-figure">${img}<div>${body}</div></figure>` : `<div>${body}</div>`;
+      },
+      inlineShot: (name, alt) => shotImg(name, alt, "rules-inline-shot"),
       rarityLadder: labels =>
         `<ul class="rarity-ladder">${Object.keys(rarityOrder)
           .map(rarity => {
@@ -315,9 +341,9 @@ const books: Record<string, (ctx: RulesContext) => RulesChapter[]> = { ru: bookR
 
 /** Книга на текущем языке игры. */
 export function buildRulesBook(meta: CityMeta, rolePrice: number): RulesChapter[] {
-  const build = books[i18next.language] ?? books.en;
-  return build(context(meta, rolePrice)).map(chapter => ({
+  const language = books[i18next.language] ? i18next.language : "en";
+  return books[language](context(meta, rolePrice)).map(chapter => ({
     ...chapter,
-    html: resourceIconsInHtml(chapter.html),
+    html: resourceIconsInHtml(annotateTerms(chapter.html, language, meta)),
   }));
 }

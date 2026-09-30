@@ -224,6 +224,7 @@ class CityEngine:
                     Command(type="claim_role", actor_id=actor_id, payload={"role_id": role_id})
                     for role_id in ROLE_IDS
                     if self.role_holder(state, role_id) is not player
+                    and not self.role_protected(state, role_id)
                     and player.influence
                     >= (state.role_price * 3 if self.role_holder(state, role_id) else state.role_price)
                 )
@@ -456,6 +457,16 @@ class CityEngine:
         rule in the engine two ways to be true and the client two role fields to render.
         """
         return player.role == role_id
+
+    def role_protected(self, state: GameState, role_id: str) -> bool:
+        """Is this seat closed to a takeover? A holder with a Крыша cannot be bought out at all.
+
+        Not an attack the token absorbs: an absorbed takeover still cost the attacker an action and
+        the holder the token, which made buying a seat a coin toss on the holder's defence. Now the
+        defence is face-up and decisive — strip the Крыша first, then take the role.
+        """
+        holder = self.role_holder(state, role_id)
+        return holder is not None and holder.roofs > 0
 
     @staticmethod
     def role_holder(state: GameState, role_id: str) -> PlayerState | None:
@@ -700,7 +711,8 @@ class CityEngine:
     def roof_limit(self, player: PlayerState) -> int:
         """How many Крыша tokens a player may hold at once.
 
-        One, because a token absorbs a takeover, a leak or a scandal and is deliberately scarce.
+        One, because a token absorbs a leak or a scandal, closes the seat to a takeover, and is
+        deliberately scarce.
         The Мафия keeps its extra one — protection is the role's whole theme.
         """
         return (2 if self.has_role(player, "mafia") else 1) + self.effect_total(player, "roofCapacity")
@@ -978,20 +990,14 @@ class CityEngine:
         # value at which every rule in the engine says the seat is already lost.
         if player.scandals >= BASE_SCANDAL_LIMIT:
             raise IllegalActionError("a player at the scandal limit cannot claim a role")
+        if self.role_protected(state, role_id):
+            raise IllegalActionError("the holder's roof protects the role")
         cost = state.role_price * 3 if holder else state.role_price
         if player.influence < cost:
             raise IllegalActionError("not enough influence for the role")
         self._spend_action(state)
         player.influence -= cost
 
-        # A blocked takeover costs the attempt (the action) and the defender's token, but the
-        # influence comes back: paying full price for nothing was a silent 3-point tax, and in the
-        # arena game it decided a match that finished four points apart.
-        if holder and holder.roofs > 0:
-            holder.roofs -= 1
-            player.influence += cost
-            state.append_event("role_takeover_blocked", player.id, role_id=role_id, by="roof", refund=cost)
-            return
         if holder:
             compensation = sum(
                 int(self.owned_definition(asset).effects.get("takeoverCompensation", 0)) for asset in holder.assets
@@ -1654,8 +1660,9 @@ class CityEngine:
     def market_locked_for(self, state: GameState, item: MarketAsset, player: PlayerState) -> bool:
         """Is this slot closed to this buyer by the mafia's grey mark?
 
-        One round, counted from the round it was placed in: the mark is a tempo weapon, and a
-        lock that outlived the market rotation would just delete the slot.
+        Until the end of the round after the one it was placed in: a mark that expired at the end
+        of its own round bought nothing once the mafia had moved late in the order. The market
+        rotation still takes the card, and the mark with it, if the slot is among the oldest.
         """
         if not item.locked_by or item.locked_by == player.id:
             return False
@@ -1697,7 +1704,7 @@ class CityEngine:
         )
 
     def _mafia_lock(self, state: GameState, command: Command) -> None:
-        """Put a grey mark on a market card: nobody but the mafia may buy it for a round.
+        """Put a grey mark on a market card: nobody but the mafia may buy it until next round ends.
 
         Costs a Крыша rather than an action — the role's currency is protection, and spending it
         on denial is the trade. Free of the action clock, so it is capped at one a turn instead,
@@ -1720,7 +1727,7 @@ class CityEngine:
                 entry.locked_by = None
                 entry.locked_round = 0
         item.locked_by = player.id
-        item.locked_round = state.round_number
+        item.locked_round = state.round_number + 1
         state.append_event(
             "market_locked",
             player.id,
@@ -2976,4 +2983,7 @@ class CityEngine:
         return sum(self.project(project_id).points for project_id in player.projects)
 
     def ranking(self, state: GameState) -> list[PlayerState]:
-        return sorted(state.players, key=self.score, reverse=True)
+        """Standings, best first. Equal scores go to whoever took more city projects: the board
+        is the contested race of the game, so winning more of it is the fairer tie-break than the
+        seating order a plain stable sort fell back to."""
+        return sorted(state.players, key=lambda player: (self.score(player), len(player.projects)), reverse=True)

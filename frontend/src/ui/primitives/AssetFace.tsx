@@ -171,6 +171,7 @@ export function AssetFace({
     );
   }
 
+  const leaving = bullets.find(bullet => bullet.key === "leaving");
   const ribbon = rarityRibbon(asset.rarity);
   const gem = rarityIcon(asset.rarity);
   const rarity = rarityLabels[asset.rarity] ?? asset.rarity;
@@ -209,9 +210,9 @@ export function AssetFace({
       </span>
 
       {/* Теги слева, сноска о скрытых условиях — под лентой редкости. */}
-      <span className="flex min-w-0 items-center gap-1 overflow-hidden text-3xs">
+      <span className="flex min-w-0 items-center gap-1 overflow-hidden text-[11px]">
         {asset.tags.map(tag => (
-          <span key={tag} className="asset-tag shrink-0 rounded-full px-1.5 font-semibold text-ink-muted">
+          <span key={tag} className="asset-tag shrink-0 rounded-full px-2 font-semibold text-ink-muted">
             {tagLabel(tag)}
           </span>
         ))}
@@ -230,7 +231,7 @@ export function AssetFace({
       <span className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-1.5">
         <span className="asset-fields grid min-h-0 min-w-0 grid-cols-2 grid-rows-2 overflow-hidden rounded-md">
           <Field icon={statIcon("money")} empty={income.money === 0} title={t("ui.asset.moneyTitle")} label={t("ui.asset.moneyEmpty")}>
-            <b className="text-[13px] text-money">{signed(income.money, "")}</b>
+            <b className="text-[14px] text-money">{signed(income.money, "")}</b>
             <small>{t("ui.asset.perRound")}</small>
           </Field>
           <Field
@@ -240,7 +241,7 @@ export function AssetFace({
             label={t("ui.asset.oneTime")}
             title={owned ? t("ui.asset.oneTimeOwned") : t("ui.asset.oneTimeMarket")}
           >
-            <b className="min-w-0 overflow-hidden text-ellipsis text-[12px] text-influence">
+            <b className="min-w-0 overflow-hidden text-ellipsis text-[13px] text-influence">
               {summary.oneTime.length ? (
                 <>
                   {summary.oneTimeInfluence !== 0 && signed(summary.oneTimeInfluence, "")}
@@ -258,7 +259,7 @@ export function AssetFace({
             </small>
           </Field>
           <Field icon={statIcon("influence")} empty={income.influence === 0} title={t("ui.asset.influenceTitle")} label={t("ui.asset.influenceEmpty")}>
-            <b className="text-[13px] text-influence">{signed(income.influence, "")}</b>
+            <b className="text-[14px] text-influence">{signed(income.influence, "")}</b>
             <small>{t("ui.asset.perRound")}</small>
           </Field>
           <Field
@@ -267,43 +268,28 @@ export function AssetFace({
             label={t("ui.asset.unique")}
             title={summary.uniqueText.join("\n") || t("ui.asset.noUnique")}
           >
-            <b className="line-clamp-2 min-w-0 text-[10px] leading-[1.15] whitespace-normal text-[var(--color-badge)]">
+            <b className="line-clamp-2 min-w-0 text-[11px] leading-[1.15] whitespace-normal text-[var(--color-badge)]">
               {summary.unique.length ? <ResourceText>{summary.unique.join(" · ")}</ResourceText> : "—"}
             </b>
           </Field>
         </span>
 
-        {bullets.length > 0 && (
-          <ul className="grid content-center gap-0.5 text-3xs leading-tight">
-            {bullets.map(bullet => (
-              bullet.key === "leaving" ? (
-                <li key={bullet.key} title={bullet.title} aria-label={bullet.title} className="text-2xl font-black leading-none text-warning drop-shadow-[0_0_4px_rgba(221,163,109,0.8)]">
-                  {bullet.icon}
-                </li>
-              ) : (
-                <li
-                  key={bullet.key}
-                  title={bullet.title}
-                  className={`flex items-center gap-1 whitespace-nowrap font-semibold ${
-                    bullet.tone ? bulletTone[bullet.tone] : "text-ink-muted"
-                  }`}
-                >
-                  <span className="text-ink-dim">•</span>
-                  <span><ResourceText>{bullet.icon}</ResourceText></span>
-                  <ResourceText>{bullet.text}</ResourceText>
-                </li>
-              )
-            ))}
-          </ul>
+        {/* Справа только «уходит»: остальные пункты повторяли поля слева и подробности
+          * по нажатию, а в узкой колонке читались как шум. */}
+        {leaving && (
+          <span title={leaving.title} aria-label={leaving.title} className="self-center text-2xl font-black leading-none
+            text-warning drop-shadow-[0_0_4px_rgba(221,163,109,0.8)]">
+            {leaving.icon}
+          </span>
         )}
       </span>
 
       {/* Очки и район — нижняя строка карточки. */}
       <span className="asset-footer grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2 pt-1">
         <span className="flex items-center gap-1 whitespace-nowrap" title={t("ui.asset.pointsTitle")}>
-          {star && <img src={star} alt="" className="size-4" />}
-          <b className="card-serif text-[15px] leading-none">{points}</b>
-          <small className="text-2xs text-ink-muted">{t("ui.asset.points")}</small>
+          {star && <img src={star} alt="" className="size-[18px]" />}
+          <b className="card-serif text-[17px] leading-none">{points}</b>
+          <small className="text-[12px] font-semibold text-ink-muted">{t("ui.asset.points")}</small>
         </span>
         <span className="asset-district-badge flex min-w-0 items-center justify-end gap-1 overflow-hidden
           rounded-md border px-1.5 py-0.5 text-2xs font-semibold">
@@ -336,11 +322,11 @@ function Field({
       title={title}
       data-empty={empty || undefined}
       className={`asset-field flex min-w-0 items-center gap-1.5 overflow-hidden px-1.5 whitespace-nowrap
-        [&_small]:text-3xs [&_small]:font-semibold [&_small]:text-ink-dim ${empty || faded ? "opacity-45" : ""}`}
+        [&_small]:text-[11px] [&_small]:font-semibold [&_small]:text-ink-dim ${empty || faded ? "opacity-45" : ""}`}
     >
       {icon && <img src={icon} alt="" className={`size-[18px] shrink-0 ${empty ? "grayscale" : ""}`} />}
       {empty ? (
-        <b className="text-[12px] text-ink-dim">—</b>
+        <b className="text-[13px] text-ink-dim">—</b>
       ) : (
         <span className="flex min-w-0 items-baseline gap-1">{children}</span>
       )}

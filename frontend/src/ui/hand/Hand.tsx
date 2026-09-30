@@ -49,13 +49,13 @@ export function Hand({
           disabled={draw.kind !== "ready"}
           onClick={() => draw.kind === "ready" && onAction(draw.action)}
           title={draw.kind === "blocked" ? draw.reason : t("ui.hand.drawHint")}
-          className="grid gap-px rounded-md border border-good/60 bg-panel-2 px-[7px] py-[5px]
+          className="grid gap-px rounded-md border border-good/60 bg-panel-2 px-2 py-1.5
             enabled:hover:bg-panel-3 disabled:border-line disabled:opacity-45"
         >
-          <b className="text-[11.5px] text-good">{t("ui.hand.draw")}</b>
+          <b className="text-[14px] text-good">{t("ui.hand.draw")}</b>
           {/* Цена всегда на кнопке, а не вместо неё причина отказа: без цены нельзя
             * решить, копить ли на карты или на объект. Красным — тот ресурс, которого не хватает. */}
-          <small className="text-3xs text-ink-muted">
+          <small className="text-[11.5px] text-ink-muted">
             <b className={me.money < actionCardCost(meta) ? "font-bold text-bad" : "font-semibold text-money"}>
               <ResourceText>{`${actionCardCost(meta)}$`}</ResourceText>
             </b>{" "}
@@ -103,13 +103,13 @@ export function Hand({
                     data-ui="hand-card"
                     style={{ "--tone": toneColor[card.tone] ?? "#2d3d50" } as CSSProperties}
                     className="grid h-full w-full content-center gap-px rounded-md border border-line
-                      border-l-[3px] border-l-[var(--tone)] bg-panel-2 px-[7px] py-[5px] text-left
+                      border-l-[3px] border-l-[var(--tone)] bg-panel-2 px-2 py-1.5 text-left
                       hover:border-accent hover:border-l-[var(--tone)]"
                   >
-                    <b className="overflow-hidden text-ellipsis whitespace-nowrap text-[11.5px] font-semibold">
+                    <b className="overflow-hidden text-ellipsis whitespace-nowrap text-[14px] font-semibold">
                       {card.title}
                     </b>
-                    <small className="overflow-hidden text-ellipsis whitespace-nowrap text-3xs text-ink-muted">
+                    <small className="overflow-hidden text-ellipsis whitespace-nowrap text-[11.5px] text-ink-muted">
                       {preview ? (
                         <b className="font-semibold text-money">{t("ui.hand.now", { money: preview.money })}</b>
                       ) : (
@@ -126,7 +126,7 @@ export function Hand({
         {Array.from({ length: Math.max(0, 3 - hand.length) }).map((_, position) => (
           <div
             key={`empty-${position}`}
-            className="empty-slot grid place-content-center rounded-md text-2xs text-ink-dim"
+            className="empty-slot grid place-content-center rounded-md text-[12px] text-ink-dim"
           >
             {t("ui.hand.empty")}
           </div>

@@ -31,7 +31,7 @@
     "mafia": {
       "title": "Mobster",
       "passive": "Grey Sector businesses: +1$. Protection costs 1$ less, and you can hold 2, not 1.",
-      "power": "Racket (once per turn, 1 action, you need a Grey Sector business): take money and influence from the target; the target's Protection stops it. Hush it up: 1 action and 3$ → −2 scandals (you need a Government business). Grey hold (once per turn, 1 Protection, no action): until the end of the round, only you can buy a market slot."
+      "power": "Racket (once per turn, 1 action, you need a Grey Sector business): take money and influence from the target; the target's Protection stops it. Hush it up: 1 action and 3$ → −2 scandals (you need a Government business). Grey hold (once per turn, 1 Protection, no action): until the end of the next round, only you can buy a market slot."
     },
     "military": {
       "title": "Enforcer",
@@ -113,20 +113,20 @@
     "shadow_logistics": { "title": "Shadow Logistics Network", "text": "+1$ for each of these districts where you have a business: Industrial Zone, Tech Cluster, Government Quarter. Full district (4 businesses): +1◆ per round." }
   },
   "action_cards": {
-    "audit": { "title": "Surprise Audit", "text": "The target loses 4$ + 1$ for each round played. If they don't have enough money, they get a scandal." },
+    "audit": { "title": "Surprise Audit", "text": "The target loses (4 + round number)$. If they don't have enough money, they get a scandal." },
     "leak": { "title": "Data Leak", "text": "The target gets 1 scandal." },
-    "hostile": { "title": "Hostile Takeover", "text": "The target loses 3$, you get 2$. Both grow by 1$ for each round played." },
+    "hostile": { "title": "Hostile Takeover", "text": "The target loses (3 + round number)$, and you get the same amount." },
     "vote": { "title": "Vote of No Confidence", "text": "The role holder loses 3◆. If they don't have enough influence, they lose the role." },
     "controlled_leak": { "title": "Controlled Leak", "text": "You get 1 scandal, the target gets 2." },
     "blackmail": { "title": "Political Blackmail", "text": "The target loses 2◆, you get 1◆." },
     "leader_expose": { "title": "Expose the Leader", "text": "The target gets a scandal. If they are the leader, you get 2◆." },
-    "disinformation": { "title": "Fake News", "text": "The target loses 1◆ and 2$ + 1$ for each round played." },
+    "disinformation": { "title": "Fake News", "text": "The target loses 1◆ and (2 + round number)$." },
     "kompromat": { "title": "Dirt File", "text": "The target gets 2 scandals." },
     "surveillance": { "title": "Undercover Watch", "text": "The target gets 1 scandal." },
     "smear_campaign": { "title": "Smear Campaign", "text": "You get 1 scandal, the target gets 2." },
-    "grant": { "title": "Innovation Grant", "text": "Get 7$ + 1$ for each round played. If you have an AI business — also 1◆." },
+    "grant": { "title": "Innovation Grant", "text": "Get (7 + round number)$. If you have an AI business — also 1◆." },
     "bridge_loan": { "title": "Bridge Loan", "text": "Get 10$ now and pay back 4$ at the end of the round." },
-    "tender": { "title": "City Tender", "text": "2$ for each of your businesses in your biggest district (it is picked for you). At most 10$ + 1$ for each round played." },
+    "tender": { "title": "City Tender", "text": "2$ for each of your businesses in your biggest district (it is picked for you). At most (10 + round number)$." },
     "campaign": { "title": "Media Campaign", "text": "Spend 2$ and get 4◆." },
     "market_subsidy": { "title": "Investment Subsidy", "text": "Your next business this turn costs 4$ less." },
     "upgrade_subsidy": { "title": "Patron of the Arts", "text": "Pay 12$ and get +4 points in the final score. No slot needed." },
