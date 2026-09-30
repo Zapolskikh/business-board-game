@@ -70,7 +70,6 @@ export function Gallery() {
       <BoardView
         game={game}
         meta={meta}
-        roomName="фикстура"
         context={context}
         onAction={(action: LegalAction) =>
           window.alert(`Отправили бы на сервер:\n${JSON.stringify(action, null, 2)}`)

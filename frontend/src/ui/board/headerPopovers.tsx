@@ -1,9 +1,11 @@
 import { useTranslation } from "react-i18next";
+import type { ReactNode } from "react";
 import { forecastRows, influencePerPoint, moneyPerPoint } from "../../online/gameUi";
 import type { CityMeta, GameState, PlayerState } from "../../online/types";
 import { PopoverBody, PopoverHeader } from "../primitives/CardPopover";
 import { KeyValue } from "../primitives/atoms";
 import { roofPrice, scandalLimit } from "../lib/board";
+import { ResourceText } from "../primitives/ResourceIcon";
 
 /** Счёт и доход. Обе таблицы считает движок — клиент печатает подписи. */
 export function ScoreDetails({ game, me, meta }: { game: GameState; me: PlayerState; meta: CityMeta }) {
@@ -46,15 +48,15 @@ export function ScoreDetails({ game, me, meta }: { game: GameState; me: PlayerSt
             <KeyValue
               rows={[
                 ...forecastRows(forecast.money).map(
-                  row => [row.label, `${row.value > 0 ? "+" : ""}${row.value}$`] as [string, string],
+                  row => [row.label, <ResourceText>{`${row.value > 0 ? "+" : ""}${row.value}$`}</ResourceText>] as [string, ReactNode],
                 ),
                 ...forecastRows(forecast.influence).map(
-                  row => [row.label, `${row.value > 0 ? "+" : ""}${row.value}◆`] as [string, string],
+                  row => [row.label, <ResourceText>{`${row.value > 0 ? "+" : ""}${row.value}◆`}</ResourceText>] as [string, ReactNode],
                 ),
                 [
                   t("ui.score.total"),
                   <b className="text-good">
-                    +{forecast.money.total}$ +{forecast.influence.total}◆
+                    <ResourceText>{`+${forecast.money.total}$ +${forecast.influence.total}◆`}</ResourceText>
                   </b>,
                 ],
               ]}
@@ -76,18 +78,18 @@ export function DefenceDetails({ game, me }: { game: GameState; me: PlayerState 
       <PopoverBody>
         <KeyValue
           rows={[
-            [t("ui.defence.roofs"), t("ui.defence.ofLimit", { have: me.roofs, limit: me.roof_limit })],
-            [t("ui.defence.scandals"), t("ui.defence.ofLimit", { have: me.scandals, limit })],
-            [t("ui.defence.roofPrice"), `${roofPrice(game)}$`],
+            [t("ui.defence.roofs"), <ResourceText>{t("ui.defence.ofLimit", { have: me.roofs, limit: me.roof_limit })}</ResourceText>],
+            [t("ui.defence.scandals"), <ResourceText>{`${me.scandals}⚠ / ${limit}⚠`}</ResourceText>],
+            [t("ui.defence.roofPrice"), <ResourceText>{`${roofPrice(game)}$`}</ResourceText>],
           ]}
         />
         <p className="mb-2">
           <strong>{t("ui.defence.roofStrong")}</strong>
-          {t("ui.defence.roofText")}
+          <ResourceText>{t("ui.defence.roofText")}</ResourceText>
         </p>
         <p>
           <strong>{t("ui.defence.scandalsStrong")}</strong>
-          {t("ui.defence.scandalsText", { limit, jail: limit + 1 })}
+          <ResourceText>{t("ui.defence.scandalsText", { limit, jail: limit + 1 })}</ResourceText>
         </p>
       </PopoverBody>
     </>

@@ -3,6 +3,7 @@ import { rolePerkRows } from "../../online/gameUi";
 import type { CityMeta, GameState, LegalAction } from "../../online/types";
 import { findAction, turnBlock, type ActionContext } from "../lib/actions";
 import type { Indexes } from "../lib/board";
+import { ResourceText } from "../primitives/ResourceIcon";
 
 /* Роли — это справочник правил, а не ещё один плотный список кнопок.
  * Поэтому описание каждой роли всегда остаётся читаемым, даже когда сам захват недоступен:
@@ -43,9 +44,9 @@ export function RolesDetails({
         <section className="grid gap-1.5 rounded-lg border border-line bg-panel-2 px-3 py-2.5 text-[12px] leading-[1.45] text-ink-muted min-[720px]:grid-cols-[1fr_auto] min-[720px]:items-center min-[720px]:gap-5">
           <p>
             {t("ui.roles.priceStart")}
-            <strong className="text-influence">{game.role_price}◆</strong>
+            <strong className="text-influence"><ResourceText>{`${game.role_price}◆`}</ResourceText></strong>
             {t("ui.roles.priceMiddle")}
-            <strong className="text-influence">{game.role_price * 3}◆</strong>
+            <strong className="text-influence"><ResourceText>{`${game.role_price * 3}◆`}</ResourceText></strong>
             {t("ui.roles.priceEnd")}
           </p>
           <p className="text-warning min-[720px]:max-w-[330px]">
@@ -99,7 +100,7 @@ export function RolesDetails({
                       {role.title}
                     </strong>
                     {!mine && (
-                      <span className="shrink-0 text-[13px] font-extrabold text-influence">{price}◆</span>
+                      <span className="shrink-0 text-[13px] font-extrabold text-influence"><ResourceText>{`${price}◆`}</ResourceText></span>
                     )}
                   </span>
                   <span className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[10.5px] leading-tight">
@@ -113,11 +114,11 @@ export function RolesDetails({
                 <span className="col-span-2 grid gap-2 border-t border-line pt-2 text-[12px] leading-[1.48]">
                   <span className="grid grid-cols-1 gap-1 min-[480px]:grid-cols-[82px_minmax(0,1fr)] min-[480px]:gap-2">
                     <b className="text-ink-dim">{t("ui.roles.passive")}</b>
-                    <span className="text-ink-muted">{role.passive}</span>
+                    <span className="text-ink-muted"><ResourceText>{role.passive}</ResourceText></span>
                   </span>
                   <span className="grid grid-cols-1 gap-1 min-[480px]:grid-cols-[82px_minmax(0,1fr)] min-[480px]:gap-2">
                     <b className="text-ink-dim">{t("ui.roles.powers")}</b>
-                    <span className="text-ink-muted">{role.power}</span>
+                    <span className="text-ink-muted"><ResourceText>{role.power}</ResourceText></span>
                   </span>
                 </span>
               </button>
@@ -135,7 +136,7 @@ export function RolesDetails({
                 <div key={perk.key} className="grid grid-cols-[auto_minmax(0,1fr)] gap-2 text-[11.5px] leading-[1.4]">
                   <span className={perk.locked ? "text-ink-dim" : "text-good"}>{perk.locked ? "○" : "✓"}</span>
                   <span>
-                    <b className={perk.locked ? "text-ink-muted" : "text-ink"}>{perk.label}: {perk.text}</b>
+                    <b className={perk.locked ? "text-ink-muted" : "text-ink"}><ResourceText>{`${perk.label}: ${perk.text}`}</ResourceText></b>
                     <small className="mt-0.5 block text-[10.5px] text-ink-dim">{perk.hint}</small>
                   </span>
                 </div>

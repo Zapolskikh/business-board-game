@@ -6,7 +6,6 @@ import { Panel, SectionHead } from "../primitives/atoms";
 import { useCommand, useGame, useLegalActions, useMe, useMeta } from "../lib/session";
 import { MarketCard } from "./MarketCard";
 import { marketCardState } from "./marketCardState";
-import { useIsPortrait } from "../lib/layout";
 
 /* Секция рынка.
  *
@@ -38,20 +37,11 @@ export function MarketGrid({
     () => new Map(meta.districts.map(district => [district.id, district])),
     [meta.districts],
   );
-  const rotation = meta.scoring?.market_rotation_size ?? 3;
   const { t } = useTranslation("game");
-  const portrait = useIsPortrait();
 
   return (
     <Panel rows zone="market">
-      <SectionHead
-        title={t("ui.marketPanel.title")}
-        meta={
-          portrait
-            ? t("ui.marketPanel.metaShort", { rotation, total: game.market.length, deck: game.market_deck_count })
-            : t("ui.marketPanel.meta", { rotation, total: game.market.length, deck: game.market_deck_count })
-        }
-      />
+      <SectionHead title={t("ui.marketPanel.title")} />
 
       {/* Шесть равных долей: слотов на рынке ровно столько. Два ряда делят высоту секции
         * поровну, и такая же разбивка у города — карточка одинакова до и после покупки.

@@ -12,6 +12,8 @@ import {
 } from "../../online/gameUi";
 import type { CityMeta, GameState, LegalAction } from "../../online/types";
 import { CardPopover, PopoverBody, PopoverHeader } from "../primitives/CardPopover";
+import { ResourceIcon, ResourceText } from "../primitives/ResourceIcon";
+import { statIcon } from "../assets/cards";
 import { DetailsModal } from "../primitives/Modal";
 import { ActionButton, DrawerRow, ListItem, Panel, sectionTitle, zoneRule, zoneStyle } from "../primitives/atoms";
 import { findActions, resolve, resolveMany, usedThisTurn, type ActionContext } from "../lib/actions";
@@ -116,11 +118,11 @@ export function ActionsPanel({
           <h2 className={sectionTitle}>{t("ui.actions.title")}</h2>
           <span className="ml-auto flex gap-1">
             {Array.from({ length: Math.max(3, game.actions_left) }).map((_, position) => (
-              <i
+              <img
                 key={position}
-                className={`size-[9px] rounded-full ${
-                  position < game.actions_left ? "bg-good" : "bg-line-2"
-                }`}
+                src={statIcon("actions")}
+                alt=""
+                className={`size-3 object-contain ${position < game.actions_left ? "" : "opacity-30 grayscale"}`}
               />
             ))}
           </span>
@@ -132,7 +134,7 @@ export function ActionsPanel({
         <div className="mt-1.5 grid grid-cols-2 gap-1">
           <ActionButton
             label={t("ui.actions.work")}
-            cost={<><span className="font-semibold text-money">+2$</span>{t("ui.actions.workCost")}</>}
+            cost={<><span className="font-semibold text-money"><ResourceText>+2$</ResourceText></span>{t("ui.actions.workCost")}</>}
             state={work}
             onClick={() => act(work)}
           />
@@ -144,8 +146,8 @@ export function ActionsPanel({
                 label={t("ui.actions.exchange")}
                 cost={
                   <>
-                    <Need short={me.money < tier.spend} tone="money">{tier.spend}$</Need>
-                    {" → "}<span className="font-semibold text-influence">{tier.gain}◆</span>
+                    <Need short={me.money < tier.spend} tone="money"><ResourceText>{`${tier.spend}$`}</ResourceText></Need>
+                    {" → "}<span className="font-semibold text-influence"><ResourceText>{`${tier.gain}◆`}</ResourceText></span>
                   </>
                 }
                 state={campaign}
@@ -157,7 +159,7 @@ export function ActionsPanel({
             label={t("ui.actions.patronage")}
             cost={
               <>
-                    <Need short={me.money < patron.money} tone="money">{patron.money}$</Need>
+                    <Need short={me.money < patron.money} tone="money"><ResourceText>{`${patron.money}$`}</ResourceText></Need>
                     {" → "}<span className="font-semibold text-points">{t("ui.actions.pts", { count: patron.points })}</span>
               </>
             }
@@ -169,7 +171,7 @@ export function ActionsPanel({
             label={t("ui.actions.lobbying")}
             cost={
               <>
-                    <Need short={me.influence < lobby.influence} tone="influence">{lobby.influence}◆</Need>
+                    <Need short={me.influence < lobby.influence} tone="influence"><ResourceText>{`${lobby.influence}◆`}</ResourceText></Need>
                     {" → "}<span className="font-semibold text-points">{t("ui.actions.pts", { count: lobby.points })}</span>
               </>
             }
@@ -183,13 +185,13 @@ export function ActionsPanel({
             label={cleanupPower ? cleanupLabel : t("ui.actions.cleanup")}
             cost={
               cleanupPower ? (
-                t("ui.actions.scandalMinus")
+                <ResourceText>{t("ui.actions.scandalMinus")}</ResourceText>
               ) : (
                 <>
                   <Need short={me.influence < crisisPrInfluence(meta)} tone="influence">
-                    {crisisPrInfluence(meta)}◆
+                    <ResourceText>{`${crisisPrInfluence(meta)}◆`}</ResourceText>
                   </Need>{" → "}
-                  {t("ui.actions.scandalMinus")}
+                  <ResourceText>{t("ui.actions.scandalMinus")}</ResourceText>
                 </>
               )
             }
@@ -200,7 +202,7 @@ export function ActionsPanel({
             label={t("ui.actions.roof")}
             cost={
               <>
-                <Need short={me.money < roofPrice(game)} tone="money">{roofPrice(game)}$</Need>
+                <Need short={me.money < roofPrice(game)} tone="money"><ResourceText>{`${roofPrice(game)}$`}</ResourceText></Need>
                 {t("ui.actions.roofHave", { have: me.roofs, limit: me.roof_limit })}
               </>
             }
@@ -245,7 +247,7 @@ export function ActionsPanel({
           />
 
           <DrawerRow
-            icon="⚡"
+            icon={<ResourceIcon name="actions" size="18px" />}
             title={t("ui.actions.rolePowers")}
             hint={role ? t("ui.actions.rolePowersHint") : t("ui.actions.rolePowersNone")}
             onClick={() => setDrawer("powers")}
@@ -391,9 +393,9 @@ function PowerButton({
           <PopoverHeader title={label} subtitle={t("ui.actions.pickTarget")} />
           <PopoverBody>
             <p className="mb-2">
-              {description?.what ?? t("ui.actions.powerDefault")}
+              <ResourceText>{description?.what ?? t("ui.actions.powerDefault")}</ResourceText>
             </p>
-            <p className="mb-2 text-[var(--color-badge)]">{t("ui.actions.price", { cost: costLabel })}</p>
+            <p className="mb-2 text-[var(--color-badge)]"><ResourceText>{t("ui.actions.price", { cost: costLabel })}</ResourceText></p>
             <div className="grid gap-1">
               {options.map((action, position) => {
                 const target = game.players.find(player => player.id === action.payload.target_id);
@@ -408,15 +410,15 @@ function PowerButton({
                     hint={
                       target ? (
                         <>
-                          <span className="block">{targetStats(target, preview, blockedByRoof)}</span>
-                          {cost && <span className="block text-gold">{cost}</span>}
+                          <span className="block"><ResourceText>{targetStats(target, preview, blockedByRoof)}</ResourceText></span>
+                          {cost && <span className="block text-gold"><ResourceText>{cost}</ResourceText></span>}
                         </>
                       ) : undefined
                     }
                     right={
                       <span className="grid text-right">
                         {/* Добыча — крупно: ради неё цель и выбирают. Очки — под ней, мельче. */}
-                        {gain && <span className="text-good">{gain}</span>}
+                        {gain && <span className="text-good"><ResourceText>{gain}</ResourceText></span>}
                         <span className="text-3xs font-normal text-ink-muted">
                           {t("ui.actions.pts", { count: scoreOf(game, target?.id) })}
                         </span>

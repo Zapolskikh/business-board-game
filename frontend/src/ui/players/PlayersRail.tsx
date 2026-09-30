@@ -8,7 +8,7 @@ import { Panel, SectionHead } from "../primitives/atoms";
 import type { ActionContext } from "../lib/actions";
 import { atScandalRisk, playerColor, scandalLimit, type Indexes } from "../lib/board";
 import { PlayerDetails } from "./PlayerDetails";
-import { playerFrame, projectIcon, roleIcon, statIcon } from "../assets/cards";
+import { playerFrame, roleIcon, statIcon } from "../assets/cards";
 
 /* Игроки — четыре строки на всю высоту колонки, без скролла.
  *
@@ -82,7 +82,7 @@ const PlayerRow = forwardRef<HTMLButtonElement, PlayerRowProps>(function PlayerR
   const risky = atScandalRisk(player);
   const color = playerColor(game, player.id);
   const shielded = player.roofs > 0;
-  const star = projectIcon("score");
+  const star = statIcon("score");
 
   const avatar = roleIcon(player.role ?? undefined);
 
@@ -183,7 +183,7 @@ const PlayerRow = forwardRef<HTMLButtonElement, PlayerRowProps>(function PlayerR
       {/* Ресурсы — плашка из четырёх равных ячеек, у каждой свой значок и смысловой цвет. */}
       <span className="player-card-plate grid grid-cols-4 items-center rounded-md py-0.5 text-[12px] font-bold">
         <Stat icon={statIcon("money")} label={t("ui.players.money")} className="text-money">
-          {player.money}$
+          {player.money}
         </Stat>
         <Stat icon={statIcon("influence")} label={t("ui.players.influence")} className="text-influence">
           {player.influence}

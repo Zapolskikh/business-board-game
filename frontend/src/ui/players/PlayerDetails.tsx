@@ -6,6 +6,8 @@ import { KeyValue, ListItem } from "../primitives/atoms";
 import { findActions, type ActionContext } from "../lib/actions";
 import { scandalLimit, turnPosition, type Indexes } from "../lib/board";
 import { findPreview, previewCost, previewGain } from "../lib/powerPreview";
+import { ResourceText } from "../primitives/ResourceIcon";
+import { statIcon } from "../assets/cards";
 
 /* Карточка игрока в поповере: его город и всё, что можно с ним сделать.
  *
@@ -73,24 +75,24 @@ export function PlayerDetails({
       <PopoverBody>
         <KeyValue
           rows={[
-            [t("ui.players.score"), <span className="text-points">{t("ui.players.scoreValue", { count: score?.total ?? 0 })}</span>],
+            [t("ui.players.score"), <span className="flex items-center gap-1 text-points"><img src={statIcon("score")} alt="" className="size-4" />{t("ui.players.scoreValue", { count: score?.total ?? 0 })}</span>],
             [
               t("ui.players.resources"),
-              <span><span className="text-money">● {player.money}$</span>{" · "}<span className="text-influence">◆ {player.influence}</span></span>,
+              <span><span className="text-money"><ResourceText>{`${player.money}$`}</ResourceText></span>{" · "}<span className="text-influence"><ResourceText>{`${player.influence}◆`}</ResourceText></span></span>,
             ],
             [
               t("ui.players.scandals"),
               <span className={player.scandals >= scandalLimit(player) - 1 ? "text-[var(--color-warning)]" : undefined}>
-                {player.scandals} / {scandalLimit(player)}
+                <ResourceText>{`${player.scandals}⚠ / ${scandalLimit(player)}⚠`}</ResourceText>
                 {player.role && player.scandals >= scandalLimit(player) - 1 && t("ui.players.roleRisk")}
               </span>,
             ],
             [
               t("ui.players.roofs"),
               <span className={player.roofs > 0 ? "text-defence" : "text-ink-muted"}>
-                {player.roofs > 0
+                <ResourceText>{player.roofs > 0
                   ? t("ui.players.roofsOn", { have: player.roofs, limit: player.roof_limit })
-                  : t("ui.players.roofsOff", { limit: player.roof_limit })}
+                  : t("ui.players.roofsOff", { limit: player.roof_limit })}</ResourceText>
               </span>,
             ],
             [t("ui.players.order"), position >= 0 ? t("ui.players.orderValue", { position: position + 1 }) : "—"],
@@ -123,7 +125,7 @@ export function PlayerDetails({
                   {asset?.title ?? owned.card_id}
                 </b>
                 <small className="text-3xs text-ink-dim">
-                  <span className="text-money">{t("ui.players.perRound", { value: asset?.income ?? 0 })}</span>
+                  <span className="text-money"><ResourceText>{t("ui.players.perRound", { value: asset?.income ?? 0 })}</ResourceText></span>
                   {" · "}
                   <span className="text-points">{t("ui.players.pts", { count: asset ? assetPoints(asset) : 0 })}</span>
                 </small>
@@ -160,7 +162,7 @@ export function PlayerDetails({
           </>
         )}
 
-        {role && <p className="mb-2 text-ink-muted">{role.passive}</p>}
+        {role && <p className="mb-2 text-ink-muted"><ResourceText>{role.passive}</ResourceText></p>}
 
         {targeted.length > 0 && (
           <>
@@ -178,10 +180,10 @@ export function PlayerDetails({
                     hint={
                       <>
                         <span className="block">{item.hint}</span>
-                        {cost && <span className="block text-gold">{cost}</span>}
+                        {cost && <span className="block text-gold"><ResourceText>{cost}</ResourceText></span>}
                       </>
                     }
-                    right={gain ? <span className="text-good">{gain}</span> : undefined}
+                    right={gain ? <span className="text-good"><ResourceText>{gain}</ResourceText></span> : undefined}
                     onClick={() => onAction(item.action)}
                   />
                 );

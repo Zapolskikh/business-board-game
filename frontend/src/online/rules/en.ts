@@ -35,7 +35,7 @@ const roles: Record<string, RoleGuide> = {
     powers: [
       {
         name: "Place a claim",
-        cost: "1 action and 1 scandal",
+        cost: "1 action and 1⚠",
         limit: "one claim: a new one removes the old one",
         effect: "A market card works for you as if it were yours: it gives income, counts for synergy and projects, and unlocks shady deals. But anyone can still buy it, it gives no points and takes no slot. The claim is gone when you lose the role.",
       },
@@ -51,7 +51,7 @@ const roles: Record<string, RoleGuide> = {
       { name: "Settle a scandal", cost: "1 action and 2◆", limit: "as many as your actions allow", effect: "Removes 1 of your scandals." },
       {
         name: "Make a deal",
-        cost: "3◆ and 1 scandal; you need a Grey Sector business",
+        cost: "3◆ and 1⚠; you need a Grey Sector business",
         limit: "once per turn, no action",
         effect: "Until the end of the round, any district you pick counts as yours: for projects, shady deals and synergy.",
       },
@@ -68,7 +68,7 @@ const roles: Record<string, RoleGuide> = {
     perks: [
       "<b>Money from other scandals:</b> at the end of the round, 1$ for each rival scandal, or 2$ if you have a Business District business. It counts what is left at payout time.",
       "<b>Influence from your own scandals:</b> at the end of the round, +1◆ for each of your scandals, with no cap. Only works if you have at least one Residential Area business.",
-      "<b>Scandal limit — 6.</b> You lose the role at the 6th scandal, not the 5th. Arrest comes at the 7th.",
+      "<b>Scandal limit — 6⚠.</b> You lose the role at 6⚠, not 5⚠. Arrest comes at 7⚠.",
       "The role has no district of its own.",
     ],
     powers: [
@@ -76,16 +76,16 @@ const roles: Record<string, RoleGuide> = {
         name: "Blow up a story",
         cost: "free, no action",
         limit: "once per turn",
-        effect: "1 scandal to you and to the rival you pick. If the target has Protection, it stops the whole hit — then you get no scandal either.",
+        effect: "1⚠ to you and to the rival you pick. If the target has Protection, it stops the whole hit — then you get no scandal either.",
       },
       {
         name: "Publish an exposé",
         cost: "1 action and 3◆",
         limit: "once per turn",
-        effect: "2 scandals to a rival, nothing to you. The target's Protection stops the whole thing, but your action and influence are spent.",
+        effect: "2⚠ to a rival, nothing to you. The target's Protection stops the whole thing, but your action and influence are spent.",
       },
     ],
-    warning: "A rival's Protection stops both the story and the exposé. At 6 scandals you lose the role, at 7 you are arrested. Without the role, your limit is 5 again.",
+    warning: "A rival's Protection stops both the story and the exposé. At 6⚠ you lose the role, at 7⚠ you are arrested. Without the role, your limit is 5⚠ again.",
   },
   fraudster: {
     style: "The risky role: more actions and strong shady deals.",
@@ -100,7 +100,7 @@ const roles: Record<string, RoleGuide> = {
         name: "Crypto scam",
         cost: "1 action; you need your own City Crypto Exchange",
         limit: "once per turn",
-        effect: "Takes 25% of every rival's money (Protection keeps its owner safe) and gives you 5 scandals. Businesses and projects that lower scandals from shady deals lower these too.",
+        effect: "Takes 25% of every rival's money (Protection keeps its owner safe) and gives you 5⚠. Businesses and projects that lower scandals from shady deals lower these too.",
       },
     ],
   },
@@ -115,7 +115,7 @@ const roles: Record<string, RoleGuide> = {
         name: "Racket",
         cost: "1 action; you need a Grey Sector business",
         limit: "once per turn",
-        effect: "The target gives you money: 2$ + 2$ for each of your Grey Sector businesses + the round number divided by 3 (rounded down), and +5$ more if the target is the leader. And influence: 1◆ for each of your Government Quarter businesses. Never more than the target has. The target's Protection cancels the racket. If you have no Government business, you get 1 scandal.",
+        effect: "The target gives you money: 2$ + 2$ for each of your Grey Sector businesses + the round number divided by 3 (rounded down), and +5$ more if the target is the leader. And influence: 1◆ for each of your Government Quarter businesses. Never more than the target has. The target's Protection cancels the racket. If you have no Government business, you get 1⚠.",
       },
       { name: "Hush it up", cost: "1 action and 3$; you need a Government business", limit: "as many as your actions allow", effect: "Removes up to 2 of your scandals." },
       {
@@ -136,8 +136,8 @@ const roles: Record<string, RoleGuide> = {
       {
         name: "Sanctions",
         cost: "1 action",
-        limit: "once per turn; the target needs at least 2 scandals",
-        effect: "If the target has Protection, they lose it — and that's all. Without Protection: at 2 scandals the target gives you up to (3 + round number)$; at 3 — also influence; at 4 — they also lose their role. The target keeps their scandals.",
+        limit: "once per turn; the target needs at least 2⚠",
+        effect: "If the target has Protection, they lose it — and that's all. Without Protection: at 2⚠ the target gives you up to (3 + round number)$; at 3⚠ — also influence; at 4⚠ — they also lose their role. The target keeps their scandals.",
       },
       {
         name: "Inspection",
@@ -164,6 +164,18 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
   const tags = ["finance", "data", "logistics", "production", "security", "government"].map(tag => `“${ctx.e(ctx.tag(tag))}”`).join(", ");
   return [
     {
+      id: "intro",
+      icon: "🏙️",
+      title: "Welcome to the city",
+      html: `
+      <p><i>City of Influence</i> is a game about building a strong network across the city and outscoring your rivals. Buy businesses, build up districts, use roles and powers, then claim city projects.</p>
+      <div class="tip"><b>Your goal:</b> finish the last round with more points than anyone else. Projects, businesses, a role, some actions, and leftover money and influence score points; scandals take points away.</div>
+      <p><b>The city and market are shared.</b> Everyone sees the same six market offers and ${n.projectBoardSize} projects. Buying a business or taking a project changes the table for all players. A project belongs to the first player who pays its price and meets its condition.</p>
+      <p><b>How a game flows:</b> spend actions on choices during your turn; at round end, the city pays income and some offers change. Plan your growth a few rounds ahead, but do not wait too long on a project a rival can take.</p>
+      <div class="box"><h4>Resource symbols in this book</h4><p><b>$ means money</b>, <b>◆ means influence</b>, and <b>⚠ means scandal</b>. The same symbols are used for prices, effects, and scoring.</p></div>
+      `,
+    },
+    {
       id: "goal",
       icon: "🏆",
       title: "Goal and points",
@@ -174,9 +186,9 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
         <li><b>Businesses</b> — half the business price, rounded down. The number is on the card (<b>★ N points</b>).</li>
         <li><b>Role</b> — +3 points if you have a role at the end.</li>
         <li><b>Other points</b> — patronage (<b>${n.patronage.money}$ → ${n.patronage.points}</b>), lobbying (<b>${n.lobbying.influence}◆ → ${n.lobbying.points}</b>) and cards that buy points. Patronage and lobbying — once per turn each.</li>
-        <li><b>Money</b> — 1 point for every <b>${n.moneyPerPoint}$</b>.</li>
-        <li><b>Influence ◆</b> — 1 point for every <b>${n.influencePerPoint}◆</b>.</li>
-        <li><b>Scandals ⚠</b> — minus 1 point for each.</li>
+        <li><b>💵 Money ($)</b> — 1 point for every <b>${n.moneyPerPoint}$</b>.</li>
+        <li><b>◆ Influence</b> — 1 point for every <b>${n.influencePerPoint}◆</b>.</li>
+        <li><b>⚠ Scandals</b> — minus 1 point for each.</li>
       </ul>
       <div class="tip"><b>Where to look:</b> your score in parts and your next income open with the “Score and income” button at the top.</div>
       `,
@@ -193,9 +205,9 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
         <div><b>1</b><span>action in the turn after an arrest</span></div>
       </div>
       <p>Actions are spent on buying, roles, projects, cards, shady deals and defence. <b>No action needed</b> to sell a business, play or discard cards. Unused actions are lost at the end of the turn.</p>
-      <p><b>End of the round.</b> Businesses pay income, influence is added, role bonuses work, the bridge loan is paid back. Then the turn order is set again, the action deck is shuffled, part of the market changes and one project on the board is replaced.</p>
+      <p><b>End of the round.</b> Businesses pay income, influence is added, role bonuses work, and the bridge loan is paid back. When the next round opens, turn order is set again, the action deck is shuffled, part of the market changes and one project on the board is replaced.</p>
       <p><b>There is no payout after the last round.</b> During the whole last round, “Score and income” shows a zero payout: spend your money and influence right away. The bridge loan is still paid back.</p>
-      <div class="tip"><b>The market only changes between rounds.</b> At the start of a round, the <b>${n.rotation} oldest</b> of the six cards leave (they are marked ⏳) and new ones come. The cards that leave go under the deck. During a round the market stays the same: what you see now will still be there on your next turn.</div>
+      <div class="tip"><b>The market has six slots and a deck of ${ctx.meta.assets.length} business cards.</b> The deck is shuffled, so offers appear in random order. When a business is bought, the next available card from the shuffled deck immediately fills its slot. At the start of each new round, the <b>${n.rotation} oldest slots</b> marked ⏳ go to the bottom of the deck and are replaced. There is no other market rotation during a round (except the Market Maker power).</div>
       `,
     },
     {
@@ -203,15 +215,16 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
       icon: "🏛",
       title: "City projects",
       html: `
-      <p>There are always <b>4 projects</b> on the table, the same for everyone. Each project is one for all: whoever takes it first gets the points.</p>
+      <p>The board of ${n.projectBoardSize} projects is shared by all players. A project is not reserved for whoever saw it first or met its condition first: the first player to spend the action and resources to take it gets it. After that, it belongs only to them.</p>
+      ${ctx.html.projectExample({ heading: "Read a real project card", caption: "The example uses a card from the game catalogue.", title: "Name", points: "Points", condition: "Condition", price: "Price", reward: "Lasting reward", action: "1 action" })}
       <ul>
         <li><b>Price</b> — the influence and money on the card, plus 1 action.</li>
         <li><b>Condition</b> — something you must already have: businesses in a district, businesses with a tag, a number of businesses, few scandals or any role.</li>
         <li><b>Reward</b> — points at the end and a lasting bonus, for example +2$ or +2◆ every round. Nobody can take the bonus away.</li>
-        <li><b>Project change</b> — at the start of a round, the <b>leftmost</b> project goes under the deck (it is marked ⏳), and a new one takes its place.</li>
-        <li><b>Re-deal the board</b> — ${n.reroll}$ and 1 action, once per turn: all four projects go back to the deck and four new ones come out.</li>
+        <li><b>Project rotation</b> — at the start of each new round, the <b>oldest project on the left</b>, marked ⏳, goes to the bottom of the deck. The others shift left, and the next card from the shuffled deck enters at the right.</li>
+        <li><b>Re-deal the board</b> — ${n.reroll}$ and 1 action, once per turn: all projects go back to the deck and a new board is dealt.</li>
       </ul>
-      <p>When someone takes a project, a new one comes out right away. If you have enough actions and resources, you can take several projects in one turn.</p>
+      <p>When someone takes a project, a new one appears immediately in the rightmost position. If you have enough actions and resources, you can take several available projects in one turn. The project deck is shuffled when the whole board is re-dealt; normal rotation draws the next card from the deck.</p>
       `,
     },
     {
@@ -221,9 +234,9 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
       html: `
       <div class="cols">
         <div class="box"><h4>💵 Money ($)</h4><p>For buying, slots, projects, cards and defence. At the end, ${n.moneyPerPoint}$ = 1 point. Patronage: ${n.patronage.money}$ → ${n.patronage.points} points, once per turn.</p></div>
-        <div class="box"><h4>💎 Influence (◆)</h4><p>For roles, projects and powers. At the end, ${n.influencePerPoint}◆ = 1 point. Lobbying: ${n.lobbying.influence}◆ → ${n.lobbying.points} points, once per turn. You get influence from businesses with “+◆ per round”, project bonuses and some roles. You can also buy it — that is “Exchange”.</p></div>
+        <div class="box"><h4>◆ Influence</h4><p>For roles, projects and powers. At the end, ${n.influencePerPoint}◆ = 1 point. Lobbying: ${n.lobbying.influence}◆ → ${n.lobbying.points} points, once per turn. You get influence from businesses with “+◆ per round”, project bonuses and some roles. You can also buy it — that is “Exchange”.</p></div>
         <div class="box"><h4>🔁 Exchange</h4><p>1 action: ${campaign}.</p></div>
-        <div class="box"><h4>⚠ Scandals</h4><p>Minus a point for each. At the 5th scandal you lose your role, at the 6th you are arrested. The Journalist has one more: role at the 6th, arrest at the 7th. Remove a scandal: <b>${n.crisisPr}◆ and 1 action</b> (crisis PR). If you have no role, 1 scandal goes away by itself at the start of your turn.</p></div>
+        <div class="box"><h4>⚠ Scandals</h4><p>Minus a point for each. At 5⚠ you lose your role; at 6⚠ you are arrested. The Journalist has one more: role at 6⚠, arrest at 7⚠. Remove 1⚠: <b>${n.crisisPr}◆ and 1 action</b> (crisis PR). If you have no role, 1⚠ goes away by itself at the start of your turn.</p></div>
         <div class="box"><h4>🛡️ Protection</h4><p>Defence <b>against other players</b>: stops a card, a racket, sanctions, a hack and an attempt to take your role. It does not save you from your own choices, like a failed shady deal.</p></div>
         <div class="box"><h4>🏢 Slots</h4><p>You start with 3 slots, 6 at most. A new slot costs ${capacity}.</p></div>
         <div class="box"><h4>🃏 Action cards</h4><p>Buying: 1 action, ${n.cardCost}$ and 1◆ — you take <b>two random</b> cards. Once per turn, 3 cards in hand at most. You can play and discard as many as you like. A discard gives ${n.discard}$ or ${n.discard}◆.</p></div>
@@ -277,7 +290,7 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
         <div class="box"><h4>Powers</h4><p>Each power has its own cost and limit. “No action” means your action counter does not go down.</p></div>
       </div>
       ${ctx.html.roleCards(roles, labels)}
-      <div class="warn"><b>Losing a role:</b> with 5 scandals you can't take a role (even as the Journalist). When you reach your scandal limit, you lose the role at once. One more scandal — arrest.</div>
+      <div class="warn"><b>Losing a role:</b> with 5⚠ you can't take a role (even as the Journalist). When you reach your scandal limit, you lose the role at once. One more 1⚠ — arrest.</div>
       `,
     },
     {
@@ -289,7 +302,7 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
       <table>
         <thead><tr><th>Deal</th><th>District</th><th>Chance</th><th>What it does on success</th><th>Points</th></tr></thead>
         <tbody>
-          <tr><td class="name"><b>Dirty rumours</b></td><td>Grey Sector</td><td class="num">${n.greyChance("smear", 60)}%</td><td><b>1 scandal to every rival</b></td><td class="num">+${n.greyPoints("smear", 2)}</td></tr>
+          <tr><td class="name"><b>Dirty rumours</b></td><td>Grey Sector</td><td class="num">${n.greyChance("smear", 60)}%</td><td><b>1⚠ to every rival</b></td><td class="num">+${n.greyPoints("smear", 2)}</td></tr>
           <tr><td class="name"><b>Pump and dump</b></td><td>Tech Cluster, Grey Sector</td><td class="num">${n.greyChance("crypto", 45)}%</td><td>take up to (${n.pumpBase} + round/2)$ <b>from every rival</b></td><td class="num">+${n.greyPoints("crypto", 2)}</td></tr>
           <tr><td class="name"><b>Break Protection</b></td><td>Grey Sector</td><td class="num">${n.greyChance("roof_break", 60)}%</td><td>remove <b>all</b> the target's Protection, +${n.roofBreakPoint} point for each</td><td class="num">+${n.greyPoints("roof_break", 2)}</td></tr>
           <tr><td class="name"><b>Hack</b></td><td>Tech Cluster, Grey Sector</td><td class="num">${n.greyChance("datacenter", 40)}%</td><td>steal up to (${n.hackBase} + round/3)◆ from the target</td><td class="num">+${n.greyPoints("datacenter", 3)}</td></tr>
@@ -308,11 +321,11 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
       title: "Scandals and arrest",
       html: `
       <div class="kpi">
-        <div><b>0–4</b><span>minus a point for each, you play as normal</span></div>
-        <div><b>5</b><span>you lose your role at once</span></div>
-        <div><b>6</b><span>arrest: scandals drop to 3, you lose your role and 1 Protection</span></div>
+        <div><b>0–4⚠</b><span>minus a point for each, you play as normal</span></div>
+        <div><b>5⚠</b><span>you lose your role at once</span></div>
+        <div><b>6⚠</b><span>arrest: scandals drop to 3⚠, you lose your role and 1 Protection</span></div>
       </div>
-      <p><b>Arrest:</b> you have only 1 action in your next turn. If the arrest happens during your turn, the turn ends at once and your remaining actions are lost. If you have no role, 1 scandal goes away by itself at the start of your turn.</p>
+      <p><b>Arrest:</b> you have only 1 action in your next turn. If the arrest happens during your turn, the turn ends at once and your remaining actions are lost. If you have no role, 1⚠ goes away by itself at the start of your turn.</p>
       <p>You can remove scandals with one “Clean up” button — it shows the price for your role. Each option costs 1 action, and you can repeat it:</p>
       <div class="kpi">
         <div><b>${n.crisisPr}◆</b><span>−1⚠ · crisis PR, for everyone</span></div>

@@ -23,7 +23,7 @@ export function RoomBrowser({ onOpen, onFeedback }: Props) {
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [capacity, setCapacity] = useState(4);
-  const [rounds, setRounds] = useState(15);
+  const [roundsInput, setRoundsInput] = useState("15");
   const [rolePrice, setRolePrice] = useState(3);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -44,14 +44,16 @@ export function RoomBrowser({ onOpen, onFeedback }: Props) {
     return () => clearInterval(timer);
   }, []);
 
-  const canCreate = Boolean(name.trim() && password.length >= 4 && !busy);
+  const parsedRounds = Number(roundsInput);
+  const roundsValid = /^\d+$/.test(roundsInput) && parsedRounds >= 5 && parsedRounds <= 30;
+  const canCreate = Boolean(name.trim() && password.length >= 4 && roundsValid && !busy);
   const waitingCount = useMemo(() => rooms.filter(room => room.status === "waiting").length, [rooms]);
 
   const create = async () => {
     if (!canCreate) return;
     setBusy(true); setError("");
     try {
-      const room = await cityApi.create({ name: name.trim(), password, capacity, max_rounds: rounds, role_price: rolePrice });
+      const room = await cityApi.create({ name: name.trim(), password, capacity, max_rounds: parsedRounds, role_price: rolePrice });
       onOpen(room.id, password);
     } catch (reason) { setError(errorText(reason, "createRoom")); }
     finally { setBusy(false); }
@@ -103,11 +105,55 @@ export function RoomBrowser({ onOpen, onFeedback }: Props) {
           <span className="eyebrow">{t("hero.eyebrow")}</span>
           <h1>{t("hero.titleLine1")}<br /><em>{t("hero.titleLine2")}</em></h1>
           <p>{t("hero.lead")}</p>
+          <ol className="hero-steps">
+            <li><b>01</b><span>{t("hero.stepBuild")}</span></li>
+            <li><b>02</b><span>{t("hero.stepCompete")}</span></li>
+            <li><b>03</b><span>{t("hero.stepScore")}</span></li>
+          </ol>
         </div>
-        <div className="hero-rules">
-          <span><b>15</b><small>{t("hero.rounds")}</small></span>
-          <span><b>3</b><small>{t("hero.actions")}</small></span>
-          <span><b>6</b><small>{t("hero.districts")}</small></span>
+        <div className="hero-table-wrap" role="img" aria-label={t("hero.artworkAlt")}>
+          <div className="hero-table-glow" />
+          <svg className="hero-table" viewBox="0 0 520 340" aria-hidden="true">
+            <defs>
+              <linearGradient id="table-surface" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stopColor="#18221f" />
+                <stop offset="1" stopColor="#0a1110" />
+              </linearGradient>
+              <radialGradient id="table-light"><stop stopColor="#d9bd78" stopOpacity=".22" /><stop offset="1" stopColor="#d9bd78" stopOpacity="0" /></radialGradient>
+              <filter id="table-shadow" x="-30%" y="-30%" width="160%" height="180%"><feGaussianBlur stdDeviation="8" /></filter>
+            </defs>
+            <ellipse cx="260" cy="286" rx="200" ry="30" fill="#000" opacity=".7" filter="url(#table-shadow)" />
+            <g className="table-board">
+              <path d="M260 24 476 145 260 266 44 145Z" fill="url(#table-surface)" stroke="#56624f" strokeWidth="1.5" />
+              <path d="M260 48 434 145 260 242 86 145Z" fill="none" stroke="#657260" strokeOpacity=".35" />
+              <path d="m260 24 0 242M44 145h432M152 84l216 122M368 84 152 206" stroke="#7d846d" strokeOpacity=".22" />
+              <path d="M260 35 458 145 260 255 62 145Z" fill="url(#table-light)" />
+              <g className="table-buildings" stroke="#d9bd78" strokeOpacity=".8" strokeWidth="1.2">
+                <path d="m117 126 34-19 24 14-34 20z" fill="#79694a"/><path d="m141 141 34-20v19l-34 20z" fill="#4a4435"/><path d="m117 126 24 15v19l-24-14z" fill="#60563e"/>
+                <path d="m187 91 29-17 24 14-29 17z" fill="#9a8053"/><path d="m211 105 29-17v24l-29 17z" fill="#544831"/><path d="m187 91 24 14v24l-24-14z" fill="#6b593b"/>
+                <path d="m283 119 36-21 27 15-36 21z" fill="#718c79" stroke="#a9c5a5"/><path d="m310 134 36-21v24l-36 21z" fill="#3d5748" stroke="#a9c5a5"/><path d="m283 119 27 15v24l-27-15z" fill="#536c59" stroke="#a9c5a5"/>
+                <path d="m357 158 27-16 23 13-27 16z" fill="#74648b" stroke="#b9a2d4"/><path d="m380 171 27-16v20l-27 16z" fill="#493e5b" stroke="#b9a2d4"/><path d="m357 158 23 13v20l-23-13z" fill="#5b4e70" stroke="#b9a2d4"/>
+              </g>
+              <g className="table-streets" fill="none" stroke="#d9bd78" strokeWidth="2" strokeDasharray="3 7" opacity=".72">
+                <path d="m93 170 58 32 41-23 54 31 50-28 41 24 87-49" />
+              </g>
+              <g className="table-tokens">
+                <circle cx="129" cy="177" r="9" fill="#91c5a5"/><circle cx="129" cy="174" r="3" fill="#e6f2e8"/>
+                <circle cx="252" cy="225" r="9" fill="#9fc4d1"/><circle cx="252" cy="222" r="3" fill="#e7f4f6"/>
+                <circle cx="391" cy="128" r="9" fill="#b9a2d4"/><circle cx="391" cy="125" r="3" fill="#f0eafa"/>
+              </g>
+              <g className="table-project">
+                <path d="m239 119 21-12 22 12-22 13z" fill="#d9bd78"/><path d="m260 132 22-13v22l-22 13z" fill="#806b3d"/><path d="m239 119 21 13v22l-21-13z" fill="#a58b50"/>
+                <path d="m251 116 9-5 9 5-9 5z" fill="#fff0be" opacity=".9" />
+              </g>
+            </g>
+            <g className="table-orbit" fill="none" stroke="#d9bd78" strokeOpacity=".28" strokeDasharray="2 7">
+              <ellipse cx="260" cy="145" rx="239" ry="136" />
+            </g>
+          </svg>
+          <div className="table-callout callout-top"><span className="callout-dot" />{t("hero.artLabel")}</div>
+          <div className="table-callout callout-bottom"><b>15</b><span>{t("hero.rounds")}</span><i /> <b>3</b><span>{t("hero.actions")}</span></div>
+          <span className="table-caption">{t("hero.districts")}</span>
         </div>
       </section>
 
@@ -186,7 +232,23 @@ export function RoomBrowser({ onOpen, onFeedback }: Props) {
 
             <div className="quick-settings">
               <label className="room-field"><span>{t("create.players")}</span><select value={capacity} onChange={event => setCapacity(Number(event.target.value))}>{[2,3,4].map(value => <option key={value}>{value}</option>)}</select></label>
-              <label className="room-field"><span>{t("create.rounds")}</span><input type="number" min={5} max={30} value={rounds} onChange={event => setRounds(Number(event.target.value))} /></label>
+              <label className="room-field">
+                <span>{t("create.rounds")}</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={roundsInput}
+                  aria-invalid={roundsInput !== "" && !roundsValid}
+                  aria-describedby="rounds-hint"
+                  onChange={event => setRoundsInput(event.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, ""))}
+                  onBlur={() => {
+                    const value = Number(roundsInput);
+                    setRoundsInput(String(roundsInput === "" ? 15 : Math.min(30, Math.max(5, value))));
+                  }}
+                />
+                <small id="rounds-hint">{t("create.roundsHint")}</small>
+              </label>
             </div>
 
             <details className="advanced-settings">

@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import { actionCardCost, actionLabel, cardDiscardValue } from "../../online/gameUi";
 import type { ActionMeta, CityMeta, GameState, HeldCard, LegalAction } from "../../online/types";
 import { CardPopover, PopoverBody, PopoverFooter, PopoverHeader } from "../primitives/CardPopover";
+import { ResourceText } from "../primitives/ResourceIcon";
 import { ListItem, Panel, SectionHead } from "../primitives/atoms";
 import { findActions, resolve, usedThisTurn, type ActionContext } from "../lib/actions";
 import type { Indexes } from "../lib/board";
@@ -56,10 +57,10 @@ export function Hand({
             * решить, копить ли на карты или на объект. Красным — тот ресурс, которого не хватает. */}
           <small className="text-3xs text-ink-muted">
             <b className={me.money < actionCardCost(meta) ? "font-bold text-bad" : "font-semibold text-money"}>
-              {actionCardCost(meta)}$
+              <ResourceText>{`${actionCardCost(meta)}$`}</ResourceText>
             </b>{" "}
-            + <b className={me.influence < 1 ? "font-bold text-bad" : "font-semibold text-influence"}>1◆</b> +{" "}
-            <b className={game.actions_left < 1 ? "font-bold text-bad" : "font-normal"}>⚡</b>
+            + <b className={me.influence < 1 ? "font-bold text-bad" : "font-semibold text-influence"}><ResourceText>1◆</ResourceText></b> +{" "}
+            <b className={game.actions_left < 1 ? "font-bold text-bad" : "font-normal"}><ResourceText>⚡</ResourceText></b>
           </small>
         </button>
 
@@ -112,7 +113,7 @@ export function Hand({
                       {preview ? (
                         <b className="font-semibold text-money">{t("ui.hand.now", { money: preview.money })}</b>
                       ) : (
-                        card.text
+                        <ResourceText>{card.text}</ResourceText>
                       )}
                     </small>
                   </button>
@@ -179,7 +180,7 @@ function HandCardDetails({
     <>
       <PopoverHeader title={card.title} subtitle={t(`ui.hand.tone.${card.tone as "deal" | "attack" | "defence"}`, { defaultValue: card.tone })} />
       <PopoverBody>
-        <p className="mb-2 text-ink">{card.text}</p>
+        <p className="mb-2 text-ink"><ResourceText>{card.text}</ResourceText></p>
         {game.card_previews?.[card.id] && (
           <p className="mb-2 text-money">
             {game.card_previews[card.id].district

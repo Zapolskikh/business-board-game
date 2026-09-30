@@ -1,6 +1,7 @@
 import { tr } from "../../i18n";
 import { forwardRef, type CSSProperties, type ReactNode } from "react";
 import type { Availability } from "../lib/actions";
+import { ResourceText } from "./ResourceIcon";
 
 /* Общие атомы доски. Держим их в одном файле, чтобы плотная сетка была
  * единообразной: одинаковые отступы, одинаковые размеры подписей.
@@ -136,7 +137,7 @@ export function ActionButton({
 export const DrawerRow = forwardRef<
   HTMLButtonElement,
   {
-    icon: string;
+    icon: ReactNode;
     title: string;
     hint: ReactNode;
     badge?: ReactNode;
@@ -245,7 +246,7 @@ export function EffectList({
                 : "relative pl-3.5 text-ink-dim before:absolute before:left-1 before:content-['·']"
             }
           >
-            {line.text}
+            <ResourceText>{line.text}</ResourceText>
             {line.boosted && <span className="ml-1 text-gold">⚙×2</span>}
           </li>
         ))}

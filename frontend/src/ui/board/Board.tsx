@@ -33,7 +33,6 @@ import { BoardLayoutProvider, usePortraitViewport, type BoardLayout } from "../l
 export function BoardView({
   game,
   meta,
-  roomName,
   context,
   onAction,
   busy,
@@ -44,7 +43,6 @@ export function BoardView({
 }: {
   game: GameState;
   meta: CityMeta;
-  roomName: string;
   context: ActionContext;
   onAction: (action: LegalAction) => void;
   busy: boolean;
@@ -157,7 +155,6 @@ export function BoardView({
         game={game}
         me={context.me}
         meta={meta}
-        roomName={roomName}
         unseenEvents={unseen}
         compact={portrait}
         onChronicle={() => setChronicle(true)}
@@ -240,7 +237,7 @@ function MobileShell({ children }: { children: ReactNode }) {
 }
 
 /** Подключённая версия: всё то же самое, но из живой партии. */
-export function Board({ roomName, onExit }: { roomName: string; onExit: () => void }) {
+export function Board({ onExit }: { onExit: () => void }) {
   const room = useRoom();
   const game = useGame();
   const me = useMe();
@@ -254,7 +251,6 @@ export function Board({ roomName, onExit }: { roomName: string; onExit: () => vo
     <BoardView
       game={game}
       meta={meta}
-      roomName={roomName}
       context={context}
       onAction={send}
       busy={isPending}

@@ -38,7 +38,9 @@ export const projectIcon = (kind: ProjectKind | "score"): string | undefined => 
 export const roleIcon = (role: string | undefined): string | undefined =>
   art(`role-${role ?? "none"}`) ?? art("role-none");
 
-export const statIcon = (stat: "money" | "influence" | "scandal" | "roof" | "score"): string | undefined =>
+export type ResourceIcon = "money" | "influence" | "actions" | "scandal" | "roof" | "score";
+
+export const statIcon = (stat: ResourceIcon): string | undefined =>
   art(`stat-${stat}`);
 
 export const playerFrame = art("player-frame");

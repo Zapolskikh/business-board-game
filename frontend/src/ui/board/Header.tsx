@@ -1,11 +1,13 @@
 import { useTranslation } from "react-i18next";
+import * as Popover from "@radix-ui/react-popover";
 import { LanguagePicker } from "../../i18n/LanguagePicker";
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import type { CityMeta, GameState, PlayerState } from "../../online/types";
 import { CardPopover } from "../primitives/CardPopover";
 import { ActionsDetails, DefenceDetails, ScoreDetails } from "./headerPopovers";
 import { atScandalRisk, scandalLimit } from "../lib/board";
-import { projectIcon, roleIcon, statIcon } from "../assets/cards";
+import { roleIcon, statIcon } from "../assets/cards";
+import { ResourceText } from "../primitives/ResourceIcon";
 import { setTheme, useTheme } from "../lib/theme";
 import { themes, type ThemeId } from "../themes";
 
@@ -66,7 +68,6 @@ export function Header({
   game,
   me,
   meta,
-  roomName,
   unseenEvents,
   compact = false,
   onChronicle,
@@ -77,7 +78,6 @@ export function Header({
   game: GameState;
   me: PlayerState;
   meta: CityMeta;
-  roomName: string;
   unseenEvents: number;
   /** Вертикальная раскладка: два яруса вместо трёх колонок, у кнопок только значки. */
   compact?: boolean;
@@ -128,7 +128,6 @@ export function Header({
         <span className="text-[11px] text-ink-muted">
           {t("ui.header.round", { round: game.round_number, max: game.max_rounds })}
         </span>
-        <em className="text-3xs not-italic text-ink-dim">{roomName}</em>
       </div>
 
       <div
@@ -152,26 +151,26 @@ export function Header({
     return (
       <>
         <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
-          <Res label={t("ui.header.points")} className="text-points">★ {score}</Res>
+          <Res label={t("ui.header.points")} className="text-points"><Icon src={statIcon("score")} />{score}</Res>
         </CardPopover>
         <Sep />
         <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
-          <Res label={t("ui.header.money")} className="text-money">● {me.money}$</Res>
+          <Res label={t("ui.header.money")} className="text-money"><ResourceText>{`${me.money}$`}</ResourceText></Res>
         </CardPopover>
         <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
-          <Res label={t("ui.header.influence")} className="text-influence">◆ {me.influence}</Res>
+          <Res label={t("ui.header.influence")} className="text-influence"><Icon src={statIcon("influence")} />{me.influence}</Res>
         </CardPopover>
         <Sep />
         <CardPopover side="bottom" align="center" content={<DefenceDetails game={game} me={me} />}>
           <Res label={t("ui.header.roofs")} className="text-defence">
-            🛡 {me.roofs}
+            <Icon src={statIcon("roof")} />{me.roofs}
             <span className="text-2xs font-normal text-ink-dim">/{me.roof_limit}</span>
           </Res>
         </CardPopover>
         <CardPopover side="bottom" align="center" content={<DefenceDetails game={game} me={me} />}>
           <Res label={t("ui.header.scandals")} className={risky ? "text-warning" : "text-ink-muted"}>
             <span className={risky ? "text-[var(--color-warning)]" : undefined}>
-              ⚠ {me.scandals}
+              <Icon src={statIcon("scandal")} />{me.scandals}
               <span className="text-2xs font-normal text-ink-dim">/{scandalLimit(me)}</span>
             </span>
           </Res>
@@ -180,16 +179,8 @@ export function Header({
         <CardPopover side="bottom" align="center" content={<ActionsDetails game={game} />}>
           <Res label={t("ui.header.actions")}>
             {!compact && t("ui.header.actions")}
-            <span className="ml-0.5 flex gap-[3px]">
-              {Array.from({ length: Math.max(3, game.actions_left) }).map((_, index) => (
-                <i
-                  key={index}
-                  className={`size-2 rounded-full ${
-                    index < game.actions_left ? "bg-good" : "bg-line-2"
-                  }`}
-                />
-              ))}
-            </span>
+            <ActionCharges left={game.actions_left} />
+            {compact && <span className="text-ink-muted">{game.actions_left}</span>}
           </Res>
         </CardPopover>
       </>
@@ -213,20 +204,20 @@ export function Header({
         </div>
         <Sep />
         <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
-          <HudStat label={t("ui.header.score")} className="text-points"><Icon src={projectIcon("score")} />{score}</HudStat>
+          <HudStat label={t("ui.header.score")} className="text-points"><Icon src={statIcon("score")} />{score}</HudStat>
         </CardPopover>
         <Sep />
         <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
           <HudStat label={t("ui.header.resources")}>
-            <span className="flex items-center gap-0.5 text-money"><Icon src={statIcon("money")} />{me.money}$</span>
+            <span className="flex items-center gap-0.5 text-money"><ResourceText>{`${me.money}$`}</ResourceText></span>
             <span className="flex items-center gap-0.5 text-influence"><Icon src={statIcon("influence")} />{me.influence}</span>
           </HudStat>
         </CardPopover>
         <Sep />
         <CardPopover side="bottom" align="center" content={<ScoreDetails game={game} me={me} meta={meta} />}>
           <HudStat label={t("ui.header.income")}>
-            <span className="text-money">+{income?.money.total ?? 0}$</span>
-            <span className="text-influence">+{income?.influence.total ?? 0}◆</span>
+            <span className="text-money"><ResourceText>{`+${income?.money.total ?? 0}$`}</ResourceText></span>
+            <span className="text-influence"><ResourceText>{`+${income?.influence.total ?? 0}◆`}</ResourceText></span>
           </HudStat>
         </CardPopover>
         <Sep />
@@ -250,13 +241,8 @@ export function Header({
         <Sep />
         <CardPopover side="bottom" align="end" content={<ActionsDetails game={game} />}>
           <HudStat label={t("ui.header.actions")}>
-            <span className="flex gap-[3px]">
-              {Array.from({ length: Math.max(3, game.actions_left) }).map((_, index) => (
-                <i
-                  key={index}
-                  className={`size-2 rounded-full ${index < game.actions_left ? "bg-good" : "bg-line-2"}`}
-                />
-              ))}
+            <span className="flex items-center gap-[3px]">
+              <ActionCharges left={game.actions_left} />
             </span>
             <span className="text-ink-muted">{game.actions_left}</span>
           </HudStat>
@@ -270,36 +256,67 @@ export function Header({
       hover:bg-panel-3 ${compact ? "px-2 py-1" : "px-2.5 py-1.5"}`;
     return (
       <>
-        <ThemePicker className={shape} compact={compact} />
-        <LanguagePicker className={`text-ink ${shape}`} compact />
-        {/* Счёт и доход — в шапке, рядом с остальными моими числами, а не в панели
-          * действий: справа должно остаться то, что можно нажать в свой ход. */}
+        {/* Часто нужные правила и сводка остаются на виду; настройки и хроника собраны
+          * в меню, чтобы шапка не распирала игровое поле. */}
         <button type="button" onClick={onScore} aria-label={t("ui.header.scoreButton")} className={shape}>
           🏆{caption(t("ui.header.scoreButton"))}
-        </button>
-        <button
-          type="button"
-          onClick={onChronicle}
-          aria-label={t("ui.header.chronicle")}
-          className={`relative ${shape}`}
-        >
-          📜{caption(t("ui.header.chronicle"))}
-          {unseenEvents > 0 && (
-            <b className="absolute -right-1.5 -top-1.5 min-w-4 rounded-[9px] bg-bad px-1 text-center
-              text-3xs font-bold text-[#2a0a0a]">
-              {Math.min(unseenEvents, 99)}
-            </b>
-          )}
         </button>
         <button type="button" onClick={onRules} aria-label={t("ui.header.rules")} className={shape}>
           📖{caption(t("ui.header.rules"))}
         </button>
-        <button type="button" onClick={onExit} aria-label={t("ui.header.backToRooms")} className={shape}>
-          ←{caption(t("ui.header.rooms"))}
+        <button type="button" onClick={onExit} aria-label={t("ui.header.backToRooms")} title={t("ui.header.backToRooms")} className={shape}>
+          <span aria-hidden="true">🚪</span>
         </button>
+        <Popover.Root>
+          <Popover.Trigger asChild>
+            <button type="button" aria-label={t("ui.header.menu")} title={t("ui.header.menu")} className={`relative ${shape}`}>
+              ☰{caption(t("ui.header.menu"))}
+              {unseenEvents > 0 && (
+                <b className="absolute -right-1.5 -top-1.5 min-w-4 rounded-[9px] bg-bad px-1 text-center
+                  text-3xs font-bold text-[#2a0a0a]">
+                  {Math.min(unseenEvents, 99)}
+                </b>
+              )}
+            </button>
+          </Popover.Trigger>
+          <Popover.Portal>
+            <Popover.Content
+              side="bottom"
+              align="end"
+              sideOffset={6}
+              collisionPadding={10}
+              className="z-50 grid w-[220px] gap-2 rounded-lg border border-line-2 bg-panel p-2 text-ink shadow-xl"
+            >
+              <ThemePicker className="w-full rounded-md border border-line bg-panel-2 px-2 py-1.5 text-xs" compact={false} />
+              <LanguagePicker className="w-full justify-between rounded-md border border-line bg-panel-2 px-2 py-1.5 text-xs" />
+              <Popover.Close asChild>
+                <button type="button" onClick={onChronicle} aria-label={t("ui.header.chronicle")}
+                  className="flex items-center justify-between rounded-md border border-line bg-panel-2 px-2 py-1.5 text-left text-xs hover:bg-panel-3">
+                  <span>📜 {t("ui.header.chronicle")}</span>
+                  {unseenEvents > 0 && <b className="rounded-full bg-bad px-1.5 text-3xs text-[#2a0a0a]">{Math.min(unseenEvents, 99)}</b>}
+                </button>
+              </Popover.Close>
+            </Popover.Content>
+          </Popover.Portal>
+        </Popover.Root>
       </>
     );
   }
+}
+
+function ActionCharges({ left }: { left: number }) {
+  return (
+    <span className="ml-0.5 flex items-center gap-0.5" aria-hidden="true">
+      {Array.from({ length: Math.max(3, left) }).map((_, index) => (
+        <img
+          key={index}
+          src={statIcon("actions")}
+          alt=""
+          className={`size-3 object-contain ${index < left ? "" : "opacity-30 grayscale"}`}
+        />
+      ))}
+    </span>
+  );
 }
 
 /* Полоса оставлена только для исключительных состояний. Текущий ход теперь виден прямо
@@ -321,7 +338,7 @@ export function StatusBar({
   if (error) {
     return (
       <div className={`${base} border-[#7d3c45] bg-[#2a1519] text-[#ffb3b3]`}>
-        <span>⚠</span>
+        <Icon src={statIcon("scandal")} />
         <span className="overflow-hidden text-ellipsis whitespace-nowrap">{error}</span>
       </div>
     );

@@ -32,7 +32,6 @@ function render(name: ScenarioName, overrides: Partial<ActionContext> = {}, layo
       <BoardView
         game={game}
         meta={meta}
-        roomName="тест"
         context={context}
         onAction={() => {}}
         busy={false}
@@ -58,7 +57,7 @@ describe("BoardView", () => {
   it("показывает закрытые слоты города с ценой расширения", () => {
     const html = render("Слоты заняты");
     expect(html).toContain("Открыть");
-    expect(html).toContain("6$");
+    expect(html).toContain("stat-money.webp");
   });
 
   it("причина «нельзя купить» — в окне подробностей, а не на лице карточки рынка", () => {
@@ -116,7 +115,6 @@ describe("BoardView", () => {
         <BoardView
           game={{ ...game, players: game.players.map(player => (player.id === ME ? bare : player)) }}
           meta={meta}
-          roomName="тест"
           context={context}
           onAction={() => {}}
           busy={false}
@@ -173,7 +171,6 @@ describe("BoardView", () => {
         <BoardView
           game={{ ...game, players: game.players.map(player => (player.id === ME ? broken : player)) }}
           meta={meta}
-          roomName="тест"
           context={context}
           onAction={() => {}}
           busy={false}

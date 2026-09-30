@@ -354,7 +354,7 @@
       "influence": "Influence", "roofs": "Protection", "scandals": "Scandals", "actions": "Actions", "yourRole": "Your role",
       "noRole": "No role", "score": "Score", "resources": "Resources", "income": "Round income", "city": "City",
       "defence": "Defence", "scoreButton": "Score and income", "chronicle": "Log", "rules": "Rules", "rooms": "Rooms",
-      "backToRooms": "Back to the rooms", "busy": "The server is making the move, bots are thinking…",
+      "backToRooms": "Back to the rooms", "menu": "Menu", "busy": "The server is making the move, bots are thinking…",
       "finished": "🏁 The game is over", "jailed": "🚔 Arrested: only 1 action next turn", "theme": "Colour theme"
     },
     "themes": { "blue": "Dusty blue", "green": "Green", "limestone": "Limestone", "plum": "Plum", "dark": "Dark" },
@@ -362,7 +362,7 @@
       "titleShort": "Projects", "title": "City projects", "mine": "yours: {{count}} · {{points}} pts",
       "none": "you have no projects yet", "rerolled": "The board was already re-dealt this turn",
       "rerollHint": "All four projects go back to the deck, and four new ones come out. The board is shared — it changes for everyone.",
-      "reroll": "Re-deal · ", "deck": "{{count}} in the deck", "details": "{{title}} — details",
+      "reroll": "Re-deal · ", "details": "{{title}} — details",
       "empty": "The city has run out of projects.", "vetoMine": "Your veto: the project is closed for everyone else",
       "vetoTheirs": "Politician's veto: only they can take this project", "leaving": "Leaves at the end of the round",
       "points": "{{count}} pts", "ptsShort": "pts", "onlyPoints": "Victory points only", "condition": "Condition: ",
@@ -497,9 +497,6 @@
       "intro": "Any of your businesses in the right district unlocks a deal — you don't need a role. One deal per turn, and the attempt is spent even if it fails. Success gives you {{success}} scandal, failure — {{failure}}. Protection does not stop your own scandals.",
       "spentHint": "you already made a deal this turn", "needHint": "you need a business in: {{districts}}", "chance": "{{chance}}% · {{points}} pts"
     },
-    "marketPanel": {
-      "title": "Market", "metaShort": "{{rotation}} of {{total}} leave · deck {{deck}}",
-      "meta": "{{rotation}} of {{total}} slots leave at the end of the round · {{deck}} in the deck"
-    }
+    "marketPanel": { "title": "Market" }
   }
 }

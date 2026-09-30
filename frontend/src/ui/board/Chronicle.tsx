@@ -4,6 +4,7 @@ import { describeEventSegments } from "../../online/gameUi";
 import { useGameLogExport } from "../../online/gameLogExport";
 import type { CityMeta, GameState, RoomView } from "../../online/types";
 import { Modal } from "../primitives/Modal";
+import { ResourceText } from "../primitives/ResourceIcon";
 import { useRoom, useSession } from "../lib/session";
 
 /* Хроника. Единственное место, которому поповера мало: события идут списком и их много.
@@ -50,7 +51,7 @@ export function Chronicle({
                 if (segment.kind === "player") {
                   return (
                     <b key={position} style={{ color: segment.color }} className="font-semibold">
-                      {segment.text}
+                      <ResourceText>{segment.text}</ResourceText>
                     </b>
                   );
                 }
@@ -66,11 +67,11 @@ export function Chronicle({
                             : "font-semibold text-ink"
                       }
                     >
-                      {segment.text}
+                      <ResourceText>{segment.text}</ResourceText>
                     </b>
                   );
                 }
-                return <span key={position}>{segment.text}</span>;
+                return <span key={position}><ResourceText>{segment.text}</ResourceText></span>;
               })}
             </li>
           );

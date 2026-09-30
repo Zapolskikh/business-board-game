@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useThemeStyle } from "../lib/theme";
 import { useState, type ReactNode } from "react";
+import { statIcon } from "../assets/cards";
 
 /* Вертикальная раскладка телефона: центр всегда на экране, бока приезжают по требованию.
  *
@@ -40,7 +41,7 @@ export function MobileFrame({
         * а не начнёт ездить по горизонтали вместе со всей доской. */}
       <div className="min-h-0 min-w-0 overflow-hidden">{center}</div>
 
-      <EdgeTab side="right" label={t("ui.mobile.right")} glyph="⚡" onOpen={() => setOpen("right")} />
+      <EdgeTab side="right" label={t("ui.mobile.right")} glyph={<img src={statIcon("actions")} alt="" className="size-4" />} onOpen={() => setOpen("right")} />
 
       <Sheet side="left" label={t("ui.mobile.left")} open={open === "left"} onClose={() => setOpen(null)}>
         {left}
@@ -61,7 +62,7 @@ function EdgeTab({
 }: {
   side: Side;
   label: string;
-  glyph: string;
+  glyph: ReactNode;
   onOpen: () => void;
 }) {
   return (

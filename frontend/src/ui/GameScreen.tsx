@@ -14,14 +14,12 @@ export function GameScreen({
   password,
   playerId,
   meta,
-  roomName,
   onExit,
 }: {
   roomId: string;
   password: string;
   playerId: string;
   meta: CityMeta;
-  roomName: string;
   onExit: () => void;
 }) {
   const [client] = useState(createGameQueryClient);
@@ -29,17 +27,17 @@ export function GameScreen({
   return (
     <GameQueryProvider client={client}>
       <GameSession roomId={roomId} password={password} playerId={playerId} meta={meta}>
-        <Gate roomName={roomName} onExit={onExit} />
+        <Gate onExit={onExit} />
       </GameSession>
     </GameQueryProvider>
   );
 }
 
-function Gate({ roomName, onExit }: { roomName: string; onExit: () => void }) {
+function Gate({ onExit }: { onExit: () => void }) {
   const { t } = useTranslation();
   const { data, error, isLoading } = useRoom();
 
-  if (data?.game) return <Board roomName={roomName} onExit={onExit} />;
+  if (data?.game) return <Board onExit={onExit} />;
 
   return (
     <div className="ui-v2 grid h-dvh place-content-center gap-3 justify-items-center bg-surface

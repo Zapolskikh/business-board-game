@@ -24,6 +24,23 @@ describe("buildRulesBook", () => {
     expect(economy.html).not.toContain("<code>finance</code>");
     expect(economy.html).toContain("«Финансы»");
   });
+
+  it("начинается с обзора и показывает общие доски и разметку карты проекта", () => {
+    expect(book[0].id).toBe("intro");
+    expect(book[0].html).toContain("рынок общие");
+    expect(book[0].html).toContain('class="rules-resource-icon"');
+    expect(book[0].html).not.toContain("◆");
+    expect(book[0].html).not.toContain("⚠");
+
+    const market = book.find(chapter => chapter.id === "flow")!;
+    expect(market.html).toContain(`${meta.assets.length} карт объектов`);
+    expect(market.html).toContain("самых старых слота");
+
+    const projects = book.find(chapter => chapter.id === "projects")!;
+    expect(projects.html).toContain("rules-project-card");
+    expect(projects.html).toContain("самый старый проект слева");
+    expect(projects.html).toContain("правый слот");
+  });
 });
 
 describe("книга на всех языках", () => {

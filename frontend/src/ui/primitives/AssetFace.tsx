@@ -13,6 +13,7 @@ import {
   rarityRibbon,
   statIcon,
 } from "../assets/cards";
+import { ResourceText } from "./ResourceIcon";
 
 /* Общая форма карточки объекта: и на рынке, и в своём городе.
  *
@@ -122,7 +123,7 @@ export function AssetFace({
   const { t } = useTranslation("game");
   const summary = assetFaceSummary(asset, lines);
   const points = asset.points ?? 0;
-  const star = projectIcon("score");
+  const star = statIcon("score");
   const icon = districtIcon(district?.id);
 
   /* Вертикально карточка краткая: цена, название, очки и доход. Всё остальное — по нажатию.
@@ -132,7 +133,7 @@ export function AssetFace({
       <>
         <span className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1">
           {price ? (
-            <b className={`text-3xs font-bold ${price.short ? "text-bad" : "text-gold"}`}>{price.value}$</b>
+            <b className={`text-3xs font-bold ${price.short ? "text-bad" : "text-gold"}`}><ResourceText>{`${price.value}$`}</ResourceText></b>
           ) : (
             <span />
           )}
@@ -144,14 +145,15 @@ export function AssetFace({
         </span>
         <h3 className="overflow-hidden text-[11px] leading-[1.15] font-semibold text-ink">{asset.title}</h3>
         <span className="flex items-center gap-1.5 overflow-hidden text-3xs whitespace-nowrap">
-          <b className={income.money ? "font-bold text-money" : "text-ink-dim"}>{signed(income.money, "$")}</b>
-          {income.influence !== 0 && <b className="font-bold text-influence">{signed(income.influence, "◆")}</b>}
+          <b className={income.money ? "font-bold text-money" : "text-ink-dim"}><ResourceText>{signed(income.money, "$")}</ResourceText></b>
+          {income.influence !== 0 && <b className="font-bold text-influence"><ResourceText>{signed(income.influence, "◆")}</ResourceText></b>}
           {summary.unique.length > 0 && <span className="text-ink-dim">✦</span>}
         </span>
         <span className="flex items-center gap-1 overflow-hidden text-3xs whitespace-nowrap text-ink-dim">
           {bullets.map(bullet => (
             <span key={bullet.key} title={bullet.title} className={bullet.tone ? bulletTone[bullet.tone] : ""}>
-              {bullet.icon}
+              <ResourceText>{bullet.icon}</ResourceText>
+              <ResourceText>{bullet.text}</ResourceText>
             </span>
           ))}
         </span>
@@ -174,7 +176,7 @@ export function AssetFace({
             style={pricePlaque ? { backgroundImage: `url(${pricePlaque})` } : undefined}
             title={price.short ? t("ui.asset.priceShort") : t("ui.asset.priceMine")}
           >
-            {price.value}$
+            <ResourceText>{`${price.value}$`}</ResourceText>
           </b>
         ) : (
           <span />
@@ -217,8 +219,8 @@ export function AssetFace({
         * Пустое поле приглушено, а не убрано — шесть карт сравниваются одним взглядом. */}
       <span className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-1.5">
         <span className="asset-fields grid min-h-0 min-w-0 grid-cols-2 grid-rows-2 overflow-hidden rounded-md">
-          <Field icon={projectIcon("money")} empty={income.money === 0} title={t("ui.asset.moneyTitle")} label={t("ui.asset.moneyEmpty")}>
-            <b className="text-[13px] text-money">{signed(income.money, "$")}</b>
+          <Field icon={statIcon("money")} empty={income.money === 0} title={t("ui.asset.moneyTitle")} label={t("ui.asset.moneyEmpty")}>
+            <b className="text-[13px] text-money"><ResourceText>{signed(income.money, "$")}</ResourceText></b>
             <small>{t("ui.asset.perRound")}</small>
           </Field>
           <Field
@@ -229,12 +231,12 @@ export function AssetFace({
             title={owned ? t("ui.asset.oneTimeOwned") : t("ui.asset.oneTimeMarket")}
           >
             <b className="min-w-0 overflow-hidden text-ellipsis text-[12px] text-influence">
-              {summary.oneTime.length ? summary.oneTime.join(", ") : "—"}
+              {summary.oneTime.length ? <ResourceText>{summary.oneTime.join(", ")}</ResourceText> : "—"}
             </b>
             <small>{owned ? t("ui.asset.received") : t("ui.asset.now")}</small>
           </Field>
-          <Field icon={projectIcon("influence")} empty={income.influence === 0} title={t("ui.asset.influenceTitle")} label={t("ui.asset.influenceEmpty")}>
-            <b className="text-[13px] text-influence">{signed(income.influence, "◆")}</b>
+          <Field icon={statIcon("influence")} empty={income.influence === 0} title={t("ui.asset.influenceTitle")} label={t("ui.asset.influenceEmpty")}>
+            <b className="text-[13px] text-influence"><ResourceText>{signed(income.influence, "◆")}</ResourceText></b>
             <small>{t("ui.asset.perRound")}</small>
           </Field>
           <Field
@@ -244,7 +246,7 @@ export function AssetFace({
             title={summary.uniqueText.join("\n") || t("ui.asset.noUnique")}
           >
             <b className="line-clamp-2 min-w-0 text-[10px] leading-[1.15] whitespace-normal text-[var(--color-badge)]">
-              {summary.unique.length ? summary.unique.join(" · ") : "—"}
+              {summary.unique.length ? <ResourceText>{summary.unique.join(" · ")}</ResourceText> : "—"}
             </b>
           </Field>
         </span>
@@ -260,8 +262,8 @@ export function AssetFace({
                 }`}
               >
                 <span className="text-ink-dim">•</span>
-                <span>{bullet.icon}</span>
-                {bullet.text}
+                <span><ResourceText>{bullet.icon}</ResourceText></span>
+                <ResourceText>{bullet.text}</ResourceText>
               </li>
             ))}
           </ul>
@@ -314,7 +316,7 @@ function Field({
       ) : (
         <span className="flex min-w-0 items-baseline gap-1">{children}</span>
       )}
-      {empty && <small className="overflow-hidden text-ellipsis">{label}</small>}
+      {empty && <small className="overflow-hidden text-ellipsis"><ResourceText>{label}</ResourceText></small>}
     </span>
   );
 }

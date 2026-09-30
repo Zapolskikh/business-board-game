@@ -2,6 +2,7 @@ import { tr } from "../../i18n";
 import { useEffect, useRef, useState } from "react";
 import { describeEventSegments, numberValue, stringValue, type LogSegment } from "../../online/gameUi";
 import type { CityMeta, DomainEvent, GameState, PlayerState } from "../../online/types";
+import type { ResourceIcon as ResourceIconName } from "../assets/cards";
 
 /* Сводка «что со мной случилось, пока я не ходил».
  *
@@ -38,7 +39,7 @@ export interface BriefingSnapshot {
 export interface BriefingStat {
   key: string;
   label: string;
-  icon: string;
+  icon: ResourceIconName | "🏢" | "🏗" | "📐" | "🏦";
   from: number;
   to: number;
   tone: BriefingTone;
@@ -99,12 +100,12 @@ function toneOf(delta: number, positiveIsGood: boolean): BriefingTone {
   return delta > 0 === positiveIsGood ? "good" : "bad";
 }
 
-const STAT_ROWS: { key: keyof BriefingSnapshot; icon: string; positiveIsGood: boolean }[] = [
-  { key: "money", icon: "$", positiveIsGood: true },
-  { key: "influence", icon: "◆", positiveIsGood: true },
-  { key: "score", icon: "★", positiveIsGood: true },
-  { key: "scandals", icon: "⚠", positiveIsGood: false },
-  { key: "roofs", icon: "🛡", positiveIsGood: true },
+const STAT_ROWS: { key: keyof BriefingSnapshot; icon: BriefingStat["icon"]; positiveIsGood: boolean }[] = [
+  { key: "money", icon: "money", positiveIsGood: true },
+  { key: "influence", icon: "influence", positiveIsGood: true },
+  { key: "score", icon: "score", positiveIsGood: true },
+  { key: "scandals", icon: "scandal", positiveIsGood: false },
+  { key: "roofs", icon: "roof", positiveIsGood: true },
   { key: "assets", icon: "🏢", positiveIsGood: true },
   { key: "projects", icon: "🏗", positiveIsGood: true },
   { key: "capacity", icon: "📐", positiveIsGood: true },

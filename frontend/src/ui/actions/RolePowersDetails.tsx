@@ -5,6 +5,7 @@ import { PopoverBody, PopoverHeader } from "../primitives/CardPopover";
 import { EffectList } from "../primitives/atoms";
 import { findActions, type ActionContext } from "../lib/actions";
 import type { Indexes } from "../lib/board";
+import { ResourceText } from "../primitives/ResourceIcon";
 
 /* Возможности своей роли в одном месте: пассивные перки и активные способности.
  *
@@ -44,7 +45,7 @@ export function RolePowersDetails({
         <PopoverBody>
           <p className="text-warning">
             {t("ui.powers.noRoleStart")}
-            <strong>{game.role_price}◆</strong>
+            <strong><ResourceText>{`${game.role_price}◆`}</ResourceText></strong>
             {t("ui.powers.noRoleEnd")}
           </p>
         </PopoverBody>
@@ -56,7 +57,7 @@ export function RolePowersDetails({
     <>
       <PopoverHeader title={`${role.icon} ${role.title}`} subtitle={t("ui.powers.subtitle")} />
       <PopoverBody>
-        <p className="mb-2">{role.passive}</p>
+        <p className="mb-2"><ResourceText>{role.passive}</ResourceText></p>
 
         <p className="mb-1 font-medium text-ink">{t("ui.roles.passive")}</p>
         {perks.length > 0 ? (
@@ -82,9 +83,6 @@ export function RolePowersDetails({
               const options = findActions(context, "use_role_power", { power: status.power });
               const description = powerDescriptions[status.power];
               const unmet = status.gates.filter(gate => !gate.met);
-              /* Одна кнопка — сразу применяем; несколько (выбор цели, района, карты) — только
-               * рассказываем, где её нажимают: цель нарисована на своей карточке, и дублировать
-               * её список ещё и здесь значит поддерживать два списка одного и того же. */
               const single = status.available && options.length === 1;
               return (
                 <div
@@ -110,8 +108,8 @@ export function RolePowersDetails({
 
                   {description && (
                     <>
-                      <p className="mt-0.5 text-2xs leading-snug text-ink-muted">{description.what}</p>
-                      <p className="mt-0.5 text-2xs text-[var(--color-badge)]">{t("ui.powers.price", { cost: description.cost })}</p>
+                      <p className="mt-0.5 text-2xs leading-snug text-ink-muted"><ResourceText>{description.what}</ResourceText></p>
+                      <p className="mt-0.5 text-2xs text-[var(--color-badge)]"><ResourceText>{t("ui.powers.price", { cost: description.cost })}</ResourceText></p>
                     </>
                   )}
 
@@ -121,7 +119,7 @@ export function RolePowersDetails({
                     <ul className="mt-1 grid gap-0.5">
                       {unmet.map(gate => (
                         <li key={gate.key} className="text-2xs text-bad">
-                          ✕ {powerGateText(gate, meta)}
+                          ✕ <ResourceText>{powerGateText(gate, meta)}</ResourceText>
                         </li>
                       ))}
                     </ul>

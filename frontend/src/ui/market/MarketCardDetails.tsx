@@ -10,6 +10,7 @@ import type {
 } from "../../online/types";
 import { PopoverBody, PopoverFooter, PopoverHeader } from "../primitives/CardPopover";
 import { EffectList } from "../primitives/atoms";
+import { ResourceText } from "../primitives/ResourceIcon";
 import { marketCardReason, type MarketCardState } from "./marketCardState";
 
 /* Содержимое поповера карточки рынка.
@@ -76,7 +77,7 @@ export function MarketCardDetails({
           </dd>
           <dt className="text-ink-dim">{t("ui.market.priceRow")}</dt>
           <dd className="font-semibold text-gold">
-            {state.price}${" "}
+            <ResourceText>{`${state.price}$`}</ResourceText>{" "}
             {item.price !== undefined && item.price !== asset.cost && (
               <span className="text-ink-dim">{t("ui.market.basePrice", { cost: asset.cost })}</span>
             )}
@@ -87,10 +88,10 @@ export function MarketCardDetails({
           <dd className="font-medium text-money">
             {item.preview ? (
               <>
-                {sign(item.preview.money)}{Math.abs(item.preview.money)}$ {t("ui.market.perRound")}
+                <ResourceText>{`${sign(item.preview.money)}${Math.abs(item.preview.money)}$`}</ResourceText> {t("ui.market.perRound")}
                 {item.preview.influence !== 0 && (
                   <span className="text-influence">
-                    {" · "}{sign(item.preview.influence)}{Math.abs(item.preview.influence)}◆ {t("ui.market.perRound")}
+                    {" · "}<ResourceText>{`${sign(item.preview.influence)}${Math.abs(item.preview.influence)}◆`}</ResourceText> {t("ui.market.perRound")}
                   </span>
                 )}
                 <span className="block text-2xs font-normal text-ink-dim">
@@ -98,13 +99,13 @@ export function MarketCardDetails({
                 </span>
               </>
             ) : (
-              <>+{asset.income}$ {t("ui.market.perRound")}</>
+              <><ResourceText>{`+${asset.income}$`}</ResourceText> {t("ui.market.perRound")}</>
             )}
           </dd>
           {asset.influence > 0 && (
             <>
               <dt className="text-ink-dim">{t("ui.market.nowRow")}</dt>
-              <dd className="font-medium text-influence">{t("ui.market.nowValue", { value: asset.influence })}</dd>
+              <dd className="font-medium text-influence"><ResourceText>{t("ui.market.nowValue", { value: asset.influence })}</ResourceText></dd>
             </>
           )}
         </dl>

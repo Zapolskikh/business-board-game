@@ -1,6 +1,8 @@
 import { useTranslation } from "react-i18next";
 import type { LogSegment } from "../../online/gameUi";
 import { Modal } from "../primitives/Modal";
+import { ResourceIcon } from "../primitives/ResourceIcon";
+import { ResourceText } from "../primitives/ResourceIcon";
 import type { Briefing, BriefingTone } from "./briefing";
 
 /* Окно «что произошло, пока вы не ходили».
@@ -29,7 +31,7 @@ function Segments({ segments }: { segments: LogSegment[] }) {
         if (segment.kind === "player") {
           return (
             <b key={position} style={{ color: segment.color }} className="font-semibold">
-              {segment.text}
+              <ResourceText>{segment.text}</ResourceText>
             </b>
           );
         }
@@ -41,11 +43,11 @@ function Segments({ segments }: { segments: LogSegment[] }) {
                 segment.tone === "good" ? "text-good" : segment.tone === "bad" ? "text-bad" : "text-ink"
               }`}
             >
-              {segment.text}
+              <ResourceText>{segment.text}</ResourceText>
             </b>
           );
         }
-        return <span key={position}>{segment.text}</span>;
+        return <span key={position}><ResourceText>{segment.text}</ResourceText></span>;
       })}
     </>
   );
@@ -111,7 +113,11 @@ export function TurnBriefingModal({ briefing, onClose }: { briefing: Briefing | 
                     key={stat.key}
                     className="flex items-baseline gap-1.5 rounded-md bg-panel-2 px-2.5 py-2 text-xs"
                   >
-                    <span className="w-4 shrink-0 text-center text-ink-dim">{stat.icon}</span>
+                    <span className="flex w-4 shrink-0 justify-center text-ink-dim">
+                      {typeof stat.icon === "string" && ["money", "influence", "actions", "scandal", "roof", "score"].includes(stat.icon)
+                        ? <ResourceIcon name={stat.icon as "money" | "influence" | "actions" | "scandal" | "roof" | "score"} size="1em" />
+                        : stat.icon}
+                    </span>
                     <span className="flex-1 truncate text-ink-muted">{stat.label}</span>
                     <span className="text-ink-dim">{stat.from}</span>
                     <span className="text-ink-dim">{arrow}</span>

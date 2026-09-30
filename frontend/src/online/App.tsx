@@ -47,7 +47,7 @@ export default function App() {
   if (playing && session) {
     return (
       <Suspense fallback={<div className="rooms-app app-state"><span className="loading-ring" /><p>{t("app.loadingTable")}</p></div>}>
-        <GameScreen roomId={roomId} password={session.password} playerId={session.playerId} meta={meta} roomName={roomId} onExit={back} />
+        <GameScreen roomId={roomId} password={session.password} playerId={session.playerId} meta={meta} onExit={back} />
       </Suspense>
     );
   }

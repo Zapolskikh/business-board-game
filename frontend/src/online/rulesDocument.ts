@@ -14,6 +14,8 @@ import {
   rarityLabels,
   tagLabel,
 } from "./gameUi";
+import { projectArt, projectIcon, projectKind, statIcon } from "../ui/assets/cards";
+import { resourceIconsInHtml } from "../ui/primitives/ResourceIcon";
 import { bookRu } from "./rules/ru";
 import { bookEn } from "./rules/en";
 import { bookCs } from "./rules/cs";
@@ -95,6 +97,7 @@ export interface RulesContext {
     crisisPr: number;
     reroll: number;
     rotation: number;
+    projectBoardSize: number;
     cardCost: number;
     discard: number;
     capacityCosts: number[];
@@ -118,6 +121,16 @@ export interface RulesContext {
     districtRoles: () => string;
     assetTables: (labels: TableLabels) => string;
     projectTable: (labels: TableLabels) => string;
+    projectExample: (labels: {
+      heading: string;
+      caption: string;
+      title: string;
+      points: string;
+      condition: string;
+      price: string;
+      reward: string;
+      action: string;
+    }) => string;
     cardTable: (labels: TableLabels) => string;
     roleCards: (guides: Record<string, RoleGuide>, labels: TableLabels) => string;
   };
@@ -171,6 +184,7 @@ function context(meta: CityMeta, rolePrice: number): RulesContext {
       crisisPr: crisisPrInfluence(meta),
       reroll: projectRerollMoney(meta),
       rotation: marketRotationSize(meta),
+      projectBoardSize: scoring?.project_board_size ?? 4,
       cardCost: scoring?.action_card_cost ?? 3,
       discard: scoring?.card_discard_value ?? 2,
       capacityCosts: Object.values(scoring?.capacity_costs ?? { 3: 6, 4: 10, 5: 15 }),
@@ -248,6 +262,36 @@ function context(meta: CityMeta, rolePrice: number): RulesContext {
           </tr>`)
           .join("")}</tbody>
       </table>`,
+      projectExample: labels => {
+        const project = meta.projects.find(item => Object.keys(item.perk ?? {}).length) ?? meta.projects[0];
+        if (!project) return "";
+        const kind = projectKind(project.perk);
+        const art = projectArt(kind);
+        const icon = projectIcon(kind);
+        const scoreIcon = statIcon("score");
+        const artStyle = art ? ` style="--rules-project-art: url('${e(art)}')"` : "";
+        return `
+        <figure class="rules-project-figure">
+          <figcaption><b>${e(labels.heading)}</b><span>${e(labels.caption)}</span></figcaption>
+          <div class="rules-project-layout">
+            <article class="rules-project-card" data-kind="${e(kind)}"${artStyle}>
+              <header><b>${e(project.title)}</b><span>${scoreIcon ? `<img src="${e(scoreIcon)}" alt="">` : "★"}<strong>${project.points}</strong></span></header>
+              <div class="rules-project-card-condition"><small>${e(labels.condition)}</small><b>${e(projectRequirementText(project, meta))}</b></div>
+              <footer>
+                <span><small>${e(labels.price)}</small><b>${project.cost_influence}◆ + ${project.cost_money}$</b></span>
+                <span><small>${e(labels.reward)}</small><b>${icon ? `<img src="${e(icon)}" alt="">` : "🎁"}${e(projectPerkText(project))}</b></span>
+              </footer>
+            </article>
+            <ol class="rules-project-annotations">
+              <li><b>1 · ${e(labels.title)}</b><span>${e(project.title)}</span></li>
+              <li><b>2 · ${e(labels.points)}</b><span>${project.points}</span></li>
+              <li><b>3 · ${e(labels.condition)}</b><span>${e(projectRequirementText(project, meta))}</span></li>
+              <li><b>4 · ${e(labels.price)}</b><span>${project.cost_influence}◆ + ${project.cost_money}$ + ${e(labels.action)}</span></li>
+              <li><b>5 · ${e(labels.reward)}</b><span>${e(projectPerkText(project))}</span></li>
+            </ol>
+          </div>
+        </figure>`;
+      },
       cardTable: labels => `
       <table>
         <thead><tr><th>${labels.card}</th><th>${labels.type}</th><th>${labels.target}</th><th>${labels.effect}</th></tr></thead>
@@ -272,5 +316,8 @@ const books: Record<string, (ctx: RulesContext) => RulesChapter[]> = { ru: bookR
 /** Книга на текущем языке игры. */
 export function buildRulesBook(meta: CityMeta, rolePrice: number): RulesChapter[] {
   const build = books[i18next.language] ?? books.en;
-  return build(context(meta, rolePrice));
+  return build(context(meta, rolePrice)).map(chapter => ({
+    ...chapter,
+    html: resourceIconsInHtml(chapter.html),
+  }));
 }

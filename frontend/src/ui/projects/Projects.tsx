@@ -8,7 +8,8 @@ import { KeyValue, Panel, sectionTitle, zoneRule } from "../primitives/atoms";
 import { resolve, usedThisTurn, type ActionContext } from "../lib/actions";
 import type { Indexes } from "../lib/board";
 import { useIsPortrait } from "../lib/layout";
-import { projectArt, projectIcon, projectKind } from "../assets/cards";
+import { projectArt, projectIcon, projectKind, statIcon } from "../assets/cards";
+import { ResourceText } from "../primitives/ResourceIcon";
 
 /* Доска проектов. Общая для всех: кто взял — тот и забрал, остальным проект недоступен.
  * Поэтому карточка на доске показывает только цену и прогресс, а «почему» — в поповере.
@@ -46,8 +47,8 @@ export function Projects({
 
   return (
     <Panel zone="projects">
-      {/* Вертикально в строку помещается заголовок, счётчик своих проектов и кнопка. Всё
-        * остальное — размер колоды, длинная подпись кнопки — уходит: это справка, а не решение. */}
+      {/* В строке остаются счётчик своих проектов и действие. Размер колоды — справочная
+        * информация, она живёт в книге правил, а не на игровом столе. */}
       <div className={`flex items-baseline gap-2 overflow-hidden px-0.5 pb-[2px] ${zoneRule}`}>
         <h2 className={sectionTitle}>
           {portrait ? t("ui.projects.titleShort") : t("ui.projects.title")}
@@ -70,13 +71,8 @@ export function Projects({
             text-3xs whitespace-nowrap text-ink-muted enabled:hover:border-accent disabled:opacity-45"
         >
           🔄 {portrait ? "" : t("ui.projects.reroll")}
-          {projectRerollMoney(meta)}$ + ⚡
+          <ResourceText>{`${projectRerollMoney(meta)}$ + ⚡`}</ResourceText>
         </button>
-        {!portrait && (
-          <span className="whitespace-nowrap text-[10.5px] text-ink-dim">
-            {t("ui.projects.deck", { count: game.project_deck_count })}
-          </span>
-        )}
       </div>
 
       {/* 90% ширины: проектов всегда четыре, и на всю колонку карточки растягивались
@@ -198,7 +194,7 @@ const ProjectCard = forwardRef<
   const kind = projectKind(project.perk);
   const art = projectArt(kind);
   const icon = projectIcon(kind);
-  const star = projectIcon("score");
+  const star = statIcon("score");
   /* Вертикально на карточке остаются только те две строки, по которым выбирают: название с
    * очками и цена с прогрессом. Текст условия и постоянный бонус уезжают в поповер — иначе
    * четыре проекта съедают треть экрана, которой не хватает рынку. */
@@ -263,7 +259,7 @@ const ProjectCard = forwardRef<
           {icon && <img src={icon} alt="" className="size-[20px] shrink-0 object-contain" />}
           <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[11.5px] font-semibold
             text-[var(--project-ink)]">
-            {kind === "points" ? t("ui.projects.onlyPoints") : perk}
+            <ResourceText>{kind === "points" ? t("ui.projects.onlyPoints") : perk}</ResourceText>
           </span>
         </span>
       )}
@@ -275,7 +271,7 @@ const ProjectCard = forwardRef<
           }`}
         >
           {met ? "✓ " : t("ui.projects.condition")}
-          {projectRequirementText(project, meta)}
+          <ResourceText>{projectRequirementText(project, meta)}</ResourceText>
         </span>
       )}
 
@@ -285,9 +281,9 @@ const ProjectCard = forwardRef<
         {standing && <ProjectProgress standing={standing} compact={portrait} />}
         <span className="project-card-plate ml-auto shrink-0 whitespace-nowrap !pl-1.5 text-[11.5px] font-bold"
           title={t("ui.projects.price")}>
-          <span className={shortInfluence ? "text-bad" : "text-influence"}>{project.cost_influence}◆</span>
+          <span className={shortInfluence ? "text-bad" : "text-influence"}><ResourceText>{`${project.cost_influence}◆`}</ResourceText></span>
           {" + "}
-          <span className={shortMoney ? "text-bad" : "text-money"}>{project.cost_money}$</span>
+          <span className={shortMoney ? "text-bad" : "text-money"}><ResourceText>{`${project.cost_money}$`}</ResourceText></span>
         </span>
       </span>
     </button>
@@ -362,8 +358,8 @@ function ProjectDetails({
       <PopoverBody>
         <KeyValue
           rows={[
-            [t("ui.projects.priceRow"), `${project.cost_influence}◆ + ${project.cost_money}$ + ⚡`],
-            [t("ui.projects.requirement"), projectRequirementText(project, meta)],
+            [t("ui.projects.priceRow"), <ResourceText>{`${project.cost_influence}◆ + ${project.cost_money}$ + ⚡`}</ResourceText>],
+            [t("ui.projects.requirement"), <ResourceText>{projectRequirementText(project, meta)}</ResourceText>],
             [
               t("ui.projects.yourProgress"),
               standing ? (
@@ -380,9 +376,9 @@ function ProjectDetails({
             ],
           ]}
         />
-        <p className="mb-2">{project.text}</p>
+        <p className="mb-2"><ResourceText>{project.text}</ResourceText></p>
         <p className="mb-2">
-          <strong>{t("ui.projects.perk")}</strong> {projectPerkText(project)}
+          <strong>{t("ui.projects.perk")}</strong> <ResourceText>{projectPerkText(project)}</ResourceText>
         </p>
         <p className="mb-2">{t("ui.projects.unique")}</p>
         {leaving && <p className="text-gold">{t("ui.projects.leavingNote")}</p>}

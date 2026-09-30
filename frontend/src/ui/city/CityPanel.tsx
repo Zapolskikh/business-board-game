@@ -9,6 +9,7 @@ import { useIsPortrait } from "../lib/layout";
 import { EffectList, KeyValue, Panel, SectionHead } from "../primitives/atoms";
 import { resolve, type ActionContext } from "../lib/actions";
 import { maxCapacity, type Indexes } from "../lib/board";
+import { ResourceText } from "../primitives/ResourceIcon";
 
 /* Мой город: занятые слоты, свободные и закрытые.
  *
@@ -142,7 +143,7 @@ export function CityPanel({
             >
               <b className="card-serif text-[13px]">{t("ui.city.lockedSlot", { number: slot + 1 })}</b>
               <span className="rounded border border-line bg-panel-2 px-2 py-0.5 text-2xs text-ink">
-                {t("ui.city.open")}<b className={short ? "font-bold text-bad" : ""}>{price ?? "?"}$</b>
+                {t("ui.city.open")}<b className={short ? "font-bold text-bad" : ""}><ResourceText>{`${price ?? "?"}$`}</ResourceText></b>
               </span>
             </button>
           );
