@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "content_version": "city-content-2026-09-29",
+  "content_version": "city-content-2026-09-30",
   "districts": [
     {
       "id": "residential",
@@ -762,15 +762,10 @@
       "cost": 4,
       "income": 2,
       "influence": 0,
-      "text": "При покупке +2$; открывает отмывание денег в влияние.",
+      "text": "Открывает отмывание денег во влияние.",
       "tags": [
         "grey"
-      ],
-      "effects": {
-        "purchase": {
-          "money": 2
-        }
-      }
+      ]
     },
     {
       "id": "market",

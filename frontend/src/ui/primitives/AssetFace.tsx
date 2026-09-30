@@ -41,6 +41,8 @@ export const assetRarityColor = (rarity: string): string => rarityColor[rarity] 
 export interface AssetFaceSummary {
   /** Что покупка даёт один раз: «+2◆», «+2$», «+1 Крыша», «карта». */
   oneTime: string[];
+  /** Влияние, выдаваемое при покупке: на лице карты оно показывается рядом с иконкой поля. */
+  oneTimeInfluence: number;
   /** Постоянные особые свойства — короткими ярлыками. */
   unique: string[];
   /** Полные формулировки особых свойств — для подсказки. */
@@ -72,6 +74,7 @@ export function assetFaceSummary(asset: AssetMeta, lines: AssetEffectLine[]): As
   const passive = lines.filter(line => line.kind === "passive");
   return {
     oneTime,
+    oneTimeInfluence: influence,
     unique: passive.map(line => line.short),
     uniqueText: passive.map(line => line.text),
     // Общие правила района одинаковы для всех карт района и объяснены в подробностях;
@@ -122,6 +125,7 @@ export function AssetFace({
   const portrait = useIsPortrait();
   const { t } = useTranslation("game");
   const summary = assetFaceSummary(asset, lines);
+  const otherOneTime = summary.oneTime.filter(item => !item.endsWith("◆"));
   const points = asset.points ?? 0;
   const star = statIcon("score");
   const icon = districtIcon(district?.id);
@@ -220,7 +224,7 @@ export function AssetFace({
       <span className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-1.5">
         <span className="asset-fields grid min-h-0 min-w-0 grid-cols-2 grid-rows-2 overflow-hidden rounded-md">
           <Field icon={statIcon("money")} empty={income.money === 0} title={t("ui.asset.moneyTitle")} label={t("ui.asset.moneyEmpty")}>
-            <b className="text-[13px] text-money"><ResourceText>{signed(income.money, "$")}</ResourceText></b>
+            <b className="text-[13px] text-money">{signed(income.money, "")}</b>
             <small>{t("ui.asset.perRound")}</small>
           </Field>
           <Field
@@ -231,12 +235,24 @@ export function AssetFace({
             title={owned ? t("ui.asset.oneTimeOwned") : t("ui.asset.oneTimeMarket")}
           >
             <b className="min-w-0 overflow-hidden text-ellipsis text-[12px] text-influence">
-              {summary.oneTime.length ? <ResourceText>{summary.oneTime.join(", ")}</ResourceText> : "—"}
+              {summary.oneTime.length ? (
+                <>
+                  {summary.oneTimeInfluence !== 0 && signed(summary.oneTimeInfluence, "")}
+                  {summary.oneTimeInfluence !== 0 && otherOneTime.length > 0 && ", "}
+                  {otherOneTime.length > 0 && <ResourceText>{otherOneTime.join(", ")}</ResourceText>}
+                </>
+              ) : "—"}
             </b>
-            <small>{owned ? t("ui.asset.received") : t("ui.asset.now")}</small>
+            <small>
+              {owned
+                ? t("ui.asset.received")
+                : summary.oneTimeInfluence !== 0
+                  ? t("ui.asset.oneTime")
+                  : t("ui.asset.now")}
+            </small>
           </Field>
           <Field icon={statIcon("influence")} empty={income.influence === 0} title={t("ui.asset.influenceTitle")} label={t("ui.asset.influenceEmpty")}>
-            <b className="text-[13px] text-influence"><ResourceText>{signed(income.influence, "◆")}</ResourceText></b>
+            <b className="text-[13px] text-influence">{signed(income.influence, "")}</b>
             <small>{t("ui.asset.perRound")}</small>
           </Field>
           <Field
@@ -277,8 +293,8 @@ export function AssetFace({
           <b className="card-serif text-[15px] leading-none">{points}</b>
           <small className="text-2xs text-ink-muted">{t("ui.asset.points")}</small>
         </span>
-        <span className="flex min-w-0 items-center justify-end gap-1 overflow-hidden border-l border-line pl-2
-          text-2xs font-semibold text-[var(--card-district)]">
+        <span className="asset-district-badge flex min-w-0 items-center justify-end gap-1 overflow-hidden
+          rounded-md border px-1.5 py-0.5 text-2xs font-semibold">
           {icon && <img src={icon} alt="" className="size-4 shrink-0" />}
           <span className="overflow-hidden text-ellipsis whitespace-nowrap">{district?.title}</span>
         </span>

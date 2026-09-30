@@ -104,6 +104,13 @@ def test_backend_catalog_is_complete_and_can_create_a_game() -> None:
     assert len(state.project_board) == PROJECT_BOARD_SIZE
 
 
+def test_cash_exchange_does_not_grant_money_when_purchased() -> None:
+    cash = load_catalog().assets["cash"]
+
+    assert cash.effects.get("purchase", {}).get("money", 0) == 0
+    assert "При покупке +2$" not in cash.text
+
+
 def test_public_meta_ships_the_scoring_rates() -> None:
     """Clients print "N$ = 1 очко" from here; hardcoding it on either side would drift."""
     scoring = load_catalog().public_meta()["scoring"]

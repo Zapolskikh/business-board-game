@@ -14,8 +14,8 @@ SCHEMA_VERSION = 1
 RULES_VERSION = "city-1.14.0"
 
 # Bumped whenever the catalog changes, even if no rule moved: card texts are part of the agreement
-# too. 2026-09-29: the tender and zoning texts rewritten for 1.14.0.
-CONTENT_VERSION = "city-content-2026-09-29"
+# too. 2026-09-30: removed the unsupported cash-exchange purchase payout.
+CONTENT_VERSION = "city-content-2026-09-30"
 
 DISTRICT_IDS = (
     "residential",

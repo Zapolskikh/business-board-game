@@ -76,7 +76,7 @@
     "regulator": { "title": "Federální agentura pro rozvoj", "text": "+1$ pro Politika a +2$, pokud máte podnik v Obchodní čtvrti. Celá čtvrť (4 podniky): +1◆ za kolo." },
     "anticorruption": { "title": "Protikorupční úřad", "text": "Žádný základní příjem, ale na začátku každého tahu smaže 1 váš skandál. Celá čtvrť (4 podniky): +1◆ za kolo." },
     "planning_charter": { "title": "Územní listina", "text": "Jednou za hru: vezměte městský projekt bez splnění podmínky. Cenu a akci platíte jako obvykle. Celá čtvrť (4 podniky): +1◆ za kolo." },
-    "cash": { "title": "Směnárny hotovosti", "text": "Při koupi: +2$." },
+    "cash": { "title": "Směnárny hotovosti", "text": "Zpřístupní praní peněz na vliv." },
     "market": { "title": "Noční trh", "text": "Při koupi: karta akce zdarma." },
     "datacenter": { "title": "Nelegální datacentrum", "text": "+2$, pokud máte podnik v Tech klastru." },
     "smuggling": { "title": "Pašerácký terminál", "text": "+2$, pokud máte podnik v Průmyslové zóně." },

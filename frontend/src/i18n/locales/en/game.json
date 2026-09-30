@@ -379,9 +379,9 @@
       "conditions_one": "↗ {{count}} more condition", "conditions_other": "↗ {{count}} more conditions",
       "conditionsTitle": "Card conditions that are not met right now. Click the card for all the details.",
       "priceShort": "Not enough money", "priceMine": "Your price", "rarity": "Rarity: {{rarity}}",
-      "moneyTitle": "Money per round", "moneyEmpty": "$ / round", "perRound": "/ round", "oneTime": "one-time",
+      "moneyTitle": "Money per round", "moneyEmpty": "/ round", "perRound": "/ round", "oneTime": "one-time",
       "oneTimeOwned": "Received when bought", "oneTimeMarket": "You get it right when you buy", "received": "received",
-      "now": "now", "influenceTitle": "Influence per round", "influenceEmpty": "◆ / round", "unique": "special bonus",
+      "now": "now", "influenceTitle": "Influence per round", "influenceEmpty": "/ round", "unique": "special bonus",
       "noUnique": "No special bonus", "pointsTitle": "Points in the final score", "points": "points"
     },
     "city": {

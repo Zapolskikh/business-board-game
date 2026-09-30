@@ -76,7 +76,7 @@
     "regulator": { "title": "Federal Development Agency", "text": "+1$ for the Politician and +2$ if you have a Business District business. Full district (4 businesses): +1◆ per round." },
     "anticorruption": { "title": "Anti-Corruption Agency", "text": "No base income, but removes 1 of your scandals at the start of every turn. Full district (4 businesses): +1◆ per round." },
     "planning_charter": { "title": "City Planning Charter", "text": "Once per game: take a city project without meeting its condition. You still pay its price and an action. Full district (4 businesses): +1◆ per round." },
-    "cash": { "title": "Cash Exchange Points", "text": "When you buy it: +2$." },
+    "cash": { "title": "Cash Exchange Points", "text": "Unlocks laundering money into influence." },
     "market": { "title": "Night Market", "text": "When you buy it: a free action card." },
     "datacenter": { "title": "Illegal Data Centre", "text": "+2$ if you have a Tech Cluster business." },
     "smuggling": { "title": "Smuggling Terminal", "text": "+2$ if you have an Industrial Zone business." },

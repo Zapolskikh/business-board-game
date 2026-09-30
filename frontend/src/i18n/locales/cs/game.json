@@ -380,9 +380,9 @@
       "conditions_many": "↗ ještě {{count}} podmínky", "conditions_other": "↗ ještě {{count}} podmínek",
       "conditionsTitle": "Podmínky karty, které teď nejsou splněné. Všechny podrobnosti po kliknutí na kartu.",
       "priceShort": "Nemáte dost peněz", "priceMine": "Vaše cena", "rarity": "Vzácnost: {{rarity}}",
-      "moneyTitle": "Peníze za kolo", "moneyEmpty": "$ / kolo", "perRound": "/ kolo", "oneTime": "jednorázově",
+      "moneyTitle": "Peníze za kolo", "moneyEmpty": "/ kolo", "perRound": "/ kolo", "oneTime": "jednorázově",
       "oneTimeOwned": "Získáno při koupi", "oneTimeMarket": "Dostanete hned při koupi", "received": "získáno",
-      "now": "hned", "influenceTitle": "Vliv za kolo", "influenceEmpty": "◆ / kolo", "unique": "zvláštní bonus",
+      "now": "hned", "influenceTitle": "Vliv za kolo", "influenceEmpty": "/ kolo", "unique": "zvláštní bonus",
       "noUnique": "Bez zvláštního bonusu", "pointsTitle": "Body do konečného skóre", "points": "bodů"
     },
     "city": {
