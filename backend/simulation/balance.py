@@ -49,10 +49,7 @@ from city_bots import choose_bot_command, normalize_bot_policy
 from city_engine.commands import Command
 from city_engine.constants import (
     CAMPAIGN_TIERS,
-    INFLUENCE_PER_POINT,
-    LOBBYING_INFLUENCE,
     LOBBYING_POINTS,
-    MONEY_PER_POINT,
     PATRONAGE_MONEY,
     PATRONAGE_POINTS,
 )
@@ -64,27 +61,23 @@ from simulation.runner import recommended_workers
 # Actions whose immediate score delta is arithmetic the engine prints in its own constants. If the
 # harness disagrees with these, it is not measuring what it thinks it is measuring.
 ANCHORS: dict[str, float] = {
-    "basic_action:work": 2 / MONEY_PER_POINT,
-    "basic_action:patronage": PATRONAGE_POINTS - PATRONAGE_MONEY / MONEY_PER_POINT,
-    "basic_action:lobbying": LOBBYING_POINTS - LOBBYING_INFLUENCE / INFLUENCE_PER_POINT,
-    **{
-        f"basic_action:campaign:{spend}": gain / INFLUENCE_PER_POINT - spend / MONEY_PER_POINT
-        for spend, gain in CAMPAIGN_TIERS.items()
-    },
+    # Money and influence score nothing, so earning or converting them moves the score by zero
+    # and the two sinks pay their full face value.
+    "basic_action:work": 0.0,
+    "basic_action:patronage": PATRONAGE_POINTS,
+    "basic_action:lobbying": LOBBYING_POINTS,
+    **{f"basic_action:campaign:{spend}": 0.0 for spend in CAMPAIGN_TIERS},
 }
+
+# What a dollar is worth in points when a report has to put income on the same axis as points:
+# the rate of its one way out, patronage. Reporting only — the engine scores a pile at nothing.
+MONEY_EXIT_RATE = PATRONAGE_POINTS / PATRONAGE_MONEY
 
 
 def fractional_score(engine: CityEngine, player: PlayerState) -> float:
-    """The engine's own score with the two floored rows counted at their exact rate.
-
-    ``score`` floors money and influence, and it has to — 28$ is two points, not 2.8. But a floored
-    number cannot see a single action at all: work (+2$) moves the score by zero four times out of
-    five. Nothing here re-implements a rule; the itemised score comes from the engine and only the
-    two rows it floors by design are recomputed at the exact rate.
-    """
-    rows = engine.score_breakdown(player)
-    exact = player.money / MONEY_PER_POINT + player.influence / INFLUENCE_PER_POINT
-    return rows["total"] - rows["money"] - rows["influence"] + exact
+    """The engine's own score. Kept as a seam: money and influence no longer score, so nothing is
+    floored any more and the harness reads the engine number directly."""
+    return float(engine.score(player))
 
 
 def action_key(state: GameState, player: PlayerState, action: dict[str, Any]) -> str:
@@ -825,7 +818,7 @@ def render(ledger: Ledger, engine: CityEngine, config: BalanceConfig) -> str:
         points = (
             ledger.self_delta[f"buy_asset:{card}"]
             + ledger.self_delta[f"sell_asset:{card}"]
-            + income_total / MONEY_PER_POINT
+            + income_total * MONEY_EXIT_RATE
         ) / bought
         owner_games = ledger.obj_owner_games[card]
         naive = 100 * ledger.obj_owner_wins[card] / owner_games if owner_games else 0

@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { ReactNode } from "react";
-import { forecastRows, influencePerPoint, moneyPerPoint } from "../../online/gameUi";
+import { forecastRows, lobbying, patronage } from "../../online/gameUi";
 import type { CityMeta, GameState, PlayerState } from "../../online/types";
 import { PopoverBody, PopoverHeader } from "../primitives/CardPopover";
 import { KeyValue } from "../primitives/atoms";
@@ -22,14 +22,6 @@ export function ScoreDetails({ game, me, meta }: { game: GameState; me: PlayerSt
             rows={[
               [t("ui.score.projects"), score.projects],
               [t("ui.score.assets"), score.assets],
-              [
-                t("ui.score.money", { value: me.money }),
-                t("ui.score.moneyRate", { points: score.money, rate: moneyPerPoint(meta) }),
-              ],
-              [
-                t("ui.score.influence", { value: me.influence }),
-                t("ui.score.influenceRate", { points: score.influence, rate: influencePerPoint(meta) }),
-              ],
               [t("ui.score.role"), score.role],
               ...(score.bonus ? ([[t("ui.score.bonus"), score.bonus]] as [string, number][]) : []),
               [t("ui.score.scandals"), <span className="text-bad">{score.scandals}</span>],
@@ -38,7 +30,12 @@ export function ScoreDetails({ game, me, meta }: { game: GameState; me: PlayerSt
           />
         )}
         <p className="mb-2">
-          {t("ui.score.leftover", { money: moneyPerPoint(meta), influence: influencePerPoint(meta) })}
+          {t("ui.score.leftover", {
+            patronageMoney: patronage(meta).money,
+            patronagePoints: patronage(meta).points,
+            lobbyingInfluence: lobbying(meta).influence,
+            lobbyingPoints: lobbying(meta).points,
+          })}
         </p>
 
         {forecast && (

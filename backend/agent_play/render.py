@@ -579,8 +579,6 @@ def render_state(
     )
     breakdown = dict(game.get("score_breakdown", {}).get(player_id, {}))
     if breakdown:
-        per_money = catalog.scoring.get("money_per_point", 10)
-        per_influence = catalog.scoring.get("influence_per_point", 3)
         patronage_money = catalog.scoring.get("patronage_money", 10)
         patronage_points = catalog.scoring.get("patronage_points", 2)
         lobbying_influence = catalog.scoring.get("lobbying_influence", 3)
@@ -589,13 +587,11 @@ def render_state(
             f"    мои очки {breakdown.get('total', 0)}: проекты {breakdown.get('projects', 0)} · "
             f"объекты {breakdown.get('assets', 0)} · роль {breakdown.get('role', 0)} · "
             f"прочие {breakdown.get('bonus', 0)} · "
-            f"деньги {breakdown.get('money', 0)} ({per_money}$=1) · "
-            f"влияние {breakdown.get('influence', 0)} ({per_influence}◆=1) · "
             f"скандалы {breakdown.get('scandals', 0)}"
         )
-        # Both sinks pay double the passive rate, which is the only reason to spend an action on one.
+        # Money and influence score nothing at the end: the sinks are the only way to bank a pile.
         lines.append(
-            f"    стоки вдвое выгоднее хранения: патронаж {patronage_money}$={patronage_points} очка, "
+            f"    деньги и влияние в конце очков не дают; стоки: патронаж {patronage_money}$={patronage_points} очка, "
             f"лоббирование {lobbying_influence}◆={lobbying_points} очка, каждое раз за ход"
         )
 

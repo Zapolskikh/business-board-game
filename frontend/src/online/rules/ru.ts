@@ -139,7 +139,7 @@ const roles: Record<string, RoleGuide> = {
       {
         name: "Проверка",
         cost: "1 действие",
-        limit: "можно повторять; нужен хотя бы один соперник с объектом Серого сектора",
+        limit: "раз в ход; нужен хотя бы один соперник с объектом Серого сектора",
         effect: "Каждый соперник с объектом Серого сектора получает 1 скандал.",
       },
       {
@@ -307,7 +307,7 @@ export function bookRu(ctx: RulesContext): RulesChapter[] {
           <tr><td class="name"><b>Памп и дамп</b></td><td>Технокластер или Серый сектор</td><td class="num">${n.greyChance("crypto", 45)}%</td><td>Заберите у каждого соперника до (${n.pumpBase} + номер раунда ÷ 2)$</td><td class="num">+${n.greyPoints("crypto", 2)}</td></tr>
           <tr><td class="name"><b>Пробить защиту</b></td><td>Серый сектор</td><td class="num">${n.greyChance("roof_break", 60)}%</td><td>Снимите с цели всю Защиту и получите ${n.roofBreakPoint}★ за каждую снятую</td><td class="num">+${n.greyPoints("roof_break", 2)}</td></tr>
           <tr><td class="name"><b>Взлом</b></td><td>Технокластер или Серый сектор</td><td class="num">${n.greyChance("datacenter", 40)}%</td><td>Заберите у цели до (${n.hackBase} + номер раунда ÷ 3)◆</td><td class="num">+${n.greyPoints("datacenter", 3)}</td></tr>
-          <tr><td class="name"><b>Слив компромата</b></td><td>Административный квартал или Серый сектор</td><td class="num">${n.greyChance("influence_broker", 60)}%</td><td>Цель теряет роль</td><td class="num">+${n.greyPoints("influence_broker", 3)}</td></tr>
+          <tr><td class="name"><b>Слив компромата</b></td><td>Административный квартал и Серый сектор (нужны оба)</td><td class="num">${n.greyChance("influence_broker", 60)}%</td><td>Цель теряет роль</td><td class="num">+${n.greyPoints("influence_broker", 3)}</td></tr>
         </tbody>
       </table>
       <p><b>Успех:</b> эффект срабатывает, вы получаете очки из таблицы и ${n.greySuccess} скандал. <b>Провал:</b> эффект не срабатывает, а вы получаете ${n.greyFailure} скандала. Действие тратится в любом случае. Деления в формулах округляются вниз.</p>
@@ -367,10 +367,9 @@ export function bookRu(ctx: RulesContext): RulesChapter[] {
         <li><b>Объекты</b> — половина цены каждого объекта. Это число напечатано на карточке.</li>
         <li><b>Роль</b> — 3 очка, если она у вас есть.</li>
         <li><b>Очки, полученные за игру</b> — за патронаж, лоббирование, карты действий и серые операции.</li>
-        <li><b>Деньги</b> — 1 очко за каждые ${n.moneyPerPoint}$.</li>
-        <li><b>Влияние</b> — 1 очко за каждые ${n.influencePerPoint}◆.</li>
         <li><b>Скандалы</b> — минус 1 очко за каждый.</li>
       </ul>
+      <p>Оставшиеся деньги и влияние очков не дают: это ресурсы, а не очки. Потратьте их до конца игры или переведите в очки патронажем и лоббированием.</p>
       <div class="tip">Побеждает игрок с наибольшим числом очков. <b>При равенстве очков побеждает игрок, купивший больше городских проектов.</b></div>
       `,
     },

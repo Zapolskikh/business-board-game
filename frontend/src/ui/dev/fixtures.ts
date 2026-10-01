@@ -69,8 +69,6 @@ export const actionCards: ActionMeta[] = [
 ];
 
 const scoring: ScoringMeta = {
-  money_per_point: 10,
-  influence_per_point: 3,
   lobbying_influence: 10,
   lobbying_points: 6,
   project_board_size: 4,
@@ -220,10 +218,10 @@ export function makeGame(overrides: Partial<GameState> = {}): GameState {
     action_deck_count: 41,
     project_deck_count: 36,
     score_breakdown: {
-      "p-bot4": { money: 0, influence: 1, assets: 14, projects: 8, role: 1, scandals: -2, total: 24 },
-      "p-bot2": { money: 0, influence: 1, assets: 6, projects: 3, role: 1, scandals: -4, total: 15 },
-      [ME]: { money: 1, influence: 2, assets: 7, projects: 13, role: 0, scandals: -5, total: 18 },
-      "p-bot3": { money: 1, influence: 1, assets: 2, projects: 0, role: 0, scandals: 0, total: 12 },
+      "p-bot4": { assets: 14, projects: 8, role: 1, scandals: -2, total: 24 },
+      "p-bot2": { assets: 6, projects: 3, role: 1, scandals: -4, total: 15 },
+      [ME]: { assets: 7, projects: 13, role: 0, scandals: -5, total: 18 },
+      "p-bot3": { assets: 2, projects: 0, role: 0, scandals: 0, total: 12 },
     },
     round_forecast: {
       money: { objects: 5, projects: 4, residents_tax: 1, journalist: 2, debt: 0, total: 12 },
@@ -353,6 +351,55 @@ export const scenarios = {
     }),
     legal_actions: [{ type: "end_turn", payload: {} }],
   }),
+
+  /* Способности с целью и без: таблица «цель — результат» у санкций, подтверждение проверки
+   * и выбор района у «Договоримся». Числа превью — как их прислал бы движок. */
+  "Силовик: способности": (() => {
+    const players = basePlayers.map(item =>
+      item.id === ME ? { ...item, role: "military", scandal_limit: 5, influence: 9 } : { ...item },
+    );
+    const rivals = players.filter(item => item.id !== ME);
+    const game = makeGame({
+      actions_left: 3,
+      turn_flags: {},
+      players,
+      power_previews: [
+        ...rivals.map(rival => ({
+          power: "military_sanction",
+          target_id: rival.id,
+          blocked_by_roof: rival.roofs > 0,
+          money: Math.min(rival.money, 9),
+          influence: rival.scandals >= 4 ? Math.min(rival.influence, 3) : 0,
+          strips_role: rival.scandals >= 5 && Boolean(rival.role),
+        })),
+        // Проверка: в Сером секторе стоят двое, у одного из них Защита.
+        { power: "military_inspection", target_id: "p-bot2", blocked_by_roof: false, scandals: 1 },
+        { power: "military_inspection", target_id: "p-bot3", blocked_by_roof: true, scandals: 1 },
+        { power: "military_inspection", target_id: "p-bot4", blocked_by_roof: false },
+      ],
+    });
+    return makeRoom({
+      game,
+      legal_actions: [
+        ...rivals.filter(rival => rival.scandals >= 2).map(rival =>
+          act("use_role_power", { power: "military_sanction", target_id: rival.id })),
+        act("use_role_power", { power: "military_inspection" }),
+        { type: "end_turn", payload: {} },
+      ],
+    });
+  })(),
+
+  "Политик: договоримся": (() => {
+    const players = basePlayers.map(item => (item.id === ME ? { ...item, role: "politician", influence: 9 } : { ...item }));
+    const game = makeGame({ actions_left: 3, turn_flags: {}, players });
+    return makeRoom({
+      game,
+      legal_actions: [
+        ...districts.map(district => act("use_role_power", { power: "politician_deal", district: district.id })),
+        { type: "end_turn", payload: {} },
+      ],
+    });
+  })(),
 
   "Ход соперника": makeRoom({
     game: makeGame({ current_player_index: 1, actions_left: 3 }),

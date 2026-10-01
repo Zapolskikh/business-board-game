@@ -8,6 +8,11 @@ export function errorText(reason: unknown, fallback: "generic" | "roomUnavailabl
   if (reason instanceof ApiError) {
     if (reason.status === 403) return i18next.t("errors.wrongPassword");
     if (reason.status === 404) return i18next.t("errors.notFound");
+    // Занятое название — тоже 409, но игроку нужно не «обновляем», а «придумайте другое».
+    if (reason.status === 409 && reason.message === "room name already taken") return i18next.t("errors.nameTaken");
+    if (reason.status === 409 && reason.message === "player name already taken") return i18next.t("errors.playerNameTaken");
+    if (reason.status === 409 && reason.message === "this seat is taken") return i18next.t("errors.seatTaken");
+    if (reason.status === 403 && reason.message === "only the room creator can do this") return i18next.t("errors.hostOnly");
     if (reason.status === 409) return i18next.t("errors.conflict");
     if (reason.status === 429) return i18next.t("errors.tooMany");
     if (reason.status >= 500) return i18next.t("errors.server");

@@ -26,7 +26,11 @@
     "notFound": "Místnost nenalezena — možná už skončila",
     "conflict": "Někdo byl rychlejší. Aktualizujeme…",
     "tooMany": "Příliš mnoho požadavků. Počkejte chvilku.",
-    "server": "Chyba serveru. Zkuste to prosím za chvíli."
+    "server": "Chyba serveru. Zkuste to prosím za chvíli.",
+    "nameTaken": "Místnost s tímto názvem už existuje — vymyslete jiný.",
+    "playerNameTaken": "U tohoto stolu už někdo má toto jméno — zvolte jiné.",
+    "seatTaken": "Toto místo už obsadil jiný hráč.",
+    "hostOnly": "To může udělat jen zakladatel lobby."
   },
   "difficulty": {
     "easy": "Lehký",

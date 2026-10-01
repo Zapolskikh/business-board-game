@@ -19,10 +19,9 @@ from city_engine.constants import (
     GREY_FAILURE_SCANDALS,
     GREY_OPERATION_POINTS,
     GREY_SUCCESS_SCANDALS,
-    INFLUENCE_PER_POINT,
     LOBBYING_INFLUENCE,
+    LOBBYING_POINTS,
     MAX_CAPACITY,
-    MONEY_PER_POINT,
     PATRONAGE_MONEY,
     PATRONAGE_POINTS,
     POINTS_CARD_RATE,
@@ -63,7 +62,7 @@ class PolicyProfile:
     # What a point of recurring influence is worth against a dollar of recurring income. The older
     # profiles keep 1.0 — the ratio they were tuned against. See ``_position_value``.
     influence_weight: float = 1.0
-    # Whether the bot values money and influence at their exact rate instead of the floored score.
+    # Whether the bot values held money and influence at their exact rate instead of a floored one.
     # Only the reborn profile does: see ``_fractional_score`` for what it buys, and the note above
     # for why the older profiles are left playing the game they were tuned against.
     exact_resources: bool = False
@@ -77,12 +76,17 @@ INFLUENCE_IN_MONEY = 3.0
 # What a dollar becomes, in points, depending on where it can still go. Compounding is the
 # premium a dollar carries while a free slot can turn it into an object that pays income again;
 # patronage is the floor once the slots are full; a dollar that is never spent scores at the
-# holding rate. The last two are engine numbers, not tuning: see ``PATRONAGE_*`` and
-# ``MONEY_PER_POINT``. The premium is the one tuned value, and every rate below it is a discount
-# on it.
+# holding rate. The premium is the one tuned value, and every rate below it is a discount on it.
 MONEY_RATE_COMPOUNDING = 0.55
 MONEY_RATE_PATRONAGE = PATRONAGE_POINTS / PATRONAGE_MONEY
-MONEY_RATE_HELD = 1 / MONEY_PER_POINT
+# The engine scores a pile at nothing, but a pile is not worthless to a policy: it is an option on
+# a future sink. A bot that valued it at zero would never save influence for a project, and one
+# that valued it at the full sink rate would never press the sink — pressing would be a wash (the
+# bots pressed lobbying nought times in twelve games that way). Half the sink rate keeps both
+# buttons worth an action and lands within a rounding of the 10$ / 3◆ a point the bots were tuned
+# against while the engine still scored piles.
+MONEY_RATE_HELD = MONEY_RATE_PATRONAGE / 2
+INFLUENCE_RATE_HELD = LOBBYING_POINTS / LOBBYING_INFLUENCE / 2
 
 # What an empty slot is expected to cost to fill. Only used to ask "does this income still have
 # anywhere to go", so the average of the market is enough and a live lookup would be noise.
@@ -232,27 +236,26 @@ def _score_function(engine: CityEngine, profile: PolicyProfile) -> Callable[[Pla
     """Which score a profile judges positions by. Only the reborn bot gets the exact one."""
     if profile.exact_resources:
         return lambda player: _fractional_score(engine, player)
-    return engine.score
+    return lambda player: _floored_score(engine, player)
 
 
 def _fractional_score(engine: CityEngine, player: PlayerState) -> float:
-    """The engine's own score, with money and influence counted at their exact passive rate.
+    """The engine's score plus what the unspent piles are worth to a policy, at the exact rate.
 
-    ``score`` floors both, and it has to: a player holding 28$ owns two points, not 2.8. But a
-    policy that values *positions* with a floored number cannot see a small resource move at all —
-    the mafia racket taking 8$ and 1◆ off a rival scored 0.30 against 2.28 for a hack, and the whole
-    0.30 came from the victim happening to cross a ten-dollar boundary.
-
-    The passive rate, not the sink rate: holding is what an unspent pile is really worth, and the
-    sinks then show the gain they actually give (double, for an action). Valuing the pile at the sink
-    rate instead is circular — the bots pressed lobbying nought times in twelve games that way.
-
-    Nothing here re-implements a rule: the itemised score comes from the engine, and only the two
-    rows that are floored by design are recomputed at the same rate the engine used.
+    Fractional because a floored number cannot see a small resource move at all — the mafia racket
+    taking 8$ and 1◆ off a rival scored 0.30 against 2.28 for a hack, and the whole 0.30 came from
+    the victim happening to cross a ten-dollar boundary.
     """
-    breakdown = engine.score_breakdown(player)
-    exact = player.money / MONEY_PER_POINT + player.influence / INFLUENCE_PER_POINT
-    return breakdown["total"] - breakdown["money"] - breakdown["influence"] + exact
+    return engine.score(player) + player.money * MONEY_RATE_HELD + player.influence * INFLUENCE_RATE_HELD
+
+
+def _floored_score(engine: CityEngine, player: PlayerState) -> float:
+    """The same valuation, floored per currency: what the older profiles were tuned against."""
+    return (
+        engine.score(player)
+        + int(player.money * MONEY_RATE_HELD)
+        + int(player.influence * INFLUENCE_RATE_HELD)
+    )
 
 
 def _income_rate(
@@ -330,7 +333,7 @@ def _position_value(
     defence = player.roofs * profile.defence
     role_value = _role_position_value(engine, state, player, player.role, profile)
     hand_value = sum(_card_value(engine, card.card_id, player) for card in player.hand) * 0.35
-    # Money counts toward the score at 10$ = 1 point, so simply holding it looks profitable and
+    # Held money is valued at ``MONEY_RATE_HELD``, so simply holding it looks profitable and
     # every sink — a slot, an object, a project — reads as a net loss. A bot finished a measured
     # match sitting on 296$ and three slots, converting two dollars at a time through campaign.
     #
@@ -340,8 +343,8 @@ def _position_value(
     # 138$ and it took a full extra project a game, and it still lost: −2.3 points and 42% of wins
     # against the untuned profile over 40 games. The bot is not the problem — with only four project
     # slots on a shared board, the influence that money buys has nowhere to go, so the surplus
-    # scores more sitting in the wallet at 0.1 points a dollar than it does converted. That is a
-    # statement about the scoring rate and the width of the board, not about the policy.
+    # scored more sitting in the wallet at 0.1 points a dollar than it did converted. (Measured while
+    # the engine still scored piles; it no longer does.)
     cash_drag = max(0, player.money - profile.cash_comfort) * profile.cash_drag * profile.planning
     # The quantum centre's printed income is zero, so a pure income horizon misses its defining
     # effect.  It grants no action on the purchase turn, only on future turns.
@@ -855,11 +858,11 @@ def _card_value(engine: CityEngine, card_id: str, player: PlayerState) -> float:
         price = card.value * POINTS_CARD_RATE
         if player.money < price:
             return 0.5
-        return card.value * 3 - price / MONEY_PER_POINT
+        return card.value * 3 - price * MONEY_RATE_HELD
     if card.kind == "cash_to_influence":
         if player.money < CASH_TO_INFLUENCE_MONEY:
             return 0.5
-        return card.value / INFLUENCE_PER_POINT * 3 - CASH_TO_INFLUENCE_MONEY / MONEY_PER_POINT
+        return card.value * INFLUENCE_RATE_HELD * 3 - CASH_TO_INFLUENCE_MONEY * MONEY_RATE_HELD
     if card.kind == "roof":
         # Three cards hand out the same token, and the limit is two: at the ceiling the card is
         # unplayable, and pretending otherwise is how a hand fills up with dead defence.

@@ -1,19 +1,61 @@
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { errorText } from "../i18n/errors";
 import { LanguagePicker } from "../i18n/LanguagePicker";
-import { cityApi } from "./api";
-import type { RoomSummary } from "./types";
+import { ApiError, cityApi } from "./api";
+import { newSecret, saveOwnerToken } from "./roomSecrets";
+import type { CityMeta, RoomSummary } from "./types";
 import { AboutDialog } from "./AboutDialog";
 import { SupportLinks } from "./SupportLinks";
 import { StudioLogo } from "./StudioMark";
 
-interface Props { onOpen: (roomId: string, initialPassword?: string) => void; onFeedback: () => void }
+interface Props {
+  meta: CityMeta;
+  /** `joinAs` — имя, под которым игрок сразу сядет за стол (после создания или «случайной игры»). */
+  onOpen: (roomId: string, initialPassword?: string, joinAs?: string) => void;
+  onFeedback: () => void;
+}
+
+const PLAYER_NAME_KEY = "city-player-name";
+// Названия сравниваются так, как их читает человек: без регистра и лишних пробелов — как на сервере.
+const nameKey = (value: string) => value.replace(/\s+/g, " ").trim().toLocaleLowerCase();
+
+// Серые операции для карточки «Серая сторона» — названия из переводов игры, без модуля правил
+// доски: он тяжёлый, а главной нужны только пять подписей.
+const GREY_OPERATIONS = ["smear", "crypto", "roof_break", "datacenter", "influence_broker"] as const;
+
+// Книга правил грузится по первому нажатию: со скриншотами и темой доски она тяжелее всей главной.
+const RulesBook = lazy(() => import("../ui/RulesBookEntry"));
 
 
-export function RoomBrowser({ onOpen, onFeedback }: Props) {
-  const { t, i18n } = useTranslation(["home", "common"]);
+export function RoomBrowser({ meta, onOpen, onFeedback }: Props) {
+  const { t, i18n } = useTranslation(["home", "common", "game"]);
   const [about, setAbout] = useState(false);
+  const [rules, setRules] = useState(false);
+  const nameRef = useRef<HTMLInputElement>(null);
+  // На самых узких телефонах полное название языка не помещается рядом с меню — только код.
+  const [narrow, setNarrow] = useState(() => window.matchMedia("(max-width: 420px)").matches);
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 420px)");
+    const update = () => setNarrow(query.matches);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  const [showPassword, setShowPassword] = useState(false);
+  const [playerName, setPlayerName] = useState(() => localStorage.getItem(PLAYER_NAME_KEY) ?? "");
+  const [isOpen, setIsOpen] = useState(false);
+  const [randomNote, setRandomNote] = useState("");
+  const savePlayerName = (value: string) => { setPlayerName(value); localStorage.setItem(PLAYER_NAME_KEY, value); };
+  // Имя обязательно в обоих путях в игру — и при создании лобби, и в «случайной игре».
+  const playerNameOk = playerName.trim().length > 0;
+  const joinName = () => playerName.trim();
+  // Правая панель — одна на две вкладки: так главная помещается в экран без прокрутки.
+  const [tab, setTab] = useState<"create" | "rooms">("create");
+  // «Начать партию»: вкладка создания и сразу курсор в поле названия.
+  const startGame = () => {
+    setTab("create");
+    requestAnimationFrame(() => nameRef.current?.focus());
+  };
   const updatedLabel = (value: string) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return t("rooms.updatedRecently");
@@ -46,21 +88,70 @@ export function RoomBrowser({ onOpen, onFeedback }: Props) {
 
   const parsedRounds = Number(roundsInput);
   const roundsValid = /^\d+$/.test(roundsInput) && parsedRounds >= 5 && parsedRounds <= 30;
-  const canCreate = Boolean(name.trim() && password.length >= 4 && roundsValid && !busy);
+  // Значение для кнопок «−/+»: пустое поле считается значением по умолчанию.
+  const roundsValue = roundsInput === "" ? 15 : parsedRounds;
+  const nameTaken = Boolean(name.trim()) && rooms.some(room => nameKey(room.name) === nameKey(name));
+  const passwordOk = isOpen || password.length >= 4;
+  const canCreate = Boolean(playerNameOk && name.trim() && !nameTaken && passwordOk && roundsValid && !busy);
   const waitingCount = useMemo(() => rooms.filter(room => room.status === "waiting").length, [rooms]);
 
   const create = async () => {
     if (!canCreate) return;
     setBusy(true); setError("");
     try {
-      const room = await cityApi.create({ name: name.trim(), password, capacity, max_rounds: parsedRounds, role_price: rolePrice });
-      onOpen(room.id, password);
+      const roomPassword = isOpen ? "" : password;
+      // Ключ создателя придумывает браузер: с ним — и только с ним — можно убирать ботов и освобождать места.
+      const ownerToken = newSecret();
+      const room = await cityApi.create({ name: name.trim(), password: roomPassword, capacity, max_rounds: parsedRounds, role_price: rolePrice, open: isOpen, owner_token: ownerToken });
+      saveOwnerToken(room.id, ownerToken);
+      onOpen(room.id, roomPassword, joinName());
     } catch (reason) { setError(errorText(reason, "createRoom")); }
     finally { setBusy(false); }
   };
 
+  /* «Случайная игра»: любое открытое лобби, которое ещё ждёт игроков и где есть свободное место.
+   * Если таких нет — игрок сам открывает лобби с базовыми настройками и становится его хозяином:
+   * следующий, кто нажмёт «Случайная игра», попадёт уже к нему. */
+  const joinRandom = async () => {
+    if (!playerNameOk) return;
+    setBusy(true); setError(""); setRandomNote("");
+    try {
+      const fresh = await cityApi.rooms();
+      setRooms(fresh);
+      const candidates = fresh.filter(room => room.open && room.status === "waiting" && room.players < room.capacity);
+      if (candidates.length) {
+        const pick = candidates[Math.floor(Math.random() * candidates.length)];
+        onOpen(pick.id, "", joinName());
+        return;
+      }
+      const room = await createQuickLobby(fresh);
+      onOpen(room.id, "", joinName());
+    } catch (reason) { setError(errorText(reason, "createRoom")); }
+    finally { setBusy(false); }
+  };
+
+  /* Название — первое свободное «lobbyN». Два игрока могут нажать одновременно и выбрать одно и то
+   * же имя: сервер отклонит второе как занятое, и тогда берётся следующий номер. */
+  const createQuickLobby = async (listed: RoomSummary[]) => {
+    const taken = new Set(listed.map(room => nameKey(room.name)));
+    let number = 1;
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      while (taken.has(nameKey(`lobby${number}`))) number += 1;
+      const ownerToken = newSecret();
+      try {
+        const room = await cityApi.create({ name: `lobby${number}`, password: "", capacity: 4, max_rounds: 15, role_price: 3, open: true, owner_token: ownerToken });
+        saveOwnerToken(room.id, ownerToken);
+        return room;
+      } catch (reason) {
+        if (!(reason instanceof ApiError && reason.status === 409)) throw reason;
+        taken.add(nameKey(`lobby${number}`));
+      }
+    }
+    throw new Error("no free lobby name");
+  };
+
   const remove = async () => {
-    if (!deleteTarget || deletePassword.length < 4) return;
+    if (!deleteTarget || (deletePassword.length < 4 && !deleteTarget.open)) return;
     setDeletingId(deleteTarget.id); setError("");
     try {
       await cityApi.remove(deleteTarget.id, deletePassword);
@@ -72,12 +163,13 @@ export function RoomBrowser({ onOpen, onFeedback }: Props) {
   };
 
   return (
-    <main className="rooms-app room-browser" data-ui="room-browser">
+    <main className="rooms-app room-browser home-screen" data-ui="room-browser">
+      {/* Фон всего экрана. Картинка — `--hero-art` в styles.css: слева текст, справа панель,
+        * поэтому смысловой центр картинки — между ними и правее. */}
+      <div className="hero-art" aria-hidden="true" />
       <header className="rooms-topbar">
-        <div className="rooms-wordmark">
-          <span className="rooms-mark">{t("brand.mark")}</span>
-          <span><b>{t("brand.title")}</b><small>{t("brand.tagline")}</small></span>
-        </div>
+        {/* В панели — студия: название игры и так крупно стоит ниже, в титуле. */}
+        <div className="rooms-wordmark home-studio"><StudioLogo /></div>
         <div className="rooms-topbar-end">
           <div className="rooms-presence">
             <span className="presence-dot" />
@@ -85,81 +177,57 @@ export function RoomBrowser({ onOpen, onFeedback }: Props) {
             <small>v{__GAME_VERSION__}</small>
           </div>
           <nav className="rooms-topnav" aria-label={t("nav.about")}>
+            <button type="button" className="rooms-button subtle" onClick={() => setRules(true)}>{t("nav.rules")}</button>
             <button type="button" className="rooms-button subtle" onClick={() => setAbout(true)}>{t("nav.about")}</button>
             <button type="button" className="rooms-button subtle" onClick={onFeedback}>{t("nav.feedback")}</button>
             <SupportLinks />
-            <LanguagePicker className="rooms-language" />
+            <LanguagePicker className="rooms-language" compact={narrow} />
           </nav>
         </div>
       </header>
 
+      {/* Цена роли — та, что выставлена в форме создания комнаты: книга описывает партию, которую вы создаёте. */}
+      {rules && (
+        <Suspense fallback={null}>
+          <RulesBook open onClose={() => setRules(false)} meta={meta} rolePrice={rolePrice} />
+        </Suspense>
+      )}
       {about && <AboutDialog onClose={() => setAbout(false)} onFeedback={() => { setAbout(false); onFeedback(); }} />}
 
-      <section className="rooms-hero">
-        <div>
-          {/* Как титр перед названием: студия видна сразу, без прокрутки до подвала. */}
-          <span className="hero-studio">
-            <StudioLogo />
-            <span>{t("common:studio.presents")}</span>
-          </span>
+      {/* Титульный экран в один экран: слева — что это за игра, справа — создание партии и
+        * открытые комнаты, чтобы игрок понял, куда попал, ещё до лобби. */}
+      <div className="home-main">
+      <section className="rooms-hero" data-ui="home-hero">
+        <div className="hero-copy">
+          <h1 className="hero-title">{t("brand.title")}</h1>
           <span className="eyebrow">{t("hero.eyebrow")}</span>
-          <h1>{t("hero.titleLine1")}<br /><em>{t("hero.titleLine2")}</em></h1>
-          <p>{t("hero.lead")}</p>
-          <ol className="hero-steps">
-            <li><b>01</b><span>{t("hero.stepBuild")}</span></li>
-            <li><b>02</b><span>{t("hero.stepCompete")}</span></li>
-            <li><b>03</b><span>{t("hero.stepScore")}</span></li>
-          </ol>
-        </div>
-        <div className="hero-table-wrap" role="img" aria-label={t("hero.artworkAlt")}>
-          <div className="hero-table-glow" />
-          <svg className="hero-table" viewBox="0 0 520 340" aria-hidden="true">
-            <defs>
-              <linearGradient id="table-surface" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stopColor="#18221f" />
-                <stop offset="1" stopColor="#0a1110" />
-              </linearGradient>
-              <radialGradient id="table-light"><stop stopColor="#d9bd78" stopOpacity=".22" /><stop offset="1" stopColor="#d9bd78" stopOpacity="0" /></radialGradient>
-              <filter id="table-shadow" x="-30%" y="-30%" width="160%" height="180%"><feGaussianBlur stdDeviation="8" /></filter>
-            </defs>
-            <ellipse cx="260" cy="286" rx="200" ry="30" fill="#000" opacity=".7" filter="url(#table-shadow)" />
-            <g className="table-board">
-              <path d="M260 24 476 145 260 266 44 145Z" fill="url(#table-surface)" stroke="#56624f" strokeWidth="1.5" />
-              <path d="M260 48 434 145 260 242 86 145Z" fill="none" stroke="#657260" strokeOpacity=".35" />
-              <path d="m260 24 0 242M44 145h432M152 84l216 122M368 84 152 206" stroke="#7d846d" strokeOpacity=".22" />
-              <path d="M260 35 458 145 260 255 62 145Z" fill="url(#table-light)" />
-              <g className="table-buildings" stroke="#d9bd78" strokeOpacity=".8" strokeWidth="1.2">
-                <path d="m117 126 34-19 24 14-34 20z" fill="#79694a"/><path d="m141 141 34-20v19l-34 20z" fill="#4a4435"/><path d="m117 126 24 15v19l-24-14z" fill="#60563e"/>
-                <path d="m187 91 29-17 24 14-29 17z" fill="#9a8053"/><path d="m211 105 29-17v24l-29 17z" fill="#544831"/><path d="m187 91 24 14v24l-24-14z" fill="#6b593b"/>
-                <path d="m283 119 36-21 27 15-36 21z" fill="#718c79" stroke="#a9c5a5"/><path d="m310 134 36-21v24l-36 21z" fill="#3d5748" stroke="#a9c5a5"/><path d="m283 119 27 15v24l-27-15z" fill="#536c59" stroke="#a9c5a5"/>
-                <path d="m357 158 27-16 23 13-27 16z" fill="#74648b" stroke="#b9a2d4"/><path d="m380 171 27-16v20l-27 16z" fill="#493e5b" stroke="#b9a2d4"/><path d="m357 158 23 13v20l-23-13z" fill="#5b4e70" stroke="#b9a2d4"/>
-              </g>
-              <g className="table-streets" fill="none" stroke="#d9bd78" strokeWidth="2" strokeDasharray="3 7" opacity=".72">
-                <path d="m93 170 58 32 41-23 54 31 50-28 41 24 87-49" />
-              </g>
-              <g className="table-tokens">
-                <circle cx="129" cy="177" r="9" fill="#91c5a5"/><circle cx="129" cy="174" r="3" fill="#e6f2e8"/>
-                <circle cx="252" cy="225" r="9" fill="#9fc4d1"/><circle cx="252" cy="222" r="3" fill="#e7f4f6"/>
-                <circle cx="391" cy="128" r="9" fill="#b9a2d4"/><circle cx="391" cy="125" r="3" fill="#f0eafa"/>
-              </g>
-              <g className="table-project">
-                <path d="m239 119 21-12 22 12-22 13z" fill="#d9bd78"/><path d="m260 132 22-13v22l-22 13z" fill="#806b3d"/><path d="m239 119 21 13v22l-21-13z" fill="#a58b50"/>
-                <path d="m251 116 9-5 9 5-9 5z" fill="#fff0be" opacity=".9" />
-              </g>
-            </g>
-            <g className="table-orbit" fill="none" stroke="#d9bd78" strokeOpacity=".28" strokeDasharray="2 7">
-              <ellipse cx="260" cy="145" rx="239" ry="136" />
-            </g>
-          </svg>
-          <div className="table-callout callout-top"><span className="callout-dot" />{t("hero.artLabel")}</div>
-          <div className="table-callout callout-bottom"><b>15</b><span>{t("hero.rounds")}</span><i /> <b>3</b><span>{t("hero.actions")}</span></div>
-          <span className="table-caption">{t("hero.districts")}</span>
+          <p className="hero-slogan">{t("hero.titleLine1")}<br /><em>{t("hero.titleLine2")}</em></p>
+          <p className="hero-lead">{t("hero.lead")}</p>
+          <p className="hero-hook">{t("hero.hook")}</p>
+          <div className="hero-actions">
+            <button type="button" className="rooms-button primary hero-cta" onClick={startGame}>{t("hero.ctaPlay")}</button>
+            <button type="button" className="rooms-button hero-cta ghost" onClick={() => setRules(true)}>{t("hero.ctaRules")}</button>
+          </div>
+          <ul className="hero-facts">
+            <li><b>2–4</b><span>{t("hero.factPlayers")}</span></li>
+            <li><b>5–30</b><span>{t("hero.factRounds")}</span></li>
+            <li><b>3</b><span>{t("hero.factActions")}</span></li>
+            <li><b>{meta.assets.length}</b><span>{t("hero.factAssets")}</span></li>
+            <li><b>{meta.projects.length}</b><span>{t("hero.factProjects")}</span></li>
+          </ul>
         </div>
       </section>
 
+      <aside className="home-side">
+      <div className="home-tabs" role="tablist">
+        <button type="button" role="tab" aria-selected={tab === "create"} className={tab === "create" ? "active" : ""} onClick={() => setTab("create")}>{t("create.eyebrow")}</button>
+        <button type="button" role="tab" aria-selected={tab === "rooms"} className={tab === "rooms" ? "active" : ""} onClick={() => setTab("rooms")}>
+          {t("rooms.title")}{rooms.length > 0 && <span className="tab-count">{rooms.length}</span>}
+        </button>
+      </div>
       {error && <p className="rooms-alert" role="alert">⚠ {error}</p>}
 
-      <div className="room-browser-layout">
+        {tab === "rooms" && (
         <section className="rooms-panel room-directory">
           <div className="rooms-section-head">
             <div>
@@ -186,7 +254,7 @@ export function RoomBrowser({ onOpen, onFeedback }: Props) {
                 <button className="room-card-main" type="button" onClick={() => onOpen(room.id)}>
                   <span className="room-card-title">
                     <span className="room-status"><i />{t(`rooms.status.${room.status}`)}</span>
-                    <strong>{room.name}</strong>
+                    <strong>{room.name}{room.open && <span className="open-badge">{t("rooms.openBadge")}</span>}</strong>
                     <small>{updatedLabel(room.updated_at)}</small>
                   </span>
                   <span className="room-occupancy">
@@ -214,54 +282,148 @@ export function RoomBrowser({ onOpen, onFeedback }: Props) {
           </div>
         </section>
 
+        )}
+
+        {tab === "create" && (
         <section className="rooms-panel create-room-card" data-ui="create-room">
-          <div className="rooms-section-head">
-            <div><span className="eyebrow">{t("create.eyebrow")}</span><h2>{t("create.title")}</h2></div>
-            <span className="step-badge">{t("create.badge")}</span>
-          </div>
+          <header className="create-head">
+            <h2>{t("create.heading")}</h2>
+            <span className="ornament-rule" aria-hidden="true" />
+            <p>{t("create.subheading")}</p>
+          </header>
           <form onSubmit={event => { event.preventDefault(); void create(); }}>
             <label className="room-field">
-              <span>{t("create.name")}</span>
-              <input value={name} maxLength={48} placeholder={t("create.namePlaceholder")} onChange={event => setName(event.target.value)} />
+              <span>{t("create.playerName")}</span>
+              <input ref={nameRef} value={playerName} maxLength={32} placeholder={t("create.playerNamePlaceholder")} onChange={event => savePlayerName(event.target.value)} />
             </label>
             <label className="room-field">
-              <span>{t("create.password")}</span>
-              <input type="password" value={password} maxLength={128} placeholder={t("create.passwordPlaceholder")} onChange={event => setPassword(event.target.value)} />
-              <small>{t("create.passwordHint")}</small>
+              <span>{t("create.name")}</span>
+              <input value={name} maxLength={48} placeholder={t("create.namePlaceholder")} aria-invalid={nameTaken} onChange={event => setName(event.target.value)} />
+              {nameTaken && <small className="field-error">{t("create.nameTaken")}</small>}
             </label>
 
-            <div className="quick-settings">
-              <label className="room-field"><span>{t("create.players")}</span><select value={capacity} onChange={event => setCapacity(Number(event.target.value))}>{[2,3,4].map(value => <option key={value}>{value}</option>)}</select></label>
+            <label className="open-toggle">
+              <input type="checkbox" checked={isOpen} onChange={event => setIsOpen(event.target.checked)} />
+              <span className="switch" aria-hidden="true" />
+              <span><b>{t("create.openLobby")}</b><small>{t("create.openLobbyHint")}</small></span>
+            </label>
+
+            {!isOpen && (
               <label className="room-field">
-                <span>{t("create.rounds")}</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={roundsInput}
-                  aria-invalid={roundsInput !== "" && !roundsValid}
-                  aria-describedby="rounds-hint"
-                  onChange={event => setRoundsInput(event.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, ""))}
-                  onBlur={() => {
-                    const value = Number(roundsInput);
-                    setRoundsInput(String(roundsInput === "" ? 15 : Math.min(30, Math.max(5, value))));
-                  }}
-                />
-                <small id="rounds-hint">{t("create.roundsHint")}</small>
+                <span>{t("create.password")}</span>
+                <span className="input-with-action">
+                  <input type={showPassword ? "text" : "password"} value={password} maxLength={128} placeholder={t("create.passwordPlaceholder")} onChange={event => setPassword(event.target.value)} />
+                  <button
+                    type="button"
+                    className="input-action"
+                    aria-label={t(showPassword ? "create.hidePassword" : "create.showPassword")}
+                    aria-pressed={showPassword}
+                    onClick={() => setShowPassword(value => !value)}
+                  >
+                    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7">
+                      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" />
+                      {showPassword && <path d="M4 4l16 16" />}
+                    </svg>
+                  </button>
+                </span>
               </label>
+            )}
+
+            <div className="quick-settings">
+              <div className="room-field">
+                <span>{t("create.players")}</span>
+                <div className="segmented" role="radiogroup" aria-label={t("create.players")}>
+                  {[2, 3, 4].map(value => (
+                    <button key={value} type="button" role="radio" aria-checked={capacity === value} className={capacity === value ? "active" : ""} onClick={() => setCapacity(value)}>{value}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="room-field">
+                <span>{t("create.rounds")}</span>
+                <div className="stepper">
+                  <button type="button" aria-label={t("create.roundsLess")} disabled={roundsValue <= 5} onClick={() => setRoundsInput(String(Math.max(5, roundsValue - 1)))}>−</button>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={roundsInput}
+                    aria-label={t("create.rounds")}
+                    aria-invalid={roundsInput !== "" && !roundsValid}
+                    onChange={event => setRoundsInput(event.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, ""))}
+                    onBlur={() => {
+                      const value = Number(roundsInput);
+                      setRoundsInput(String(roundsInput === "" ? 15 : Math.min(30, Math.max(5, value))));
+                    }}
+                  />
+                  <button type="button" aria-label={t("create.roundsMore")} disabled={roundsValue >= 30} onClick={() => setRoundsInput(String(Math.min(30, roundsValue + 1)))}>+</button>
+                </div>
+              </div>
             </div>
 
             <details className="advanced-settings">
-              <summary>{t("create.advanced")} <span>⌄</span></summary>
+              <summary>{t("create.advanced")} <span aria-hidden="true">⌄</span></summary>
               <label className="room-field"><span>{t("create.rolePrice")}</span><input type="number" min={2} max={10} value={rolePrice} onChange={event => setRolePrice(Number(event.target.value))} /><small>{t("create.rolePriceHint")}</small></label>
             </details>
 
             <button className="rooms-button primary create-submit" type="submit" disabled={!canCreate}>
-              {busy ? t("create.submitting") : t("create.submit")}
+              <span>{busy ? t("create.submitting") : t("create.submit")}</span><span aria-hidden="true">→</span>
             </button>
-            {!name.trim() || password.length < 4 ? <p className="form-hint">{t("create.hintMissing")}</p> : <p className="form-hint ready">{t("create.hintReady")}</p>}
+            <p className={`form-hint ${canCreate ? "" : "missing"}`}>
+              {canCreate ? t("create.hintReady") : !playerNameOk ? t("create.hintPlayerName") : !name.trim() ? t("create.hintName") : nameTaken ? t("create.nameTaken") : !passwordOk ? t("create.hintPassword") : t("create.hintReady")}
+            </p>
+
+            {/* Внизу панели — второй путь в игру: без своей комнаты, в любое открытое лобби. */}
+            <div className="random-join">
+              <span className="or-divider" aria-hidden="true"><i>{t("random.or")}</i></span>
+              <button type="button" className="rooms-button primary create-submit random-submit" disabled={busy || !playerNameOk} onClick={() => void joinRandom()}>
+                <span>{t("random.button")}</span><span aria-hidden="true">→</span>
+              </button>
+              <p className="form-hint">{randomNote || (playerNameOk ? t("random.hint") : t("create.hintPlayerName"))}</p>
+            </div>
           </form>
         </section>
+        )}
+      </aside>
+      <ul className="hero-pillars" aria-label={t("hero.pillarsLabel")}>
+        <li>
+          <span className="pillar-icon">🏙️</span>
+          <b>{t("hero.districtsTitle", { count: meta.districts.length })}</b>
+          <span>{t("hero.districtsText")}</span>
+          <ul className="pillar-chips">
+            {meta.districts.map(district => (
+              <li key={district.id} style={{ "--chip": district.color } as CSSProperties}>{district.icon} {district.title}</li>
+            ))}
+          </ul>
+        </li>
+        <li>
+          <span className="pillar-icon">🎭</span>
+          <b>{t("hero.rolesTitle", { count: meta.roles.length })}</b>
+          <span>{t("hero.rolesText")}</span>
+          <ul className="pillar-chips">
+            {meta.roles.map(role => (
+              <li key={role.id} style={{ "--chip": role.color } as CSSProperties}>{role.icon} {role.title}</li>
+            ))}
+          </ul>
+        </li>
+        <li>
+          <span className="pillar-icon">🏛️</span>
+          <b>{t("hero.projectsTitle")}</b>
+          <span>{t("hero.projectsText")}</span>
+          <ul className="pillar-chips plain">
+            {[...meta.projects].sort((a, b) => b.points - a.points).slice(0, 4).map(project => (
+              <li key={project.id}>★{project.points} {project.title}</li>
+            ))}
+          </ul>
+        </li>
+        <li className="pillar-grey">
+          <span className="pillar-icon">🌒</span>
+          <b>{t("hero.greyTitle")}</b>
+          <span>{t("hero.greyText")}</span>
+          <ul className="pillar-chips grey">
+            {GREY_OPERATIONS.map(id => <li key={id}>{t(`game:grey.${id}.label`)}</li>)}
+          </ul>
+        </li>
+      </ul>
       </div>
 
       {deleteTarget && (
@@ -273,7 +435,7 @@ export function RoomBrowser({ onOpen, onFeedback }: Props) {
             <label className="room-field"><span>{t("delete.password")}</span><input autoFocus type="password" value={deletePassword} placeholder={t("delete.passwordPlaceholder")} onChange={event => setDeletePassword(event.target.value)} onKeyDown={event => event.key === "Enter" && void remove()} /></label>
             <div className="dialog-actions">
               <button type="button" className="rooms-button subtle" onClick={() => setDeleteTarget(null)}>{t("delete.cancel")}</button>
-              <button type="button" className="rooms-button danger" disabled={deletePassword.length < 4 || deletingId === deleteTarget.id} onClick={() => void remove()}>{deletingId === deleteTarget.id ? t("delete.deleting") : t("delete.confirm")}</button>
+              <button type="button" className="rooms-button danger" disabled={(deletePassword.length < 4 && !deleteTarget.open) || deletingId === deleteTarget.id} onClick={() => void remove()}>{deletingId === deleteTarget.id ? t("delete.deleting") : t("delete.confirm")}</button>
             </div>
           </section>
         </div>

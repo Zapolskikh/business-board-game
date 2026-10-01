@@ -19,7 +19,7 @@
     "politician_cleanup": { "label": "Urovnat skandál", "what": "Smaže jeden váš skandál. Levnější než běžné krizové PR, ale taky stojí akci.", "cost": "akce + 2◆" },
     "politician_deal": {
       "label": "Domluvíme se",
-      "what": "Do konce kola se jakákoli čtvrť, kterou vyberete, počítá jako vaše: otevírá projekty a šedé kšefty té čtvrti a počítá se do synergie. Podnik v ní mít nemusíte.",
+      "what": "Do konce kola se jakákoli čtvrť, kterou vyberete, počítá jako vaše: otevírá projekty a šedé kšefty té čtvrti a počítá se do synergie. Podnik v ní mít nemusíte, ale potřebujete vlastní podnik v Šedé zóně: tam se dohoda uzavírá.",
       "cost": "3◆ + 1 skandál, bez akce, jednou za tah"
     },
     "politician_veto": {
@@ -58,7 +58,7 @@
     "military_inspection": {
       "label": "Kontrola",
       "what": "Skandál každému soupeři, který má podnik v Šedé zóně. Míří na čtvrť, ne na jednoho hráče, takže se nikdo neschová. Ochrana chrání svého majitele a spotřebuje se.",
-      "cost": "akce"
+      "cost": "akce, jednou za tah"
     },
     "military_roof_seize": { "label": "Sebrat Ochranu", "what": "Vezme jednu Ochranu soupeři a dá ji vám. Ochrana proti tomu nechrání.", "cost": "akce + 3◆" }
   },
@@ -320,17 +320,16 @@
       "greyPick": "vyberte kšeft a cíl", "greyNeed": "potřebujete podnik ve správné čtvrti",
       "greyBadge": "{{count}} z 5", "endTurn": "Ukončit tah", "ending": "Končíme…", "spendsAction": "stojí akci",
       "noAction": "bez akce", "unavailable": "Nedostupné", "pickDistrict": "vyberte čtvrť",
-      "dealText": "Do konce kola se čtvrť počítá jako vaše: otevírá projekty a šedé kšefty té čtvrti a počítá se do synergie. Stojí vliv a skandál, ale ne akci.",
+      "dealText": "Do konce kola se čtvrť počítá jako vaše: otevírá projekty a šedé kšefty té čtvrti a počítá se do synergie. Potřebujete vlastní podnik v Šedé zóně. Stojí vliv a skandál, ale ne akci.",
       "dealCost": "3◆ + skandál, bez akce", "pickTarget": "vyberte cíl",
       "powerDefault": "Schopnost se použije na soupeře, kterého vyberete.", "price": "Cena: {{cost}}", "target": "Cíl",
       "targetPick": "vybrat cíl ›", "targetPickFree": "bez akce · vybrat cíl ›"
     },
     "score": {
       "title": "🏆 Skóre a příjem", "points": "{{count}} b.", "projects": "Projekty", "assets": "Podniky",
-      "money": "Peníze {{value}}$", "moneyRate": "{{points}} · {{rate}}$ za bod", "influence": "Vliv {{value}}◆",
-      "influenceRate": "{{points}} · {{rate}}◆ za bod", "role": "Role", "bonus": "Karty a akce za body",
+      "role": "Role", "bonus": "Karty a akce za body",
       "scandals": "Skandály", "total": "Celkem",
-      "leftover": "Peníze a vliv, které vám na konci zůstanou, dávají taky body: 1 bod za {{money}}$ a za {{influence}}◆.",
+      "leftover": "Peníze a vliv jsou zdroje, ne body: co vám na konci zbude, se nepočítá. Utraťte je, nebo je proměňte v body patronátem ({{patronageMoney}}$ → {{patronagePoints}} b.) a lobbingem ({{lobbyingInfluence}}◆ → {{lobbyingPoints}} b.).",
       "income": "Příjem na konci kola",
       "lastRound": "Poslední kolo: na konci výplata nebude — utraťte peníze a vliv hned."
     },
@@ -494,7 +493,7 @@
       "jail": "Zatčení: v tomto tahu jen 1 akce", "jailOut": "Zatčení skončilo — hrajete zase normálně",
       "scandalLimit": "Skandálů {{have}} z {{limit}} — limit je dosažen"
     },
-    "preview": { "stripsRole": "vezme roli", "selfScandals": "vám ⚠+{{count}}", "leader": "lídr — dvojnásobek", "roofBlocks": " — zastaví to" },
+    "preview": { "roofEats": "Ochrana to zastaví: 🛡−1", "losesRole": "přijde o roli", "nothing": "—", "colTarget": "Cíl", "colLoses": "Cíl ztratí", "colYou": "Získáte", "pick": "Vybrat", "confirm": "Potvrdit", "confirmTitle": "koho to zasáhne — zkontrolujte a potvrďte",  "stripsRole": "vezme roli", "selfScandals": "vám ⚠+{{count}}", "leader": "lídr — dvojnásobek", "roofBlocks": " — zastaví to" },
     "grey": {
       "title": "🌒 Šedé kšefty", "spent": "už proběhl", "once": "jeden za tah",
       "intro": "Kšeft otevře kterýkoli váš podnik ve správné čtvrti — role není potřeba. Jeden kšeft za tah a pokus se spotřebuje i při neúspěchu. Úspěch vám dá {{success}} skandál, neúspěch {{failure}}. Vlastní skandály Ochrana nezastaví.",

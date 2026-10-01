@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import {
   greyOperationDistricts,
+  greyOperationNeedsAll,
   greyOperationInfo,
   greyOperationLabels,
   greyOperationPoints,
@@ -49,7 +50,7 @@ export function GreyDetails({
             const points = greyOperationPoints(meta, operationId);
             const gates = (greyOperationDistricts[operationId] ?? [])
               .map(id => index.districts.get(id)?.title ?? id)
-              .join(" / ");
+              .join(greyOperationNeedsAll.has(operationId) ? " + " : " / ");
 
             if (options.length === 0) {
               return (

@@ -10,6 +10,8 @@ export interface RoomSummary {
   humans: number;
   capacity: number;
   updated_at: string;
+  /** Открытое лобби: без пароля, в него попадают и через «случайную игру». */
+  open?: boolean;
 }
 
 export interface RoomSeat {
@@ -123,8 +125,6 @@ export interface DomainEvent {
 // Itemised live score, computed by the engine. The client must never re-derive the formula:
 // money and influence convert at a rate now, and two implementations would drift apart.
 export interface ScoreBreakdown {
-  money: number;
-  influence: number;
   assets: number;
   projects: number;
   // Points from neither projects nor objects: the cards that buy score outright.
@@ -243,8 +243,6 @@ export interface ProjectMeta {
 // Rates owned by the engine (`city_engine/constants.py`) and shipped with the catalog, so no
 // client hardcodes the conversion.
 export interface ScoringMeta {
-  money_per_point: number;
-  influence_per_point: number;
   lobbying_influence: number;
   lobbying_points: number;
   project_board_size: number;

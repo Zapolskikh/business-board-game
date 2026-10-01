@@ -32,14 +32,14 @@ export const cityApi = {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ password }),
   }),
-  create: (body: { name: string; password: string; capacity: number; max_rounds: number; role_price: number }) =>
+  create: (body: { name: string; password: string; capacity: number; max_rounds: number; role_price: number; open?: boolean; owner_token?: string }) =>
     request<RoomView>("/api/city/rooms", json(body)),
-  join: (id: string, body: { password: string; seat_index: number; player_name: string; release_seat_index?: number | null }) =>
+  join: (id: string, body: { password: string; seat_index: number; player_name: string; release_seat_index?: number | null; seat_token?: string }) =>
     request<RoomView>(`/api/city/rooms/${id}/join`, json(body)),
-  seat: (id: string, body: { password: string; seat_index: number; kind: "bot" | "empty"; difficulty?: Difficulty; preferred_role?: string | null }) =>
+  seat: (id: string, body: { password: string; seat_index: number; kind: "bot" | "empty"; difficulty?: Difficulty; preferred_role?: string | null; owner_token?: string }) =>
     request<RoomView>(`/api/city/rooms/${id}/seats`, json(body)),
-  start: (id: string, password: string) =>
-    request<RoomView>(`/api/city/rooms/${id}/start`, json({ password })),
+  start: (id: string, password: string, ownerToken?: string) =>
+    request<RoomView>(`/api/city/rooms/${id}/start`, json({ password, owner_token: ownerToken })),
   state: (id: string, password: string, viewerId: string, afterRevision?: number) => {
     const params = new URLSearchParams({ viewer_id: viewerId });
     if (afterRevision !== undefined) params.set("after_revision", String(afterRevision));

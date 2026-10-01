@@ -6,7 +6,13 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from city_engine.commands import Command
-from city_rooms.errors import RoomAccessError, RoomConflictError, RoomNotFoundError
+from city_rooms.errors import (
+    RoomAccessError,
+    RoomConflictError,
+    RoomNameTakenError,
+    RoomNotFoundError,
+    RoomValidationError,
+)
 from city_rooms.models import RoomState
 from city_rooms.repository import InMemoryRoomRepository
 from city_rooms.security import hash_password, verify_password
@@ -17,10 +23,12 @@ from city_rooms.views import room_view
 
 def create_started_room() -> tuple[CityRoomService, str]:
     service = CityRoomService(InMemoryRoomRepository())
-    room = service.create_room(name="Test city", password="secret", capacity=3)
-    service.join(room.id, password="secret", seat_index=0, player_name="Oleg")
-    service.set_bot(room.id, password="secret", seat_index=1, difficulty="hard", preferred_role="mafia")
-    service.start(room.id, password="secret", seed=42)
+    room = service.create_room(name="Test city", password="secret", capacity=3, owner_token="host-secret")
+    service.join(room.id, password="secret", seat_index=0, player_name="Oleg", seat_token="oleg-secret")
+    service.set_bot(
+        room.id, password="secret", seat_index=1, difficulty="hard", preferred_role="mafia", owner_token="host-secret"
+    )
+    service.start(room.id, password="secret", seed=42, owner_token="host-secret")
     return service, room.id
 
 
@@ -48,6 +56,39 @@ def test_wrong_password_cannot_join() -> None:
         service.join(room.id, password="wrong", seat_index=0, player_name="Intruder")
 
 
+def test_room_names_are_unique_regardless_of_case_and_spacing() -> None:
+    """Two identical cards in the list are indistinguishable — the wrong one gets opened."""
+    service = CityRoomService(InMemoryRoomRepository())
+    service.create_room(name="Вечерняя партия", password="secret")
+    for duplicate in ("Вечерняя партия", "  вечерняя   ПАРТИЯ "):
+        with pytest.raises(RoomNameTakenError):
+            service.create_room(name=duplicate, password="secret")
+    assert service.create_room(name="Вечерняя партия 2", password="secret").name == "Вечерняя партия 2"
+
+
+def test_open_lobby_needs_no_password_and_cannot_be_closed_from_under_players() -> None:
+    service = CityRoomService(InMemoryRoomRepository())
+    room = service.create_room(name="Open table", password="", is_open=True)
+    assert room.public_summary()["open"] is True
+    service.join(room.id, password="", seat_index=0, player_name="Guest")
+    service.set_bot(room.id, password="", seat_index=1, difficulty="expert", preferred_role=None)
+    assert service.start(room.id, password="").status == "playing"
+    # Nobody owns an open room, but a passer-by may not close a table people are sitting at.
+    with pytest.raises(RoomAccessError):
+        service.delete_room(room.id, password="")
+    # A private room still requires a real password.
+    with pytest.raises(RoomValidationError):
+        service.create_room(name="Private", password="")
+
+
+def test_an_empty_open_lobby_can_be_cleared_by_anyone() -> None:
+    service = CityRoomService(InMemoryRoomRepository())
+    room = service.create_room(name="Abandoned", password="", is_open=True)
+    service.delete_room(room.id, password="")
+    with pytest.raises(RoomNotFoundError):
+        service.get_room(room.id)
+
+
 def test_room_deletion_requires_password_and_removes_room() -> None:
     service = CityRoomService(InMemoryRoomRepository())
     room = service.create_room(name="Temporary", password="secret")
@@ -73,23 +114,97 @@ def test_upstash_room_inactivity_defaults_to_thirty_minutes(monkeypatch: pytest.
     assert not UpstashRoomRepository._inactive(room, now.timestamp())
 
 
-def test_password_holder_can_reconnect_to_existing_human_seat() -> None:
+def test_a_player_reconnects_to_their_seat_with_its_secret() -> None:
     service = CityRoomService(InMemoryRoomRepository())
     room = service.create_room(name="Reconnect", password="secret")
-    joined = service.join(room.id, password="secret", seat_index=0, player_name="Oleg")
-    reconnected = service.join(room.id, password="secret", seat_index=0, player_name="Ignored name")
+    joined = service.join(room.id, password="secret", seat_index=0, player_name="Oleg", seat_token="oleg-secret")
+    reconnected = service.join(
+        room.id, password="secret", seat_index=0, player_name="Ignored name", seat_token="oleg-secret"
+    )
     assert reconnected.seats[0].player_id == joined.seats[0].player_id
     assert reconnected.seats[0].name == "Oleg"
     assert reconnected.revision == joined.revision + 1
 
 
-def test_password_holder_can_reconnect_after_game_started() -> None:
+def test_the_password_alone_does_not_take_somebody_elses_seat() -> None:
+    """Everybody at the table knows the password — it cannot be what proves a seat is yours."""
+    service = CityRoomService(InMemoryRoomRepository())
+    room = service.create_room(name="Guarded", password="secret")
+    service.join(room.id, password="secret", seat_index=0, player_name="Oleg", seat_token="oleg-secret")
+    for token in ("", "guess"):
+        with pytest.raises(RoomConflictError):
+            service.join(room.id, password="secret", seat_index=0, player_name="Intruder", seat_token=token)
+    service.set_bot(room.id, password="secret", seat_index=1, difficulty="expert")
+    with pytest.raises(RoomConflictError):
+        service.join(room.id, password="secret", seat_index=1, player_name="Intruder", seat_token="x")
+    # Moving seats frees only your own: a guest cannot release the host's chair as their "old" seat.
+    guest = service.join(
+        room.id, password="secret", seat_index=2, player_name="Guest", seat_token="guest-secret", release_seat_index=0
+    )
+    assert guest.seats[0].name == "Oleg"
+
+
+def test_only_the_creator_starts_the_game() -> None:
+    service = CityRoomService(InMemoryRoomRepository())
+    room = service.create_room(name="Host starts", password="secret", owner_token="host-secret")
+    service.join(room.id, password="secret", seat_index=0, player_name="Host", seat_token="host-seat")
+    service.join(room.id, password="secret", seat_index=1, player_name="Guest", seat_token="guest-seat")
+    with pytest.raises(RoomAccessError):
+        service.start(room.id, password="secret")
+    assert service.start(room.id, password="secret", owner_token="host-secret").status == "playing"
+
+
+def test_player_names_are_unique_at_a_table() -> None:
+    """Two «Игрок» cannot be told apart on the board or in the log — bots' names included."""
+    service = CityRoomService(InMemoryRoomRepository())
+    room = service.create_room(name="Names", password="secret", owner_token="host-secret")
+    service.join(room.id, password="secret", seat_index=0, player_name="Игрок", seat_token="first")
+    service.set_bot(room.id, password="secret", seat_index=1, difficulty="expert", owner_token="host-secret")
+    for duplicate in ("Игрок", "  игрок ", "bot 2"):
+        with pytest.raises(RoomConflictError):
+            service.join(room.id, password="secret", seat_index=2, player_name=duplicate, seat_token="second")
+    # Moving to another chair under your own name is not a duplicate: the old chair is released.
+    moved = service.join(
+        room.id, password="secret", seat_index=2, player_name="Игрок", seat_token="first", release_seat_index=0
+    )
+    assert [seat.name for seat in moved.seats[:3]] == [None, "Bot 2", "Игрок"]
+
+
+def test_a_player_reconnects_after_game_started_only_with_the_secret() -> None:
     service, room_id = create_started_room()
     before = service.get_room(room_id)
-    reconnected = service.join(room_id, password="secret", seat_index=0, player_name="Ignored")
+    with pytest.raises(RoomConflictError):
+        service.join(room_id, password="secret", seat_index=0, player_name="Intruder")
+    reconnected = service.join(
+        room_id, password="secret", seat_index=0, player_name="Ignored", seat_token="oleg-secret"
+    )
     assert reconnected.status == "playing"
     assert reconnected.seats[0].player_id == "seat-1"
     assert reconnected.revision == before.revision + 1
+
+
+def test_only_the_creator_clears_or_reconfigures_occupied_seats() -> None:
+    service = CityRoomService(InMemoryRoomRepository())
+    room = service.create_room(name="Hosted", password="secret", owner_token="host-secret")
+    service.join(room.id, password="secret", seat_index=0, player_name="Guest", seat_token="guest-secret")
+    # Seating a bot, changing it, removing it or clearing a player — all the host's call.
+    with pytest.raises(RoomAccessError):
+        service.set_bot(room.id, password="secret", seat_index=1, difficulty="expert")
+    service.set_bot(room.id, password="secret", seat_index=1, difficulty="expert", owner_token="host-secret")
+    with pytest.raises(RoomAccessError):
+        service.set_bot(room.id, password="secret", seat_index=1, difficulty="expert", preferred_role="mafia")
+    for seat in (0, 1):
+        with pytest.raises(RoomAccessError):
+            service.clear_seat(room.id, password="secret", seat_index=seat)
+    service.set_bot(
+        room.id, password="secret", seat_index=1, difficulty="expert", preferred_role="mafia", owner_token="host-secret"
+    )
+    cleared = service.clear_seat(room.id, password="secret", seat_index=0, owner_token="host-secret")
+    assert cleared.seats[0].kind == "empty"
+    # The cleared player's secret is gone with the seat: it does not reclaim the next occupant's chair.
+    service.join(room.id, password="secret", seat_index=0, player_name="Next", seat_token="next-secret")
+    with pytest.raises(RoomConflictError):
+        service.join(room.id, password="secret", seat_index=0, player_name="Guest", seat_token="guest-secret")
 
 
 def test_human_command_uses_authoritative_engine() -> None:

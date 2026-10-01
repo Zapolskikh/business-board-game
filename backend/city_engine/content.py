@@ -22,12 +22,10 @@ from city_engine.constants import (
     GREY_OPERATION_POINTS,
     GREY_SUCCESS_SCANDALS,
     HACK_INFLUENCE_BASE,
-    INFLUENCE_PER_POINT,
     LOBBYING_INFLUENCE,
     LOBBYING_POINTS,
     MARKET_ROTATION_SIZE,
     MAX_CAPACITY,
-    MONEY_PER_POINT,
     PATRONAGE_MONEY,
     PATRONAGE_POINTS,
     PROJECT_BOARD_SIZE,
@@ -46,7 +44,7 @@ def asset_points(cost: int) -> int:
     """Final-scoring points an object is worth, and what selling it pays back: half its price.
 
     Lives here rather than in the engine because the number has to reach the card: an object turns
-    money into points at 2$ each, five times better than the 10$ a hoarded point costs, which makes
+    money into points at 2$ each, while a hoarded dollar scores nothing, which makes
     "sell the weak one, buy the dear one" the strongest late money sink in the game. Clients that
     derive `floor(cost / 2)` themselves put the rate on screen nowhere and duplicate it in three
     places.
@@ -211,8 +209,6 @@ class ContentCatalog:
             "project_reroll_money": PROJECT_REROLL_MONEY,
             # How many rounds a market slot lasts, so the client can say "rounds" and mean it.
             "market_rotation_size": MARKET_ROTATION_SIZE,
-            "money_per_point": MONEY_PER_POINT,
-            "influence_per_point": INFLUENCE_PER_POINT,
             "lobbying_influence": LOBBYING_INFLUENCE,
             "lobbying_points": LOBBYING_POINTS,
             "patronage_money": PATRONAGE_MONEY,

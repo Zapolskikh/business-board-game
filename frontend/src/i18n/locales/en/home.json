@@ -5,6 +5,7 @@
     "tagline": "board strategy game"
   },
   "nav": {
+    "rules": "📖 Rules",
     "about": "About",
     "feedback": "Feedback",
     "home": "← Home"
@@ -15,18 +16,27 @@
     "serverUp": "server is up"
   },
   "hero": {
-    "eyebrow": "Strategy · 2–4 players",
-    "titleLine1": "Build the city.",
-    "titleLine2": "Take the influence.",
-    "lead": "A strategy game about power in a growing city. Build businesses, claim districts and outplay your rivals. In the end, being rich is not enough — the most victory points win. Create a room or join an open one to play.",
-    "stepBuild": "Build businesses and earn income",
-    "stepCompete": "Contend for roles, districts and projects",
-    "stepScore": "Turn influence into victory points",
-    "artLabel": "Every move reshapes the city",
-    "artworkAlt": "An illustrated game table with city districts, buildings and player pieces",
-    "rounds": "rounds per game",
-    "actions": "actions per turn",
-    "districts": "city districts"
+    "eyebrow": "Board strategy · 2–4 players",
+    "titleLine1": "Money builds the city.",
+    "titleLine2": "Influence runs it.",
+    "lead": "The city is growing — and everyone wants it for themselves. Buy businesses in six districts, take a role with its own powers and grab city projects before your rivals do.",
+    "hook": "And when the honest ways run out — dirt, rackets and shady deals. Just watch your scandals: pile up too many and you lose your role, or end up under arrest.",
+    "ctaPlay": "Start a game",
+    "ctaRules": "📖 How to play",
+    "factPlayers": "players",
+    "factRounds": "rounds",
+    "factActions": "actions per turn",
+    "factAssets": "businesses on the market",
+    "factProjects": "city projects",
+    "pillarsLabel": "What the game is made of",
+    "districtsTitle": "{{count}} districts",
+    "districtsText": "Buy buildings, strengthen your district and unlock unique bonuses that help you grow faster than everyone else.",
+    "rolesTitle": "{{count}} roles",
+    "rolesText": "Build your strategy around your role — or pick a different one when the situation calls for it. Roles can change hands during the game, and you can fight other players for them.",
+    "projectsTitle": "City projects",
+    "projectsText": "Take part in city projects to earn more victory points and bonuses that keep working for you until the end of the game.",
+    "greyTitle": "The shady side",
+    "greyText": "When the honest ways run out, go around them: smears, hacks and dirt score points, but every failure turns into a scandal."
   },
   "rooms": {
     "eyebrow": "Games",
@@ -49,7 +59,8 @@
     "humans_other": "{{count}} people",
     "open": "Open",
     "remove": "Delete room",
-    "removeNamed": "Delete room {{name}}"
+    "removeNamed": "Delete room {{name}}",
+    "openBadge": "open"
   },
   "create": {
     "eyebrow": "New game",
@@ -59,17 +70,31 @@
     "namePlaceholder": "For example, Friday game",
     "password": "Room password",
     "passwordPlaceholder": "At least 4 characters",
-    "passwordHint": "You need it to set up the seats and start the game.",
+    "passwordHint": "To manage the room and start the game.",
     "players": "Players",
     "rounds": "Rounds",
-    "roundsHint": "Choose 5–30 rounds. The default is 15.",
+    "roundsHint": "From 5 to 30 rounds.",
     "advanced": "More settings",
     "rolePrice": "Role price",
     "rolePriceHint": "How much influence a free role costs.",
-    "submit": "Create and go to the lobby →",
+    "submit": "Create lobby",
     "submitting": "Creating…",
     "hintMissing": "Enter a name and a password (4+ characters).",
-    "hintReady": "All set."
+    "hintReady": "You can invite players once it's created.",
+    "heading": "Set up your table",
+    "subheading": "Invite your friends and start the fight for the city.",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "roundsLess": "Fewer rounds",
+    "roundsMore": "More rounds",
+    "playerName": "Your name",
+    "playerNamePlaceholder": "How to show you at the table",
+    "nameTaken": "A room with this name already exists — pick another one.",
+    "openLobby": "Open lobby",
+    "openLobbyHint": "No password — anyone can join, including through a random game.",
+    "hintName": "Enter a room name.",
+    "hintPassword": "Set a password (4+ characters) or make the lobby open.",
+    "hintPlayerName": "Enter your name."
   },
   "delete": {
     "eyebrow": "Please confirm",
@@ -94,7 +119,7 @@
     "eyebrow": "Getting ready",
     "titleWaiting": "Pick a seat and fill the table",
     "titleRunning": "Go back to your seat",
-    "leadWaiting": "People and bots can play together. To start, you need at least two players, and at least one of them must be a person.",
+    "leadWaiting": "You need two players to start, at least one of them human.",
     "leadRunning": "The game is already running. Enter the password and pick your seat.",
     "seatsEyebrow": "The table",
     "seatsTitle": "Seats",
@@ -108,18 +133,27 @@
     "defaultName": "Player",
     "password": "Room password",
     "passwordPlaceholder": "To join and change settings",
-    "accessNote": "Pick a free seat. If you are coming back to a game, click your old seat.",
+    "accessNote": "Pick a free seat. Coming back? Click your old seat.",
     "readyEyebrow": "Ready?",
     "readyWaiting": "Can we start?",
     "readyRunning": "The game has started",
     "checkPassword": "Password entered",
     "checkPlayers": "At least two players",
     "checkHuman": "At least one person at the table",
-    "start": "Start the game →",
+    "start": "Start game",
     "wait": "Please wait…",
-    "resume": "Back to the game →",
+    "resume": "Back to the game",
     "pickSeatFirst": "First pick your seat.",
-    "meetChecks": "Tick all the boxes above and the button will turn on."
+    "meetChecks": "Add a rival — a human or a bot.",
+    "copyCode": "Copy room code",
+    "copied": "Copied",
+    "accessNeedPasswordNote": "Enter the room password to take a seat.",
+    "meetPassword": "Enter the room password.",
+    "meetHuman": "Take a seat and add a rival.",
+    "openTitle": "Open lobby",
+    "openNote": "No password needed — just pick a seat.",
+    "waitHost": "Waiting for the lobby creator to start the game.",
+    "nameRequired": "Enter your name to take a seat."
   },
   "seat": {
     "kind": {
@@ -132,7 +166,7 @@
     "anyRole": "any role",
     "youAreHere": "You are at the table",
     "humanPlayer": "Human player",
-    "emptyHint": "Take it yourself or add a bot",
+    "emptyHint": "Take this seat",
     "confirmed": "✓ This is your seat",
     "sitHere": "Sit here",
     "returnHere": "Go back to this seat",
@@ -143,7 +177,12 @@
     "preferredRole": "Favourite role",
     "anyRoleOption": "Any role",
     "saveBot": "Save",
-    "placeBot": "Add bot"
+    "placeBot": "Add bot",
+    "configureBot": "Bot settings",
+    "taken": "Seat taken",
+    "freeSeat": "Free this seat",
+    "botSeat": "Bot seat — only the lobby creator can change it",
+    "emptyHintHost": "Take it or add a bot"
   },
   "about": {
     "eyebrow": "About",
@@ -195,5 +234,11 @@
     "doneText": "It really helps to make the game better.",
     "writeMore": "Write another",
     "toHome": "Home"
+  },
+  "random": {
+    "or": "or",
+    "button": "Random game",
+    "hint": "Join an open lobby — or, if there is none, open one and host it.",
+    "none": "No open lobbies with free seats right now — create your own."
   }
 }

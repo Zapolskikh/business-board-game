@@ -13,6 +13,10 @@ class RoomConflictError(RoomError):
     """The room changed concurrently or the requested seat is unavailable."""
 
 
+class RoomNameTakenError(RoomConflictError):
+    """Another open room already uses this name: the list would show two identical cards."""
+
+
 class RoomAccessError(RoomError):
     """The supplied room password is invalid."""
 

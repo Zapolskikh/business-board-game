@@ -3,10 +3,8 @@ import i18next from "../i18n";
 import {
   campaignTiers,
   crisisPrInfluence,
-  influencePerPoint,
   lobbying,
   marketRotationSize,
-  moneyPerPoint,
   patronage,
   projectPerkText,
   projectRequirementText,
@@ -91,8 +89,6 @@ export interface RulesContext {
   rolePrice: number;
   e: typeof escapeHtml;
   n: {
-    moneyPerPoint: number;
-    influencePerPoint: number;
     patronage: { money: number; points: number };
     lobbying: { influence: number; points: number };
     campaign: { spend: number; gain: number }[];
@@ -193,8 +189,6 @@ function context(meta: CityMeta, rolePrice: number): RulesContext {
     rolePrice,
     e,
     n: {
-      moneyPerPoint: moneyPerPoint(meta),
-      influencePerPoint: influencePerPoint(meta),
       patronage: patronage(meta),
       lobbying: lobbying(meta),
       campaign: campaignTiers(meta),

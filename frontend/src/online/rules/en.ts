@@ -139,7 +139,7 @@ const roles: Record<string, RoleGuide> = {
       {
         name: "Inspection",
         cost: "1 action",
-        limit: "can be repeated; you need at least one rival with a Grey Sector business",
+        limit: "once per turn; you need at least one rival with a Grey Sector business",
         effect: "Each rival with a Grey Sector business gets 1 scandal.",
       },
       {
@@ -304,7 +304,7 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
           <tr><td class="name"><b>Pump and dump</b></td><td>Tech Cluster or Grey Sector</td><td class="num">${n.greyChance("crypto", 45)}%</td><td>Take up to (${n.pumpBase} + round number ÷ 2)$ from each rival</td><td class="num">+${n.greyPoints("crypto", 2)}</td></tr>
           <tr><td class="name"><b>Break Protection</b></td><td>Grey Sector</td><td class="num">${n.greyChance("roof_break", 60)}%</td><td>Remove all the target's Protection and get ${n.roofBreakPoint}★ for each one removed</td><td class="num">+${n.greyPoints("roof_break", 2)}</td></tr>
           <tr><td class="name"><b>Hack</b></td><td>Tech Cluster or Grey Sector</td><td class="num">${n.greyChance("datacenter", 40)}%</td><td>Take up to (${n.hackBase} + round number ÷ 3)◆ from the target</td><td class="num">+${n.greyPoints("datacenter", 3)}</td></tr>
-          <tr><td class="name"><b>Leak dirt</b></td><td>Government Quarter or Grey Sector</td><td class="num">${n.greyChance("influence_broker", 60)}%</td><td>The target loses their role</td><td class="num">+${n.greyPoints("influence_broker", 3)}</td></tr>
+          <tr><td class="name"><b>Leak dirt</b></td><td>Government Quarter and Grey Sector (both)</td><td class="num">${n.greyChance("influence_broker", 60)}%</td><td>The target loses their role</td><td class="num">+${n.greyPoints("influence_broker", 3)}</td></tr>
         </tbody>
       </table>
       <p><b>Success:</b> the effect works, you get the points from the table and ${n.greySuccess} scandal. <b>Failure:</b> the effect does not work, and you get ${n.greyFailure} scandals. The action is spent either way. Divisions in the formulas are rounded down.</p>
@@ -364,10 +364,9 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
         <li><b>Businesses</b> — half the price of each business. The number is printed on the card.</li>
         <li><b>Role</b> — 3 points if you have one.</li>
         <li><b>Points earned during the game</b> — for patronage, lobbying, action cards and shady deals.</li>
-        <li><b>Money</b> — 1 point for every ${n.moneyPerPoint}$.</li>
-        <li><b>Influence</b> — 1 point for every ${n.influencePerPoint}◆.</li>
         <li><b>Scandals</b> — minus 1 point for each.</li>
       </ul>
+      <p>Leftover money and influence give no points: they are resources, not score. Spend them before the game ends, or turn them into points with patronage and lobbying.</p>
       <div class="tip">The player with the most points wins. <b>With equal points, the player who bought more city projects wins.</b></div>
       `,
     },

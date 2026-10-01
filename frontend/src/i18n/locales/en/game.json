@@ -19,7 +19,7 @@
     "politician_cleanup": { "label": "Settle a scandal", "what": "Removes one of your scandals. Cheaper than normal crisis PR, but it also costs an action.", "cost": "action + 2◆" },
     "politician_deal": {
       "label": "Make a deal",
-      "what": "Until the end of the round, any district you pick counts as yours: it unlocks that district's projects and shady deals and counts for synergy. You don't need a business there.",
+      "what": "Until the end of the round, any district you pick counts as yours: it unlocks that district's projects and shady deals and counts for synergy. You don't need a business there, but you need your own Grey Sector business: that is where the deal is struck.",
       "cost": "3◆ + 1 scandal, no action, once per turn"
     },
     "politician_veto": {
@@ -58,7 +58,7 @@
     "military_inspection": {
       "label": "Inspection",
       "what": "A scandal for every rival who has a Grey Sector business. It hits the district, not one player, so nobody can hide. Protection keeps its owner safe and is used up.",
-      "cost": "action"
+      "cost": "action, once per turn"
     },
     "military_roof_seize": { "label": "Take Protection", "what": "Takes one Protection from a rival and gives it to you. Protection does not defend against this.", "cost": "action + 3◆" }
   },
@@ -320,17 +320,16 @@
       "greyPick": "pick a deal and a target", "greyNeed": "you need a business in the right district",
       "greyBadge": "{{count}} of 5", "endTurn": "End turn", "ending": "Ending…", "spendsAction": "costs an action",
       "noAction": "no action", "unavailable": "Not available", "pickDistrict": "pick a district",
-      "dealText": "Until the end of the round, the district counts as yours: it unlocks that district's projects and shady deals and counts for synergy. It costs influence and a scandal, but no action.",
+      "dealText": "Until the end of the round, the district counts as yours: it unlocks that district's projects and shady deals and counts for synergy. You need your own Grey Sector business. It costs influence and a scandal, but no action.",
       "dealCost": "3◆ + scandal, no action", "pickTarget": "pick a target",
       "powerDefault": "The power is used on the rival you pick.", "price": "Price: {{cost}}", "target": "Target",
       "targetPick": "pick a target ›", "targetPickFree": "no action · pick a target ›"
     },
     "score": {
       "title": "🏆 Score and income", "points": "{{count}} pts", "projects": "Projects", "assets": "Businesses",
-      "money": "Money {{value}}$", "moneyRate": "{{points}} · {{rate}}$ per point", "influence": "Influence {{value}}◆",
-      "influenceRate": "{{points}} · {{rate}}◆ per point", "role": "Role", "bonus": "Cards and actions for points",
+      "role": "Role", "bonus": "Cards and actions for points",
       "scandals": "Scandals", "total": "Total",
-      "leftover": "The money and influence you still have at the end also give points: 1 point for {{money}}$ and for {{influence}}◆.",
+      "leftover": "Money and influence are resources, not points: whatever is left at the end does not count. Spend them, or turn them into points with patronage ({{patronageMoney}}$ → {{patronagePoints}} pts) and lobbying ({{lobbyingInfluence}}◆ → {{lobbyingPoints}} pts).",
       "income": "Income at the end of the round",
       "lastRound": "Last round: there is no payout at the end — spend your money and influence now."
     },
@@ -492,7 +491,7 @@
       "jail": "Arrested: only 1 action this turn", "jailOut": "The arrest is over — you play as normal again",
       "scandalLimit": "{{have}} of {{limit}} scandals — the limit is reached"
     },
-    "preview": { "stripsRole": "takes the role", "selfScandals": "to you ⚠+{{count}}", "leader": "leader — doubled", "roofBlocks": " — will stop it" },
+    "preview": { "roofEats": "Defence stops it: 🛡−1", "losesRole": "loses the role", "nothing": "—", "colTarget": "Target", "colLoses": "Target loses", "colYou": "You get", "pick": "Pick", "confirm": "Confirm", "confirmTitle": "who it hits — check and confirm",  "stripsRole": "takes the role", "selfScandals": "to you ⚠+{{count}}", "leader": "leader — doubled", "roofBlocks": " — will stop it" },
     "grey": {
       "title": "🌒 Shady deals", "spent": "already done", "once": "one per turn",
       "intro": "Any of your businesses in the right district unlocks a deal — you don't need a role. One deal per turn, and the attempt is spent even if it fails. Success gives you {{success}} scandal, failure — {{failure}}. Protection does not stop your own scandals.",

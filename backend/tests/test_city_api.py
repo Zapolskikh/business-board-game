@@ -273,7 +273,8 @@ def test_journal_is_exported_only_after_the_game_is_finished() -> None:
 
         running = client.get(f"/api/city/rooms/{room_id}/journal", params=params, headers=headers)
         assert running.status_code == 422  # the seed is hidden information while the game runs
-        assert client.get(f"/api/city/rooms/{room_id}/journal", params=params).status_code == 422
+        # No password header reads as an empty password: a private room refuses it.
+        assert client.get(f"/api/city/rooms/{room_id}/journal", params=params).status_code == 403
 
         for index in range(20):
             state = client.get(f"/api/city/rooms/{room_id}/state", params=params, headers=headers).json()

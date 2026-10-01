@@ -15,12 +15,10 @@ from city_engine.constants import (
     GREY_OPERATION_CHANCE,
     GREY_OPERATION_POINTS,
     GREY_SUCCESS_SCANDALS,
-    INFLUENCE_PER_POINT,
     LOBBYING_INFLUENCE,
     LOBBYING_POINTS,
     MARKET_ROTATION_SIZE,
     MILITARY_SEIZE_INFLUENCE,
-    MONEY_PER_POINT,
     PATRONAGE_MONEY,
     PATRONAGE_POINTS,
     POINTS_CARD_RATE,
@@ -741,6 +739,11 @@ def test_military_inspection_scandalises_everyone_in_the_grey_sector() -> None:
     give_asset(state, rivals[2], "housing")  # residential — untouched
 
     assert engine.inspection_targets(state, military) == [rivals[0].id, rivals[1].id]
+    # The confirmation window prints this before the action is spent: who is reached, and whose
+    # roof will answer instead.
+    previews = [engine.power_preview(state, military, "military_inspection", rival) for rival in rivals]
+    assert [preview.get("scandals", 0) for preview in previews] == [1, 1, 0]
+    assert [preview["blocked_by_roof"] for preview in previews[:2]] == [False, True]
 
     state = run(engine, state, "use_role_power", {"power": "military_inspection"})
 
@@ -751,6 +754,9 @@ def test_military_inspection_scandalises_everyone_in_the_grey_sector() -> None:
     assert state.actions_left == 2
     event = next(item for item in state.event_log if item.type == "military_inspection")
     assert event.data["scandalised_ids"] == [rivals[0].id]
+    # Once a turn: three in a row took a rival from clean to arrested in a single turn.
+    with pytest.raises(IllegalActionError):
+        run(engine, state, "use_role_power", {"power": "military_inspection"})
 
 
 def test_military_inspection_is_not_offered_against_a_clean_city() -> None:
@@ -1296,6 +1302,7 @@ def test_compromat_leak_strips_a_role() -> None:
     state = make_state()
     actor = state.current_player
     give_asset(state, actor, "influence_broker")
+    give_asset(state, actor, "passport_office")  # the leak needs the city hall as well
     actor.influence = 10
     actor.scandals = 0
     target = next(other for other in state.players if other.id != actor.id)
@@ -1316,11 +1323,24 @@ def test_compromat_leak_strips_a_role() -> None:
         run(engine, state, "grey_operation", {"asset_id": "influence_broker", "target_id": target.id})
 
 
+def test_compromat_leak_needs_both_the_grey_sector_and_the_city_hall() -> None:
+    """With the Серый сектор alone it was a one-action role strip from the first round."""
+    engine = CityEngine()
+    state = make_state()
+    actor = state.current_player
+    give_asset(state, actor, "influence_broker")
+    assert not engine.grey_operation_unlocked(actor, "influence_broker")
+    assert engine.grey_operation_unlocked(actor, "smear")
+    give_asset(state, actor, "passport_office")
+    assert engine.grey_operation_unlocked(actor, "influence_broker")
+
+
 def test_compromat_leak_is_absorbed_by_a_roof() -> None:
     engine = CityEngine()
     state = make_state()
     actor = state.current_player
     give_asset(state, actor, "influence_broker")
+    give_asset(state, actor, "passport_office")
     actor.influence = 10
     target = next(other for other in state.players if other.id != actor.id)
     target.role = "capitalist"
@@ -1425,27 +1445,22 @@ def put_on_board(state, project_id: str) -> None:
     state.project_deck = [item for item in state.project_deck if item not in state.project_board]
 
 
-def test_money_and_influence_pay_a_poor_passive_rate() -> None:
-    """They score, badly. Dropping the payout outright doubled the winner's margin — see 1.5.1."""
+def test_money_and_influence_are_resources_not_score() -> None:
+    """A pile scores nothing: points come from objects, projects, the role and the sinks."""
     engine = CityEngine()
     state = make_state()
     player = state.current_player
-    player.money = 47
-    player.influence = 11
     player.scandals = 2
+    player.money, player.influence = 0, 0
+    empty = engine.score(player)
 
+    player.money = 147
+    player.influence = 41
     breakdown = engine.score_breakdown(player)
-    # 47$ → 4 points, 11◆ → 3: a round's income hoarded is worth less than one cheap object.
-    assert breakdown["money"] == 47 // MONEY_PER_POINT
-    assert breakdown["influence"] == 11 // INFLUENCE_PER_POINT
+    assert engine.score(player) == empty
+    assert "money" not in breakdown and "influence" not in breakdown
     assert breakdown["scandals"] == -2
     assert breakdown["total"] == engine.score(player)
-
-    # A pile already scores by itself, so what a sink really pays is the *difference*. Both hand
-    # back three points over what the same resource was worth sitting still, against an action
-    # worth about two — which is what makes each worth pressing and neither worth building around.
-    assert PATRONAGE_POINTS - PATRONAGE_MONEY // MONEY_PER_POINT == 3
-    assert LOBBYING_POINTS - LOBBYING_INFLUENCE // INFLUENCE_PER_POINT == 3
 
     player.projects.append("art_museum")
     assert engine.score_breakdown(player)["projects"] == engine.project("art_museum").points
@@ -1679,8 +1694,8 @@ def test_patronage_turns_dead_money_into_points_without_a_slot() -> None:
     assert player.bonus_points == PATRONAGE_POINTS
     assert engine.score_breakdown(player)["bonus"] == PATRONAGE_POINTS
     assert state.actions_left == actions - 1
-    # The 10$ that left were worth a point on their own, so the action nets exactly one point.
-    assert engine.score(player) == before + PATRONAGE_POINTS - PATRONAGE_MONEY // MONEY_PER_POINT
+    # The money that left scored nothing, so the action pays its full face value.
+    assert engine.score(player) == before + PATRONAGE_POINTS
 
     # Once a turn, with money left over: unbounded, the biggest pile would simply buy the game.
     assert player.money >= PATRONAGE_MONEY
@@ -1702,7 +1717,7 @@ def test_patronage_turns_dead_money_into_points_without_a_slot() -> None:
 
 
 def test_lobbying_is_the_same_floor_for_influence() -> None:
-    """The influence twin of patronage: double the passive rate for an action, once a turn.
+    """The influence twin of patronage: the one way to bank influence, once a turn.
 
     A measured game ended with 72◆ in one hand and nothing left on the board to spend it on.
     """
@@ -1715,7 +1730,7 @@ def test_lobbying_is_the_same_floor_for_influence() -> None:
     state = run(engine, state, "basic_action", {"kind": "lobbying"})
     player = state.current_player
     assert player.influence == LOBBYING_INFLUENCE
-    assert engine.score(player) == before + LOBBYING_POINTS - LOBBYING_INFLUENCE // INFLUENCE_PER_POINT
+    assert engine.score(player) == before + LOBBYING_POINTS
     assert engine.score_breakdown(player)["bonus"] == LOBBYING_POINTS
 
     # One press a turn, exactly like patronage, and the two do not share the limit.

@@ -26,7 +26,11 @@
     "notFound": "Room not found — it may have closed",
     "conflict": "Someone was faster. Updating…",
     "tooMany": "Too many requests. Please wait a minute.",
-    "server": "Server error. Please try again a bit later."
+    "server": "Server error. Please try again a bit later.",
+    "nameTaken": "A room with this name already exists — pick another one.",
+    "playerNameTaken": "Someone at this table already has this name — pick another one.",
+    "seatTaken": "This seat is taken by another player.",
+    "hostOnly": "Only the lobby creator can do this."
   },
   "difficulty": {
     "easy": "Easy",

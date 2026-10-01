@@ -32,7 +32,6 @@ from city_engine.constants import (
     GREY_SUCCESS_SCANDALS,
     HACK_INFLUENCE_BASE,
     HAND_LIMIT,
-    INFLUENCE_PER_POINT,
     JOURNALIST_SCANDAL_LIMIT,
     LATE_FILLER_RARITIES,
     LOBBYING_INFLUENCE,
@@ -41,7 +40,6 @@ from city_engine.constants import (
     MARKET_ROTATION_SIZE,
     MAX_CAPACITY,
     MILITARY_SEIZE_INFLUENCE,
-    MONEY_PER_POINT,
     PATRONAGE_MONEY,
     PATRONAGE_POINTS,
     POINTS_CARD_RATE,
@@ -1804,6 +1802,8 @@ class CityEngine:
         targets = self.inspection_targets(state, player)
         if not targets:
             raise IllegalActionError("an inspection requires a rival with a shadows object")
+        # Once a turn: three inspections in one turn put a rival from clean to arrested.
+        self._once_per_turn(state, "military_inspection")
         self._spend_action(state)
         hit: list[str] = []
         for target_id in targets:
@@ -1887,6 +1887,11 @@ class CityEngine:
         "datacenter": ("tech", "shadows"),
         "influence_broker": ("shadows", "government"),
     }
+    # Operations that need a foothold in every listed district, not just one of them. The leak
+    # strips a role for one action, and with the Серый сектор alone it was the opening move of
+    # every game: a cheap object and the whole table lost their roles. Requiring the city hall too
+    # makes it a mid-game play that has to be built towards.
+    GREY_OPERATION_NEEDS_ALL = frozenset({"influence_broker"})
     GREY_ASSET_IDS = tuple(GREY_OPERATION_DISTRICTS)
     # The smear and the pump reach every rival at once, so they ask for no target; the other three
     # are pointed at one player.
@@ -1900,13 +1905,15 @@ class CityEngine:
     def grey_operation_unlocked(self, player: PlayerState, operation_id: str) -> bool:
         """Does the player hold an object in a district this operation runs out of?
 
+        One of the listed districts is enough, except for the operations in
+        ``GREY_OPERATION_NEEDS_ALL``, which need every one of them.
+
         «Зонирование» counts, like it does for project conditions and object synergy: the card
         rents the district for the round and this is a district gate.
         """
-        return any(
-            self.district_count(player, district) > 0
-            for district in self.GREY_OPERATION_DISTRICTS.get(operation_id, ())
-        )
+        districts = self.GREY_OPERATION_DISTRICTS.get(operation_id, ())
+        check = all if operation_id in self.GREY_OPERATION_NEEDS_ALL else any
+        return bool(districts) and check(self.district_count(player, district) > 0 for district in districts)
 
     def hack_influence_steal(self, state: GameState) -> int:
         """How much influence a hack takes. Grows with the round — see HACK_INFLUENCE_BASE."""
@@ -2459,7 +2466,7 @@ class CityEngine:
         if not self.round_pays_out(state):
             # The last round pays nothing. A settlement is the money and influence a player takes
             # *into the next round*, and after the fifteenth there is no next round: the payout
-            # could only ever be spent through the passive rate (10$ and 3◆ a point), which handed
+            # could only ever be scored at the old passive rate (10$ and 3◆ a point, since removed), which handed
             # everybody 3-10 points that no decision at that table could still influence. Measured
             # across six exported matches it moved every player by 4-7 points and turned a
             # one-point finish into a tie — a coin toss decided by the size of an engine the score
@@ -2716,6 +2723,7 @@ class CityEngine:
             "mafia_racket",
             "mafia_lock",
             "military_sanction",
+            "military_inspection",
             "fraudster_crypto_scam",
         }
     )
@@ -2776,6 +2784,11 @@ class CityEngine:
             preview["self_scandals"] = 1
         elif power == "military_roof_seize":
             preview["roofs"] = 1
+        elif power == "military_inspection":
+            # No target is picked — the district picks them — so the preview says, rival by rival,
+            # who the inspection reaches. A rival outside the Серый сектор gets no scandal row.
+            if target.id in self.inspection_targets(state, player):
+                preview["scandals"] = 1
         return preview
 
     def role_power_status(self, state: GameState, player: PlayerState) -> list[dict[str, Any]]:
@@ -2987,16 +3000,12 @@ class CityEngine:
     def score(self, player: PlayerState) -> int:
         """Points come from what you built, not from what you hoarded.
 
-        Money and influence pay at a deliberately poor rate — 10$ and 3◆ a point — and the two
-        sinks pay double that for an action. Dropping the passive payout entirely was measured and
-        reverted: the score got honest and the table got 70% less close, because the wallets of the
-        trailing players were what kept the standings tight.
+        Money and influence score nothing by themselves: they are spent, or turned into points
+        through patronage and lobbying, or lost when the game ends.
         """
         asset_score = sum(self.asset_value(asset) for asset in player.assets)
         return (
-            player.money // MONEY_PER_POINT
-            + player.influence // INFLUENCE_PER_POINT
-            + asset_score
+            asset_score
             + self.project_points(player)
             + player.bonus_points
             + (3 if player.role else 0)
@@ -3007,8 +3016,6 @@ class CityEngine:
         """Same numbers as ``score``, itemised — the client must never re-derive the formula."""
         asset_score = sum(self.asset_value(asset) for asset in player.assets)
         return {
-            "money": player.money // MONEY_PER_POINT,
-            "influence": player.influence // INFLUENCE_PER_POINT,
             "assets": asset_score,
             "projects": self.project_points(player),
             "bonus": player.bonus_points,

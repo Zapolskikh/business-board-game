@@ -10,7 +10,7 @@ import {
   powerLabels,
   crisisPrInfluence,
 } from "../../online/gameUi";
-import type { CityMeta, GameState, LegalAction } from "../../online/types";
+import type { CityMeta, GameState, LegalAction, PlayerState } from "../../online/types";
 import { CardPopover, PopoverBody, PopoverHeader } from "../primitives/CardPopover";
 import { ResourceIcon, ResourceText } from "../primitives/ResourceIcon";
 import { statIcon } from "../assets/cards";
@@ -18,7 +18,8 @@ import { DetailsModal } from "../primitives/Modal";
 import { ActionButton, DrawerRow, ListItem, Panel, sectionTitle, zoneRule, zoneStyle } from "../primitives/atoms";
 import { findActions, resolve, resolveMany, usedThisTurn, type ActionContext } from "../lib/actions";
 import { roofPrice, type Indexes } from "../lib/board";
-import { findPreview, previewCost, previewGain, scoreOf, targetStats } from "../lib/powerPreview";
+import { findPreview, previewGain } from "../lib/powerPreview";
+import { PowerResultTable, PowerTrigger } from "./PowerTargets";
 import { RolesDetails } from "./RolesDetails";
 import { RolePowersDetails } from "./RolePowersDetails";
 import { GreyDetails } from "./GreyDetails";
@@ -331,20 +332,70 @@ function PowerButton({
   const costLabel = description?.cost ?? (spendsAction ? t("ui.actions.spendsAction") : t("ui.actions.noAction"));
   const blockedByRoof = status?.blocked_by_roof ?? true;
 
-  if (single || options.length === 0) {
-    const state = options[0]
-      ? ({ kind: "ready", action: options[0] } as const)
-      : pending
-        ? ({ kind: "pending", action: context.pending as LegalAction } as const)
-        : ({ kind: "blocked", reason: blocked ?? t("ui.actions.unavailable") } as const);
+  // Недоступна: обычная кнопка с причиной в подсказке — открывать нечего.
+  if (options.length === 0) {
+    const state = pending
+      ? ({ kind: "pending", action: context.pending as LegalAction } as const)
+      : ({ kind: "blocked", reason: blocked ?? t("ui.actions.unavailable") } as const);
     return (
       <ActionButton
         label={label}
         cost={spendsAction ? t("ui.actions.spendsAction") : t("ui.actions.noAction")}
         tone={danger ? "danger" : "plain"}
         state={state}
-        onClick={() => state.kind === "ready" && onAction(state.action)}
+        onClick={() => undefined}
       />
+    );
+  }
+
+  /* Без цели (проверка Силовика, крипто-схема): цели выбирает правило, поэтому окно сначала
+   * показывает, кого и как заденет, и только кнопка «Подтвердить» тратит действие. Раньше
+   * способность срабатывала с первого клика, и что она сделает, можно было узнать только из лога. */
+  if (single) {
+    const reached = game.players
+      .filter(player => player.id !== context.me.id)
+      .filter(player => {
+        const preview = findPreview(game, power, player.id);
+        return Boolean(preview && previewGain(preview));
+      })
+      .map(target => ({ target }));
+    return (
+      <CardPopover
+        side="left"
+        width={reached.length ? 460 : 340}
+        content={
+          <>
+            <PopoverHeader title={label} subtitle={t("ui.preview.confirmTitle")} />
+            <PopoverBody>
+              <p className="mb-2">
+                <ResourceText>{description?.what ?? t("ui.actions.powerDefault")}</ResourceText>
+              </p>
+              <p className="mb-2 text-[var(--color-badge)]"><ResourceText>{t("ui.actions.price", { cost: costLabel })}</ResourceText></p>
+              {reached.length > 0 && (
+                <div className="mb-2">
+                  <PowerResultTable game={game} power={power} rows={reached} blockedByRoof={blockedByRoof} />
+                </div>
+              )}
+              <button
+                type="button"
+                data-ui="power-confirm"
+                onClick={() => onAction(options[0])}
+                className={`w-full rounded-md border px-2 py-1.5 font-semibold ${
+                  danger ? "border-bad/60 text-bad hover:bg-bad/10" : "border-accent text-ink hover:bg-panel-3"
+                }`}
+              >
+                {t("ui.preview.confirm")}
+              </button>
+            </PopoverBody>
+          </>
+        }
+      >
+        <PowerTrigger
+          label={label}
+          danger={danger}
+          hint={spendsAction ? t("ui.actions.spendsAction") : t("ui.actions.noAction")}
+        />
+      </CardPopover>
     );
   }
 
@@ -374,20 +425,19 @@ function PowerButton({
           </>
         }
       >
-        <ActionButton
-          label={label}
-          cost={t("ui.actions.dealCost")}
-          tone="plain"
-          state={{ kind: "ready", action: options[0] }}
-          onClick={() => undefined}
-        />
+        <PowerTrigger label={label} hint={t("ui.actions.dealCost")} />
       </CardPopover>
     );
   }
 
+  const rows = options
+    .map(action => ({ action, target: game.players.find(player => player.id === action.payload.target_id) }))
+    .filter((row): row is { action: LegalAction; target: PlayerState } => Boolean(row.target));
+
   return (
     <CardPopover
       side="left"
+      width={460}
       content={
         <>
           <PopoverHeader title={label} subtitle={t("ui.actions.pickTarget")} />
@@ -396,59 +446,16 @@ function PowerButton({
               <ResourceText>{description?.what ?? t("ui.actions.powerDefault")}</ResourceText>
             </p>
             <p className="mb-2 text-[var(--color-badge)]"><ResourceText>{t("ui.actions.price", { cost: costLabel })}</ResourceText></p>
-            <div className="grid gap-1">
-              {options.map((action, position) => {
-                const target = game.players.find(player => player.id === action.payload.target_id);
-                const preview = findPreview(game, power, target?.id);
-                const gain = previewGain(preview);
-                const cost = previewCost(preview);
-                return (
-                  <ListItem
-                    key={position}
-                    icon="🎯"
-                    title={target?.name ?? t("ui.actions.target")}
-                    hint={
-                      target ? (
-                        <>
-                          <span className="block"><ResourceText>{targetStats(target, preview, blockedByRoof)}</ResourceText></span>
-                          {cost && <span className="block text-gold"><ResourceText>{cost}</ResourceText></span>}
-                        </>
-                      ) : undefined
-                    }
-                    right={
-                      <span className="grid text-right">
-                        {/* Добыча — крупно: ради неё цель и выбирают. Очки — под ней, мельче. */}
-                        {gain && <span className="text-good"><ResourceText>{gain}</ResourceText></span>}
-                        <span className="text-3xs font-normal text-ink-muted">
-                          {t("ui.actions.pts", { count: scoreOf(game, target?.id) })}
-                        </span>
-                      </span>
-                    }
-                    onClick={() => onAction(action)}
-                  />
-                );
-              })}
-            </div>
+            <PowerResultTable game={game} power={power} rows={rows} blockedByRoof={blockedByRoof} onPick={onAction} />
           </PopoverBody>
         </>
       }
     >
-      <button
-        type="button"
-          className={`grid min-w-0 gap-0.5 rounded-md border bg-panel-2 px-2 py-1.5
-          hover:bg-panel-3 ${danger ? "border-bad/50 hover:border-bad" : "border-line hover:border-line-2"}`}
-      >
-        <b
-          className={`overflow-hidden text-ellipsis whitespace-nowrap text-[14px] font-semibold ${
-            danger ? "text-bad" : "text-ink"
-          }`}
-        >
-          {label}
-        </b>
-        <small className="text-[11.5px] text-ink-muted">
-          {spendsAction ? t("ui.actions.targetPick") : t("ui.actions.targetPickFree")}
-        </small>
-      </button>
+      <PowerTrigger
+        label={label}
+        danger={danger}
+        hint={spendsAction ? t("ui.actions.targetPick") : t("ui.actions.targetPickFree")}
+      />
     </CardPopover>
   );
 }

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import re
 import secrets
 from copy import deepcopy
@@ -11,12 +13,21 @@ from city_engine.commands import Command
 from city_engine.engine import CityEngine
 from city_engine.errors import CityEngineError, StaleRevisionError
 from city_engine.factory import GameSettings, PlayerSetup, create_game_from_catalog
-from city_rooms.errors import RoomAccessError, RoomConflictError, RoomValidationError
+from city_rooms.errors import RoomAccessError, RoomConflictError, RoomNameTakenError, RoomValidationError
 from city_rooms.models import RoomSeat, RoomState
 from city_rooms.repository import RoomRepository
 from city_rooms.security import hash_password, verify_password
 
 _ROOM_NAME_RE = re.compile(r"\s+")
+
+
+def _token_hash(token: str) -> str:
+    """The secrets are long random strings from the browser, so a plain digest is enough."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest() if token else ""
+
+
+def _token_matches(token: str, expected_hash: str) -> bool:
+    return bool(token and expected_hash) and hmac.compare_digest(_token_hash(token), expected_hash)
 
 
 class CityRoomService:
@@ -32,6 +43,8 @@ class CityRoomService:
         capacity: int = 4,
         max_rounds: int = 15,
         role_price: int = 3,
+        is_open: bool = False,
+        owner_token: str = "",
     ) -> RoomState:
         clean_name = _ROOM_NAME_RE.sub(" ", name).strip()
         if not 1 <= len(clean_name) <= 48:
@@ -42,10 +55,19 @@ class CityRoomService:
             raise RoomValidationError("max_rounds must be between 5 and 30")
         if not 2 <= role_price <= 10:
             raise RoomValidationError("role_price must be between 2 and 10")
-        try:
-            password_hash = hash_password(password)
-        except ValueError as exc:
-            raise RoomValidationError(str(exc)) from exc
+        # Two cards with the same name in the list are indistinguishable: a player opens the wrong
+        # room and types a password that does not work. Names are compared the way people read
+        # them — case and spacing aside — and only against rooms that are still listed.
+        key = clean_name.casefold()
+        if any(_ROOM_NAME_RE.sub(" ", other.name).strip().casefold() == key for other in self.list_rooms(100)):
+            raise RoomNameTakenError("room name already taken")
+        if is_open:
+            password_hash = ""
+        else:
+            try:
+                password_hash = hash_password(password)
+            except ValueError as exc:
+                raise RoomValidationError(str(exc)) from exc
         room = RoomState(
             id=secrets.token_urlsafe(8),
             name=clean_name,
@@ -53,6 +75,8 @@ class CityRoomService:
             seats=[RoomSeat(index=index) for index in range(capacity)],
             max_rounds=max_rounds,
             role_price=role_price,
+            is_open=is_open,
+            owner_token_hash=_token_hash(owner_token),
         )
         self.repository.create(room)
         return room
@@ -68,6 +92,10 @@ class CityRoomService:
 
     def delete_room(self, room_id: str, *, password: str) -> None:
         room = self.repository.get(room_id)
+        # An open lobby has no owner to ask, so anyone may clear it — but only once nobody is
+        # sitting at it, or a passer-by could close a table that people are playing at.
+        if room.is_open and any(seat.kind == "human" for seat in room.seats):
+            raise RoomAccessError("an open room with players cannot be deleted")
         self._authorize(room, password)
         self.repository.delete(room_id)
 
@@ -88,6 +116,7 @@ class CityRoomService:
         seat_index: int,
         player_name: str,
         release_seat_index: int | None = None,
+        seat_token: str = "",
     ) -> RoomState:
         room = self.repository.get(room_id)
         expected = room.revision
@@ -100,17 +129,38 @@ class CityRoomService:
             raise RoomConflictError("a bot occupies this seat")
         if room.status != "waiting" and seat.kind != "human":
             raise RoomConflictError("after start, only an existing human seat can be selected")
-        if seat.kind == "empty":
+        if seat.kind != "human":
+            # Two «Игрок» at one table cannot be told apart in the log or on the board. The chair
+            # being vacated by the same move does not count — that is the player themselves.
+            key = clean_name.casefold()
+            if any(
+                other.kind != "empty" and (other.name or "").casefold() == key
+                for other in room.seats
+                if other.index not in {seat_index, release_seat_index}
+            ):
+                raise RoomConflictError("player name already taken")
+        if seat.kind == "human":
+            # Somebody's seat: only its own secret takes it back. Without this, anyone holding the
+            # room password could sit down over another player and play their hand.
+            if not _token_matches(seat_token, room.seat_token_hashes.get(seat.player_id or "", "")):
+                raise RoomConflictError("this seat is taken")
+        else:
             seat.kind = "human"
             seat.player_id = f"seat-{seat.index + 1}"
             seat.name = clean_name
+            if seat_token:
+                room.seat_token_hashes[seat.player_id] = _token_hash(seat_token)
         if (
             release_seat_index is not None
             and release_seat_index != seat_index
             and room.status == "waiting"
         ):
             previous = self._seat(room, release_seat_index)
-            if previous.kind == "human":
+            # Moving seats frees the old one — but only your own, proven by the same secret.
+            if previous.kind == "human" and _token_matches(
+                seat_token, room.seat_token_hashes.get(previous.player_id or "", "")
+            ):
+                room.seat_token_hashes.pop(previous.player_id or "", None)
                 room.seats[release_seat_index] = RoomSeat(index=release_seat_index)
         room.touch()
         self.repository.save(room, expected)
@@ -124,6 +174,7 @@ class CityRoomService:
         seat_index: int,
         difficulty: str,
         preferred_role: str | None = None,
+        owner_token: str = "",
     ) -> RoomState:
         room = self.repository.get(room_id)
         expected = room.revision
@@ -132,6 +183,8 @@ class CityRoomService:
         seat = self._seat(room, seat_index)
         if seat.kind == "human":
             raise RoomConflictError("a human occupies this seat")
+        # Who sits at the table is the host's call: seating, changing and removing bots alike.
+        self._authorize_owner(room, owner_token)
         seat.kind = "bot"
         seat.player_id = f"seat-{seat.index + 1}"
         seat.name = f"Bot {seat.index + 1}"
@@ -145,19 +198,24 @@ class CityRoomService:
         self.repository.save(room, expected)
         return room
 
-    def clear_seat(self, room_id: str, *, password: str, seat_index: int) -> RoomState:
+    def clear_seat(self, room_id: str, *, password: str, seat_index: int, owner_token: str = "") -> RoomState:
         room = self.repository.get(room_id)
         expected = room.revision
         self._authorize(room, password)
         self._waiting(room)
-        self._seat(room, seat_index)
+        seat = self._seat(room, seat_index)
+        # Clearing a seat — a bot or another player — is the host's call alone.
+        self._authorize_owner(room, owner_token)
+        room.seat_token_hashes.pop(seat.player_id or "", None)
         room.seats[seat_index] = RoomSeat(index=seat_index)
         room.touch()
         self.repository.save(room, expected)
         return room
 
-    def start(self, room_id: str, *, password: str, seed: int | None = None) -> RoomState:
+    def start(self, room_id: str, *, password: str, seed: int | None = None, owner_token: str = "") -> RoomState:
         room = self.repository.get(room_id)
+        # Only the host decides the table is complete — a guest pressing «start» would cut it short.
+        self._authorize_owner(room, owner_token)
         expected = room.revision
         self._authorize(room, password)
         self._waiting(room)
@@ -230,7 +288,15 @@ class CityRoomService:
         raise RoomValidationError("bot execution guard reached; possible policy loop")
 
     @staticmethod
+    def _authorize_owner(room: RoomState, owner_token: str) -> None:
+        """The host's secret. A room created before hosts existed has none: its password suffices."""
+        if room.owner_token_hash and not _token_matches(owner_token, room.owner_token_hash):
+            raise RoomAccessError("only the room creator can do this")
+
+    @staticmethod
     def _authorize(room: RoomState, password: str) -> None:
+        if room.is_open:
+            return
         if not verify_password(password, room.password_hash):
             raise RoomAccessError("invalid room password")
 

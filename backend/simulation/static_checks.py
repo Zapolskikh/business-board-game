@@ -11,10 +11,20 @@ import argparse
 from pathlib import Path
 from typing import Any
 
-from city_engine.constants import CARD_DISCARD_VALUE, INFLUENCE_PER_POINT, MONEY_PER_POINT
+from city_engine.constants import (
+    CARD_DISCARD_VALUE,
+    LOBBYING_INFLUENCE,
+    LOBBYING_POINTS,
+    PATRONAGE_MONEY,
+    PATRONAGE_POINTS,
+)
 from city_engine.engine import CityEngine
 
 ACTION_BENCHMARK = 2.0
+# The engine scores a pile at nothing, so the yardstick for a currency is its one way out: what
+# patronage pays for a dollar and lobbying for a point of influence.
+MONEY_POINT_VALUE = PATRONAGE_POINTS / PATRONAGE_MONEY
+INFLUENCE_POINT_VALUE = LOBBYING_POINTS / LOBBYING_INFLUENCE
 
 
 def _deep_subset(left: Any, right: Any) -> bool:
@@ -95,7 +105,7 @@ def _requirement_supply(engine: CityEngine, requirement: dict[str, Any]) -> tupl
 
 
 def _perk_per_round(perk: dict[str, int]) -> float:
-    return perk.get("passiveMoney", 0) / MONEY_PER_POINT + perk.get("passiveInfluence", 0) / INFLUENCE_PER_POINT
+    return perk.get("passiveMoney", 0) * MONEY_POINT_VALUE + perk.get("passiveInfluence", 0) * INFLUENCE_POINT_VALUE
 
 
 def render(engine: CityEngine | None = None) -> str:
@@ -109,7 +119,7 @@ def render(engine: CityEngine | None = None) -> str:
     else:
         lines.append("  none (cost/income/influence/tags/effects/unlock all checked)")
 
-    discard_points = CARD_DISCARD_VALUE / INFLUENCE_PER_POINT
+    discard_points = CARD_DISCARD_VALUE * INFLUENCE_POINT_VALUE
     delayed = {"roof", "market_discount", "zoning", "extra_action", "capacity", "project"}
     hostile = {"scandal", "fine", "steal", "role_pressure", "double_scandal", "blackmail", "expose", "mixed_fine"}
     lines.append("\n=== ACTION CARDS VS DISCARD ===")
@@ -126,7 +136,11 @@ def render(engine: CityEngine | None = None) -> str:
     lines.append("\n=== CITY PROJECTS: IMMEDIATE NET AND REACHABILITY ===")
     project_suspects: list[str] = []
     for project in sorted(engine.catalog.projects.values(), key=lambda item: item.id):
-        immediate = project.points - project.cost_influence / INFLUENCE_PER_POINT - project.cost_money / MONEY_PER_POINT
+        immediate = (
+            project.points
+            - project.cost_influence * INFLUENCE_POINT_VALUE
+            - project.cost_money * MONEY_POINT_VALUE
+        )
         supply, earliest = _requirement_supply(engine, project.requirement)
         earliest_text = str(earliest) if earliest is not None else "NEVER"
         per_round = _perk_per_round(project.perk)
@@ -142,8 +156,9 @@ def render(engine: CityEngine | None = None) -> str:
     for operation, districts in engine.GREY_OPERATION_DISTRICTS.items():
         matches = [asset for asset in engine.catalog.assets.values() if asset.district in districts]
         earliest = min(engine.catalog.rarity_min_round[asset.rarity] for asset in matches) if matches else None
+        joiner = "+" if operation in engine.GREY_OPERATION_NEEDS_ALL else ","
         lines.append(
-            f"  {operation:<20} districts={','.join(districts):<28}"
+            f"  {operation:<20} districts={joiner.join(districts):<28}"
             f" objects={len(matches):>2} earliest={earliest if earliest is not None else 'NEVER'}"
         )
 

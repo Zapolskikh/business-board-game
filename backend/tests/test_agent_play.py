@@ -128,7 +128,7 @@ def test_cli_new_state_and_do_share_a_session(tmp_path: Path, monkeypatch, capsy
         # plays the old game: hoards cash and never looks at the only real source of points.
         assert "доска городских проектов" in board
         assert "Защита" in board  # the price line survives; the automation token does not exist
-        assert "деньги 1 (10$=1)" in board
+        assert "деньги и влияние в конце очков не дают" in board
         assert "-й в раунде" in board
 
         assert main(["--dir", str(tmp_path), "do", "basic_action", "kind=work", "--quiet"]) == 0

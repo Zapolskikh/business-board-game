@@ -91,7 +91,7 @@ for (const key of GREY_IDS) {
 }
 
 // Mirrors `CityEngine.GREY_OPERATION_DISTRICTS`: an operation is unlocked by any active object of
-// these districts, not by one card out of 71. Kept next to the labels because the object cards have
+// these districts (all of them for `greyOperationNeedsAll`), not by one card out of 71. Kept next to the labels because the object cards have
 // to say the same thing the operation panel says — a requirement announced only by the panel is a
 // requirement you learn after spending your money on something else.
 export const greyOperationDistricts: Record<string, string[]> = {
@@ -101,6 +101,10 @@ export const greyOperationDistricts: Record<string, string[]> = {
   datacenter: ["tech", "shadows"],
   influence_broker: ["shadows", "government"],
 };
+
+// Mirrors `CityEngine.GREY_OPERATION_NEEDS_ALL`: these need an object in every listed district,
+// the rest in any one of them.
+export const greyOperationNeedsAll = new Set(["influence_broker"]);
 
 // Mirrors `CityEngine.grey_operation_points`. Every operation carries its own score now, so this
 // reads a table instead of asking which ones are the "hard" ones.
@@ -187,16 +191,8 @@ export function rankPlayers(game: GameState): PlayerState[] {
 }
 
 // Scoring rates come from the engine via `/meta`; the fallbacks only cover a stale cached meta.
-// Scoring rates come from the engine via `/meta`; the fallbacks only cover a stale cached meta.
-export function moneyPerPoint(meta: CityMeta): number {
-  return meta.scoring?.money_per_point ?? 10;
-}
-
-export function influencePerPoint(meta: CityMeta): number {
-  return meta.scoring?.influence_per_point ?? 3;
-}
-
-// Both sinks pay double the passive rate above, for one action and once a turn each.
+// Money and influence score nothing by themselves: the two sinks are the only way to bank them,
+// for one action and once a turn each.
 export function lobbying(meta: CityMeta): { influence: number; points: number } {
   return { influence: meta.scoring?.lobbying_influence ?? 3, points: meta.scoring?.lobbying_points ?? 2 };
 }
@@ -828,7 +824,7 @@ export function buildGameLogMarkdown(room: RoomView, meta: CityMeta, version: st
     lines.push(
       `| ${index + 1} | ${player.name}${player.is_bot ? tg("log.bot", { level: difficultyLabels[player.difficulty] ?? player.difficulty }) : ""} · ${role} `
       + `| ${scoreOf(game, player)} | ${score?.projects ?? 0} | ${score?.assets ?? 0} | ${score?.role ?? 0} `
-      + `| ${score?.money ?? 0} (${player.money}$) | ${score?.influence ?? 0} (${player.influence}◆) | ${score?.scandals ?? 0} |`,
+      + `| ${player.money}$ | ${player.influence}◆ | ${score?.scandals ?? 0} |`,
     );
   });
   lines.push("", tg("log.portfolios"), "");

@@ -51,19 +51,12 @@ MAX_ROLE_PRICE = 10
 MAX_CAPACITY = 6
 CAPACITY_COSTS = {3: 6, 4: 10, 5: 15}
 
-# Both currencies score at the end, at a deliberately poor rate. Removing the payout entirely was
-# tried and reverted: the score became honest — only what a player had actually played — but the
-# winner's margin doubled from 11 points to 19, because the trailing players' wallets had been the
-# thing keeping the table close. A cushion that flatters the loser turns out to be doing real work.
-MONEY_PER_POINT = 10
-INFLUENCE_PER_POINT = 3
-# ...and the two sinks stay, because holding is not supposed to be the best a pile can do. Each
-# costs an action and each may be pressed once a turn.
+# Money and influence are resources, not score: a pile left at the end of the game is worth
+# nothing. (An earlier version paid 10$ and 3◆ a point; it was dropped by design decision on
+# 2026-10-01 — the rules never explained it, and a hidden payout is a rule nobody plays.)
 #
-# The rate has to be read as a *delta*, not as a price. A pile already scores by itself, so what
-# the button really pays is the difference: patronage takes 20$ that were worth 2 points and pays
-# 5, lobbying takes 10◆ that were worth 3 and pays 6. Both net +3 against an action worth ~2, so
-# both are worth pressing and neither is worth building a strategy around.
+# The two sinks are the way out of a pile, and each costs an action and may be pressed once a
+# turn: patronage turns 20$ into 5 points, lobbying 10◆ into 6.
 #
 # The thresholds are deliberately large. Small ones (10$ → 2, 3◆ → 2) made these a drip pressed
 # every turn by everybody, which is not a decision — it is a conversion rate with extra steps.
@@ -229,8 +222,8 @@ HAND_LIMIT = 3
 # closes that at the source while leaving a hand the player has already paid for free to spend at
 # any speed — which is what a card layer needs to feel alive rather than rationed.
 CARD_PURCHASE_FLAG = "action_card_bought"
-# What a point costs when a card buys it outright: worse than an object (2$) and much better than a
-# hoarded point (10$), and it needs no slot — which is the whole point. Six slots cap the object
+# What a point costs when a card buys it outright: worse than an object (2$), but a hoarded dollar
+# scores nothing at all, and it needs no slot — which is the whole point. Six slots cap the object
 # channel, so a full tableau had nowhere to put money: two measured matches ended with 248$ and 864$
 # unspent across the table, 24 and 86 points nobody made a decision about.
 POINTS_CARD_RATE = 3

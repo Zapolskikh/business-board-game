@@ -5,6 +5,7 @@
     "tagline": "desková strategie"
   },
   "nav": {
+    "rules": "📖 Pravidla",
     "about": "O projektu",
     "feedback": "Zpětná vazba",
     "home": "← Domů"
@@ -17,18 +18,27 @@
     "serverUp": "server běží"
   },
   "hero": {
-    "eyebrow": "Strategie · 2–4 hráči",
-    "titleLine1": "Postavte město.",
-    "titleLine2": "Získejte vliv.",
-    "lead": "Strategická hra o moc v rostoucím městě. Budujte podniky, ovládejte čtvrti a předčete soupeře. Nestačí být bohatý — vítězí ten, kdo na konci získá nejvíc bodů. Založte místnost nebo se připojte k otevřené hře.",
-    "stepBuild": "Budujte podniky a získávejte příjmy",
-    "stepCompete": "Bojujte o role, čtvrti a projekty",
-    "stepScore": "Proměňte vliv ve vítězné body",
-    "artLabel": "Každý tah mění město",
-    "artworkAlt": "Ilustrovaný herní stůl s městskými čtvrtěmi, budovami a figurkami hráčů",
-    "rounds": "kol za hru",
-    "actions": "akce za tah",
-    "districts": "čtvrtí ve městě"
+    "eyebrow": "Desková strategie · 2–4 hráči",
+    "titleLine1": "Peníze staví město.",
+    "titleLine2": "Vliv mu vládne.",
+    "lead": "Město roste — a každý ho chce pro sebe. Skupujte podniky v šesti čtvrtích, zaujměte roli s vlastními schopnostmi a berte městské projekty dřív než soupeři.",
+    "hook": "A když poctivé cesty dojdou — kompromitující materiály, výpalné a šedé kšefty. Jen hlídejte skandály: naberete jich moc a přijdete o roli, nebo skončíte ve vazbě.",
+    "ctaPlay": "Začít hru",
+    "ctaRules": "📖 Jak hrát",
+    "factPlayers": "hráči",
+    "factRounds": "kol",
+    "factActions": "akce za tah",
+    "factAssets": "podniků na trhu",
+    "factProjects": "městských projektů",
+    "pillarsLabel": "Z čeho se hra skládá",
+    "districtsTitle": "{{count}} čtvrtí",
+    "districtsText": "Kupujte budovy, posilujte svou čtvrť a získávejte jedinečné bonusy, které vám pomohou růst rychleji než ostatní.",
+    "rolesTitle": "{{count}} rolí",
+    "rolesText": "Stavějte strategii kolem své role — nebo si včas vyberte jinou, když to situace vyžaduje. Role se během hry mění a můžete o ně bojovat s ostatními hráči.",
+    "projectsTitle": "Městské projekty",
+    "projectsText": "Zapojte se do městských projektů a získejte víc vítězných bodů i bonusy, které pro vás pracují až do konce hry.",
+    "greyTitle": "Šedá strana",
+    "greyText": "Když poctivé cesty dojdou, jděte oklikou: pomluvy, hackování a špína přinášejí body, ale každý neúspěch skončí skandálem."
   },
   "rooms": {
     "eyebrow": "Hry",
@@ -55,7 +65,8 @@
     "humans_other": "{{count}} lidí",
     "open": "Otevřít",
     "remove": "Smazat místnost",
-    "removeNamed": "Smazat místnost {{name}}"
+    "removeNamed": "Smazat místnost {{name}}",
+    "openBadge": "otevřené"
   },
   "create": {
     "eyebrow": "Nová hra",
@@ -64,18 +75,32 @@
     "name": "Název místnosti",
     "namePlaceholder": "Třeba Páteční hra",
     "password": "Heslo místnosti",
-    "passwordPlaceholder": "Aspoň 4 znaky",
-    "passwordHint": "S ním můžete nastavit místa a spustit hru.",
+    "passwordPlaceholder": "Alespoň 4 znaky",
+    "passwordHint": "Pro správu místnosti a spuštění hry.",
     "players": "Hráčů",
     "rounds": "Kol",
-    "roundsHint": "Zvolte 5 až 30 kol. Výchozí hodnota je 15.",
+    "roundsHint": "Od 5 do 30 kol.",
     "advanced": "Další nastavení",
     "rolePrice": "Cena role",
     "rolePriceHint": "Kolik vlivu stojí volná role.",
-    "submit": "Založit a jít do lobby →",
+    "submit": "Vytvořit lobby",
     "submitting": "Zakládáme…",
-    "hintMissing": "Zadejte název a heslo (aspoň 4 znaky).",
-    "hintReady": "Vše připraveno."
+    "hintMissing": "Zadejte název a heslo (alespoň 4 znaky).",
+    "hintReady": "Po vytvoření můžete pozvat hráče.",
+    "heading": "Připravte svůj stůl",
+    "subheading": "Pozvěte přátele a začněte boj o město.",
+    "showPassword": "Zobrazit heslo",
+    "hidePassword": "Skrýt heslo",
+    "roundsLess": "Méně kol",
+    "roundsMore": "Více kol",
+    "playerName": "Vaše jméno",
+    "playerNamePlaceholder": "Jak vás ukázat u stolu",
+    "nameTaken": "Místnost s tímto názvem už existuje — vymyslete jiný.",
+    "openLobby": "Otevřené lobby",
+    "openLobbyHint": "Bez hesla — připojit se může kdokoli, i přes náhodnou hru.",
+    "hintName": "Zadejte název místnosti.",
+    "hintPassword": "Nastavte heslo (alespoň 4 znaky) nebo lobby otevřete.",
+    "hintPlayerName": "Zadejte své jméno."
   },
   "delete": {
     "eyebrow": "Potvrzení",
@@ -100,7 +125,7 @@
     "eyebrow": "Příprava",
     "titleWaiting": "Vyberte si místo a doplňte stůl",
     "titleRunning": "Vraťte se na své místo",
-    "leadWaiting": "Hrát mohou lidé i boti dohromady. Ke spuštění jsou potřeba aspoň dva hráči a aspoň jeden z nich musí být člověk.",
+    "leadWaiting": "Ke startu jsou potřeba dva hráči, aspoň jeden z nich člověk.",
     "leadRunning": "Hra už běží. Zadejte heslo a vyberte své místo.",
     "seatsEyebrow": "Herní stůl",
     "seatsTitle": "Místa",
@@ -114,18 +139,27 @@
     "defaultName": "Hráč",
     "password": "Heslo místnosti",
     "passwordPlaceholder": "Pro vstup a nastavení",
-    "accessNote": "Vyberte volné místo. Pokud se vracíte do hry, klikněte na své dřívější místo.",
+    "accessNote": "Vyberte volné místo. Vracíte se? Klikněte na své původní.",
     "readyEyebrow": "Připravenost",
     "readyWaiting": "Můžeme začít?",
     "readyRunning": "Hra už začala",
     "checkPassword": "Heslo je zadané",
     "checkPlayers": "Aspoň dva hráči",
     "checkHuman": "U stolu sedí člověk",
-    "start": "Spustit hru →",
+    "start": "Začít hru",
     "wait": "Počkejte…",
-    "resume": "Zpět do hry →",
+    "resume": "Zpět do hry",
     "pickSeatFirst": "Nejdřív si vyberte místo.",
-    "meetChecks": "Splňte podmínky výše a tlačítko se zapne."
+    "meetChecks": "Přidejte soupeře — člověka nebo bota.",
+    "copyCode": "Zkopírovat kód místnosti",
+    "copied": "Zkopírováno",
+    "accessNeedPasswordNote": "Zadejte heslo místnosti, abyste mohli zasednout.",
+    "meetPassword": "Zadejte heslo místnosti.",
+    "meetHuman": "Zasedněte a přidejte soupeře.",
+    "openTitle": "Otevřené lobby",
+    "openNote": "Heslo není potřeba — stačí vybrat místo.",
+    "waitHost": "Čekáme, až zakladatel lobby spustí hru.",
+    "nameRequired": "Zadejte své jméno, abyste mohli zasednout."
   },
   "seat": {
     "kind": {
@@ -138,7 +172,7 @@
     "anyRole": "jakákoli role",
     "youAreHere": "Už sedíte u stolu",
     "humanPlayer": "Hráč — člověk",
-    "emptyHint": "Obsaďte ho sami, nebo přidejte bota",
+    "emptyHint": "Zasedněte",
     "confirmed": "✓ Tohle je vaše místo",
     "sitHere": "Sednout sem",
     "returnHere": "Vrátit se na místo",
@@ -149,7 +183,12 @@
     "preferredRole": "Oblíbená role",
     "anyRoleOption": "Jakákoli role",
     "saveBot": "Uložit",
-    "placeBot": "Přidat bota"
+    "placeBot": "Přidat bota",
+    "configureBot": "Nastavit bota",
+    "taken": "Místo obsazeno",
+    "freeSeat": "Uvolnit místo",
+    "botSeat": "Místo bota — změnit ho může jen zakladatel lobby",
+    "emptyHintHost": "Zasedněte nebo přidejte bota"
   },
   "about": {
     "eyebrow": "O projektu",
@@ -201,5 +240,11 @@
     "doneText": "Opravdu to pomáhá udělat hru lepší.",
     "writeMore": "Napsat další",
     "toHome": "Domů"
+  },
+  "random": {
+    "or": "nebo",
+    "button": "Náhodná hra",
+    "hint": "Zasednete do otevřeného lobby — a když žádné není, založíte své a budete hostitel.",
+    "none": "Teď není žádné otevřené lobby s volným místem — založte vlastní."
   }
 }

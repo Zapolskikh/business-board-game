@@ -72,6 +72,13 @@ class RoomState:
     created_at: str = field(default_factory=utc_now)
     updated_at: str = field(default_factory=utc_now)
     game: GameState | None = None
+    # An open lobby has no password: anyone can join it, including through «random game».
+    is_open: bool = False
+    # Hashes of secrets the browsers generated themselves: the creator's, and one per human seat
+    # (keyed by player id). A seat is reclaimed — after a reload — only with its own secret, and
+    # only the creator may clear or reconfigure an occupied seat. Never part of a public view.
+    owner_token_hash: str = ""
+    seat_token_hashes: dict[str, str] = field(default_factory=dict)
 
     def validate(self) -> None:
         if not self.id or not self.name.strip():
@@ -111,6 +118,9 @@ class RoomState:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "game": self.game.to_dict() if self.game else None,
+            "is_open": self.is_open,
+            "owner_token_hash": self.owner_token_hash,
+            "seat_token_hashes": dict(self.seat_token_hashes),
         }
 
     @classmethod
@@ -127,6 +137,9 @@ class RoomState:
             created_at=str(data["created_at"]),
             updated_at=str(data["updated_at"]),
             game=GameState.from_dict(data["game"]) if data.get("game") else None,
+            is_open=bool(data.get("is_open", False)),
+            owner_token_hash=str(data.get("owner_token_hash", "")),
+            seat_token_hashes={str(key): str(value) for key, value in (data.get("seat_token_hashes") or {}).items()},
         )
         state.validate()
         return state
@@ -146,4 +159,5 @@ class RoomState:
             "humans": humans,
             "capacity": len(self.seats),
             "updated_at": self.updated_at,
+            "open": self.is_open,
         }

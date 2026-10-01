@@ -224,7 +224,9 @@ def test_a_threatened_seat_makes_the_token_worth_buying() -> None:
     player.difficulty = "expert"
     player.role = "capitalist"
     rival = next(other for other in state.players if other.id != player.id)
-    rival.assets.append(OwnedAsset(uid="owned:cash", card_id="cash"))  # unlocks the compromat leak
+    # The compromat leak needs both the Серый сектор and the city hall.
+    rival.assets.append(OwnedAsset(uid="owned:cash", card_id="cash"))
+    rival.assets.append(OwnedAsset(uid="owned:passport_office", card_id="passport_office"))
     action = {"type": "buy_roof", "payload": {}}
 
     exposed = _strategic_action_bonus(engine, state, player, action, PROFILES["expert"])

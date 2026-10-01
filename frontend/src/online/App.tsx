@@ -25,6 +25,8 @@ export default function App() {
   const [fatal, setFatal] = useState("");
   const [roomId, setRoomId] = useState<string | null>(null);
   const [initialPassword, setInitialPassword] = useState("");
+  // Имя, под которым игрок сразу садится за стол: после создания комнаты или «случайной игры».
+  const [autoJoinName, setAutoJoinName] = useState<string | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [playing, setPlaying] = useState(false);
   const [feedback, setFeedback] = useState(onFeedbackPage);
@@ -37,13 +39,13 @@ export default function App() {
   const openFeedback = useCallback(() => { history.pushState(null, "", FEEDBACK_URL); setFeedback(true); window.scrollTo(0, 0); }, []);
   const closeFeedback = useCallback(() => { history.pushState(null, "", "/"); setFeedback(false); }, []);
   useEffect(() => { cityApi.meta().then(setMeta).catch(() => setFatal(t("app.serverDown"))); }, []);
-  const back = useCallback(() => { setRoomId(null); setSession(null); setPlaying(false); setInitialPassword(""); }, []);
+  const back = useCallback(() => { setRoomId(null); setSession(null); setPlaying(false); setInitialPassword(""); setAutoJoinName(null); }, []);
   const play = useCallback(() => setPlaying(true), []);
   // Отзыв можно оставить и тогда, когда игровой сервер лежит, — это как раз повод написать.
   if (feedback) return <FeedbackPage onBack={closeFeedback} />;
   if (fatal) return <main className="rooms-app app-state"><section className="rooms-panel"><span className="eyebrow">{t("app.connectionError")}</span><h1>{t("app.serverDown")}</h1><p className="rooms-alert">{fatal}</p><button className="rooms-button primary" onClick={() => location.reload()}>{t("app.retry")}</button></section></main>;
   if (!meta) return <div className="rooms-app app-state"><span className="loading-ring" /><p>{t("app.loadingCatalog")}</p></div>;
-  if (!roomId) return <RoomBrowser onFeedback={openFeedback} onOpen={(id, password = "") => { setRoomId(id); setInitialPassword(password); }} />;
+  if (!roomId) return <RoomBrowser meta={meta} onFeedback={openFeedback} onOpen={(id, password = "", joinAs) => { setRoomId(id); setInitialPassword(password); setAutoJoinName(joinAs ?? null); }} />;
   if (playing && session) {
     return (
       <Suspense fallback={<div className="rooms-app app-state"><span className="loading-ring" /><p>{t("app.loadingTable")}</p></div>}>
@@ -51,5 +53,5 @@ export default function App() {
       </Suspense>
     );
   }
-  return <Lobby roomId={roomId} meta={meta} initialPassword={initialPassword} playerId={session?.playerId} onBack={back} onJoined={(password, playerId) => setSession({ password, playerId })} onPlay={play} />;
+  return <Lobby roomId={roomId} meta={meta} initialPassword={initialPassword} autoJoinName={autoJoinName} playerId={session?.playerId} onBack={back} onJoined={(password, playerId) => setSession({ password, playerId })} onPlay={play} />;
 }

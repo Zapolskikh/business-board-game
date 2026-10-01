@@ -139,7 +139,7 @@ const roles: Record<string, RoleGuide> = {
       {
         name: "Kontrola",
         cost: "1 akce",
-        limit: "lze opakovat; potřebujete aspoň jednoho soupeře s podnikem v Šedé zóně",
+        limit: "jednou za tah; potřebujete aspoň jednoho soupeře s podnikem v Šedé zóně",
         effect: "Každý soupeř s podnikem v Šedé zóně dostane 1 skandál.",
       },
       {
@@ -304,7 +304,7 @@ export function bookCs(ctx: RulesContext): RulesChapter[] {
           <tr><td class="name"><b>Pump and dump</b></td><td>Tech klastr nebo Šedá zóna</td><td class="num">${n.greyChance("crypto", 45)} %</td><td>Vezměte každému soupeři až (${n.pumpBase} + číslo kola ÷ 2)$</td><td class="num">+${n.greyPoints("crypto", 2)}</td></tr>
           <tr><td class="name"><b>Prolomit Ochranu</b></td><td>Šedá zóna</td><td class="num">${n.greyChance("roof_break", 60)} %</td><td>Sundejte cíli všechnu Ochranu a za každou sundanou dostanete ${n.roofBreakPoint}★</td><td class="num">+${n.greyPoints("roof_break", 2)}</td></tr>
           <tr><td class="name"><b>Hack</b></td><td>Tech klastr nebo Šedá zóna</td><td class="num">${n.greyChance("datacenter", 40)} %</td><td>Vezměte cíli až (${n.hackBase} + číslo kola ÷ 3)◆</td><td class="num">+${n.greyPoints("datacenter", 3)}</td></tr>
-          <tr><td class="name"><b>Únik špíny</b></td><td>Vládní čtvrť nebo Šedá zóna</td><td class="num">${n.greyChance("influence_broker", 60)} %</td><td>Cíl přijde o roli</td><td class="num">+${n.greyPoints("influence_broker", 3)}</td></tr>
+          <tr><td class="name"><b>Únik špíny</b></td><td>Vládní čtvrť i Šedá zóna (obě)</td><td class="num">${n.greyChance("influence_broker", 60)} %</td><td>Cíl přijde o roli</td><td class="num">+${n.greyPoints("influence_broker", 3)}</td></tr>
         </tbody>
       </table>
       <p><b>Úspěch:</b> účinek nastane, dostanete body z tabulky a ${n.greySuccess} skandál. <b>Neúspěch:</b> účinek nenastane a dostanete ${n.greyFailure} skandály. Akce se utratí v každém případě. Dělení ve vzorcích se zaokrouhluje dolů.</p>
@@ -364,10 +364,9 @@ export function bookCs(ctx: RulesContext): RulesChapter[] {
         <li><b>Podniky</b> — polovina ceny každého podniku. Číslo je vytištěné na kartě.</li>
         <li><b>Role</b> — 3 body, pokud ji máte.</li>
         <li><b>Body získané během hry</b> — za mecenášství, lobbing, karty akcí a šedé kšefty.</li>
-        <li><b>Peníze</b> — 1 bod za každých ${n.moneyPerPoint}$.</li>
-        <li><b>Vliv</b> — 1 bod za každé ${n.influencePerPoint}◆.</li>
         <li><b>Skandály</b> — mínus 1 bod za každý.</li>
       </ul>
+      <p>Zbylé peníze a vliv body nedávají: jsou to zdroje, ne body. Utraťte je do konce hry, nebo je proměňte v body patronátem a lobbingem.</p>
       <div class="tip">Vyhrává hráč s nejvíc body. <b>Při stejném počtu bodů vyhrává hráč, který koupil víc městských projektů.</b></div>
       `,
     },
