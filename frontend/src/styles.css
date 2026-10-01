@@ -344,7 +344,6 @@ h1:where(:not(.ui-v2 *)), h2:where(:not(.ui-v2 *)), h3:where(:not(.ui-v2 *)), p:
 .seat-action { width: 100%; margin-top: auto; }
 .seat-confirmed { margin-top: auto; padding: 9px; color: var(--rooms-green); background: #0c1510; border: 1px solid #294437; border-radius: 7px; font-size: 10px; text-align: center; }
 .bot-setup { margin-top: -4px; border-top: 1px solid var(--rooms-line); }
-.rooms-app p.bot-style-v2 { margin: -4px 0 0; color: var(--rooms-dim); font-size: 10px; line-height: 1.4; }
 .lobby-sidebar { display: grid; gap: 10px; }
 .access-card, .launch-card { display: grid; gap: 13px; }
 .access-card .rooms-section-head { margin-bottom: 0; }

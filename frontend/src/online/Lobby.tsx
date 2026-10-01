@@ -326,7 +326,6 @@ function BotConfigurator({ seat, roles, disabled, onApply }: {
           {BOT_POLICIES.map(item => <option value={item.id} key={item.id}>{t(`seat.botLevel.${item.level}`)} · {item.name}</option>)}
         </select>
       </label>
-      <p className="bot-style-v2">{t(`seat.botStyle.${policy}`)}</p>
       {USES_PREFERRED_ROLE.has(policy) && (
         <label className="room-field">{t("seat.preferredRole")}
           <select value={role} onChange={event => setRole(event.target.value)}>
