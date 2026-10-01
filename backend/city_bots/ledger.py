@@ -29,7 +29,7 @@ from city_engine.commands import Command
 from city_engine.constants import (
     BASE_SCANDAL_LIMIT,
     CAMPAIGN_TIERS,
-    FRAUDSTER_GREY_BONUS,
+    GREY_DIE_SIDES,
     LOBBYING_INFLUENCE,
     LOBBYING_POINTS,
     MAX_CAPACITY,
@@ -219,38 +219,41 @@ def _child_value(
     return _utility(engine, after, root) + unspent, expandable
 
 
-def grey_chance(engine: CityEngine, player: PlayerState, asset_id: str) -> float:
-    """The printed odds of a grey operation for this player."""
-    chance = engine.GREY_BASE_CHANCE[asset_id]
-    if engine.has_role(player, "fraudster"):
-        chance += FRAUDSTER_GREY_BONUS
-    return min(0.9, chance)
-
-
-def forced_grey_outcomes(engine: CityEngine, before: GameState, action: dict[str, Any]) -> tuple[GameState, GameState]:
-    """The same grey operation run twice, once forced to land and once forced to miss.
+def grey_outcomes(engine: CityEngine, before: GameState, action: dict[str, Any]) -> list[tuple[float, GameState]]:
+    """The grey operation run once per distinct face of the die, each with its probability.
 
     The roll is the next value of the game's LCG, so presetting the generator to the state whose
-    successor is 0 (or the top value) decides it without reading the generator the game really holds.
+    successor lands on a given face decides it without reading the generator the game really holds.
+    Rolls the player's modifier folds onto the same face (+1 makes 5 and 6 both a six) are run once
+    and weighted together.
     """
+    player = before.current_player
+    modifier, _sources = engine.grey_roll_modifier(before, player)
+    counts: dict[int, int] = {}
+    first_roll: dict[int, int] = {}
+    for roll in range(1, GREY_DIE_SIDES + 1):
+        face = min(GREY_DIE_SIDES, roll + modifier)
+        counts[face] = counts.get(face, 0) + 1
+        first_roll.setdefault(face, roll)
     outcomes = []
-    for draw in (0, 2**32 - 1):
+    for face, count in counts.items():
         forced = before.clone()
+        # randbelow(6) is int(random() * 6): pick the u32 at the start of the wanted slice.
+        draw = ((first_roll[face] - 1) * 2**32) // GREY_DIE_SIDES + 1
         forced.rng.state = ((draw - _LCG_ADD) * _LCG_INV) % 2**32
-        command = Command(type=action["type"], actor_id=before.current_player.id, payload=dict(action["payload"]))
-        outcomes.append(engine.apply(forced, command).state)
-    return outcomes[0], outcomes[1]
+        command = Command(type=action["type"], actor_id=player.id, payload=dict(action["payload"]))
+        outcomes.append((count / GREY_DIE_SIDES, engine.apply(forced, command).state))
+    return outcomes
 
 
 def _grey_expectation(engine: CityEngine, before: GameState, action: dict[str, Any], root: _Root) -> float:
-    """The printed odds over a forced hit and a forced miss — never the roll the state already holds."""
-    chance = grey_chance(engine, before.current_player, action["payload"]["asset_id"])
-    outcomes = []
-    for after in forced_grey_outcomes(engine, before, action):
+    """The faces of the die, each at its printed probability — never the roll the state already holds."""
+    value = 0.0
+    for weight, after in grey_outcomes(engine, before, action):
         still_mine = after.status == "playing" and after.current_player.id == root.player_id
         unspent = after.actions_left * UNSPENT_ACTION * _late_factor(after) if still_mine else 0.0
-        outcomes.append(_utility(engine, after, root) + unspent)
-    return chance * outcomes[0] + (1 - chance) * outcomes[1]
+        value += weight * (_utility(engine, after, root) + unspent)
+    return value
 
 
 # --- valuation -----------------------------------------------------------------------------------

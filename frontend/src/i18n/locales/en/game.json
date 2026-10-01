@@ -82,11 +82,11 @@
     "other": "{{key}}: {{have}}/{{needed}}"
   },
   "grey": {
-    "smear": { "label": "Dirty rumours", "effect": "1 scandal to every rival", "note": "The only move that hits all rivals at once, so its chance is lower. Each rival's Protection counts separately: it stops their scandal and is used up. One deal can remove three Protections." },
-    "crypto": { "label": "Pump and dump", "effect": "take up to {{money}}$ from every rival", "note": "The money moves to you from other wallets, so it is stronger with more players at the table. Each rival's Protection counts separately: it saves their money and is used up." },
-    "roof_break": { "label": "Break Protection", "effect": "remove all the target's Protection, +{{points}} point for each", "note": "The only attack Protection does not stop — it is aimed at Protection itself. Only possible if the target has at least one Protection." },
-    "datacenter": { "label": "Hack", "effect": "steal up to {{influence}}◆ from the target", "note": "Influence is the rarest resource, so the chance here is the lowest, and the theft grows every round. The target's Protection is used up and cancels the theft." },
-    "influence_broker": { "label": "Leak dirt", "effect": "the target loses their role", "note": "The target loses the role: −3 points and all role bonuses, and the role can be taken again at the normal price. Only possible if the target has a role. The target's Protection is used up and stops the leak." }
+    "smear": { "label": "Dirty rumours" },
+    "crypto": { "label": "Pump and dump" },
+    "roof_break": { "label": "Break Protection" },
+    "datacenter": { "label": "Hack" },
+    "influence_broker": { "label": "Leak dirt" }
   },
   "perk": {
     "passiveMoney": "+{{value}}$ every round",
@@ -108,7 +108,7 @@
     "distinct_districts": "businesses in {{count}} different districts",
     "tag_objects": "at least {{count}} businesses with the {{tag}} tag"
   },
-  "capacity": { "max": "Maximum — 6 slots", "next": "Slot {{slot}}: {{cost}}$" },
+  "capacity": { "max": "Maximum — 6 slots", "next": "Slot {{slot}}: {{cost}}$", "nextInfluence": "Slot {{slot}}: {{cost}}$ + {{influence}}◆" },
   "cleanup": {
     "base": "The normal way is crisis PR: 1 action and {{cost}}◆ per scandal.",
     "politician_cleanup": { "label": "🧯 Settle a scandal: 2◆ → −1⚠", "tooltip": "Politician power: 1 action and 2◆ per scandal — 1◆ cheaper than for everyone else. {{base}}" },
@@ -203,9 +203,14 @@
     "jailedTail": ", Protection removed",
     "jailedNow": " is arrested during their own turn: the remaining actions are lost",
     "marketRotated": "🔄 The business market has changed",
-    "greyBlocked": "stopped by Protection",
+    "underdog": "Support for the trailing player: ",
+    "greyRoll": "rolled {{roll}}",
+    "greyRollModified": "rolled {{roll}} (+{{modifier}}) → {{face}}",
+    "greyWeak": "weak effect",
+    "greyFull": "full effect",
+    "greyBlocked": "blocked by Protection",
     "greySuccess": "success",
-    "greyFailure": "failure",
+    "greyFailure": "failed",
     "gameFinished": "🏆 The game is over · winner ",
     "gameFinishedTail": " ({{count}} pts)",
     "verbs": {
@@ -235,7 +240,8 @@
     "journalist_money": { "label": "Money for other players' scandals", "unit": "$/round", "hint": "1$ for each scandal of other players, 2$ if you have a Business District business" },
     "journalist_rating": { "label": "Influence for your own scandals", "unit": "◆/round", "hint": "+1◆ for each of your scandals — you need at least one Residential Area business" },
     "fraudster_actions": { "label": "Four actions per turn", "unit": "", "hint": "More than any other role" },
-    "fraudster_chance": { "label": "Shady deal chance bonus", "unit": "%", "hint": "+30% for any shady deal" },
+    "fraudster_grey_roll": {"label": "Shady deal roll bonus", "unit": "", "hint": "+1 to every roll"},
+    "mafia_grey_roll": {"label": "Shady deal roll bonus", "unit": "", "hint": "+1 per own Grey Sector business, at most +2"},
     "mafia_racket_money": { "label": "Racket money", "unit": "$", "hint": "2$ plus 2$ for each of your Grey Sector businesses (+5$ if the target is the leader)" },
     "mafia_racket_influence": { "label": "Racket influence", "unit": "◆", "hint": "1◆ for each of your Government Quarter businesses" },
     "mafia_roofs": { "label": "Protection limit", "unit": "", "hint": "2 instead of 1, and each costs 1$ less" },
@@ -390,7 +396,7 @@
       "details": "{{title}} — details", "slot": "Slot {{number}}", "free": "Free", "openSlot": "Open the slot",
       "openPrevious": "First open the previous slot",
       "openTitle": "Open slot {{number}}?", "openHint": "The slot expands your city for good: you can place one more business in it.",
-      "openPrice": "Price: {{money}}$ and one action. The money is not refunded.", "openConfirm": "Open the slot", "lockedSlot": "🔒 Slot {{number}}", "open": "Open · ",
+      "openPrice": "Price: {{money}}$ and one action. The money is not refunded.", "openPriceInfluence": "Price: {{money}}$, {{influence}}◆ and one action. Nothing is refunded.", "openConfirm": "Open the slot", "lockedSlot": "🔒 Slot {{number}}", "open": "Open · ",
       "district": "district {{count}}/4", "districtTitle": "Your businesses in this district. Synergy starts at 2 and at 4.",
       "sellTitle": "Sell for {{value}}$ — costs no action", "districtRow": "District",
       "districtValue": "{{icon}} {{title}} · you have {{count}} of 4", "incomeRow": "Income",
@@ -493,9 +499,61 @@
     },
     "preview": { "roofEats": "Defence stops it: 🛡−1", "losesRole": "loses the role", "nothing": "—", "colTarget": "Target", "colLoses": "Target loses", "colYou": "You get", "pick": "Pick", "confirm": "Confirm", "confirmTitle": "who it hits — check and confirm",  "stripsRole": "takes the role", "selfScandals": "to you ⚠+{{count}}", "leader": "leader — doubled", "roofBlocks": " — will stop it" },
     "grey": {
-      "title": "🌒 Shady deals", "spent": "already done", "once": "one per turn",
-      "intro": "Any of your businesses in the right district unlocks a deal — you don't need a role. One deal per turn, and the attempt is spent even if it fails. Success gives you {{success}} scandal, failure — {{failure}}. Protection does not stop your own scandals.",
-      "spentHint": "you already made a deal this turn", "needHint": "you need a business in: {{districts}}", "chance": "{{chance}}% · {{points}} pts"
+      "title": "🌒 Shady deals",
+      "spent": "already done",
+      "once": "one per turn",
+      "intro": "Any business of the right district opens a deal — no role needed. One deal per turn: roll the die and read the table. Faces 1–2 fail, 3–4 give the weak effect, 5–6 the full one. Your scandals depend on the face too; Protection never cancels your own scandals. Deals score no points: everything they give is in the effect.",
+      "defence": "The target's Protection blocks any shady deal in full and is not used up. Only «Break Protection» removes it — make sure the target is open before you strike.",
+      "spentHint": "a deal has already been done this turn",
+      "needHint": "needs a business in: {{districts}}",
+      "noRoofs": "no rival holds Protection",
+      "noTarget": "no suitable target",
+      "unavailable": "not available right now — no actions left this turn",
+      "unlock": "opened by: {{districts}}",
+      "targeted": "one target",
+      "mass": "every rival without Protection",
+      "massRoofs": "every rival holding Protection",
+      "modifierNone": "Your roll modifier: none — the face reads as it is.",
+      "modifier": "Your roll modifier: +{{value}}",
+      "modifierCap": "never more than +{{cap}}",
+      "modifierShift": "the face moves up, above 6 counts as 6",
+      "source": {
+        "fraudster": "Fraudster +{{value}}",
+        "mafia": "Mafia +{{value}} for the Grey Sector",
+        "card": "card +{{value}}"
+      },
+      "row": {
+        "roll": "Roll",
+        "countsAs": "Counts as",
+        "effect": "Effect",
+        "scandals": "Your scandals"
+      },
+      "tier": {
+        "fail": "fail",
+        "weak": "weak",
+        "full": "full"
+      },
+      "clean": "clean",
+      "capNote": "It is the {{third}} of the game; never more than the target holds.",
+      "third": {
+        "0": "opening",
+        "1": "middle",
+        "2": "endgame"
+      },
+      "run": "Run",
+      "runAt": "Against: {{name}}",
+      "defended": "The target holds Protection — the deal will not work and the Protection stays",
+      "effect": {
+        "none": "—",
+        "smear": "a scandal to each",
+        "smearPaid": "a scandal to each, +{{influence}}◆ per scandal",
+        "crypto": "{{money}}$ from each",
+        "datacenter": "steal {{influence}}◆",
+        "leakScandal": "target +{{scandals}}⚠, you +{{influence}}◆",
+        "leakStrip": "strip the role, you +{{influence}}◆",
+        "roofBreak": "remove all Protection from all",
+        "roofBreakPaid": "remove all Protection, +{{influence}}◆ each"
+      }
     },
     "marketPanel": { "title": "Market" }
   }

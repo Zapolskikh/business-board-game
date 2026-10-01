@@ -951,6 +951,14 @@
     font-variant-numeric: tabular-nums;
   }
   .ui-v2 .rules-book-text td.name { min-width: 170px; overflow-wrap: normal; }
+  /* Таблицы граней серых операций: кубик в шапке, исход грани — цветом. */
+  .ui-v2 .rules-book-text table.grey-dice { table-layout: fixed; }
+  .ui-v2 .rules-book-text table.grey-dice th.die { font-size: 30px; line-height: 1; text-align: center; }
+  .ui-v2 .rules-book-text table.grey-dice td { text-align: center; font-size: 13px; }
+  .ui-v2 .rules-book-text table.grey-dice td.grey-fail { color: var(--book-bad); }
+  .ui-v2 .rules-book-text table.grey-dice td.grey-weak { color: #8a5a1c; }
+  .ui-v2 .rules-book-text table.grey-dice td.grey-full { color: var(--book-good); font-weight: 600; }
+  .ui-v2 .rules-book-text table.grey-dice td.grey-clean { color: var(--book-good); font-weight: 700; }
   .ui-v2 .rules-book-text td.effect { color: #4a3d30; }
   .ui-v2 .rules-book-text td.name .badge {
     display: inline-block;

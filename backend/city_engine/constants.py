@@ -12,7 +12,7 @@ SCHEMA_VERSION = 1
 # bought out of their role at all, the mafia's grey mark lasts through the next round, and a tie
 # goes to whoever took more city projects. 1.16.0: an action-card draw costs 6$ instead of 3$, and the late market
 # is a weighted draw instead of the recycled round-one commons.
-RULES_VERSION = "city-1.16.0"
+RULES_VERSION = "city-1.17.0"
 
 # Bumped whenever the catalog changes, even if no rule moved: card texts are part of the agreement
 # too. 2026-09-30: removed the unsupported cash-exchange purchase payout. 2026-09-30b: «Судебный
@@ -20,7 +20,7 @@ RULES_VERSION = "city-1.16.0"
 # 2026-10-01: «Крыша» is «Защита» in every Russian text; round-scaled cards say «номер раунда»
 # (which is what the engine always added) instead of «за каждый прошедший раунд».
 # 2026-10-01b: city projects repriced by how hard their condition is — see CHANGELOG.
-CONTENT_VERSION = "city-content-2026-10-01b"
+CONTENT_VERSION = "city-content-2026-10-02"
 
 DISTRICT_IDS = (
     "residential",
@@ -63,7 +63,12 @@ MAX_ROUNDS = 30
 MIN_ROLE_PRICE = 2
 MAX_ROLE_PRICE = 10
 MAX_CAPACITY = 6
-CAPACITY_COSTS = {3: 6, 4: 10, 5: 15}
+CAPACITY_COSTS = {3: 7, 4: 12, 5: 18}
+# The influence the same slots cost on top of the money, keyed like CAPACITY_COSTS. A slot was the
+# most underpriced decision in the game (balance patch 2026-10: +4.9 points against the table in
+# paired forks, the best option in 84% of Oracle's rollouts). Influence is the scarce currency, so
+# the fifth and sixth slots now compete with lobbying and projects instead of only with money.
+CAPACITY_INFLUENCE = {3: 0, 4: 1, 5: 3}
 
 # Money and influence are resources, not score: a pile left at the end of the game is worth
 # nothing. (An earlier version paid 10$ and 3◆ a point; it was dropped by design decision on
@@ -108,45 +113,51 @@ MARKET_DISCARD_WEIGHTS = {"common": 1, "uncommon": 2, "rare": 6, "epic": 12, "le
 # come out of the weighted draw, as filler.
 LATE_FILLER_RARITIES = frozenset({"common", "uncommon"})
 
+# The catch-up: at the start of every round the trailing player (all of them, on a tie for last)
+# gets this much influence. Not when the whole table is level — that is the opening, not a deficit.
+# Moving first alone did not close the gap: the trailing seat scored 7.3 a round against 8.2 for
+# the leader, and from last place after round ten only 2.7% of games were won (balance patch 2026-10).
+UNDERDOG_INFLUENCE = 1
+
 # --- roles ------------------------------------------------------------------------------------
 # The publication costs an action and lands twice as hard. Two free attacks a turn — inflate
 # *and* publish on top of three ordinary actions — would be the journalist's edge over every other
 # role, none of which has a power that skips the action cost.
 PUBLICATION_SCANDALS = 2
-# The fraudster's grey bonus, flat and single. Split in two — a share for the role and more for
-# holding any Технокластер object — the crypto exchange, itself a Технокластер object, would
-# silently grant both and pin every fraudster operation at the 0.9 ceiling.
-# One number the player can read off the role card is worth more than two that stack invisibly.
-FRAUDSTER_GREY_BONUS = 0.30
-# --- grey operation payouts ---------------------------------------------------------------------
-# Every operation scores the same kind of thing, so the score sits in one table instead of being
-# split between a plain tier and a "hard" one. Three is the price of the two that reach into a
-# rival's sheet permanently — the hack takes influence outright, the leak takes the role — and two
-# is the price of the rest, which is roughly what a patronage pays for the same action.
-GREY_OPERATION_POINTS = {
-    "smear": 2,
-    "crypto": 2,
-    "roof_break": 2,
-    "datacenter": 3,
-    "influence_broker": 3,
-}
-# Base odds before the fraudster's bonus. The smear hits all three rivals at once and is the
-# strongest line in the table by a distance, so it deliberately sits below its neighbours rather
-# than above them; the hack is the longest shot because what it takes is the scarce resource.
-GREY_OPERATION_CHANCE = {
-    "smear": 0.60,
-    "crypto": 0.45,
-    "roof_break": 0.60,
-    "datacenter": 0.40,
-    "influence_broker": 0.60,
-}
-# One rule for the whole layer, replacing five bespoke failure penalties (lose the stake, lose a
-# roof, pay influence). A coin flip decides between "the effect happens and costs you one scandal"
-# and "nothing happens and it costs you two" — so an operation is worth 2 - chance ≈ 1.4 scandals
-# on average, and the five-scandal limit funds three or four runs a game before a cleanup is
-# mandatory. The scandal, not the odds and not the price, is what paces the grey layer now.
-GREY_SUCCESS_SCANDALS = 1
-GREY_FAILURE_SCANDALS = 2
+# --- grey operations: the die ------------------------------------------------------------------
+# A grey operation is one roll of a six-sided die plus the player's modifiers; anything above six
+# reads as six. Every operation has its own table, face by face, of what it does and how many
+# scandals it costs — whole numbers the player reads off the panel, recomputed for their role,
+# their cards and the third of the game. The old 40–60% all-or-nothing coin was impossible to
+# price at the table and half of every attempt burned an action for two scandals; the strong
+# bots picked the layer in 0.4–1.7% of the turns it was open (balance patch 2026-10).
+#
+# Faces 1–2 do nothing, 3–4 do the weak version, 5–6 the full one. Grey operations score no points
+# any more: what they pay is in the effect itself.
+GREY_DIE_SIDES = 6
+# The sum of every modifier is capped, so no seat reaches a guaranteed clean six on every run.
+GREY_ROLL_CAP = 3
+# What the role gives the roll. The fraudster's flat +1 replaces the old +30% chance; the mafia's
+# bonus is the role's grey power: +1 per own Серый сектор object, at most +2.
+FRAUDSTER_GREY_ROLL = 1
+MAFIA_GREY_ROLL_PER_OBJECT = 1
+MAFIA_GREY_ROLL_MAX = 2
+# Scandals for the attacker, face by face (index 0 is face 1). Clean on a six, two on a one.
+GREY_SCANDALS = (2, 1, 1, 1, 1, 0)
+# «Пробить защиту» is the one operation whose whole job is to open the table for the next turn, so
+# it is cleaner on a hit.
+GREY_SCANDALS_BY_OPERATION = {"roof_break": (2, 1, 1, 0, 0, 0)}
+# The turn flag «Подкуп охраны» leaves behind: its bonus waits for the next roll this turn.
+GREY_ROLL_BONUS_FLAG = "grey_roll_bonus"
+# Effects, face by face. Thirds of the game (0 = opening, 1 = middle, 2 = endgame) for the two
+# operations that take a resource, so a six in the second round cannot win the game.
+SMEAR_INFLUENCE_PER_HIT = (0, 0, 1, 1, 2, 2)
+PUMP_MONEY_EACH = {0: (0, 0, 1, 1, 2, 3), 1: (0, 0, 2, 2, 4, 6), 2: (0, 0, 4, 4, 6, 8)}
+HACK_INFLUENCE = {0: (0, 0, 1, 1, 2, 3), 1: (0, 0, 2, 2, 3, 5), 2: (0, 0, 3, 3, 5, 7)}
+LEAK_TARGET_SCANDALS = (0, 0, 2, 2, 0, 0)
+LEAK_STRIPS_ROLE = (False, False, False, False, True, True)
+LEAK_INFLUENCE = (0, 0, 1, 1, 2, 3)
+ROOF_BREAK_INFLUENCE_PER_ROOF = (0, 0, 0, 0, 1, 2)
 # One grey operation a turn, whichever the player picks. Measured over 80 games: 46.8% of every
 # fraudster turn ran two or more, and 45% of the role's grey points came from those repeats — the
 # fraudster finished 19 points (29%) ahead of the table on the strength of an engine it could fire
@@ -163,6 +174,8 @@ CRYPTO_SCAM_SCANDALS = 5
 # What the racket adds when its target is leading the table. The rest of the demand comes from the
 # mafia's own districts: 2$ per Серый сектор object, plus a slow drift with the round.
 RACKET_LEADER_BONUS = 5
+# The flat part of the racket demand, before 2$ per own Серый сектор object and the round drift.
+RACKET_BASE = 3
 # The sanction reads the target's own scandal counter: money at two, money and influence at three,
 # and the role itself at four.
 SANCTION_MONEY_TIER = 2
@@ -189,11 +202,14 @@ POLITICIAN_DEAL_INFLUENCE = 3
 # A veto closes one project to everybody else for as long as it stays on the board. The project
 # rotates on the ordinary schedule and takes the veto with it, so this buys tempo on one card
 # rather than freezing the board.
-POLITICIAN_VETO_INFLUENCE = 3
+# Free since the 2026-10 balance patch: the veto lost 5.1 points against the table in paired forks,
+# mostly because the vetoed project rotated away before the politician could take it and the 3◆
+# burned. The action is the price now.
+POLITICIAN_VETO_INFLUENCE = 0
 # Taking a Крыша off a rival and putting it on your own stack. Not blocked by the token it is
 # aimed at, for the same reason «Пробить крышу» is not: a defence that answers the attack on
 # itself makes the whole line unreachable.
-MILITARY_SEIZE_INFLUENCE = 3
+MILITARY_SEIZE_INFLUENCE = 2
 # Money into influence: one action, one exchange, 5$ → 3◆. The action — not the money — was the
 # real price of influence: campaign was the only scalable source and it was capped at 2◆ per
 # action, so a player holding 264$ and 2◆ had no way to convert.
@@ -218,7 +234,10 @@ PROJECT_REROLL_MONEY = 10
 # was legal, +1.16 points a buy against a 0.63 price), and discarding both cards for influence
 # turned 3$ into 3◆ — a better rate than the exchange (5$ → 3◆) with a free lottery on top. At 6$
 # the discard floor is the exchange rate, so the cards have to earn the rest by being played.
-ACTION_CARD_COST = 6
+#
+# 4$ since the 2026-10 balance patch: at 6$ a purchase of two cards returned 1.91 points against a
+# 2.10-point price plus the action, so the layer lost on average.
+ACTION_CARD_COST = 4
 # How many copies of each card the deck holds. One copy meant a four-player table exhausted the
 # deck around round 9 — every draw is two cards, so the catalogue lasted about seventeen buys. From
 # there on the whole card layer was simply gone, and it went precisely when the late game needs
@@ -226,6 +245,8 @@ ACTION_CARD_COST = 6
 # the money channel collapses into repeating Патронаж. Two copies carry the deck to the final
 # round. Duplicates are fine by design — a card is a blind draw, not a collectible, and seeing the
 # same card twice in fifteen rounds reads as luck rather than repetition.
+#
+# The default only: a card may print its own ``copies`` in the catalog.
 ACTION_DECK_COPIES = 2
 # How many cards a hand holds. Reaching the cap is the player's problem, not the engine's: a draw
 # that finds no room is simply lost, which is what makes the «Лоббистский кабинет» a reason to
@@ -241,8 +262,9 @@ CARD_PURCHASE_FLAG = "action_card_bought"
 # channel, so a full tableau had nowhere to put money: two measured matches ended with 248$ and 864$
 # unspent across the table, 24 and 86 points nobody made a decision about.
 POINTS_CARD_RATE = 3
-# What discarding a card returns, so a bad draw is not a dead 3$.
-CARD_DISCARD_VALUE = 2
+# What discarding a card returns, so a bad draw is not a dead purchase: 2$ or 1◆.
+CARD_DISCARD_MONEY = 2
+CARD_DISCARD_INFLUENCE = 1
 # What the tax manoeuvre pays to run money into influence. It has to beat the discard — a card that
 # gives 2◆ for 8$ is strictly worse than the same card thrown away for 2◆ — and it buys the top
 # campaign tier without spending the action, which is the point of playing a card at all.
@@ -286,24 +308,7 @@ CONSEQUENCE_EVENTS = frozenset(
 # campaign does — for free, without a scandal, and at a better rate — so it would never be the
 # right click. Nor a smuggling one: the pump does that job against all three rivals at once.
 #
-# The influence a hack takes, growing with the round. A flat 4◆ is half of somebody's war chest in
-# the third round and a rounding error in the twelfth; the scarce resource has to be priced against
-# how much of it is in circulation, which is what every other money figure here already does.
-HACK_INFLUENCE_BASE = 2
-# What the pump takes from *every* rival, not just the leader. A leader-only jab would be a rider
-# on an operation that already pays its owner, making the operation two effects in one. As a
-# table-wide drain it is the money operation, and it is the only one that scales with the number
-# of players.
-PUMP_DRAIN_BASE = 2
-# Пробить крышу pays a point per token it takes. Without it the operation is a pure set-up: you
-# spend the action and the scandal, and the defenceless target is defenceless for everybody —
-# two thirds of the value goes to the neighbours in a four-player game. Measured: Крыша absorbs
-# 59% of every targeted command in the game and 68.8% of the hits it eats land on a stack of two,
-# so the operation is worth exactly two tokens against the players it is aimed at and nothing at
-# all against the 36% who hold none. The per-token point is what makes aiming it worthwhile.
-ROOF_BREAK_POINT_PER_ROOF = 1
 # Leaking compromat strips a role: -3 points, the whole passive behind it, and the seat opens at
 # the free price instead of the threefold takeover. Its only gate is a target holding a role: an
 # operation that charges the scarce resource before the dice, on top of the scandal it charges
 # after, is not a gamble, it is a tax, and nobody runs it.
-# Its odds live in GREY_OPERATION_CHANCE with everybody else's.

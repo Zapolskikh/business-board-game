@@ -27,6 +27,7 @@ from typing import Any
 from city_engine.constants import (
     ACTION_CARD_COST,
     CAPACITY_COSTS,
+    CAPACITY_INFLUENCE,
     LOBBYING_INFLUENCE,
     MAX_CAPACITY,
     PATRONAGE_MONEY,
@@ -460,10 +461,11 @@ def _money_reserve(engine: CityEngine, state: GameState, player: PlayerState) ->
 
 
 def _influence_reserve(engine: CityEngine, state: GameState, player: PlayerState) -> float:
-    """Influence the plan still needs: the seat it has not bought yet."""
-    if state.round_number >= state.max_rounds or player.role is not None:
+    """Influence the plan still needs: the seat it has not bought yet, and the next slot's influence."""
+    if state.round_number >= state.max_rounds:
         return 0.0
-    return float(state.role_price)
+    slot = CAPACITY_INFLUENCE.get(player.capacity, 0) if player.capacity < MAX_CAPACITY else 0
+    return float(slot + (0 if player.role is not None else state.role_price))
 
 
 def _self_gain(engine: CityEngine, state: GameState, player: PlayerState, after: GameState) -> float:

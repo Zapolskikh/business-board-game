@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { forwardRef, useState, type ForwardedRef } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { assetEffectLines, assetPoints, districtCount, districtSynergyValue } from "../../online/gameUi";
+import { assetEffectLines, assetPoints, districtCount, districtSynergyValue, slotPrice } from "../../online/gameUi";
 import type { AssetMeta, AssetYield, CityMeta, DistrictMeta, LegalAction, OwnedAsset } from "../../online/types";
 import { AssetFace, assetFaceGrid, assetFaceGridPortrait, assetFaceStyle, type AssetBullet } from "../primitives/AssetFace";
 import { CardPopover, PopoverBody, PopoverFooter, PopoverHeader } from "../primitives/CardPopover";
@@ -35,7 +35,7 @@ export function CityPanel({
   const capacity = resolve(context, "buy_capacity");
   /* Слот стоит дорого, а замок легко задеть мимоходом, поэтому покупка идёт через окно. */
   const [confirmSlot, setConfirmSlot] = useState(false);
-  const nextSlotPrice = meta.scoring?.capacity_costs?.[String(me.capacity)];
+  const nextSlot = slotPrice(meta, me.capacity);
   const portrait = useIsPortrait();
   const { t } = useTranslation("game");
 
@@ -125,10 +125,10 @@ export function CityPanel({
           * остальные замки показывают цену, но не нажимаются. */}
         {Array.from({ length: locked }).map((_, position) => {
           const slot = me.capacity + position;
-          const price = meta.scoring?.capacity_costs?.[String(slot)];
+          const { money: price, influence } = slotPrice(meta, slot);
           const next = position === 0;
           const ready = next && capacity.kind === "ready";
-          const short = price !== undefined && me.money < price;
+          const short = (price !== undefined && me.money < price) || me.influence < influence;
           return (
             <button
               key={`locked-${position}`}
@@ -147,7 +147,7 @@ export function CityPanel({
             >
               <b className="card-serif text-[13px]">{t("ui.city.lockedSlot", { number: slot + 1 })}</b>
               <span className="rounded border border-line bg-panel-2 px-2 py-0.5 text-2xs text-ink">
-                {t("ui.city.open")}<b className={short ? "font-bold text-bad" : ""}><ResourceText>{`${price ?? "?"}$`}</ResourceText></b>
+                {t("ui.city.open")}<b className={short ? "font-bold text-bad" : ""}><ResourceText>{`${price ?? "?"}$${influence ? ` + ${influence}◆` : ""}`}</ResourceText></b>
               </span>
             </button>
           );
@@ -158,7 +158,11 @@ export function CityPanel({
         onClose={() => setConfirmSlot(false)}
         onConfirm={() => capacity.kind === "ready" && onAction(capacity.action)}
         title={t("ui.city.openTitle", { number: me.capacity + 1 })}
-        price={t("ui.city.openPrice", { money: nextSlotPrice ?? "?" })}
+        price={
+          nextSlot.influence
+            ? t("ui.city.openPriceInfluence", { money: nextSlot.money ?? "?", influence: nextSlot.influence })
+            : t("ui.city.openPrice", { money: nextSlot.money ?? "?" })
+        }
         confirmLabel={t("ui.city.openConfirm")}
       >
         {t("ui.city.openHint")}

@@ -52,7 +52,7 @@ GREY_LABELS = {
     "influence_broker": "слив компромата: снять роль с цели",
 }
 
-CAPACITY_COSTS = {3: 6, 4: 10, 5: 15}
+CAPACITY_COSTS = {3: 7, 4: 12, 5: 18}
 
 
 @dataclass(slots=True)
@@ -174,14 +174,10 @@ def _payload_hint(action: dict[str, Any], game: dict[str, Any], me: dict[str, An
     if payload.get("asset_id") and action["type"] == "grey_operation":
         asset_id = str(payload["asset_id"])
         bits.append(GREY_LABELS.get(asset_id, asset_id))
-        point_table = catalog.scoring.get("grey_operation_points")
-        if isinstance(point_table, dict):
-            points = int(point_table.get(asset_id, 0))
-        else:
-            # Compatibility with servers before the per-operation scoring table.
-            hard = asset_id in {"datacenter", "influence_broker"}
-            points = int(catalog.scoring.get("grey_operation_points_hard" if hard else "grey_operation_points", 3))
-        bits.append(f"+{points} {'очков' if points >= 5 else 'очка'} при успехе, при провале ничего")
+        table = next((item for item in game.get("grey_tables") or [] if item.get("asset_id") == asset_id), None)
+        modifier = int(table.get("modifier", 0)) if table else 0
+        bonus = f" +{modifier}" if modifier else ""
+        bits.append(f"кубик{bonus}: 1–2 ничего, 3–4 слабый эффект, 5–6 полный; Защита цели блокирует")
     if payload.get("target_id"):
         bits.append(f"→ {player_name(game, payload['target_id'])}")
     if payload.get("district"):
@@ -191,7 +187,11 @@ def _payload_hint(action: dict[str, Any], game: dict[str, Any], me: dict[str, An
     if action["type"] == "buy_roof":
         bits.append(f"{roof_price(game, me)}$")
     if action["type"] == "buy_capacity":
-        bits.append(f"слот {int(me['capacity']) + 1} за {CAPACITY_COSTS.get(int(me['capacity']), '?')}$")
+        capacity = int(me["capacity"])
+        costs = catalog.scoring.get("capacity_costs") or {str(key): value for key, value in CAPACITY_COSTS.items()}
+        influence = (catalog.scoring.get("capacity_influence") or {}).get(str(capacity), 0)
+        price = f"{costs.get(str(capacity), '?')}$" + (f" + {influence}◆" if influence else "")
+        bits.append(f"слот {capacity + 1} за {price}")
     if action["type"] == "claim_role":
         holder = next((p for p in game["players"] if p["role"] == payload.get("role_id")), None)
         price = int(game["role_price"]) * (3 if holder else 1)
@@ -564,9 +564,11 @@ def render_state(
     lines.append("— мой бизнес —")
     lines.extend(_owned_line(owned, me, game, catalog) for owned in me["assets"])
     lines.append(f"    районы: {districts or 'пусто'}")
-    slot = CAPACITY_COSTS.get(int(me["capacity"]))
+    slot_influence = (catalog.scoring.get("capacity_influence") or {}).get(str(me["capacity"]), 0)
+    slot_money = CAPACITY_COSTS.get(int(me["capacity"]))
+    slot = f"{slot_money}$" + (f" + {slot_influence}◆" if slot_influence else "") if slot_money else None
     project_reroll = catalog.scoring.get("project_reroll_money", 10)
-    card_cost = catalog.scoring.get("action_card_cost", 6)
+    card_cost = catalog.scoring.get("action_card_cost", 4)
     tiers = " / ".join(
         f"{int(row['spend'])}$→{int(row['gain'])}◆" for row in catalog.scoring.get("campaign_tiers") or []
     )
@@ -575,7 +577,7 @@ def render_state(
         f"две карты {card_cost}$+1◆ и действие · "
         f"пересборка доски проектов {project_reroll}$ и действие · "
         + (f"кампания {tiers} за одно действие · " if tiers else "")
-        + (f"слот {int(me['capacity']) + 1} за {slot}$" if slot else "слоты максимум")
+        + (f"слот {int(me['capacity']) + 1} за {slot}" if slot else "слоты максимум")
     )
     breakdown = dict(game.get("score_breakdown", {}).get(player_id, {}))
     if breakdown:

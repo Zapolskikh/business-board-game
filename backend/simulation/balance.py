@@ -122,10 +122,6 @@ def bucket_of(round_number: int, max_rounds: int) -> str:
 
 
 BUCKETS = ("early", "mid", "late")
-_LCG_MASK = 0xFFFFFFFF
-_LCG_MULTIPLIER = 1_664_525
-_LCG_INCREMENT = 1_013_904_223
-_LCG_MULTIPLIER_INVERSE = pow(_LCG_MULTIPLIER, -1, 2**32)
 
 
 @dataclass
@@ -274,36 +270,20 @@ def _myopic_command(
         stable = json.dumps(action, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
         if action["type"] == "grey_operation":
             # ``legal_transitions`` has already rolled the operation. Scoring that realised state
-            # lets a policy see the next RNG result and choose only hits. Evaluate the exact success
-            # and failure branches instead, weighted by the public chance printed in the event.
-            chance = next(
-                float(event.data["chance"]) for event in transition.events if event.type == "grey_operation_resolved"
+            # lets a policy see the next RNG result and choose only hits. Every face of the die is
+            # forced instead and weighted by its printed probability.
+            from city_bots.ledger import grey_outcomes
+
+            immediate = sum(
+                weight * (fractional_score(engine, after.player_by_id(actor.id)) - before)
+                for weight, after in grey_outcomes(engine, state, action)
             )
-            command = _command_from_action(state, actor.id, action)
-            success_delta = _forced_grey_delta(engine, state, actor.id, command, next_u32=0)
-            failure_delta = _forced_grey_delta(engine, state, actor.id, command, next_u32=_LCG_MASK)
-            immediate = chance * success_delta + (1 - chance) * failure_delta
         else:
             after_actor = transition.state.player_by_id(actor.id)
             immediate = fractional_score(engine, after_actor) - before
         scored.append((immediate, stable, action))
     _, _, picked = max(scored, key=lambda item: (item[0], item[1]))
     return _command_from_action(state, actor.id, picked)
-
-
-def _forced_grey_delta(
-    engine: CityEngine,
-    state: GameState,
-    actor_id: str,
-    command: Command,
-    *,
-    next_u32: int,
-) -> float:
-    forced = state.clone()
-    forced.rng.state = ((next_u32 - _LCG_INCREMENT) * _LCG_MULTIPLIER_INVERSE) & _LCG_MASK
-    before = fractional_score(engine, forced.player_by_id(actor_id))
-    after = engine.apply(forced, command).state.player_by_id(actor_id)
-    return fractional_score(engine, after) - before
 
 
 def _actions_consumed(before: GameState, after: GameState, actor_id: str, command: Command) -> int:

@@ -97,15 +97,14 @@ export interface RulesContext {
     rotation: number;
     projectBoardSize: number;
     cardCost: number;
-    discard: number;
+    discardMoney: number;
+    discardInfluence: number;
     capacityCosts: number[];
-    pumpBase: number;
-    hackBase: number;
-    roofBreakPoint: number;
-    greySuccess: number;
-    greyFailure: number;
-    greyChance: (id: string, fallback: number) => number;
-    greyPoints: (id: string, fallback: number) => number;
+    capacityInfluence: number[];
+    rollCap: number;
+    fraudsterRoll: number;
+    mafiaRollMax: number;
+    underdog: number;
   };
   roleTitle: (id: string) => string;
   districtTitle: (id: string) => string;
@@ -137,7 +136,28 @@ export interface RulesContext {
     }) => string;
     cardTable: (labels: TableLabels) => string;
     roleCards: (guides: Record<string, RoleGuide>, labels: TableLabels) => string;
+    /** Every grey operation's die: faces, effects (per third where they grow) and scandals. */
+    greyTables: (labels: GreyTableLabels) => string;
   };
+}
+
+export interface GreyTableLabels {
+  operations: Record<string, { name: string; gate: string }>;
+  face: string;
+  effect: string;
+  scandals: string;
+  clean: string;
+  /** Row titles for the opening, the middle and the endgame third. */
+  thirds: [string, string, string];
+  effectText: (operationId: string, effect: Record<string, number | boolean>, tier: "fail" | "weak" | "full") => string;
+}
+
+const DICE = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
+const GREY_RULE_ORDER = ["smear", "crypto", "datacenter", "influence_broker", "roof_break"];
+const GROWS_BY_THIRD = new Set(["crypto", "datacenter"]);
+
+function greyTier(face: number): "fail" | "weak" | "full" {
+  return face <= 2 ? "fail" : face <= 4 ? "weak" : "full";
 }
 
 function listJoin(items: string[], and: string): string {
@@ -196,16 +216,15 @@ function context(meta: CityMeta, rolePrice: number): RulesContext {
       reroll: projectRerollMoney(meta),
       rotation: marketRotationSize(meta),
       projectBoardSize: scoring?.project_board_size ?? 4,
-      cardCost: scoring?.action_card_cost ?? 6,
-      discard: scoring?.card_discard_value ?? 2,
-      capacityCosts: Object.values(scoring?.capacity_costs ?? { 3: 6, 4: 10, 5: 15 }),
-      pumpBase: scoring?.pump_drain_base ?? 2,
-      hackBase: scoring?.hack_influence_base ?? 2,
-      roofBreakPoint: scoring?.roof_break_point_per_roof ?? 1,
-      greySuccess: scoring?.grey_success_scandals ?? 1,
-      greyFailure: scoring?.grey_failure_scandals ?? 2,
-      greyChance: (id, fallback) => Math.round((scoring?.grey_operation_chance?.[id] ?? fallback / 100) * 100),
-      greyPoints: (id, fallback) => scoring?.grey_operation_points?.[id] ?? fallback,
+      cardCost: scoring?.action_card_cost ?? 4,
+      discardMoney: scoring?.card_discard_money ?? 2,
+      discardInfluence: scoring?.card_discard_influence ?? 1,
+      capacityCosts: Object.values(scoring?.capacity_costs ?? { 3: 7, 4: 12, 5: 18 }),
+      capacityInfluence: Object.values(scoring?.capacity_influence ?? { 3: 0, 4: 1, 5: 3 }),
+      rollCap: scoring?.grey_roll_cap ?? 3,
+      fraudsterRoll: scoring?.fraudster_grey_roll ?? 1,
+      mafiaRollMax: scoring?.mafia_grey_roll_max ?? 2,
+      underdog: scoring?.underdog_influence ?? 1,
     },
     roleTitle,
     districtTitle,
@@ -325,6 +344,37 @@ function context(meta: CityMeta, rolePrice: number): RulesContext {
           </tr>`)
           .join("")}</tbody>
       </table>`,
+      greyTables: labels => {
+        const faces = meta.scoring?.grey_faces ?? {};
+        return GREY_RULE_ORDER.filter(id => faces[id])
+          .map(id => {
+            const table = faces[id];
+            const operation = labels.operations[id] ?? { name: id, gate: "" };
+            const thirds = GROWS_BY_THIRD.has(id) ? [0, 1, 2] : [0];
+            const effectRows = thirds
+              .map(third => {
+                const title = thirds.length > 1 ? `${labels.effect} · ${labels.thirds[third]}` : labels.effect;
+                const cells = table.effects[third]
+                  .map((effect, index) => {
+                    const tier = greyTier(index + 1);
+                    return `<td class="grey-${tier}">${e(labels.effectText(id, effect, tier))}</td>`;
+                  })
+                  .join("");
+                return `<tr><th>${e(title)}</th>${cells}</tr>`;
+              })
+              .join("");
+            const scandals = table.scandals
+              .map(count => `<td class="num${count === 0 ? " grey-clean" : ""}">${count === 0 ? e(labels.clean) : `${count}⚠`}</td>`)
+              .join("");
+            return `
+            <h4>${e(operation.name)} <small>· ${e(operation.gate)}</small></h4>
+            <table class="grey-dice">
+              <thead><tr><th>${e(labels.face)}</th>${DICE.map(die => `<th class="die">${die}</th>`).join("")}</tr></thead>
+              <tbody>${effectRows}<tr><th>${e(labels.scandals)}</th>${scandals}</tr></tbody>
+            </table>`;
+          })
+          .join("");
+      },
       roleCards: (guides, labels) =>
         `<div class="role-grid">${meta.roles.map(role => roleCard(role, guides[role.id], labels)).join("")}</div>`,
     },

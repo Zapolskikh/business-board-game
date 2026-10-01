@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from city_engine.constants import (
-    CARD_DISCARD_VALUE,
+    CARD_DISCARD_INFLUENCE,
     LOBBYING_INFLUENCE,
     LOBBYING_POINTS,
     PATRONAGE_MONEY,
@@ -119,11 +119,11 @@ def render(engine: CityEngine | None = None) -> str:
     else:
         lines.append("  none (cost/income/influence/tags/effects/unlock all checked)")
 
-    discard_points = CARD_DISCARD_VALUE * INFLUENCE_POINT_VALUE
+    discard_points = CARD_DISCARD_INFLUENCE * INFLUENCE_POINT_VALUE
     delayed = {"roof", "market_discount", "zoning", "extra_action", "capacity", "project"}
     hostile = {"scandal", "fine", "steal", "role_pressure", "double_scandal", "blackmail", "expose", "mixed_fine"}
     lines.append("\n=== ACTION CARDS VS DISCARD ===")
-    lines.append(f"  best discard: {CARD_DISCARD_VALUE} influence = {discard_points:.2f} immediate points")
+    lines.append(f"  best discard: {CARD_DISCARD_INFLUENCE} influence = {discard_points:.2f} immediate points")
     for card in sorted(engine.catalog.action_cards.values(), key=lambda item: item.id):
         if card.kind in delayed:
             verdict = "DELAYED — simulation/counterfactual required"

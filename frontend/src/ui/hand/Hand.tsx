@@ -230,7 +230,7 @@ function HandCardDetails({
             className="rounded-md border border-line bg-panel-2 px-2 py-2 text-center text-xs
               enabled:hover:border-accent disabled:opacity-45"
           >
-            {converted ? t("ui.hand.discarded") : t("ui.hand.discard", { value: discardValue })}
+            {converted ? t("ui.hand.discarded") : t("ui.hand.discard", { value: discardValue.money })}
           </button>
           <button
             type="button"
@@ -239,7 +239,7 @@ function HandCardDetails({
             className="rounded-md border border-line bg-panel-2 px-2 py-2 text-center text-xs
               enabled:hover:border-accent disabled:opacity-45"
           >
-            {converted ? "—" : t("ui.hand.discardInfluence", { value: discardValue })}
+            {converted ? "—" : t("ui.hand.discardInfluence", { value: discardValue.influence })}
           </button>
         </div>
       </PopoverFooter>

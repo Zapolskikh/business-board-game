@@ -18,17 +18,12 @@ from city_engine.commands import Command
 from city_engine.constants import (
     CAPACITY_COSTS,
     CASH_TO_INFLUENCE_MONEY,
-    FRAUDSTER_GREY_BONUS,
-    GREY_FAILURE_SCANDALS,
-    GREY_OPERATION_POINTS,
-    GREY_SUCCESS_SCANDALS,
     LOBBYING_INFLUENCE,
     LOBBYING_POINTS,
     MAX_CAPACITY,
     PATRONAGE_MONEY,
     PATRONAGE_POINTS,
     POINTS_CARD_RATE,
-    ROOF_BREAK_POINT_PER_ROOF,
 )
 from city_engine.engine import CityEngine
 from city_engine.models import GameState, PlayerState, Transition
@@ -747,102 +742,73 @@ def _grey_operation_utility(
     payload: dict[str, Any],
     profile: PolicyProfile,
 ) -> float:
-    """Grey operations are priced in expected units, so influence has to be converted to them.
+    """A grey operation priced face by face off the engine's own die table.
 
-    Two of the five trade in influence rather than cash, and a dollar and a point of influence are
-    nowhere near interchangeable: influence buys projects at roughly 1.5 points each, a dollar buys
-    0.5 at best and 0.1 once the slots are full. ``INFLUENCE_IN_MONEY`` is that ratio.
+    Every face of ``CityEngine.grey_table`` is valued with the same weights the rest of this policy
+    uses and averaged at 1/6 each. A Защита answers any grey operation in full and is not spent, so a
+    defended target is worth nothing to anything but the roof break.
 
     A standing caveat on everything below: a bot scores one turn, and three of these operations pay
-    in an opponent's lost tempo over the following ten. It cannot see that, and it also cannot see
-    that denying the runaway leader is worth doing even when two thirds of the benefit lands on the
-    other seats. So the numbers here are a floor on the value of the aggressive lines, not a
-    measurement of them, and simulation results for this layer read the same way.
+    in an opponent's lost tempo over the following ten. So the numbers here are a floor on the value
+    of the aggressive lines, not a measurement of them, and simulation results read the same way.
     """
     asset_id = str(payload["asset_id"])
-    fraud_bonus = FRAUDSTER_GREY_BONUS if engine.has_role(player, "fraudster") else 0
-    chance = min(0.9, engine.GREY_BASE_CHANCE[asset_id] + fraud_bonus)
+    table = engine.grey_table(state, player, asset_id)
     rivals = [other for other in state.players if other.id != player.id]
-    # The score is the same for every operation, so it belongs outside the branch. It is the part
-    # of the payout a one-turn scorer can actually see.
-    success_value = float(GREY_OPERATION_POINTS[asset_id])
-    if asset_id == "smear":
-        # A scandal costs its owner an action and 3◆ to wash off, so value it near a whole action;
-        # a roof answers for its owner and eats the hit instead. That is not nothing: the token is
-        # spent, and the next attack on that seat goes through.
-        exposed = sum(1 for rival in rivals if rival.roofs == 0)
-        success_value += exposed * 2.0 * (1 + profile.aggression)
-        success_value += sum(_token_burn_value(rival, profile) for rival in rivals if rival.roofs > 0)
-    elif asset_id == "crypto":
-        drain = engine.pump_drain(state)
-        success_value += sum(min(drain, rival.money) for rival in rivals if rival.roofs == 0)
-        success_value += sum(_token_burn_value(rival, profile) for rival in rivals if rival.roofs > 0)
-    elif asset_id == "roof_break":
-        target = state.player_by_id(str(payload["target_id"]))
-        # The points are the honest half of this one: the opening it makes is shared with the whole
-        # table, and only a player who plans several turns ahead ever cashes it in.
-        success_value += target.roofs * ROOF_BREAK_POINT_PER_ROOF
-        success_value += target.roofs * profile.aggression
-    elif asset_id == "datacenter":
-        target = state.player_by_id(str(payload["target_id"]))
-        if target.roofs > 0:
-            # A blocked run is not free: the roll still scores its points and still costs its
-            # scandal, and the token is burned off the defender. Zeroing the payout here would read
-            # the honest price of the attempt against none of its reward, and so refuse to touch a
-            # defended seat even when clearing the token is the whole plan.
-            success_value += _token_burn_value(target, profile)
-        else:
-            stolen = min(engine.hack_influence_steal(state), target.influence)
+    open_rivals = [rival for rival in rivals if rival.roofs == 0]
+    target = state.player_by_id(str(payload["target_id"])) if payload.get("target_id") else None
+    if asset_id == "influence_broker" and (target is None or target.role is None):
+        return -100.0
+
+    def face_value(effect: dict[str, Any]) -> float:
+        if asset_id == "smear":
+            hits = len(open_rivals)
+            # A scandal costs its owner an action and 3◆ to wash off, so value it near a whole action.
+            return hits * 2.0 * (1 + profile.aggression) + hits * effect["influence_per_hit"] * INFLUENCE_IN_MONEY
+        if asset_id == "crypto":
+            return float(sum(min(effect["money_each"], rival.money) for rival in open_rivals))
+        if asset_id == "roof_break":
+            roofs = sum(rival.roofs for rival in rivals) if effect["strip_roofs"] else 0
+            return roofs * (1 + profile.aggression) + roofs * effect["influence_per_roof"] * INFLUENCE_IN_MONEY
+        if target is None or target.roofs > 0:
+            return 0.0
+        if asset_id == "datacenter":
+            stolen = min(effect["influence"], target.influence)
             # Taken from a rival, so the aggression profile values the denial on top of the gain.
-            success_value += stolen * INFLUENCE_IN_MONEY * (1 + profile.aggression)
-    else:
-        target = state.player_by_id(str(payload["target_id"]))
-        if target.role is None:
-            return -100.0
-        # Stripping a role costs the target 3 points and the passive behind it; a face-up Крыша
-        # keeps the seat, but the token goes and the points are paid all the same.
-        if target.roofs > 0:
-            success_value += _token_burn_value(target, profile)
-        else:
-            denial = (3 + _role_utility(engine, state, target, target.role) * 0.3) * (1 + profile.aggression)
-            # The seat also reopens at the free price instead of the threefold takeover, and that is
-            # the attacker's own reason to pull the trigger. Counting only the denial made a leak
-            # pure altruism in a four-player game — the cost is yours and the benefit is split three
-            # ways — so the bot correctly never ran one across 24 measured games.
-            held = _role_utility(engine, state, player, player.role) if player.role else 0.0
-            wanted = _role_utility(engine, state, player, target.role)
-            if target.role == player.preferred_role:
-                wanted += 5 * profile.role_focus
-            seat = (state.role_price * 2) * INFLUENCE_IN_MONEY * 0.5 if wanted > held else 0.0
-            success_value += denial + seat
-    # One scandal for a hit, two for a miss — the same trade for every operation in the set, which
-    # is what makes the layer paced by the scandal limit rather than by the price of each line.
-    reduction = engine.grey_scandal_reduction(player)
-    expected_scandals = chance * max(0, GREY_SUCCESS_SCANDALS - reduction) + (1 - chance) * max(
-        0, GREY_FAILURE_SCANDALS - reduction
-    )
-    scandal_cost = expected_scandals * profile.risk_penalty
+            return stolen * INFLUENCE_IN_MONEY * (1 + profile.aggression)
+        gain = effect["influence"] * INFLUENCE_IN_MONEY
+        if not effect["strip_role"]:
+            return gain + effect["target_scandals"] * 2.0 * (1 + profile.aggression)
+        denial = (3 + _role_utility(engine, state, target, target.role) * 0.3) * (1 + profile.aggression)
+        # The seat also reopens at the free price instead of the threefold takeover, and that is the
+        # attacker's own reason to pull the trigger: counting only the denial made a leak pure
+        # altruism in a four-player game.
+        held = _role_utility(engine, state, player, player.role) if player.role else 0.0
+        wanted = _role_utility(engine, state, player, target.role)
+        if target.role == player.preferred_role:
+            wanted += 5 * profile.role_focus
+        seat = (state.role_price * 2) * INFLUENCE_IN_MONEY * 0.5 if wanted > held else 0.0
+        return gain + denial + seat
 
     def threshold_penalty(added: int) -> float:
         resulting = player.scandals + added
         limit = engine.scandal_limit(player)
         penalty = 0.0
         if resulting >= limit and player.role is not None:
-            # Three printed points plus the passive the bot already knows how to value.
             # Losing the role is not just the three printed points: the seat and its passive are
-            # gone until another action and a much higher takeover price can win them back.  A
-            # majority of the role utility is therefore a real immediate consequence, while the
-            # remaining discount keeps a decisive late-game attack available when it can win now.
+            # gone until another action and a much higher takeover price can win them back.
             penalty += 4.5 + _role_utility(engine, state, player, player.role) * 0.6
         if resulting >= limit + 1:
             # Jail ends the current turn immediately, so every action after this attempt burns.
             penalty += 2.0 + max(0, state.actions_left - 1) * 1.5
         return penalty
 
-    success_added = max(0, GREY_SUCCESS_SCANDALS - reduction)
-    failure_added = max(0, GREY_FAILURE_SCANDALS - reduction)
-    consequence_cost = chance * threshold_penalty(success_added) + (1 - chance) * threshold_penalty(failure_added)
-    return chance * success_value - scandal_cost - consequence_cost
+    total = 0.0
+    for row in table["rows"]:
+        value = face_value(row["effect"]) if row["tier"] != "fail" else 0.0
+        scandals = int(row["scandals"])
+        total += value - scandals * profile.risk_penalty - threshold_penalty(scandals)
+    return total / len(table["rows"])
 
 
 def _card_value(engine: CityEngine, card_id: str, player: PlayerState) -> float:

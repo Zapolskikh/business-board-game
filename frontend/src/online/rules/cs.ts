@@ -1,4 +1,4 @@
-import type { RoleGuide, RulesChapter, RulesContext, TableLabels } from "../rulesDocument";
+import type { GreyTableLabels, RoleGuide, RulesChapter, RulesContext, TableLabels } from "../rulesDocument";
 
 /* Kniha pravidel česky — stejné kapitoly a formulace jako ruská tištěná pravidla, jen bez snímků
  * obrazovky (rozhraní na nich je rusky). Čísla bere z ctx, ikonky u pojmů přidává rulesTerms.ts.
@@ -59,7 +59,7 @@ const roles: Record<string, RoleGuide> = {
       },
       {
         name: "Veto",
-        cost: "1 akce a 3◆",
+        cost: "1 akce",
         limit: "veto může být jen jedno",
         effect: "Vyberte projekt na desce: vzít ho můžete jen vy, ostatní hráči ho získat nemohou. Veto vidí všichni. Zmizí, když projekt odejde z desky nebo když ztratíte roli.",
       },
@@ -87,7 +87,7 @@ const roles: Record<string, RoleGuide> = {
     perks: [
       "<b>4 akce</b> za tah místo 3.",
       "Podniky v Tech klastru dávají +1$.",
-      "Vaše šedé kšefty mají o 30 % vyšší šanci na úspěch.",
+      "+1 ke každému hodu šedého kšeftu: jednička vám nepadne.",
     ],
     powers: [
       { name: "Zamést stopy", cost: "1 akce", limit: "lze opakovat", effect: "Smažte 1 svůj skandál." },
@@ -104,13 +104,14 @@ const roles: Record<string, RoleGuide> = {
     perks: [
       "Podniky v Šedé zóně dávají +1$.",
       "Ochrana vás stojí o 1$ méně a můžete mít 2 Ochrany místo jedné.",
+      "+1 k hodu šedého kšeftu za každý váš podnik v Šedé zóně, nejvýš +2 — hlavní síla role.",
     ],
     powers: [
       {
         name: "Výpalné",
         cost: "1 akce; potřebujete svůj podnik v Šedé zóně",
         limit: "jednou za tah",
-        effect: "Vyberte soupeře. Dá vám peníze: 2$, další 2$ za každý váš podnik v Šedé zóně a číslo kola děleno 3. Pokud je cíl lídr, přidejte ještě 5$. Cíl vám navíc dá 1◆ za každý váš podnik ve Vládní čtvrti. Cíl nemůže dát víc, než má. Pokud nemáte podnik ve Vládní čtvrti, dostanete 1 skandál.",
+        effect: "Vyberte soupeře. Dá vám peníze: 3$, další 2$ za každý váš podnik v Šedé zóně a číslo kola děleno 3. Pokud je cíl lídr, přidejte ještě 5$. Cíl vám navíc dá 1◆ za každý váš podnik ve Vládní čtvrti. Cíl nemůže dát víc, než má. Pokud nemáte podnik ve Vládní čtvrti, dostanete 1 skandál.",
       },
       {
         name: "Ututlat",
@@ -144,11 +145,36 @@ const roles: Record<string, RoleGuide> = {
       },
       {
         name: "Sebrat Ochranu",
-        cost: "1 akce a 3◆",
+        cost: "1 akce a 2◆",
         limit: "potřebujete volné místo na Ochranu",
         effect: "Vezměte soupeři 1 Ochranu.",
       },
     ],
+  },
+};
+
+const greyLabels: GreyTableLabels = {
+  operations: {
+    smear: { name: "Pomluvy", gate: "Šedá zóna · všichni soupeři bez Ochrany" },
+    crypto: { name: "Pump and dump", gate: "Tech klastr nebo Šedá zóna · všichni soupeři bez Ochrany" },
+    datacenter: { name: "Hack", gate: "Tech klastr nebo Šedá zóna · jeden cíl" },
+    influence_broker: { name: "Únik špíny", gate: "Vládní čtvrť i Šedá zóna (obě) · jeden cíl s rolí" },
+    roof_break: { name: "Prolomit Ochranu", gate: "Šedá zóna · všichni soupeři" },
+  },
+  face: "Hod",
+  effect: "Účinek",
+  scandals: "Vaše skandály",
+  clean: "čistě",
+  thirds: ["začátek hry", "střed", "konec"],
+  effectText: (id, effect, tier) => {
+    if (tier === "fail") return "—";
+    const v = (key: string) => Number(effect[key] ?? 0);
+    if (id === "smear") return v("influence_per_hit") ? `skandál každému, +${v("influence_per_hit")}◆ za každý` : "skandál každému";
+    if (id === "crypto") return `${v("money_each")}$ od každého`;
+    if (id === "datacenter") return `ukrást ${v("influence")}◆`;
+    if (id === "influence_broker") return effect.strip_role ? `odebrat roli, vy +${v("influence")}◆` : `cíl +${v("target_scandals")}⚠, vy +${v("influence")}◆`;
+    if (id === "roof_break") return v("influence_per_roof") ? `sundat všechnu Ochranu, +${v("influence_per_roof")}◆ za každou` : "sundat všem všechnu Ochranu";
+    return "";
   },
 };
 
@@ -196,7 +222,7 @@ export function bookCs(ctx: RulesContext): RulesChapter[] {
       <p>Uvolněné místo na trhu hned zaplní další podnik z balíčku.</p>
       <p>Prodat podnik můžete bez akce. Dostanete polovinu jeho ceny a místo se uvolní.</p>
       <h3>Moje město</h3>
-      <p>Na začátku máte 3 místa. Čtvrté místo stojí ${slot4}$, páté ${slot5}$, šesté ${slot6}$. Nejvýš 6 míst. Otevření místa stojí 1 akci.</p>
+      <p>Na začátku máte 3 místa. Čtvrté místo stojí ${slot4}$, páté ${slot5}$ a ${n.capacityInfluence[1]}◆, šesté ${slot6}$ a ${n.capacityInfluence[2]}◆. Nejvýš 6 míst. Otevření místa stojí 1 akci.</p>
       <h3>Příjem</h3>
       <p>Karta podniku na trhu ukazuje celkový příjem a bonusy, které při koupi dostanete, se všemi synergiemi a podmínkami, které teď plníte.</p>
       <p>Podrobnosti a ještě skryté bonusy uvidíte, když na kartu kliknete.</p>
@@ -297,18 +323,11 @@ export function bookCs(ctx: RulesContext): RulesChapter[] {
       title: "Šedé kšefty",
       html: `
       <p>Šedý kšeft otevírá čtvrť: stačí mít aspoň jeden podnik ve správné čtvrti. Kšeft stojí 1 akci a za tah můžete udělat jen jeden.</p>
-      <table>
-        <thead><tr><th>Kšeft</th><th>Potřebný podnik</th><th>Šance</th><th>Účinek při úspěchu</th><th>★</th></tr></thead>
-        <tbody>
-          <tr><td class="name"><b>Pomluvy</b></td><td>Šedá zóna</td><td class="num">${n.greyChance("smear", 60)} %</td><td>Každý soupeř dostane 1⚠</td><td class="num">+${n.greyPoints("smear", 2)}</td></tr>
-          <tr><td class="name"><b>Pump and dump</b></td><td>Tech klastr nebo Šedá zóna</td><td class="num">${n.greyChance("crypto", 45)} %</td><td>Vezměte každému soupeři až (${n.pumpBase} + číslo kola ÷ 2)$</td><td class="num">+${n.greyPoints("crypto", 2)}</td></tr>
-          <tr><td class="name"><b>Prolomit Ochranu</b></td><td>Šedá zóna</td><td class="num">${n.greyChance("roof_break", 60)} %</td><td>Sundejte cíli všechnu Ochranu a za každou sundanou dostanete ${n.roofBreakPoint}★</td><td class="num">+${n.greyPoints("roof_break", 2)}</td></tr>
-          <tr><td class="name"><b>Hack</b></td><td>Tech klastr nebo Šedá zóna</td><td class="num">${n.greyChance("datacenter", 40)} %</td><td>Vezměte cíli až (${n.hackBase} + číslo kola ÷ 3)◆</td><td class="num">+${n.greyPoints("datacenter", 3)}</td></tr>
-          <tr><td class="name"><b>Únik špíny</b></td><td>Vládní čtvrť i Šedá zóna (obě)</td><td class="num">${n.greyChance("influence_broker", 60)} %</td><td>Cíl přijde o roli</td><td class="num">+${n.greyPoints("influence_broker", 3)}</td></tr>
-        </tbody>
-      </table>
-      <p><b>Úspěch:</b> účinek nastane, dostanete body z tabulky a ${n.greySuccess} skandál. <b>Neúspěch:</b> účinek nenastane a dostanete ${n.greyFailure} skandály. Akce se utratí v každém případě. Dělení ve vzorcích se zaokrouhluje dolů.</p>
-      <p>Ochrana cíle účinek zastaví, ale body za úspěch i svůj skandál dostanete stejně. Pomluvy a Pump and dump zasáhnou všechny soupeře najednou, takže Ochrana každého funguje zvlášť. Prolomení Ochrany Ochrana nezastaví: úder míří právě na ni.</p>
+      <p><b>Hoďte kostkou.</b> Stěny 1–2 jsou neúspěch, nic se nestane. Stěny 3–4 dají slabý účinek, 5–6 plný. Kolik skandálů dostanete vy, závisí také na stěně: na jedničce 2, na 2–5 jeden, na šestce žádný. Šedé kšefty nedávají body — vše, co přinesou, je napsáno v účinku.</p>
+      <p><b>Modifikátory</b> se přičítají k hodu, cokoli nad 6 se počítá jako šestka: Podvodník +${n.fraudsterRoll}, Mafie +1 za každý vlastní podnik v Šedé zóně (nejvýš +${n.mafiaRollMax}), karta «Podplatit ochranku» +2 k jednomu hodu. Dohromady nikdy víc než +${n.rollCap}. Ve hře okno šedých kšeftů ukazuje tabulku už přepočtenou pro vás.</p>
+      <p><b>Ochrana</b> cíle zablokuje jakýkoli šedý kšeft celý a nespotřebuje se. Ochranu sundá jen «Prolomit Ochranu» — tím se stůl otevře před úderem. Kšefty proti všem zasáhnou jen soupeře bez Ochrany.</p>
+      ${ctx.html.greyTables(greyLabels)}
+      <p>Pump and dump a Hack rostou ke konci hry: každá třetina má svá čísla. Nikdy nevezmete víc, než cíl má.</p>
       `,
     },
     {
@@ -333,7 +352,8 @@ export function bookCs(ctx: RulesContext): RulesChapter[] {
       icon: "🛡",
       title: "Ochrana",
       html: `
-      <p>Ochrana vás zachrání před jedním úderem soupeře: útočnou kartou, schopností role nebo šedým kšeftem. Když na vás někdo zaútočí, Ochrana zafunguje sama: přijdete o 1 Ochranu a celý úder se zruší, i se všemi skandály, které by vám přinesl.</p>
+      <p>Ochrana vás zachrání před jedním úderem soupeře: útočnou kartou nebo schopností role. Když na vás někdo zaútočí, Ochrana zafunguje sama: přijdete o 1 Ochranu a celý úder se zruší, i se všemi skandály, které by vám přinesl.</p>
+      <p><b>Šedý kšeft Ochrana zablokuje celý a nespotřebuje se.</b> Ochranu sundá jen kšeft «Prolomit Ochranu», karty «Obejít ochranku» a «Přetáhnout ochranku», Výpalné Mafie nebo schopnost Siláka «Sebrat Ochranu».</p>
       <p><b>Dokud máte Ochranu, nikdo vám nemůže vzít roli.</b> Ochrana se přitom nespotřebuje.</p>
       <p>Útočník nedostane zpět, co za úder utratil, pokud popis úderu neříká jinak.</p>
       <p>Před vašimi vlastními činy Ochrana nechrání. Skandál za vlastní šedý kšeft nebo kryptopodvod dostanete vždycky.</p>
@@ -347,7 +367,7 @@ export function bookCs(ctx: RulesContext): RulesChapter[] {
       title: "Karty akcí",
       html: `
       <p>Jednou za tah můžete utratit 1 akci, ${n.cardCost}$ a 1◆ a vzít z balíčku <b>2 náhodné karty</b>. V ruce můžete mít nejvýš 3 karty. Pokud už máte 2 karty, doberete jen do 3.</p>
-      <p>Hrát a odhazovat karty můžete kolikrát chcete a bez akce. Za každou odhozenou kartu dostanete ${n.discard}$ nebo ${n.discard}◆ podle výběru.</p>
+      <p>Hrát a odhazovat karty můžete kolikrát chcete a bez akce. Za každou odhozenou kartu dostanete ${n.discardMoney}$ nebo ${n.discardInfluence}◆ podle výběru.</p>
       <p>Každá karta je v balíčku dvakrát. „Číslo kola“ znamená číslo aktuálního kola: v 5. kole přičtěte 5.</p>
       <p>Útoky se hrají na soupeře. Na sebe můžete zahrát ${selfCards}.</p>
       ${ctx.html.cardTable(labels)}
@@ -381,13 +401,13 @@ export function bookCs(ctx: RulesContext): RulesChapter[] {
         <tbody>
           <tr><td class="name">Koupit podnik</td><td>1⚡ + cena</td><td>Potřebujete volné místo</td></tr>
           <tr><td class="name">Prodat podnik</td><td>Bez akce</td><td>Dostanete polovinu ceny</td></tr>
-          <tr><td class="name">Koupit místo</td><td>1⚡ + ${n.capacityCosts.join(" / ")}$</td><td>Nejvýš 6 míst</td></tr>
+          <tr><td class="name">Koupit místo</td><td>1⚡ + ${slot4}$ / ${slot5}$ + ${n.capacityInfluence[1]}◆ / ${slot6}$ + ${n.capacityInfluence[2]}◆</td><td>Nejvýš 6 míst</td></tr>
           <tr><td class="name">Vzít projekt</td><td>1⚡ + cena projektu</td><td>Podmínka splněna</td></tr>
           <tr><td class="name">Znovu rozdat desku projektů</td><td>1⚡ + ${n.reroll}$</td><td>Jednou za tah</td></tr>
           <tr><td class="name">Vzít volnou roli</td><td>1⚡ + ${rolePrice}◆</td><td>Méně než 5⚠</td></tr>
           <tr><td class="name">Vzít roli jinému hráči</td><td>1⚡ + ${rolePrice * 3}◆</td><td>Méně než 5⚠, držitel nemá Ochranu🛡</td></tr>
           <tr><td class="name">Vzít 2 karty akcí</td><td>1⚡ + ${n.cardCost}$ + 1◆</td><td>Jednou za tah, v ruce nejvýš 3 karty</td></tr>
-          <tr><td class="name">Zahrát nebo odhodit kartu</td><td>Bez akce</td><td>Odhození: ${n.discard}$ nebo ${n.discard}◆</td></tr>
+          <tr><td class="name">Zahrát nebo odhodit kartu</td><td>Bez akce</td><td>Odhození: ${n.discardMoney}$ nebo ${n.discardInfluence}◆</td></tr>
           <tr><td class="name">Šedý kšeft</td><td>1⚡</td><td>Jeden za tah</td></tr>
           <tr><td class="name">Koupit Ochranu</td><td>1⚡ + 3$ + (kolo − 1) ÷ 2</td><td>Do limitu Ochrany🛡</td></tr>
           <tr><td class="name">Krizové PR</td><td>1⚡ + ${n.crisisPr}◆</td><td>Smaže 1⚠</td></tr>
@@ -429,9 +449,10 @@ export function bookCs(ctx: RulesContext): RulesChapter[] {
         <li><b>Stavte čtvrti.</b> 2 podniky ve čtvrti zapnou synergii, 4 ji zdvojnásobí.</li>
         <li><b>Vyberte roli podle své strategie</b>, ne tu, která vypadá nejsilněji.</li>
         <li><b>Hlídejte si skandály.</b> Nechoďte k limitu bez důvodu: Bezpečák udeří tím silněji, čím víc jich máte.</li>
-        <li><b>Nejdřív sundejte Ochranu.</b> Ochrana zastaví jakýkoli úder, takže levný útok může soupeře „svléknout“ před tím vážným.</li>
+        <li><b>Nejdřív sundejte Ochranu.</b> Šedé kšefty se o Ochranu zastaví, takže ji před úderem sundejte: «Prolomit Ochranu», kartou, Výpalným nebo Silákem.</li>
         <li><b>Novináři se hodí vlastní skandály.</b> ${selfCards} může zahrát na sebe.</li>
         <li><b>Kdo prohrává, táhne první</b> a první vybírá na trhu i mezi projekty.</li>
+        <li><b>Podpora poslednímu:</b> na začátku každého kola dostane hráč s nejnižším skóre +${n.underdog}◆ (při shodě všichni s nejnižším skóre; když mají všichni stejně, nikdo).</li>
         <li><b>V posledním kole utraťte všechno</b> za projekty, podniky a body: příjem už nepřijde.</li>
       </ol>
       `,

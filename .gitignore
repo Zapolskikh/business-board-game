@@ -63,3 +63,6 @@ frontend/.vite/
 .idea/
 .DS_Store
 Thumbs.db
+TOURNAMENT_*.md
+TOURNAMENT_*.json
+TOURNAMENT_*.log

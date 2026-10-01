@@ -180,35 +180,40 @@ def test_expert_values_the_quantum_centres_future_actions() -> None:
 
 
 def test_expert_prices_role_loss_and_jail_into_a_grey_attempt() -> None:
+    """One scandal short of the limit, five faces of six cost the seat and a one jails: with nothing
+    to take from the target, ending the turn beats the roll."""
     engine = CityEngine()
     state = bot_game()
     player = state.current_player
-    player.difficulty = "expert"
-    player.role = "fraudster"
+    player.role = "capitalist"
     player.scandals = 4
     player.assets.append(OwnedAsset(uid="owned:cash", card_id="cash"))
+    target = next(other for other in state.players if other.id != player.id)
+    target.roofs, target.influence = 0, 0
 
-    utility = _grey_operation_utility(engine, state, player, {"asset_id": "smear"}, PROFILES["expert"])
+    utility = _grey_operation_utility(
+        engine, state, player, {"asset_id": "datacenter", "target_id": target.id}, PROFILES["expert"]
+    )
 
-    assert utility < -0.5  # ending the turn is better than certain role loss and possible jail
+    assert utility < -0.5
 
 
-def test_a_blocked_grey_run_is_no_longer_valued_at_nothing() -> None:
-    """Since 1.9.0 a blocked run still scores its points and still burns the defender's token, so
-    pricing it at zero made the bot refuse to touch a defended seat even to clear the token."""
+def test_a_defended_target_makes_a_grey_run_worthless() -> None:
+    """A Защита answers a grey operation in full and stays: the run pays only its scandals."""
     engine = CityEngine()
     state = bot_game()
     player = state.current_player
-    player.difficulty = "expert"
     player.assets.append(OwnedAsset(uid="owned:cash", card_id="cash"))
     target = next(other for other in state.players if other.id != player.id)
-    target.role = "capitalist"
+    target.influence = 8
+    payload = {"asset_id": "datacenter", "target_id": target.id}
+
+    target.roofs = 0
+    open_value = _grey_operation_utility(engine, state, player, payload, PROFILES["expert"])
     target.roofs = 1
+    defended = _grey_operation_utility(engine, state, player, payload, PROFILES["expert"])
 
-    payload = {"asset_id": "influence_broker", "target_id": target.id}
-    utility = _grey_operation_utility(engine, state, player, payload, PROFILES["expert"])
-
-    assert utility > 0
+    assert defended < 0 < open_value
 
 
 def test_a_threatened_seat_makes_the_token_worth_buying() -> None:

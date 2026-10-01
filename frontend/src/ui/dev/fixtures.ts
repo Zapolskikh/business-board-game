@@ -4,6 +4,8 @@ import type {
   CityMeta,
   DistrictMeta,
   GameState,
+  GreyTable,
+  GreyTier,
   LegalAction,
   MarketAsset,
   PlayerState,
@@ -77,17 +79,19 @@ const scoring: ScoringMeta = {
   patronage_money: 20,
   patronage_points: 5,
   crisis_pr_influence: 3,
-  action_card_cost: 6,
-  card_discard_value: 2,
+  action_card_cost: 4,
+  card_discard_money: 2,
+  card_discard_influence: 1,
   campaign_tiers: [{ spend: 5, gain: 3 }],
-  grey_operation_points: { smear: 2, crypto: 2, roof_break: 2, datacenter: 3, influence_broker: 3 },
-  grey_operation_chance: { smear: 0.6, crypto: 0.45, roof_break: 0.6, datacenter: 0.4, influence_broker: 0.6 },
-  grey_success_scandals: 1,
-  grey_failure_scandals: 2,
-  hack_influence_base: 2,
-  pump_drain_base: 2,
-  roof_break_point_per_roof: 1,
-  capacity_costs: { "3": 6, "4": 10, "5": 15 },
+  grey_die_sides: 6,
+  grey_roll_cap: 3,
+  fraudster_grey_roll: 1,
+  mafia_grey_roll_per_object: 1,
+  mafia_grey_roll_max: 2,
+  underdog_influence: 1,
+  capacity_costs: { "3": 7, "4": 12, "5": 18 },
+  capacity_influence: { "3": 0, "4": 1, "5": 3 },
+  grey_faces: fixtureGreyFaces(),
   max_capacity: 6,
 };
 
@@ -182,6 +186,53 @@ const baseMarket: MarketAsset[] = [
   { uid: "m-6", card_id: "pawnshops", price: 9 },
 ];
 
+// Таблицы граней для книги правил — как их отдаёт /meta (scoring.grey_faces).
+function fixtureGreyFaces(): NonNullable<ScoringMeta["grey_faces"]> {
+  const byThird = (rows: number[][], key: string) => rows.map(row => row.map(value => ({ [key]: value })));
+  const flat = (make: (face: number) => Record<string, number | boolean>) => [0, 1, 2].map(() => [1, 2, 3, 4, 5, 6].map(make));
+  return {
+    smear: { scandals: [2, 1, 1, 1, 1, 0], effects: flat(face => ({ scandal_each: face >= 3 ? 1 : 0, influence_per_hit: [0, 0, 1, 1, 2, 2][face - 1] })) },
+    crypto: { scandals: [2, 1, 1, 1, 1, 0], effects: byThird([[0, 0, 1, 1, 2, 3], [0, 0, 2, 2, 4, 6], [0, 0, 4, 4, 6, 8]], "money_each") },
+    datacenter: { scandals: [2, 1, 1, 1, 1, 0], effects: byThird([[0, 0, 1, 1, 2, 3], [0, 0, 2, 2, 3, 5], [0, 0, 3, 3, 5, 7]], "influence") },
+    influence_broker: {
+      scandals: [2, 1, 1, 1, 1, 0],
+      effects: flat(face => ({ target_scandals: [0, 0, 2, 2, 0, 0][face - 1], strip_role: face >= 5, influence: [0, 0, 1, 1, 2, 3][face - 1] })),
+    },
+    roof_break: { scandals: [2, 1, 1, 0, 0, 0], effects: flat(face => ({ strip_roofs: face >= 3, influence_per_roof: [0, 0, 0, 0, 1, 2][face - 1] })) },
+  };
+}
+
+// Таблицы граней серых операций такими, какими их прислал бы движок в середине партии игроку с +1
+// (аферист): грань 1 читается как 2, шестёрка — дважды.
+function fixtureGreyTables(): GreyTable[] {
+  const scandals = [2, 1, 1, 1, 1, 0];
+  const tier = (face: number): GreyTier => (face <= 2 ? "fail" : face <= 4 ? "weak" : "full");
+  const effects: Record<string, (face: number) => Record<string, number | boolean>> = {
+    smear: face => ({ scandal_each: face >= 3 ? 1 : 0, influence_per_hit: [0, 0, 1, 1, 2, 2][face - 1] }),
+    crypto: face => ({ money_each: [0, 0, 2, 2, 4, 6][face - 1] }),
+    datacenter: face => ({ influence: [0, 0, 2, 2, 3, 5][face - 1] }),
+    influence_broker: face => ({
+      target_scandals: [0, 0, 2, 2, 0, 0][face - 1],
+      strip_role: face >= 5,
+      influence: [0, 0, 1, 1, 2, 3][face - 1],
+    }),
+    roof_break: face => ({ strip_roofs: face >= 3, influence_per_roof: [0, 0, 0, 0, 1, 2][face - 1] }),
+  };
+  return Object.entries(effects).map(([asset_id, effect]) => ({
+    asset_id,
+    unlocked: asset_id !== "influence_broker",
+    targeted: asset_id === "datacenter" || asset_id === "influence_broker",
+    modifier: 1,
+    sources: [{ source: "fraudster", value: 1 }],
+    third: 1,
+    rows: [1, 2, 3, 4, 5, 6].map(roll => {
+      const face = Math.min(6, roll + 1);
+      const rowScandals = (asset_id === "roof_break" ? [2, 1, 1, 0, 0, 0] : scandals)[face - 1];
+      return { roll, face, tier: tier(face), scandals: rowScandals, effect: effect(face) };
+    }),
+  }));
+}
+
 export function makeGame(overrides: Partial<GameState> = {}): GameState {
   const players = overrides.players ?? basePlayers.map(item => ({ ...item }));
   return {
@@ -214,6 +265,7 @@ export function makeGame(overrides: Partial<GameState> = {}): GameState {
       { seq: 62, type: "grey_operation", actor_id: "p-bot2", data: { asset_id: "crypto", success: true } },
       { seq: 63, type: "asset_bought", actor_id: ME, data: { card_id: "insurance", price: 7 } },
     ],
+    grey_tables: fixtureGreyTables(),
     market_deck_count: 63,
     action_deck_count: 41,
     project_deck_count: 36,
@@ -264,9 +316,9 @@ function richLegal(game: GameState): LegalAction[] {
       act("use_role_power", { power: "journalist_publish", target_id: rival.id }),
     ]),
     act("grey_operation", { asset_id: "smear" }),
-    ...rivals
-      .filter(rival => rival.roofs > 0)
-      .map(rival => act("grey_operation", { asset_id: "roof_break", target_id: rival.id })),
+    act("grey_operation", { asset_id: "crypto" }),
+    ...(rivals.some(rival => rival.roofs > 0) ? [act("grey_operation", { asset_id: "roof_break" })] : []),
+    ...rivals.map(rival => act("grey_operation", { asset_id: "datacenter", target_id: rival.id })),
     act("claim_role", { role_id: "capitalist" }),
     act("claim_role", { role_id: "mafia" }),
   ];

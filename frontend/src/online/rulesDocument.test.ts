@@ -54,6 +54,14 @@ describe("buildRulesBook", () => {
     const scandals = book.find(chapter => chapter.id === "scandals")!;
     expect(scandals.html).toContain("«Чистка»");
   });
+
+  it("описывает серые операции кубиком: таблица граней на каждую операцию, без шансов и очков", () => {
+    const grey = book.find(chapter => chapter.id === "grey")!;
+    expect(grey.html.match(/class="grey-dice"/g)?.length).toBe(5);
+    expect(grey.html).toContain("⚅");
+    expect(grey.html).not.toMatch(/\d+%/);
+    expect(grey.html).toContain("Пробить защиту");
+  });
 });
 
 describe("книга на всех языках", () => {

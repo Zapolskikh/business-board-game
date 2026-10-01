@@ -11,28 +11,39 @@ from typing import Any
 
 from city_engine.constants import (
     ACTION_CARD_COST,
+    ACTION_DECK_COPIES,
     CAMPAIGN_TIERS,
     CAPACITY_COSTS,
-    CARD_DISCARD_VALUE,
+    CAPACITY_INFLUENCE,
+    CARD_DISCARD_INFLUENCE,
+    CARD_DISCARD_MONEY,
     CONTENT_VERSION,
     CRISIS_PR_INFLUENCE,
     DISTRICT_IDS,
-    GREY_FAILURE_SCANDALS,
-    GREY_OPERATION_CHANCE,
-    GREY_OPERATION_POINTS,
-    GREY_SUCCESS_SCANDALS,
-    HACK_INFLUENCE_BASE,
+    FRAUDSTER_GREY_ROLL,
+    GREY_DIE_SIDES,
+    GREY_ROLL_CAP,
+    GREY_SCANDALS,
+    GREY_SCANDALS_BY_OPERATION,
+    HACK_INFLUENCE,
+    LEAK_INFLUENCE,
+    LEAK_STRIPS_ROLE,
+    LEAK_TARGET_SCANDALS,
     LOBBYING_INFLUENCE,
     LOBBYING_POINTS,
+    MAFIA_GREY_ROLL_MAX,
+    MAFIA_GREY_ROLL_PER_OBJECT,
     MARKET_ROTATION_SIZE,
     MAX_CAPACITY,
     PATRONAGE_MONEY,
     PATRONAGE_POINTS,
     PROJECT_BOARD_SIZE,
     PROJECT_REROLL_MONEY,
-    PUMP_DRAIN_BASE,
+    PUMP_MONEY_EACH,
     ROLE_IDS,
-    ROOF_BREAK_POINT_PER_ROOF,
+    ROOF_BREAK_INFLUENCE_PER_ROOF,
+    SMEAR_INFLUENCE_PER_HIT,
+    UNDERDOG_INFLUENCE,
 )
 from city_engine.errors import StateValidationError
 
@@ -113,6 +124,9 @@ class ActionCardDefinition:
     # learn, while a flag is a line the card prints. The journalist wants their own scandals — the
     # rating pays for them — and nothing else in the game let them buy one on purpose.
     self_target: bool = False
+    # How many copies the deck holds. Printed on the card rather than fixed for the whole deck: the
+    # cards that are only ever used to take a Защита off a rival come in threes, the rest in pairs.
+    copies: int = ACTION_DECK_COPIES
 
 
 @dataclass(frozen=True, slots=True)
@@ -215,29 +229,72 @@ class ContentCatalog:
             "patronage_points": PATRONAGE_POINTS,
             "crisis_pr_influence": CRISIS_PR_INFLUENCE,
             "action_card_cost": ACTION_CARD_COST,
-            # What a discarded card pays back. The client had "+1" written into a label while the
-            # engine paid 2, so the cheapest influence line in the game was mislabelled on screen.
-            "card_discard_value": CARD_DISCARD_VALUE,
+            # What a discarded card pays back, one figure per currency. The client had "+1" written
+            # into a label while the engine paid 2, so the line was mislabelled on screen.
+            "card_discard_money": CARD_DISCARD_MONEY,
+            "card_discard_influence": CARD_DISCARD_INFLUENCE,
             # Campaign tiers travel as pairs so the client renders one button per tier without
             # knowing the rates; a dict would arrive with string keys through JSON.
             "campaign_tiers": [{"spend": spend, "gain": gain} for spend, gain in sorted(CAMPAIGN_TIERS.items())],
-            # The grey layer travels as whole tables now: one score and one chance per operation,
-            # so the panel never has to know which operations are the "hard" ones.
-            "grey_operation_points": GREY_OPERATION_POINTS,
-            "grey_operation_chance": GREY_OPERATION_CHANCE,
-            "grey_success_scandals": GREY_SUCCESS_SCANDALS,
-            "grey_failure_scandals": GREY_FAILURE_SCANDALS,
-            # Both of these grow with the round, so the client is given the base and the formula.
-            "hack_influence_base": HACK_INFLUENCE_BASE,
-            "pump_drain_base": PUMP_DRAIN_BASE,
-            "roof_break_point_per_roof": ROOF_BREAK_POINT_PER_ROOF,
+            # The grey die. The face-by-face table of every operation is computed for the viewer and
+            # ships with the game view (``grey_tables``); these are the constants the rules quote.
+            "grey_die_sides": GREY_DIE_SIDES,
+            "grey_roll_cap": GREY_ROLL_CAP,
+            "fraudster_grey_roll": FRAUDSTER_GREY_ROLL,
+            "mafia_grey_roll_per_object": MAFIA_GREY_ROLL_PER_OBJECT,
+            "mafia_grey_roll_max": MAFIA_GREY_ROLL_MAX,
+            "underdog_influence": UNDERDOG_INFLUENCE,
+            # Face by face, per third of the game: what the rules book prints. The panel gets the
+            # same rows already recomputed for the viewer, in the game view.
+            "grey_faces": grey_faces_meta(),
             # What the next city slot costs, keyed by the capacity the player has now. The React
             # client kept its own copy of this table and printed the wrong price the moment the
             # ladder changed; the engine owns the ladder, so the engine ships it.
             "capacity_costs": {str(capacity): cost for capacity, cost in sorted(CAPACITY_COSTS.items())},
+            "capacity_influence": {str(capacity): cost for capacity, cost in sorted(CAPACITY_INFLUENCE.items())},
             "max_capacity": MAX_CAPACITY,
         }
         return raw
+
+
+GREY_OPERATION_IDS = ("smear", "crypto", "roof_break", "datacenter", "influence_broker")
+
+
+def grey_face_effect(asset_id: str, face: int, third: int) -> dict[str, Any]:
+    """The printed effect of one face of a grey operation, for one third of the game.
+
+    Pure, so the engine resolves with it, the panel draws it and the rules book prints it from the
+    same table.
+    """
+    index = face - 1
+    if asset_id == "smear":
+        return {"scandal_each": int(face >= 3), "influence_per_hit": SMEAR_INFLUENCE_PER_HIT[index]}
+    if asset_id == "crypto":
+        return {"money_each": PUMP_MONEY_EACH[third][index]}
+    if asset_id == "datacenter":
+        return {"influence": HACK_INFLUENCE[third][index]}
+    if asset_id == "influence_broker":
+        return {
+            "target_scandals": LEAK_TARGET_SCANDALS[index],
+            "strip_role": LEAK_STRIPS_ROLE[index],
+            "influence": LEAK_INFLUENCE[index],
+        }
+    if asset_id == "roof_break":
+        return {"strip_roofs": face >= 3, "influence_per_roof": ROOF_BREAK_INFLUENCE_PER_ROOF[index]}
+    raise StateValidationError(f"unknown grey operation: {asset_id}")
+
+
+def grey_faces_meta() -> dict[str, Any]:
+    """Every operation's die for the rules book: scandals per face and effects per third."""
+    return {
+        asset_id: {
+            "scandals": list(GREY_SCANDALS_BY_OPERATION.get(asset_id, GREY_SCANDALS)),
+            "effects": [
+                [grey_face_effect(asset_id, face, third) for face in range(1, GREY_DIE_SIDES + 1)] for third in range(3)
+            ],
+        }
+        for asset_id in GREY_OPERATION_IDS
+    }
 
 
 def _unique_by_id(items: list[dict[str, Any]], label: str) -> dict[str, dict[str, Any]]:
@@ -302,6 +359,7 @@ def load_catalog(path: Path = CATALOG_PATH) -> ContentCatalog:
                 value=int(row["value"]),
                 targeted=bool(row.get("targeted", False)),
                 self_target=bool(row.get("self_target", False)),
+                copies=int(row.get("copies", ACTION_DECK_COPIES)),
             )
             for key, row in action_rows.items()
         },

@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 
 from city_engine.constants import (
-    GREY_OPERATION_CHANCE,
-    GREY_OPERATION_POINTS,
+    GREY_DIE_SIDES,
+    GREY_ROLL_CAP,
     LOBBYING_INFLUENCE,
     LOBBYING_POINTS,
     PATRONAGE_MONEY,
@@ -95,7 +95,7 @@ def test_backend_catalog_is_complete_and_can_create_a_game() -> None:
     assert len(catalog.districts) == 6
     assert len(catalog.roles) == 6
     assert len(catalog.assets) == 71
-    assert len(catalog.action_cards) == 32
+    assert len(catalog.action_cards) == 35
     # Every project is unique and every one is in the deck: nothing repeatable lives outside it,
     # and no card drives district development.
     assert len(catalog.projects) == 40
@@ -115,8 +115,8 @@ def test_public_meta_ships_the_scoring_rates() -> None:
     """Clients print "N$ = 1 очко" from here; hardcoding it on either side would drift."""
     scoring = load_catalog().public_meta()["scoring"]
 
-    assert scoring["grey_operation_points"] == GREY_OPERATION_POINTS
-    assert scoring["grey_operation_chance"] == GREY_OPERATION_CHANCE
+    assert scoring["grey_die_sides"] == GREY_DIE_SIDES
+    assert scoring["grey_roll_cap"] == GREY_ROLL_CAP
     assert scoring["patronage_money"] == PATRONAGE_MONEY
     assert scoring["patronage_points"] == PATRONAGE_POINTS
     assert scoring["lobbying_influence"] == LOBBYING_INFLUENCE
@@ -138,16 +138,16 @@ def test_public_meta_ships_the_points_every_object_scores() -> None:
 
 
 def test_special_perk_projects_trade_points_for_the_perk() -> None:
-    """A project whose reward is a special perk scores below the other projects of its difficulty:
-    the perk is the payout. Priced by the same difficulty model, so they are cheap to take."""
+    """The small perk projects were lifted in the 2026-10 patch: at 3–4 points they paid less than
+    the same resources through patronage and lobbying, and were taken in 7–15% of their chances."""
     engine = CityEngine()
     expected = {
-        "city_park": 3,
-        "night_quarter": 3,
-        "security_hub": 3,
-        "defence_order": 4,
-        "city_clinics": 4,
-        "shadow_market": 4,
+        "city_park": 5,
+        "night_quarter": 5,
+        "security_hub": 5,
+        "defence_order": 6,
+        "city_clinics": 6,
+        "shadow_market": 6,
     }
 
     assert {project_id: engine.project(project_id).points for project_id in expected} == expected

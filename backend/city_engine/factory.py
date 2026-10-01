@@ -48,6 +48,7 @@ def create_game(
     project_ids: list[str],
     settings: GameSettings | None = None,
     asset_unlock_rounds: dict[str, int] | None = None,
+    action_card_copies: dict[str, int] | None = None,
 ) -> GameState:
     settings = settings or GameSettings()
     if not game_id.strip():
@@ -78,7 +79,16 @@ def create_game(
     asset_deck = list(asset_ids)
     # Several copies of each card, shuffled together: the deck has to outlast fifteen rounds of a
     # four-player table, and one copy of each ran dry around round 9. See ACTION_DECK_COPIES.
-    action_deck = list(action_card_ids) * ACTION_DECK_COPIES
+    # Built copy layer by copy layer, so a catalog where every card has the default count deals the
+    # same deck as the old ``ids * copies`` did — the same seed, the same draws.
+    copies = action_card_copies or {}
+    layers = max([ACTION_DECK_COPIES, *copies.values()])
+    action_deck = [
+        card_id
+        for layer in range(layers)
+        for card_id in action_card_ids
+        if copies.get(card_id, ACTION_DECK_COPIES) > layer
+    ]
     project_deck = list(project_ids)
     rng.shuffle(asset_deck)
     rng.shuffle(action_deck)
@@ -149,6 +159,7 @@ def create_game_from_catalog(
         seed=seed,
         asset_ids=list(catalog.assets),
         action_card_ids=list(catalog.action_cards),
+        action_card_copies={card.id: card.copies for card in catalog.action_cards.values()},
         project_ids=catalog.deck_project_ids(),
         settings=settings,
         asset_unlock_rounds={asset.id: catalog.rarity_min_round[asset.rarity] for asset in catalog.assets.values()},

@@ -35,8 +35,7 @@ from city_bots.ledger import (
     _Root,
     _utility,
     choose_ledger_command,
-    forced_grey_outcomes,
-    grey_chance,
+    grey_outcomes,
 )
 from city_engine.commands import Command
 from city_engine.engine import CityEngine
@@ -87,6 +86,10 @@ class _Candidate:
 
 
 _PLANS: dict[tuple[str, str], _Plan] = {}
+# Set to a list by the balance tournament to receive every plan Oracle compared: the value of each
+# option it weighed is the closest thing the project has to an expert's opinion of that option.
+# ``None`` everywhere else, so the lobby bot records nothing.
+TELEMETRY: list[dict[str, Any]] | None = None
 
 
 def choose_oracle_command(
@@ -156,6 +159,17 @@ def _replan(
         for item in scored[:5]
     ]
     value = best.rollout if best.rollout is not None else best.value
+    if TELEMETRY is not None:
+        TELEMETRY.append(
+            {
+                "player_id": player_id,
+                "round": state.round_number,
+                "revision": state.revision,
+                "plan": [dict(action) for action in best.actions],
+                "rolled": [(dict(item.actions[0]), item.rollout) for item in scored if item.rollout is not None],
+                "static": [(dict(item.actions[0]), item.value) for item in candidates],
+            }
+        )
     return best.actions[0], value, alternatives, best.actions[1:]
 
 
@@ -222,13 +236,11 @@ def _chance_candidate(
     actions: list[dict[str, Any]],
     player_id: str,
 ) -> _Candidate:
-    chance = grey_chance(engine, before.current_player, action["payload"]["asset_id"])
-    values = []
-    for after in forced_grey_outcomes(engine, before, action):
+    value = 0.0
+    for weight, after in grey_outcomes(engine, before, action):
         mine = after.status == "playing" and after.current_player.id == player_id
         unspent = after.actions_left * UNSPENT_ACTION * _late_factor(after) if mine else 0.0
-        values.append(_value(engine, after, player_id) + unspent)
-    value = chance * values[0] + (1 - chance) * values[1]
+        value += weight * (_value(engine, after, player_id) + unspent)
     return _Candidate(actions, value, before=before, chance=action)
 
 
@@ -240,10 +252,9 @@ def _rollout_value(engine: CityEngine, candidate: _Candidate, player_id: str, lu
         assert candidate.end is not None
         return _play_forward(engine, candidate.end, player_id, luck, last_round)
     assert candidate.before is not None
-    chance = grey_chance(engine, candidate.before.current_player, candidate.chance["payload"]["asset_id"])
-    hit, miss = forced_grey_outcomes(engine, candidate.before, candidate.chance)
-    return chance * _play_forward(engine, hit, player_id, luck, last_round) + (1 - chance) * _play_forward(
-        engine, miss, player_id, luck, last_round
+    return sum(
+        weight * _play_forward(engine, after, player_id, luck, last_round)
+        for weight, after in grey_outcomes(engine, candidate.before, candidate.chance)
     )
 
 

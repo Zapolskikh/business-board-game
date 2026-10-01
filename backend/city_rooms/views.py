@@ -121,6 +121,9 @@ def room_view(
         # own list of powers per role — a copy of a rule in another language is a copy that drifts,
         # and it can only print "сейчас недоступна" with no reason attached.
         game["role_powers"] = engine.role_power_status(room.game, viewer_for_role)
+        # The grey die of every operation, face by face, for this viewer: their role, their cards
+        # and the third of the game are already in the numbers, so the panel draws them as they are.
+        game["grey_tables"] = engine.grey_tables(room.game, viewer_for_role)
         # What each targeted power would actually take off each rival. The formulas grow with the
         # round, the districts and the target's own standing, so a client that wants to show the
         # number before the click would have to reimplement all of them; without this, a racket can

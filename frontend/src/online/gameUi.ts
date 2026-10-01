@@ -106,44 +106,43 @@ export const greyOperationDistricts: Record<string, string[]> = {
 // the rest in any one of them.
 export const greyOperationNeedsAll = new Set(["influence_broker"]);
 
-// Mirrors `CityEngine.grey_operation_points`. Every operation carries its own score now, so this
-// reads a table instead of asking which ones are the "hard" ones.
-export function greyOperationPoints(meta: CityMeta, operationId: string): number {
-  return meta.scoring?.grey_operation_points?.[operationId] ?? (operationId === "datacenter" || operationId === "influence_broker" ? 3 : 2);
+// What one face of a grey operation does, in words, from the numbers the engine computed for it.
+export function greyEffectText(operationId: string, effect: Record<string, number | boolean>, tier: string): string {
+  if (tier === "fail") return tg("ui.grey.effect.none");
+  const value = (key: string) => Number(effect[key] ?? 0);
+  switch (operationId) {
+    case "smear":
+      return value("influence_per_hit")
+        ? tg("ui.grey.effect.smearPaid", { influence: value("influence_per_hit") })
+        : tg("ui.grey.effect.smear");
+    case "crypto":
+      return tg("ui.grey.effect.crypto", { money: value("money_each") });
+    case "datacenter":
+      return tg("ui.grey.effect.datacenter", { influence: value("influence") });
+    case "influence_broker":
+      return effect.strip_role
+        ? tg("ui.grey.effect.leakStrip", { influence: value("influence") })
+        : tg("ui.grey.effect.leakScandal", { scandals: value("target_scandals"), influence: value("influence") });
+    case "roof_break":
+      return value("influence_per_roof")
+        ? tg("ui.grey.effect.roofBreakPaid", { influence: value("influence_per_roof") })
+        : tg("ui.grey.effect.roofBreak");
+    default:
+      return "";
+  }
 }
 
-// Mirrors `CityEngine.hack_influence_steal` and `CityEngine.pump_drain`.
-function hackSteal(meta: CityMeta, round: number): number {
-  return (meta.scoring?.hack_influence_base ?? 2) + Math.floor(round / 3);
+const capacityCosts: Record<number, number> = { 3: 7, 4: 12, 5: 18 };
+const capacityInfluence: Record<number, number> = { 3: 0, 4: 1, 5: 3 };
+
+/** The next slot's price — money and the influence the fifth and sixth slots add. From /meta. */
+export function slotPrice(meta: CityMeta, capacity: number): { money: number | undefined; influence: number } {
+  const key = String(capacity);
+  return {
+    money: meta.scoring?.capacity_costs?.[key] ?? capacityCosts[capacity],
+    influence: meta.scoring?.capacity_influence?.[key] ?? capacityInfluence[capacity] ?? 0,
+  };
 }
-
-function pumpDrain(meta: CityMeta, round: number): number {
-  return (meta.scoring?.pump_drain_base ?? 2) + Math.floor(round / 2);
-}
-
-const greyChance: Record<string, number> = { smear: 60, crypto: 45, roof_break: 60, datacenter: 40, influence_broker: 60 };
-
-export const greyOperationInfo: Record<
-  string,
-  { effect: (round: number, meta: CityMeta) => string; chance: number; failure: string }
-> = {};
-for (const key of GREY_IDS) {
-  Object.defineProperty(greyOperationInfo, key, {
-    enumerable: true,
-    get: () => ({
-      effect: (round: number, meta: CityMeta) =>
-        tg(`grey.${key}.effect`, {
-          money: pumpDrain(meta, round),
-          influence: hackSteal(meta, round),
-          points: meta.scoring?.roof_break_point_per_roof ?? 1,
-        }),
-      chance: greyChance[key],
-      failure: tg(`grey.${key}.note`),
-    }),
-  });
-}
-
-const capacityCosts: Record<number, number> = { 3: 6, 4: 10, 5: 15 };
 
 // Points an object adds to the final score, and what selling it refunds in money — one number for
 // both, because the engine uses one rule (`content.asset_points`). The fallback keeps an older
@@ -246,11 +245,12 @@ export function cleanupOffer(power: string | undefined, meta: CityMeta): { label
 }
 
 export function actionCardCost(meta: CityMeta): number {
-  return meta.scoring?.action_card_cost ?? 6;
+  return meta.scoring?.action_card_cost ?? 4;
 }
 
-export function cardDiscardValue(meta: CityMeta): number {
-  return meta.scoring?.card_discard_value ?? 2;
+/** What a discarded card pays back: money or influence. */
+export function cardDiscardValue(meta: CityMeta): { money: number; influence: number } {
+  return { money: meta.scoring?.card_discard_money ?? 2, influence: meta.scoring?.card_discard_influence ?? 1 };
 }
 
 /** Human-readable project condition, built from the structured requirement. */
@@ -302,7 +302,11 @@ function roofCost(player: PlayerState, game: GameState): number {
 
 function capacityLabel(player: PlayerState): string {
   if (player.capacity >= 6) return tg("capacity.max");
-  return tg("capacity.next", { slot: player.capacity + 1, cost: capacityCosts[player.capacity] ?? "?" });
+  const price = capacityCosts[player.capacity];
+  const influence = capacityInfluence[player.capacity] ?? 0;
+  return influence
+    ? tg("capacity.nextInfluence", { slot: player.capacity + 1, cost: price ?? "?", influence })
+    : tg("capacity.next", { slot: player.capacity + 1, cost: price ?? "?" });
 }
 
 interface LabelContext {
@@ -374,7 +378,9 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
   if (action.type === "buy_action_card") return tg("action.buyCard", { title: cards.get(stringValue(payload.card_id))?.title ?? payload.card_id });
   if (action.type === "convert_action_card") {
     const back = cardDiscardValue(meta);
-    return payload.into === "money" ? tg("action.sellCard", { value: back }) : tg("action.discardCard", { value: back });
+    return payload.into === "money"
+      ? tg("action.sellCard", { value: back.money })
+      : tg("action.discardCard", { value: back.influence });
   }
   if (action.type === "play_action_card") {
     const held = player.hand?.find(item => item.uid === payload.card_uid);
@@ -584,8 +590,22 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       });
       return segments;
     }
-    case "capacity_bought":
-      return lead(txt(tg("event.capacity", { count: numberValue(data.capacity) })), signed(-numberValue(data.cost), "$"), txt(")"));
+    case "capacity_bought": {
+      const influence = numberValue(data.cost_influence);
+      const price: LogSegment[] = [signed(-numberValue(data.cost), "$")];
+      if (influence) price.push(txt(" "), signed(-influence, "◆"));
+      return lead(txt(tg("event.capacity", { count: numberValue(data.capacity) })), ...price, txt(")"));
+    }
+    case "underdog_bonus": {
+      const ids = (data.player_ids as string[] | undefined) ?? [];
+      const segments: LogSegment[] = [txt(tg("event.underdog"))];
+      ids.forEach((playerId, position) => {
+        if (position > 0) segments.push(txt(", "));
+        segments.push(playerSeg(game, playerId));
+      });
+      segments.push(txt(" "), num(`+${numberValue(data.influence)}◆`, "good"));
+      return segments;
+    }
     case "roof_bought":
       return lead(txt(tg("event.roofBought")), signed(-numberValue(data.cost), "$"), txt(tg("event.roofBoughtTail", { count: numberValue(data.roofs) })));
     case "military_sanction": {
@@ -695,17 +715,19 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
     case "market_rotated":
       return [txt(tg("event.marketRotated"))];
     case "grey_operation_resolved": {
-      const chance = Math.round(numberValue(data.chance) * 100);
       const tail: LogSegment[] = [txt(` ${greyOperationLabels[assetId] ?? assetId}`)];
       if (target) tail.push(txt(" → "), playerSeg(game, targetId));
-      tail.push(txt(": "));
-      // A blocked run is not a failed one: the roll came in, the Крыша ate it. Reading it as
-      // "провал" hid why the operation paid nothing.
+      // The die first, then what it read as: «бросок 4 (+1) → 5».
+      const roll = numberValue(data.roll);
+      const modifier = numberValue(data.modifier);
+      const face = numberValue(data.face);
+      tail.push(txt(": "), txt(modifier ? tg("event.greyRollModified", { roll, modifier, face }) : tg("event.greyRoll", { roll })), txt(" — "));
+      // A blocked run is not a failed one: the roll came in, the Защита held. Reading it as
+      // "провал" hid why the operation did nothing.
+      const tier = stringValue(data.tier);
       if (data.blocked) tail.push(num(tg("event.greyBlocked"), "bad"));
-      else tail.push(data.success ? num(tg("event.greySuccess"), "good") : num(tg("event.greyFailure"), "bad"));
-      tail.push(txt(` (${chance}%)`));
-      const points = numberValue(data.points);
-      if (points) tail.push(txt(" "), num(tg("event.points", { count: points }), "good"));
+      else if (tier === "fail") tail.push(num(tg("event.greyFailure"), "bad"));
+      else tail.push(num(tier === "full" ? tg("event.greyFull") : tg("event.greyWeak"), "good"));
       return lead(...tail, ...deltas);
     }
     case "role_power_used": {
@@ -743,7 +765,7 @@ const forecastLabels = labelTable("forecast", [
 // less is the same invisibility bug we fixed on the project board.
 const ROLE_PERK_KEYS = [
   "capitalist_objects", "capitalist_industrial_influence", "politician_residents", "journalist_money",
-  "journalist_rating", "fraudster_actions", "fraudster_chance", "mafia_racket_money", "mafia_racket_influence",
+  "journalist_rating", "fraudster_actions", "fraudster_grey_roll", "mafia_racket_money", "mafia_racket_influence",
   "mafia_roofs", "military_sanction_targets", "military_inspection_targets", "military_seize_targets",
   "role_district_income",
 ];

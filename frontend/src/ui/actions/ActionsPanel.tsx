@@ -277,7 +277,7 @@ export function ActionsPanel({
       <DetailsModal open={drawer === "powers"} onClose={() => setDrawer(null)} label={t("ui.actions.rolePowers")}>
         <RolePowersDetails game={game} meta={meta} index={index} context={context} onAction={onAction} />
       </DetailsModal>
-      <DetailsModal open={drawer === "grey"} onClose={() => setDrawer(null)} label={t("ui.actions.grey")}>
+      <DetailsModal open={drawer === "grey"} onClose={() => setDrawer(null)} label={t("ui.actions.grey")} width={1120}>
         <GreyDetails game={game} meta={meta} index={index} context={context} onAction={onAction} />
       </DetailsModal>
 

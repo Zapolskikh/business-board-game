@@ -8,13 +8,10 @@ from city_engine.constants import (
     ACTION_DECK_COPIES,
     BASE_SCANDAL_LIMIT,
     CAMPAIGN_TIERS,
-    CASH_TO_INFLUENCE_MONEY,
     CRYPTO_SCAM_SCANDALS,
     CRYPTO_SCAM_SHARE,
-    GREY_FAILURE_SCANDALS,
-    GREY_OPERATION_CHANCE,
-    GREY_OPERATION_POINTS,
-    GREY_SUCCESS_SCANDALS,
+    GREY_DIE_SIDES,
+    GREY_ROLL_CAP,
     LOBBYING_INFLUENCE,
     LOBBYING_POINTS,
     MARKET_ROTATION_SIZE,
@@ -24,7 +21,6 @@ from city_engine.constants import (
     POINTS_CARD_RATE,
     PROJECT_BOARD_SIZE,
     PROJECT_REROLL_MONEY,
-    ROOF_BREAK_POINT_PER_ROOF,
 )
 from city_engine.content import load_catalog
 from city_engine.engine import CityEngine
@@ -66,21 +62,23 @@ def give_asset(state, player, card_id: str) -> OwnedAsset:
     return owned
 
 
+def force_roll(state, roll: int) -> None:
+    """Preset the generator so the next die shows ``roll`` — the way the bots price every face."""
+    draw = ((roll - 1) * 2**32) // GREY_DIE_SIDES + 1
+    state.rng.state = ((draw - 1_013_904_223) * pow(1_664_525, -1, 2**32)) % 2**32
+
+
+def open_table(state, actor) -> None:
+    for rival in state.players:
+        if rival.id != actor.id:
+            rival.roofs = 0
+
+
 def give_card(state, player, card_id: str) -> HeldCard:
     state.action_deck = [item for item in state.action_deck if item != card_id]
     held = HeldCard(uid=f"held:{player.id}:{card_id}", card_id=card_id)
     player.hand.append(held)
     return held
-
-
-def test_the_action_deck_holds_several_copies_of_every_card() -> None:
-    """One copy each ran the deck dry around round 9, which deleted the card layer exactly when
-    the late game has the fewest things left to spend an action on."""
-    catalog = load_catalog()
-    state = make_state()
-
-    assert len(state.action_deck) == len(catalog.action_cards) * ACTION_DECK_COPIES
-    assert all(state.action_deck.count(card_id) == ACTION_DECK_COPIES for card_id in catalog.action_cards)
 
 
 def test_two_copies_of_one_card_are_told_apart_in_hand() -> None:
@@ -144,25 +142,12 @@ def test_a_card_cannot_be_bought_without_actions_left() -> None:
         run(engine, state, "buy_action_card")
 
 
-def test_discarding_a_card_returns_two_units() -> None:
-    engine = CityEngine()
-    state = make_state()
-    player = state.current_player
-    held = give_card(state, player, "grant")
-
-    state = run(engine, state, "convert_action_card", {"card_uid": held.uid, "into": "influence"})
-
-    # A single unit made the discard a pure loss on a card that cost 3$ and 1◆.
-    assert state.current_player.influence == 4
-    assert not state.current_player.hand
-
-
 def test_point_cards_are_a_better_rate_than_the_always_available_patronage() -> None:
     engine = CityEngine()
     state = make_state()
     player = state.current_player
-    held = give_card(state, player, "scholarship")
-    card = engine.action_card("scholarship")
+    held = give_card(state, player, "city_prize")
+    card = engine.action_card("city_prize")
     price = card.value * POINTS_CARD_RATE
     player.money = price
 
@@ -310,23 +295,6 @@ def test_targeted_card_hits_target_without_roof() -> None:
         {"card_uid": held.uid, "target_id": target.id},
     )
     assert state.player_by_id(target.id).scandals > 0
-
-
-def test_deal_cards_apply_discounts_and_may_be_chained_in_one_turn() -> None:
-    engine = CityEngine()
-    state = make_state()
-    player = state.current_player
-    subsidy = give_card(state, player, "market_subsidy")
-    grant = give_card(state, player, "grant")
-    original_price = engine.asset_price(state, player, state.market[0].card_id)
-
-    state = run(engine, state, "play_action_card", {"card_uid": subsidy.uid})
-    assert engine.asset_price(state, state.current_player, state.market[0].card_id) == max(1, original_price - 4)
-
-    # The second card goes down in the same turn: playing costs no action, and the cap that used
-    # to sit here moved to the purchase.
-    state = run(engine, state, "play_action_card", {"card_uid": grant.uid})
-    assert state.current_player.hand == []
 
 
 def test_a_vote_of_no_confidence_that_takes_a_role_says_so() -> None:
@@ -632,7 +600,7 @@ def test_journalist_powers_use_scandal_rules() -> None:
     assert state.player_by_id(target.id).scandals == 3  # one from the inflate, two from the story
 
 
-def test_mafia_racket_has_two_money_base_before_scaling() -> None:
+def test_mafia_racket_has_a_three_money_base_before_scaling() -> None:
     engine = CityEngine()
     state = make_state()
     mafia = state.current_player
@@ -650,9 +618,9 @@ def test_mafia_racket_has_two_money_base_before_scaling() -> None:
         {"power": "mafia_racket", "target_id": target.id},
     )
 
-    # 2 base + 1 active Shadows asset + floor(6 * 2 / 4) = 6 money (target is not the leader).
-    assert state.current_player.money == 36
-    assert state.player_by_id(target.id).money == 14
+    # 3 base + 2 per Shadows object + floor(6 / 3) = 7 money (target is not the leader).
+    assert state.current_player.money == 37
+    assert state.player_by_id(target.id).money == 13
     assert state.current_player.scandals == 1
 
 
@@ -850,127 +818,6 @@ def test_grey_assets_do_not_promise_a_purchase_scandal(card_id: str) -> None:
     assert "при покупке" not in asset.text.lower() or "скандал" not in asset.text.lower()
 
 
-def test_grey_operation_uses_serialized_rng_for_success_and_failure() -> None:
-    engine = CityEngine()
-    success = make_state()
-    actor = success.current_player
-    give_asset(success, actor, "cash")
-    for rival in success.players:
-        if rival.id != actor.id:
-            rival.roofs = 0
-    success.rng.state = 0  # next random ~= .236, below the .60 smear chance.
-    success = run(engine, success, "grey_operation", {"asset_id": "smear"})
-    assert all(rival.scandals == 1 for rival in success.players if rival.id != actor.id)
-    assert success.current_player.scandals == GREY_SUCCESS_SCANDALS
-
-    failure = make_state()
-    actor = failure.current_player
-    give_asset(failure, actor, "cash")
-    for rival in failure.players:
-        if rival.id != actor.id:
-            rival.roofs = 0
-    failure.rng.state = 100_000  # next random ~= .991, above every chance in the table.
-    failure = run(engine, failure, "grey_operation", {"asset_id": "smear"})
-    # A miss does nothing at all — the whole penalty is the extra scandal and the spent action.
-    assert all(rival.scandals == 0 for rival in failure.players if rival.id != actor.id)
-    assert failure.current_player.scandals == GREY_FAILURE_SCANDALS
-
-
-def test_successful_grey_operations_score_points_and_failures_score_none() -> None:
-    engine = CityEngine()
-    state = make_state()
-    actor = state.current_player
-    give_asset(state, actor, "cash")
-    for rival in state.players:
-        if rival.id != actor.id:
-            rival.roofs = 0
-    state.rng.state = 0  # next random ~= .236, below the .60 smear chance.
-    state = run(engine, state, "grey_operation", {"asset_id": "smear"})
-    # The damage is the point of the operation; the score is what makes it worth an action.
-    assert state.current_player.bonus_points == GREY_OPERATION_POINTS["smear"]
-    resolved = next(event for event in reversed(state.event_log) if event.type == "grey_operation_resolved")
-    assert resolved.data["points"] == GREY_OPERATION_POINTS["smear"]
-
-    failed = make_state()
-    actor = failed.current_player
-    give_asset(failed, actor, "cash")
-    failed.rng.state = 100_000  # next random ~= .991, above every chance in the table.
-    failed = run(engine, failed, "grey_operation", {"asset_id": "smear"})
-    assert failed.current_player.bonus_points == 0
-    resolved = next(event for event in reversed(failed.event_log) if event.type == "grey_operation_resolved")
-    assert resolved.data["points"] == 0
-
-
-def test_the_smear_reaches_every_rival_and_each_roof_answers_for_its_own_owner() -> None:
-    engine = CityEngine()
-    # Three players: the whole point of the smear is what it does to a table, not to one rival.
-    state = create_game_from_catalog(
-        "smear",
-        [PlayerSetup("p1", "One"), PlayerSetup("p2", "Two"), PlayerSetup("p3", "Three")],
-        seed=42,
-    )
-    actor = state.current_player
-    give_asset(state, actor, "cash")
-    rivals = [player for player in state.players if player.id != actor.id]
-    rivals[0].roofs = 1
-    for rival in rivals[1:]:
-        rival.roofs = 0
-    state.rng.state = 0
-
-    state = run(engine, state, "grey_operation", {"asset_id": "smear"})
-
-    # One action can strip several roofs at once: the smear is the only thing in the game that
-    # outpaces the defence, which is why its odds sit below its neighbours'.
-    assert state.player_by_id(rivals[0].id).roofs == 0
-    assert state.player_by_id(rivals[0].id).scandals == 0
-    assert all(state.player_by_id(rival.id).scandals == 1 for rival in rivals[1:])
-    # Blocked by one of three is not the same empty result as blocked by all three.
-    assert state.current_player.bonus_points == GREY_OPERATION_POINTS["smear"]
-
-
-def test_the_pump_drains_every_rival_into_the_runner_s_wallet() -> None:
-    engine = CityEngine()
-    state = make_state()
-    actor = state.current_player
-    give_asset(state, actor, "cash")
-    actor.money = 10
-    rivals = [player for player in state.players if player.id != actor.id]
-    for rival in rivals:
-        rival.roofs = 0
-        rival.money = 30
-    state.rng.state = 0  # below the .45 pump chance
-
-    drain = engine.pump_drain(state)
-    state = run(engine, state, "grey_operation", {"asset_id": "crypto"})
-
-    # The money operation: nothing is minted, it changes hands. Its payout is the one that grows
-    # with the number of players at the table.
-    assert all(state.player_by_id(rival.id).money == 30 - drain for rival in rivals)
-    assert state.current_player.money == 10 + drain * len(rivals)
-
-
-def test_breaking_a_roof_takes_the_whole_stack_and_pays_a_point_per_token() -> None:
-    engine = CityEngine()
-    state = make_state()
-    actor = state.current_player
-    give_asset(state, actor, "cash")
-    target = next(player for player in state.players if player.id != actor.id)
-    target.roofs = 3
-    state.rng.state = 0  # below the .60 chance
-
-    state = run(engine, state, "grey_operation", {"asset_id": "roof_break", "target_id": target.id})
-
-    # A Крыша cannot answer this one: blocking it with the very token it removes would make the
-    # stack self-defending and the operation unreachable.
-    assert state.player_by_id(target.id).roofs == 0
-    # Without a point per token the operation is a pure set-up whose value is shared with the whole
-    # table, and nobody spends an action and a scandal on that.
-    expected = GREY_OPERATION_POINTS["roof_break"] + 3 * ROOF_BREAK_POINT_PER_ROOF
-    assert state.current_player.bonus_points == expected
-    broken = next(event for event in reversed(state.event_log) if event.type == "roofs_broken")
-    assert broken.data["roofs"] == 3
-
-
 def test_the_pointed_operations_refuse_a_target_with_nothing_to_take() -> None:
     engine = CityEngine()
     state = make_state()
@@ -1061,64 +908,6 @@ def test_the_grey_cap_resets_on_the_next_turn() -> None:
     assert any(action["type"] == "grey_operation" for action in legal)
 
 
-def test_a_grey_operation_swallowed_by_a_roof_still_pays_for_the_roll() -> None:
-    engine = CityEngine()
-    state = make_state()
-    actor = state.current_player
-    actor.role = "fraudster"
-    give_asset(state, actor, "datacenter")
-    target = next(player for player in state.players if player.id != actor.id)
-    target.roofs = 1
-    target.influence = 9
-    target.bonus_points = 50  # puts the fraudster second, so the comeback would be worth 1◆
-    state.rng.state = 0  # next random ~= .236, below the hack's chance
-
-    state = run(engine, state, "grey_operation", {"asset_id": "datacenter", "target_id": target.id})
-
-    # The roll is what the operation is paid for, and it burned a token off the defender — that is
-    # a real result, so it earns its points and costs its scandal. Only the fraudster's comeback
-    # is priced against damage, and there was none.
-    expected_points = engine.grey_operation_points("datacenter")
-    actor = state.player_by_id(actor.id)
-    target = state.player_by_id(target.id)
-    assert actor.bonus_points == expected_points
-    assert actor.scandals == GREY_SUCCESS_SCANDALS
-    assert actor.influence == 2
-    assert (target.influence, target.roofs) == (9, 0)
-    resolved = next(event for event in reversed(state.event_log) if event.type == "grey_operation_resolved")
-    # "The defence held" has to read differently from "the odds failed".
-    assert (resolved.data["success"], resolved.data["blocked"], resolved.data["points"]) == (
-        True,
-        True,
-        expected_points,
-    )
-
-
-def test_a_grey_operation_that_lands_pays_its_points_and_its_loot() -> None:
-    engine = CityEngine()
-    state = make_state()
-    actor = state.current_player
-    actor.role = "fraudster"
-    give_asset(state, actor, "datacenter")
-    target = next(player for player in state.players if player.id != actor.id)
-    target.roofs = 0
-    target.influence = 9
-    target.bonus_points = 50
-    state.rng.state = 0
-
-    state = run(engine, state, "grey_operation", {"asset_id": "datacenter", "target_id": target.id})
-
-    stolen = engine.hack_influence_steal(state)
-    actor = state.player_by_id(actor.id)
-    assert actor.bonus_points == GREY_OPERATION_POINTS["datacenter"]
-    assert actor.scandals == GREY_SUCCESS_SCANDALS  # a hit costs one, a miss two
-    # The loot and nothing else: the comeback that paid the fraudster for being behind is gone.
-    assert actor.influence == 2 + stolen
-    assert state.player_by_id(target.id).influence == 9 - stolen
-    resolved = next(event for event in reversed(state.event_log) if event.type == "grey_operation_resolved")
-    assert (resolved.data["success"], resolved.data["blocked"]) == (True, False)
-
-
 def test_a_blocked_card_costs_the_attacker_no_self_scandal() -> None:
     engine = CityEngine()
     state = make_state()
@@ -1180,31 +969,6 @@ def test_a_story_that_runs_still_costs_the_journalist_a_scandal() -> None:
 
     assert state.player_by_id(journalist.id).scandals == 1
     assert state.player_by_id(target.id).scandals == 1
-
-
-def test_the_longer_odds_operations_pay_the_higher_score() -> None:
-    engine = CityEngine()
-    # The scandal cost is the same for all five now, so the score has to carry the difference: the
-    # pointed, low-odds operations pay three, the broad ones two.
-    for asset_id in ("datacenter", "influence_broker"):
-        assert engine.grey_operation_points(asset_id) == 3
-    for asset_id in ("smear", "crypto", "roof_break"):
-        assert engine.grey_operation_points(asset_id) == 2
-    assert set(GREY_OPERATION_POINTS) == set(GREY_OPERATION_CHANCE) == set(engine.GREY_ASSET_IDS)
-
-
-def test_the_fraudster_bonus_is_flat_and_needs_no_tech_object() -> None:
-    engine = CityEngine()
-    state = make_state()
-    actor = state.current_player
-    actor.role = "fraudster"
-    give_asset(state, actor, "cash")  # Серый сектор, not Технокластер.
-    actor.money = 20
-
-    state = run(engine, state, "grey_operation", {"asset_id": "smear"})
-    resolved = next(event for event in reversed(state.event_log) if event.type == "grey_operation_resolved")
-    # 0.60 base + 0.30 flat, capped at the 0.9 ceiling — no tech object involved.
-    assert resolved.data["chance"] == pytest.approx(0.9)
 
 
 def test_crypto_scam_is_one_fixed_quarter_wallet_command() -> None:
@@ -1275,54 +1039,6 @@ def test_stacked_grey_reduction_can_make_a_failed_operation_free() -> None:
     assert state.current_player.scandals == 0
 
 
-def test_hacking_takes_influence_instead_of_blocking_an_object() -> None:
-    engine = CityEngine()
-    state = make_state()
-    actor = state.current_player
-    give_asset(state, actor, "datacenter")
-    actor.scandals = 0
-    target = next(other for other in state.players if other.id != actor.id)
-    target.influence = 10
-    target.roofs = 0
-    give_asset(state, target, "robotics")
-    state.rng.state = 0  # below the .55 hack chance
-
-    state = run(engine, state, "grey_operation", {"asset_id": "datacenter", "target_id": target.id})
-
-    stolen = engine.hack_influence_steal(state)
-    hit = state.player_by_id(target.id)
-    assert hit.influence == 10 - stolen
-    assert state.current_player.influence == 2 + stolen
-    # The hack takes influence and nothing else: the target keeps every object it owns.
-    assert [asset.card_id for asset in hit.assets] == ["robotics"]
-
-
-def test_compromat_leak_strips_a_role() -> None:
-    engine = CityEngine()
-    state = make_state()
-    actor = state.current_player
-    give_asset(state, actor, "influence_broker")
-    give_asset(state, actor, "passport_office")  # the leak needs the city hall as well
-    actor.influence = 10
-    actor.scandals = 0
-    target = next(other for other in state.players if other.id != actor.id)
-    target.role = "capitalist"
-    target.roofs = 0
-    state.actions_left = 3
-    state.rng.state = 0  # below the .60 leak chance
-
-    state = run(engine, state, "grey_operation", {"asset_id": "influence_broker", "target_id": target.id})
-
-    assert state.player_by_id(target.id).role is None
-    # No prepay any more: the action, the scandal and the turn's single attempt are the whole price.
-    assert state.current_player.influence == 10
-    assert state.current_player.scandals == GREY_SUCCESS_SCANDALS
-    # The per-turn cap already limits the cadence — a second gate on top of it was one rule too many.
-    state.player_by_id(target.id).role = "politician"
-    with pytest.raises(IllegalActionError):
-        run(engine, state, "grey_operation", {"asset_id": "influence_broker", "target_id": target.id})
-
-
 def test_compromat_leak_needs_both_the_grey_sector_and_the_city_hall() -> None:
     """With the Серый сектор alone it was a one-action role strip from the first round."""
     engine = CityEngine()
@@ -1333,29 +1049,6 @@ def test_compromat_leak_needs_both_the_grey_sector_and_the_city_hall() -> None:
     assert engine.grey_operation_unlocked(actor, "smear")
     give_asset(state, actor, "passport_office")
     assert engine.grey_operation_unlocked(actor, "influence_broker")
-
-
-def test_compromat_leak_is_absorbed_by_a_roof() -> None:
-    engine = CityEngine()
-    state = make_state()
-    actor = state.current_player
-    give_asset(state, actor, "influence_broker")
-    give_asset(state, actor, "passport_office")
-    actor.influence = 10
-    target = next(other for other in state.players if other.id != actor.id)
-    target.role = "capitalist"
-    target.roofs = 1
-    state.rng.state = 0
-
-    state = run(engine, state, "grey_operation", {"asset_id": "influence_broker", "target_id": target.id})
-
-    hit = state.player_by_id(target.id)
-    assert hit.role == "capitalist"
-    assert hit.roofs == 0
-    # The roof kept the role, but stripping the table of its defences is exactly what the leak is
-    # for: the roll still scores and still costs its scandal.
-    assert state.current_player.bonus_points == engine.grey_operation_points("influence_broker")
-    assert state.current_player.scandals == GREY_SUCCESS_SCANDALS
 
 
 @pytest.mark.parametrize("card_id", list(load_catalog().action_cards))
@@ -1375,6 +1068,10 @@ def test_every_action_card_has_a_working_engine_path(card_id: str) -> None:
         payload["target_id"] = target.id
         if card.kind == "role_pressure":
             target.role = "mafia"
+        if card.kind in {"roof_strip", "roof_steal"}:
+            target.roofs = 1
+        if card.kind == "inspection_fine":
+            target.scandals = 1
         if card.kind == "remove_development":
             target.district_levels["residential"] = 1
     elif card.kind in {"district_cash", "zoning", "develop"}:
@@ -1382,6 +1079,10 @@ def test_every_action_card_has_a_working_engine_path(card_id: str) -> None:
         give_asset(state, player, "delivery")
         if card.kind == "develop":
             give_asset(state, player, "media")
+    elif card.kind == "shadow_cash":
+        give_asset(state, player, "cash")
+    elif card.kind == "government_influence":
+        give_asset(state, player, "archive")
     elif card.kind == "copy_role":
         payload["role_id"] = "capitalist"
     elif card.kind == "project":
@@ -1406,22 +1107,6 @@ def test_the_relief_card_pays_in_slots_because_money_cannot_buy_the_scarce_half(
     # A slot is the half of an object purchase that money cannot replace, which is why the card
     # pays one instead of cash worth less than discarding it for 2◆.
     assert state.current_player.capacity == capacity + 1
-
-
-def test_the_tax_manoeuvre_runs_money_into_influence_not_the_reverse() -> None:
-    engine = CityEngine()
-    state = make_state()
-    player = state.current_player
-    player.money = 20
-    player.influence = 1
-    held = give_card(state, player, "tax_manoeuvre")
-
-    state = run(engine, state, "play_action_card", {"card_uid": held.uid})
-    player = state.current_player
-
-    # 2◆ → 8$ traded the scarce resource for the plentiful one, which made the card strictly worse
-    # than throwing it away for 2◆. Reversed, it is the top campaign tier without the action.
-    assert (player.money, player.influence) == (20 - CASH_TO_INFLUENCE_MONEY, 5)
 
 
 def test_money_printed_on_cards_grows_with_the_round() -> None:
@@ -1952,13 +1637,18 @@ def test_one_token_answers_a_takeover_a_leak_and_a_scandal() -> None:
         run(engine, state, "claim_role", {"role_id": "capitalist"})
     assert (holder.role, holder.roofs, attacker.influence) == ("capitalist", 1, 30)
 
-    # And the compromat leak, which needs no card of its own.
+    # And the compromat leak: a grey operation, so the token answers it in full and stays.
     state = make_state()
-    target = rival_of(state, state.current_player)
+    actor = state.current_player
+    give_asset(state, actor, "cash")
+    give_asset(state, actor, "archive")
+    target = rival_of(state, actor)
     target.role = "military"
     target.roofs = 1
-    engine._resolve_compromat(state, state.current_player, target)
-    assert (target.role, target.roofs) == ("military", 0)
+    force_roll(state, 6)
+    state = run(engine, state, "grey_operation", {"asset_id": "influence_broker", "target_id": target.id})
+    target = state.player_by_id(target.id)
+    assert (target.role, target.roofs) == ("military", 1)
 
 
 def test_a_defence_never_cancels_the_consequences_of_your_own_move() -> None:
@@ -2034,7 +1724,7 @@ def test_every_project_is_unique_and_only_the_board_offers_one() -> None:
     # the denial, not which four cards the deal happened to turn up.
     taken = "art_museum"
     state.project_deck = [item for item in state.project_deck if item != taken]
-    state.project_board[0] = taken
+    state.project_board = [taken, *(item for item in state.project_board if item != taken)][:PROJECT_BOARD_SIZE]
     project = engine.project(taken)
 
     # One price, printed on the card. The escalating initiative surcharge is gone with the sink
@@ -2355,3 +2045,385 @@ def test_the_late_market_skips_commons_in_deck_order_and_keeps_the_rare_cards_co
 
     assert [item.card_id for item in state.market] == ["market_maker"]
     assert state.market_deck == ["housing", "delivery"]
+
+
+# --- the grey die -------------------------------------------------------------------------------
+
+
+def test_the_die_table_shifts_with_the_players_modifier_and_is_capped() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    give_asset(state, player, "cash")
+
+    plain = engine.grey_table(state, player, "smear")
+    assert [row["face"] for row in plain["rows"]] == [1, 2, 3, 4, 5, 6]
+    assert [row["tier"] for row in plain["rows"]] == ["fail", "fail", "weak", "weak", "full", "full"]
+    assert [row["scandals"] for row in plain["rows"]] == [2, 1, 1, 1, 1, 0]
+
+    player.role = "fraudster"
+    assert [row["face"] for row in engine.grey_table(state, player, "smear")["rows"]] == [2, 3, 4, 5, 6, 6]
+
+    # The mafia's power: +1 per Серый сектор object, at most +2, and the card on top, all capped.
+    player.role = "mafia"
+    for card_id in ("market", "underground_casino"):
+        give_asset(state, player, card_id)
+    assert engine.grey_roll_modifier(state, player)[0] == 2
+    state.turn_flags["grey_roll_bonus"] = 2
+    modifier, sources = engine.grey_roll_modifier(state, player)
+    assert modifier == GREY_ROLL_CAP
+    assert {item["source"] for item in sources} == {"mafia", "card"}
+
+
+def test_a_failed_roll_does_nothing_and_a_one_costs_two_scandals() -> None:
+    engine = CityEngine()
+    state = make_state()
+    actor = state.current_player
+    give_asset(state, actor, "cash")
+    open_table(state, actor)
+    force_roll(state, 1)
+
+    state = run(engine, state, "grey_operation", {"asset_id": "smear"})
+
+    assert all(rival.scandals == 0 for rival in state.players if rival.id != actor.id)
+    assert state.current_player.scandals == 2
+    resolved = next(event for event in reversed(state.event_log) if event.type == "grey_operation_resolved")
+    assert (resolved.data["roll"], resolved.data["tier"], resolved.data["success"]) == (1, "fail", False)
+
+
+def test_grey_operations_score_no_points() -> None:
+    engine = CityEngine()
+    state = make_state()
+    actor = state.current_player
+    give_asset(state, actor, "cash")
+    open_table(state, actor)
+    force_roll(state, 6)
+
+    state = run(engine, state, "grey_operation", {"asset_id": "smear"})
+
+    assert state.current_player.bonus_points == 0
+
+
+def test_the_smear_hits_every_open_rival_and_pays_influence_per_scandal() -> None:
+    engine = CityEngine()
+    state = make_state()
+    actor = state.current_player
+    give_asset(state, actor, "cash")
+    open_table(state, actor)
+    actor.influence = 0
+    force_roll(state, 6)
+
+    state = run(engine, state, "grey_operation", {"asset_id": "smear"})
+
+    rivals = [player for player in state.players if player.id != actor.id]
+    assert all(rival.scandals == 1 for rival in rivals)
+    assert state.current_player.influence == 2 * len(rivals)
+    assert state.current_player.scandals == 0  # a six is clean
+
+
+def test_a_defence_answers_a_grey_operation_in_full_and_is_not_spent() -> None:
+    engine = CityEngine()
+    state = make_state()
+    actor = state.current_player
+    give_asset(state, actor, "cash")
+    target = rival_of(state, actor)
+    target.roofs = 1
+    target.influence = 9
+    force_roll(state, 5)
+
+    state = run(engine, state, "grey_operation", {"asset_id": "datacenter", "target_id": target.id})
+
+    target = state.player_by_id(target.id)
+    assert (target.roofs, target.influence) == (1, 9)
+    assert state.current_player.scandals == 1  # the attempt still costs the attacker
+    resolved = next(event for event in reversed(state.event_log) if event.type == "grey_operation_resolved")
+    assert resolved.data["blocked"] is True
+
+
+def test_the_pump_and_the_hack_grow_by_the_third_of_the_game() -> None:
+    engine = CityEngine()
+    early = make_state()
+    late = make_state()
+    late.round_number = 12  # the last third of fifteen rounds
+    for state in (early, late):
+        actor = state.current_player
+        give_asset(state, actor, "cash")
+        open_table(state, actor)
+        for rival in state.players:
+            rival.money = 50
+    force_roll(early, 6)
+    force_roll(late, 6)
+
+    early = run(engine, early, "grey_operation", {"asset_id": "crypto"})
+    late = run(engine, late, "grey_operation", {"asset_id": "crypto"})
+
+    assert early.current_player.money == 50 + 3
+    assert late.current_player.money == 50 + 8
+
+
+def test_the_hack_takes_no_more_than_the_target_holds() -> None:
+    engine = CityEngine()
+    state = make_state()
+    state.round_number = 12
+    actor = state.current_player
+    give_asset(state, actor, "cash")
+    target = rival_of(state, actor)
+    target.roofs = 0
+    target.influence = 2
+    actor.influence = 0
+    force_roll(state, 6)
+
+    state = run(engine, state, "grey_operation", {"asset_id": "datacenter", "target_id": target.id})
+
+    assert state.player_by_id(target.id).influence == 0
+    assert state.current_player.influence == 2
+
+
+def test_the_leak_scandalises_on_a_weak_face_and_strips_the_role_on_a_full_one() -> None:
+    engine = CityEngine()
+    for roll, role_left, target_scandals, gained in ((3, "military", 2, 1), (6, None, 0, 3)):
+        state = make_state()
+        actor = state.current_player
+        give_asset(state, actor, "cash")
+        give_asset(state, actor, "archive")
+        target = rival_of(state, actor)
+        target.role, target.roofs = "military", 0
+        actor.influence = 0
+        force_roll(state, roll)
+
+        state = run(engine, state, "grey_operation", {"asset_id": "influence_broker", "target_id": target.id})
+
+        target = state.player_by_id(target.id)
+        assert (target.role, target.scandals) == (role_left, target_scandals)
+        assert state.current_player.influence == gained
+
+
+def test_the_roof_break_opens_every_rival_and_pays_per_token_on_a_high_face() -> None:
+    engine = CityEngine()
+    for roll, gained in ((3, 0), (6, 4)):
+        state = make_state()
+        actor = state.current_player
+        give_asset(state, actor, "cash")
+        target = rival_of(state, actor)
+        target.roofs = 2
+        actor.influence = 0
+        force_roll(state, roll)
+
+        state = run(engine, state, "grey_operation", {"asset_id": "roof_break"})
+
+        assert state.player_by_id(target.id).roofs == 0
+        assert state.current_player.influence == gained
+
+
+def test_the_roof_break_needs_a_defence_somewhere_at_the_table() -> None:
+    engine = CityEngine()
+    state = make_state()
+    actor = state.current_player
+    give_asset(state, actor, "cash")
+    open_table(state, actor)
+
+    assert {"asset_id": "roof_break"} not in [
+        action["payload"] for action in engine.legal_actions(state, actor.id) if action["type"] == "grey_operation"
+    ]
+    with pytest.raises(IllegalActionError):
+        run(engine, state, "grey_operation", {"asset_id": "roof_break"})
+
+
+def test_the_bribe_card_adds_two_to_one_roll_only() -> None:
+    engine = CityEngine()
+    state = make_state()
+    actor = state.current_player
+    give_asset(state, actor, "cash")
+    open_table(state, actor)
+    held = give_card(state, actor, "guard_bribe")
+
+    state = run(engine, state, "play_action_card", {"card_uid": held.uid})
+    assert engine.grey_roll_modifier(state, state.current_player)[0] == 2
+    force_roll(state, 3)
+    state = run(engine, state, "grey_operation", {"asset_id": "smear"})
+
+    resolved = next(event for event in reversed(state.event_log) if event.type == "grey_operation_resolved")
+    assert (resolved.data["roll"], resolved.data["face"]) == (3, 5)
+    assert engine.grey_roll_modifier(state, state.current_player)[0] == 0
+
+
+def test_grey_scandal_reduction_still_softens_the_die() -> None:
+    engine = CityEngine()
+    state = make_state()
+    actor = state.current_player
+    give_asset(state, actor, "cash")
+    give_asset(state, actor, "offshore")
+    open_table(state, actor)
+    force_roll(state, 1)
+
+    state = run(engine, state, "grey_operation", {"asset_id": "smear"})
+
+    assert state.current_player.scandals == 1
+
+
+# --- the rest of the 2026-10 patch --------------------------------------------------------------
+
+
+def test_every_card_prints_its_own_number_of_copies() -> None:
+    catalog = load_catalog()
+    state = make_state()
+    in_hands = [held.card_id for player in state.players for held in player.hand]
+    deck = state.action_deck + in_hands
+    for card in catalog.action_cards.values():
+        assert deck.count(card.id) == card.copies
+    assert catalog.action_cards["mobilization"].copies == 4
+    assert catalog.action_cards["guard_bypass"].copies == 3
+    assert catalog.action_cards["grant"].copies == ACTION_DECK_COPIES
+
+
+def test_discarding_a_card_returns_two_money_or_one_influence() -> None:
+    engine = CityEngine()
+    for into, money, influence in (("money", 12, 2), ("influence", 10, 3)):
+        state = make_state()
+        player = state.current_player
+        held = give_card(state, player, "grant")
+        state = run(engine, state, "convert_action_card", {"card_uid": held.uid, "into": into})
+        assert (state.current_player.money, state.current_player.influence) == (money, influence)
+
+
+def test_the_fifth_and_sixth_slots_also_cost_influence() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.capacity = 4
+    player.money = 50
+    player.influence = 0
+    assert "buy_capacity" not in {action["type"] for action in engine.legal_actions(state, player.id)}
+    with pytest.raises(IllegalActionError):
+        run(engine, state, "buy_capacity")
+    player.influence = 1
+    state = run(engine, state, "buy_capacity")
+    assert (state.current_player.capacity, state.current_player.money, state.current_player.influence) == (5, 38, 0)
+
+
+def test_the_trailing_player_opens_a_round_with_one_influence() -> None:
+    engine = CityEngine()
+    state = make_state()
+    leader = state.current_player
+    trailing = rival_of(state, leader)
+    leader.bonus_points = 5
+    before = trailing.influence
+    for _ in range(2):
+        state = run(engine, state, "end_turn")
+
+    assert state.player_by_id(trailing.id).influence == before + 1
+    event = next(event for event in reversed(state.event_log) if event.type == "underdog_bonus")
+    assert event.data["player_ids"] == [trailing.id]
+
+
+def test_a_level_table_gives_nobody_the_catch_up() -> None:
+    engine = CityEngine()
+    state = make_state()
+    for _ in range(2):
+        state = run(engine, state, "end_turn")
+    assert not [event for event in state.event_log if event.type == "underdog_bonus"]
+
+
+def test_the_veto_costs_only_the_action() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.role = "politician"
+    player.influence = 0
+    project_id = state.project_board[0]
+
+    state = run(engine, state, "use_role_power", {"power": "politician_veto", "project_id": project_id})
+
+    assert state.project_veto[project_id] == player.id
+    assert state.current_player.influence == 0
+
+
+def test_the_bypass_takes_a_token_the_token_cannot_answer() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    target = rival_of(state, player)
+    target.roofs = 1
+    held = give_card(state, player, "guard_bypass")
+
+    state = run(engine, state, "play_action_card", {"card_uid": held.uid, "target_id": target.id})
+
+    assert state.player_by_id(target.id).roofs == 0
+
+
+def test_the_intercept_moves_a_token_to_the_player() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    target = rival_of(state, player)
+    target.roofs, player.roofs = 1, 0
+    held = give_card(state, player, "guard_intercept")
+
+    state = run(engine, state, "play_action_card", {"card_uid": held.uid, "target_id": target.id})
+
+    assert (state.player_by_id(target.id).roofs, state.current_player.roofs) == (0, 1)
+
+
+def test_the_inspection_order_pays_the_military_and_fines_everybody_else() -> None:
+    engine = CityEngine()
+    for role, gained in (("military", 3), (None, 0)):
+        state = make_state()
+        player = state.current_player
+        player.role = role
+        target = rival_of(state, player)
+        target.scandals, target.roofs, target.money = 1, 0, 20
+        held = give_card(state, player, "inspection_order")
+        money = player.money
+
+        state = run(engine, state, "play_action_card", {"card_uid": held.uid, "target_id": target.id})
+
+        assert state.player_by_id(target.id).money == 17
+        assert state.current_player.money == money + gained
+
+
+def test_popular_support_pays_the_trailing_player_double() -> None:
+    engine = CityEngine()
+    for lead, gained in ((0, 4), (5, 2)):
+        state = make_state()
+        player = state.current_player
+        player.bonus_points = lead
+        held = give_card(state, player, "popular_support")
+        influence = player.influence
+
+        state = run(engine, state, "play_action_card", {"card_uid": held.uid})
+
+        assert state.current_player.influence == influence + gained
+
+
+def test_the_shadow_cash_and_the_apparatus_pay_per_object() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.role = "mafia"
+    give_asset(state, player, "cash")
+    give_asset(state, player, "market")
+    held = give_card(state, player, "shadow_cash")
+    money, influence = player.money, player.influence
+    state = run(engine, state, "play_action_card", {"card_uid": held.uid})
+    assert (state.current_player.money, state.current_player.influence) == (money + 4, influence + 1)
+
+    state = make_state()
+    player = state.current_player
+    for card_id in ("archive", "passport_office", "contract"):
+        give_asset(state, player, card_id)
+    held = give_card(state, player, "admin_resource")
+    influence = player.influence
+    state = run(engine, state, "play_action_card", {"card_uid": held.uid})
+    assert state.current_player.influence == influence + 3
+
+
+def test_mobilisation_now_gives_one_action() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    held = give_card(state, player, "mobilization")
+    actions = state.actions_left
+
+    state = run(engine, state, "play_action_card", {"card_uid": held.uid})
+
+    assert state.actions_left == actions + 1

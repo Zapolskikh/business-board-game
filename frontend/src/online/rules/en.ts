@@ -1,4 +1,4 @@
-import type { RoleGuide, RulesChapter, RulesContext, TableLabels } from "../rulesDocument";
+import type { GreyTableLabels, RoleGuide, RulesChapter, RulesContext, TableLabels } from "../rulesDocument";
 
 /* The rule book in English — the same chapters and wording as the Russian printed rules, without
  * the screenshots (the interface on them is Russian). Numbers come from ctx; the icons next to
@@ -59,7 +59,7 @@ const roles: Record<string, RoleGuide> = {
       },
       {
         name: "Veto",
-        cost: "1 action and 3◆",
+        cost: "1 action",
         limit: "only one veto",
         effect: "Pick a project on the board: only you can take it, other players can no longer get it. Everyone can see the veto. It is removed when the project leaves the board or you lose the role.",
       },
@@ -87,7 +87,7 @@ const roles: Record<string, RoleGuide> = {
     perks: [
       "<b>4 actions</b> per turn instead of 3.",
       "Tech Cluster businesses give +1$.",
-      "Your shady deals have a 30% higher chance of success.",
+      "+1 to every shady deal roll: you never roll a one.",
     ],
     powers: [
       { name: "Cover your tracks", cost: "1 action", limit: "can be repeated", effect: "Remove 1 of your scandals." },
@@ -104,13 +104,14 @@ const roles: Record<string, RoleGuide> = {
     perks: [
       "Grey Sector businesses give +1$.",
       "Protection costs you 1$ less, and you can hold 2 Protection instead of one.",
+      "+1 to the shady deal roll for each of your Grey Sector businesses, at most +2 — the main strength of the role.",
     ],
     powers: [
       {
         name: "Racket",
         cost: "1 action; you need a Grey Sector business",
         limit: "once per turn",
-        effect: "Pick a rival. They give you money: 2$, another 2$ for each of your Grey Sector businesses, and the round number divided by 3. If the target is the leader, add 5$ more. The target also gives you 1◆ for each of your Government Quarter businesses. The target cannot give more than they have. If you have no Government Quarter business, you get 1 scandal.",
+        effect: "Pick a rival. They give you money: 3$, another 2$ for each of your Grey Sector businesses, and the round number divided by 3. If the target is the leader, add 5$ more. The target also gives you 1◆ for each of your Government Quarter businesses. The target cannot give more than they have. If you have no Government Quarter business, you get 1 scandal.",
       },
       {
         name: "Hush it up",
@@ -144,11 +145,36 @@ const roles: Record<string, RoleGuide> = {
       },
       {
         name: "Take Protection",
-        cost: "1 action and 3◆",
+        cost: "1 action and 2◆",
         limit: "you need room for Protection",
         effect: "Take 1 Protection from a rival.",
       },
     ],
+  },
+};
+
+const greyLabels: GreyTableLabels = {
+  operations: {
+    smear: { name: "Dirty rumours", gate: "Grey Sector · every rival without Protection" },
+    crypto: { name: "Pump and dump", gate: "Tech Cluster or Grey Sector · every rival without Protection" },
+    datacenter: { name: "Hack", gate: "Tech Cluster or Grey Sector · one target" },
+    influence_broker: { name: "Leak dirt", gate: "Government Quarter and Grey Sector (both) · one target with a role" },
+    roof_break: { name: "Break Protection", gate: "Grey Sector · every rival" },
+  },
+  face: "Roll",
+  effect: "Effect",
+  scandals: "Your scandals",
+  clean: "clean",
+  thirds: ["opening", "middle", "endgame"],
+  effectText: (id, effect, tier) => {
+    if (tier === "fail") return "—";
+    const v = (key: string) => Number(effect[key] ?? 0);
+    if (id === "smear") return v("influence_per_hit") ? `a scandal to each, +${v("influence_per_hit")}◆ per scandal` : "a scandal to each";
+    if (id === "crypto") return `${v("money_each")}$ from each`;
+    if (id === "datacenter") return `steal ${v("influence")}◆`;
+    if (id === "influence_broker") return effect.strip_role ? `strip the role, you +${v("influence")}◆` : `target +${v("target_scandals")}⚠, you +${v("influence")}◆`;
+    if (id === "roof_break") return v("influence_per_roof") ? `remove all Protection, +${v("influence_per_roof")}◆ each` : "remove all Protection from all";
+    return "";
   },
 };
 
@@ -196,7 +222,7 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
       <p>An empty place on the market is filled at once by the next business from the deck.</p>
       <p>You can sell a business with no action. You get half of its price back, and the slot is free again.</p>
       <h3>My city</h3>
-      <p>You start with 3 slots. The fourth slot costs ${slot4}$, the fifth ${slot5}$, the sixth ${slot6}$. 6 slots at most. Opening a slot takes 1 action.</p>
+      <p>You start with 3 slots. The fourth slot costs ${slot4}$, the fifth ${slot5}$ and ${n.capacityInfluence[1]}◆, the sixth ${slot6}$ and ${n.capacityInfluence[2]}◆. 6 slots at most. Opening a slot takes 1 action.</p>
       <h3>Income</h3>
       <p>A business card on the market shows the total income and the bonuses you will get when you buy it, with all the synergies and conditions you have right now.</p>
       <p>To see the details and the bonuses that are not shown yet, click the card.</p>
@@ -297,18 +323,11 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
       title: "Shady deals",
       html: `
       <p>A shady deal is unlocked by a district: it is enough to have one business in the right district. A deal costs 1 action, and you can make only one per turn.</p>
-      <table>
-        <thead><tr><th>Deal</th><th>Business needed</th><th>Chance</th><th>Effect on success</th><th>★</th></tr></thead>
-        <tbody>
-          <tr><td class="name"><b>Dirty rumours</b></td><td>Grey Sector</td><td class="num">${n.greyChance("smear", 60)}%</td><td>Each rival gets 1⚠</td><td class="num">+${n.greyPoints("smear", 2)}</td></tr>
-          <tr><td class="name"><b>Pump and dump</b></td><td>Tech Cluster or Grey Sector</td><td class="num">${n.greyChance("crypto", 45)}%</td><td>Take up to (${n.pumpBase} + round number ÷ 2)$ from each rival</td><td class="num">+${n.greyPoints("crypto", 2)}</td></tr>
-          <tr><td class="name"><b>Break Protection</b></td><td>Grey Sector</td><td class="num">${n.greyChance("roof_break", 60)}%</td><td>Remove all the target's Protection and get ${n.roofBreakPoint}★ for each one removed</td><td class="num">+${n.greyPoints("roof_break", 2)}</td></tr>
-          <tr><td class="name"><b>Hack</b></td><td>Tech Cluster or Grey Sector</td><td class="num">${n.greyChance("datacenter", 40)}%</td><td>Take up to (${n.hackBase} + round number ÷ 3)◆ from the target</td><td class="num">+${n.greyPoints("datacenter", 3)}</td></tr>
-          <tr><td class="name"><b>Leak dirt</b></td><td>Government Quarter and Grey Sector (both)</td><td class="num">${n.greyChance("influence_broker", 60)}%</td><td>The target loses their role</td><td class="num">+${n.greyPoints("influence_broker", 3)}</td></tr>
-        </tbody>
-      </table>
-      <p><b>Success:</b> the effect works, you get the points from the table and ${n.greySuccess} scandal. <b>Failure:</b> the effect does not work, and you get ${n.greyFailure} scandals. The action is spent either way. Divisions in the formulas are rounded down.</p>
-      <p>The target's Protection stops the effect, but you still get the points for success and your own scandal. Dirty rumours and Pump and dump hit all rivals at once, so each rival's Protection works on its own. Break Protection is not stopped by Protection: it is aimed exactly at it.</p>
+      <p><b>Roll the die.</b> Faces 1–2 fail and nothing happens. Faces 3–4 give the weak effect, 5–6 the full one. How many scandals you get depends on the face too: 2 on a one, 1 on 2–5, none on a six. Shady deals score no points — everything they give is written in the effect.</p>
+      <p><b>Modifiers</b> are added to the roll, anything above 6 counts as a six: the Fraudster +${n.fraudsterRoll}, the Mafia +1 for each own Grey Sector business (at most +${n.mafiaRollMax}), the «Bribe the Guards» card +2 to one roll. Together never more than +${n.rollCap}. In the game the shady deals window shows the table already recomputed for you.</p>
+      <p><b>Protection</b> on the target blocks any shady deal in full and is not used up. Only «Break Protection» removes it — it opens the table before a strike. Deals that hit everyone only reach rivals without Protection.</p>
+      ${ctx.html.greyTables(greyLabels)}
+      <p>Pump and dump and Hack grow towards the end of the game: every third has its own numbers. You never take more than the target holds.</p>
       `,
     },
     {
@@ -333,7 +352,8 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
       icon: "🛡",
       title: "Protection",
       html: `
-      <p>Protection saves you from one hit by a rival: an attack card, a role power or a shady deal. When you are attacked, Protection works by itself: you lose 1 Protection, and the whole hit is cancelled, with all the scandals it would bring you.</p>
+      <p>Protection saves you from one hit by a rival: an attack card or a role power. When you are attacked, Protection works by itself: you lose 1 Protection, and the whole hit is cancelled, with all the scandals it would bring you.</p>
+      <p><b>A shady deal is blocked by Protection in full, and the Protection is not used up.</b> Protection can only be removed by the «Break Protection» deal, the «Slip Past the Guards» and «Poach the Guards» cards, the Mafia's Racket or the Enforcer's «Take Protection».</p>
       <p><b>While you have Protection, nobody can take your role.</b> The Protection is not used up by this.</p>
       <p>The attacker does not get back what they spent on the hit, unless the hit says otherwise.</p>
       <p>Protection does not save you from your own actions. You always get the scandal for your own shady deal or crypto scam.</p>
@@ -347,7 +367,7 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
       title: "Action cards",
       html: `
       <p>Once per turn you can spend 1 action, ${n.cardCost}$ and 1◆ and take <b>2 random cards</b> from the deck. You can hold no more than 3 cards. If you already have 2 cards, you only draw up to 3.</p>
-      <p>You can play and discard cards as much as you like, with no action. For each discarded card you get ${n.discard}$ or ${n.discard}◆, your choice.</p>
+      <p>You can play and discard cards as much as you like, with no action. For each discarded card you get ${n.discardMoney}$ or ${n.discardInfluence}◆, your choice.</p>
       <p>The deck has two copies of each card. “Round number” means the number of the current round: in round 5, add 5.</p>
       <p>Attacks are played on a rival. You can play ${selfCards} on yourself.</p>
       ${ctx.html.cardTable(labels)}
@@ -381,13 +401,13 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
         <tbody>
           <tr><td class="name">Buy a business</td><td>1⚡ + price</td><td>A free slot is needed</td></tr>
           <tr><td class="name">Sell a business</td><td>No action</td><td>Get half the price</td></tr>
-          <tr><td class="name">Buy a slot</td><td>1⚡ + ${n.capacityCosts.join(" / ")}$</td><td>6 slots at most</td></tr>
+          <tr><td class="name">Buy a slot</td><td>1⚡ + ${slot4}$ / ${slot5}$ + ${n.capacityInfluence[1]}◆ / ${slot6}$ + ${n.capacityInfluence[2]}◆</td><td>6 slots at most</td></tr>
           <tr><td class="name">Take a project</td><td>1⚡ + project price</td><td>Condition met</td></tr>
           <tr><td class="name">Re-deal the project board</td><td>1⚡ + ${n.reroll}$</td><td>Once per turn</td></tr>
           <tr><td class="name">Take a free role</td><td>1⚡ + ${rolePrice}◆</td><td>Fewer than 5⚠</td></tr>
           <tr><td class="name">Take another player's role</td><td>1⚡ + ${rolePrice * 3}◆</td><td>Fewer than 5⚠, the holder has no Protection🛡</td></tr>
           <tr><td class="name">Take 2 action cards</td><td>1⚡ + ${n.cardCost}$ + 1◆</td><td>Once per turn, up to 3 cards in hand</td></tr>
-          <tr><td class="name">Play or discard a card</td><td>No action</td><td>Discard: ${n.discard}$ or ${n.discard}◆</td></tr>
+          <tr><td class="name">Play or discard a card</td><td>No action</td><td>Discard: ${n.discardMoney}$ or ${n.discardInfluence}◆</td></tr>
           <tr><td class="name">Shady deal</td><td>1⚡</td><td>One per turn</td></tr>
           <tr><td class="name">Buy Protection</td><td>1⚡ + 3$ + (round − 1) ÷ 2</td><td>Up to your Protection🛡 limit</td></tr>
           <tr><td class="name">Crisis PR</td><td>1⚡ + ${n.crisisPr}◆</td><td>Removes 1⚠</td></tr>
@@ -429,9 +449,10 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
         <li><b>Build districts.</b> 2 businesses in a district turn on synergy, 4 double it.</li>
         <li><b>Pick a role for your strategy</b>, not the one that looks strongest.</li>
         <li><b>Watch your scandals.</b> Do not go near the limit without a reason: the Enforcer hits harder the more you have.</li>
-        <li><b>Remove Protection first.</b> Protection stops any hit, so a cheap attack can “strip” a rival before a serious one.</li>
+        <li><b>Remove Protection first.</b> Shady deals stop at Protection, so remove it before the strike: «Break Protection», a card, the Racket or the Enforcer.</li>
         <li><b>The Journalist likes their own scandals.</b> ${selfCards} can be played on yourself.</li>
         <li><b>The player who is behind goes first</b> and picks first on the market and among the projects.</li>
+        <li><b>Support for the trailing player:</b> at the start of every round the player with the lowest score gets +${n.underdog}◆ (on a tie, everyone with the lowest score; if all scores are equal, nobody).</li>
         <li><b>In the last round, spend everything</b> on projects, businesses and points: there is no income after it.</li>
       </ol>
       `,

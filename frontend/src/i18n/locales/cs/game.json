@@ -82,11 +82,11 @@
     "other": "{{key}}: {{have}}/{{needed}}"
   },
   "grey": {
-    "smear": { "label": "Pomluvy", "effect": "1 skandál každému soupeři", "note": "Jediný tah, který zasáhne všechny soupeře najednou, proto má nižší šanci. Ochrana každého soupeře se počítá zvlášť: zastaví jeho skandál a spotřebuje se. Jeden kšeft může sundat až tři Ochrany." },
-    "crypto": { "label": "Pump and dump", "effect": "vzít každému soupeři až {{money}}$", "note": "Peníze přejdou k vám z cizích peněženek, takže je to silnější, když u stolu sedí víc hráčů. Ochrana každého soupeře se počítá zvlášť: zachrání jeho peníze a spotřebuje se." },
-    "roof_break": { "label": "Prolomit Ochranu", "effect": "sundat cíli všechny Ochrany, +{{points}} bod za každou", "note": "Jediný útok, který Ochrana nezastaví — míří přímo na ni. Jde jen tehdy, když má cíl aspoň jednu Ochranu." },
-    "datacenter": { "label": "Hack", "effect": "ukrást cíli až {{influence}}◆", "note": "Vliv je nejvzácnější surovina, proto je tu šance nejnižší a krádež každé kolo roste. Ochrana cíle se spotřebuje a krádež zruší." },
-    "influence_broker": { "label": "Únik špíny", "effect": "cíl přijde o roli", "note": "Cíl ztratí roli: −3 body a všechny bonusy role, a roli pak jde vzít za běžnou cenu. Jde jen tehdy, když cíl nějakou roli má. Ochrana cíle se spotřebuje a únik zastaví." }
+    "smear": { "label": "Pomluvy" },
+    "crypto": { "label": "Pump and dump" },
+    "roof_break": { "label": "Prolomit Ochranu" },
+    "datacenter": { "label": "Hack" },
+    "influence_broker": { "label": "Únik špíny" }
   },
   "perk": {
     "passiveMoney": "+{{value}}$ každé kolo",
@@ -108,7 +108,7 @@
     "distinct_districts": "podniky ve {{count}} různých čtvrtích",
     "tag_objects": "aspoň {{count}} podniků se štítkem {{tag}}"
   },
-  "capacity": { "max": "Maximum — 6 míst", "next": "Místo {{slot}}: {{cost}}$" },
+  "capacity": { "max": "Maximum — 6 míst", "next": "Místo {{slot}}: {{cost}}$", "nextInfluence": "Slot {{slot}}: {{cost}}$ + {{influence}}◆" },
   "cleanup": {
     "base": "Běžný způsob je krizové PR: 1 akce a {{cost}}◆ za jeden skandál.",
     "politician_cleanup": { "label": "🧯 Urovnat skandál: 2◆ → −1⚠", "tooltip": "Schopnost Politika: 1 akce a 2◆ za jeden skandál — o 1◆ levněji než pro ostatní. {{base}}" },
@@ -203,7 +203,12 @@
     "jailedTail": ", Ochrana zmizí",
     "jailedNow": " je zatčen ve svém tahu: zbylé akce propadají",
     "marketRotated": "🔄 Trh s podniky se změnil",
-    "greyBlocked": "zastaveno Ochranou",
+    "underdog": "Podpora poslednímu: ",
+    "greyRoll": "hod {{roll}}",
+    "greyRollModified": "hod {{roll}} (+{{modifier}}) → {{face}}",
+    "greyWeak": "slabý účinek",
+    "greyFull": "plný účinek",
+    "greyBlocked": "zablokováno Ochranou",
     "greySuccess": "úspěch",
     "greyFailure": "neúspěch",
     "gameFinished": "🏆 Hra skončila · vítěz ",
@@ -235,7 +240,8 @@
     "journalist_money": { "label": "Peníze za cizí skandály", "unit": "$/kolo", "hint": "1$ za každý cizí skandál, 2$ pokud máte podnik v Obchodní čtvrti" },
     "journalist_rating": { "label": "Vliv za vlastní skandály", "unit": "◆/kolo", "hint": "+1◆ za každý váš skandál — potřebujete aspoň jeden podnik na Sídlišti" },
     "fraudster_actions": { "label": "Čtyři akce za tah", "unit": "", "hint": "Víc než kterákoli jiná role" },
-    "fraudster_chance": { "label": "Bonus k šanci šedých kšeftů", "unit": "%", "hint": "+30 % ke každému šedému kšeftu" },
+    "fraudster_grey_roll": {"label": "Bonus k hodu šedých operací", "unit": "", "hint": "+1 ke každému hodu"},
+    "mafia_grey_roll": {"label": "Bonus k hodu šedých operací", "unit": "", "hint": "+1 za každý vlastní podnik Šedé zóny, nejvýš +2"},
     "mafia_racket_money": { "label": "Peníze z výpalného", "unit": "$", "hint": "2$ plus 2$ za každý váš podnik v Šedé zóně (+5$, pokud je cíl lídr)" },
     "mafia_racket_influence": { "label": "Vliv z výpalného", "unit": "◆", "hint": "1◆ za každý váš podnik ve Vládní čtvrti" },
     "mafia_roofs": { "label": "Limit Ochrany", "unit": "", "hint": "2 místo 1 a každá o 1$ levnější" },
@@ -391,7 +397,7 @@
       "details": "{{title}} — podrobnosti", "slot": "Místo {{number}}", "free": "Volné", "openSlot": "Otevřít místo",
       "openPrevious": "Nejdřív otevřete předchozí místo",
       "openTitle": "Otevřít místo {{number}}?", "openHint": "Místo natrvalo rozšíří vaše město: můžete do něj postavit další podnik.",
-      "openPrice": "Cena: {{money}}$ a jedna akce. Peníze se nevracejí.", "openConfirm": "Otevřít místo", "lockedSlot": "🔒 Místo {{number}}", "open": "Otevřít · ",
+      "openPrice": "Cena: {{money}}$ a jedna akce. Peníze se nevracejí.", "openPriceInfluence": "Cena: {{money}}$, {{influence}}◆ a jedna akce. Nic se nevrací.", "openConfirm": "Otevřít místo", "lockedSlot": "🔒 Místo {{number}}", "open": "Otevřít · ",
       "district": "čtvrť {{count}}/4", "districtTitle": "Vaše podniky v této čtvrti. Synergie začíná při 2 a při 4.",
       "sellTitle": "Prodat za {{value}}$ — nestojí akci", "districtRow": "Čtvrť",
       "districtValue": "{{icon}} {{title}} · máte {{count}} ze 4", "incomeRow": "Příjem",
@@ -495,9 +501,61 @@
     },
     "preview": { "roofEats": "Ochrana to zastaví: 🛡−1", "losesRole": "přijde o roli", "nothing": "—", "colTarget": "Cíl", "colLoses": "Cíl ztratí", "colYou": "Získáte", "pick": "Vybrat", "confirm": "Potvrdit", "confirmTitle": "koho to zasáhne — zkontrolujte a potvrďte",  "stripsRole": "vezme roli", "selfScandals": "vám ⚠+{{count}}", "leader": "lídr — dvojnásobek", "roofBlocks": " — zastaví to" },
     "grey": {
-      "title": "🌒 Šedé kšefty", "spent": "už proběhl", "once": "jeden za tah",
-      "intro": "Kšeft otevře kterýkoli váš podnik ve správné čtvrti — role není potřeba. Jeden kšeft za tah a pokus se spotřebuje i při neúspěchu. Úspěch vám dá {{success}} skandál, neúspěch {{failure}}. Vlastní skandály Ochrana nezastaví.",
-      "spentHint": "v tomto tahu už kšeft proběhl", "needHint": "potřebujete podnik ve čtvrti: {{districts}}", "chance": "{{chance}} % · {{points}} b."
+      "title": "🌒 Šedé operace",
+      "spent": "už proběhla",
+      "once": "jedna za tah",
+      "intro": "Operaci odemyká jakýkoli váš podnik příslušné čtvrti — role není potřeba. Jedna operace za tah: hoďte kostkou a podívejte se do tabulky. Stěny 1–2 jsou neúspěch, 3–4 slabý účinek, 5–6 plný. Skandály pro vás závisí také na stěně; Ochrana vaše vlastní skandály neruší. Operace nedávají body: vše, co přinesou, je v účinku.",
+      "defence": "Ochrana cíle zablokuje jakoukoli šedou operaci celou a nespotřebuje se. Ochranu sundá jen «Prolomit Ochranu» — před útokem se ujistěte, že je cíl otevřený.",
+      "spentHint": "v tomto tahu už operace proběhla",
+      "needHint": "potřebuje podnik ve čtvrti: {{districts}}",
+      "noRoofs": "žádný soupeř nemá Ochranu",
+      "noTarget": "není vhodný cíl",
+      "unavailable": "teď nedostupné — v tomto tahu už nejsou akce",
+      "unlock": "odemyká: {{districts}}",
+      "targeted": "jeden cíl",
+      "mass": "všichni soupeři bez Ochrany",
+      "massRoofs": "všichni soupeři s Ochranou",
+      "modifierNone": "Váš modifikátor hodu: žádný — stěna platí, jak padla.",
+      "modifier": "Váš modifikátor hodu: +{{value}}",
+      "modifierCap": "nikdy víc než +{{cap}}",
+      "modifierShift": "stěna se posouvá nahoru, nad 6 se počítá jako 6",
+      "source": {
+        "fraudster": "Podvodník +{{value}}",
+        "mafia": "Mafie +{{value}} za Šedou zónu",
+        "card": "karta +{{value}}"
+      },
+      "row": {
+        "roll": "Hod",
+        "countsAs": "Počítá se jako",
+        "effect": "Účinek",
+        "scandals": "Vaše skandály"
+      },
+      "tier": {
+        "fail": "neúspěch",
+        "weak": "slabě",
+        "full": "plně"
+      },
+      "clean": "čistě",
+      "capNote": "Teď je {{third}} hry; nikdy víc, než cíl má.",
+      "third": {
+        "0": "začátek",
+        "1": "střed",
+        "2": "konec"
+      },
+      "run": "Spustit",
+      "runAt": "Proti: {{name}}",
+      "defended": "Cíl má Ochranu — operace nezabere a Ochrana zůstane",
+      "effect": {
+        "none": "—",
+        "smear": "skandál každému",
+        "smearPaid": "skandál každému, +{{influence}}◆ za každý",
+        "crypto": "{{money}}$ od každého",
+        "datacenter": "ukrást {{influence}}◆",
+        "leakScandal": "cíl +{{scandals}}⚠, vy +{{influence}}◆",
+        "leakStrip": "odebrat roli, vy +{{influence}}◆",
+        "roofBreak": "sundat všem všechnu Ochranu",
+        "roofBreakPaid": "sundat všechnu Ochranu, +{{influence}}◆ za každou"
+      }
     },
     "marketPanel": { "title": "Trh" }
   }

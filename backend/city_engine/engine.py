@@ -16,7 +16,9 @@ from city_engine.constants import (
     BASE_SCANDAL_LIMIT,
     CAMPAIGN_TIERS,
     CAPACITY_COSTS,
-    CARD_DISCARD_VALUE,
+    CAPACITY_INFLUENCE,
+    CARD_DISCARD_INFLUENCE,
+    CARD_DISCARD_MONEY,
     CARD_PURCHASE_FLAG,
     CASH_TO_INFLUENCE_MONEY,
     CONSEQUENCE_EVENTS,
@@ -24,18 +26,20 @@ from city_engine.constants import (
     CRYPTO_SCAM_SCANDALS,
     CRYPTO_SCAM_SHARE,
     DISTRICT_IDS,
-    FRAUDSTER_GREY_BONUS,
-    GREY_FAILURE_SCANDALS,
-    GREY_OPERATION_CHANCE,
+    FRAUDSTER_GREY_ROLL,
+    GREY_DIE_SIDES,
     GREY_OPERATION_FLAG,
-    GREY_OPERATION_POINTS,
-    GREY_SUCCESS_SCANDALS,
-    HACK_INFLUENCE_BASE,
+    GREY_ROLL_BONUS_FLAG,
+    GREY_ROLL_CAP,
+    GREY_SCANDALS,
+    GREY_SCANDALS_BY_OPERATION,
     HAND_LIMIT,
     JOURNALIST_SCANDAL_LIMIT,
     LATE_FILLER_RARITIES,
     LOBBYING_INFLUENCE,
     LOBBYING_POINTS,
+    MAFIA_GREY_ROLL_MAX,
+    MAFIA_GREY_ROLL_PER_OBJECT,
     MARKET_DISCARD_WEIGHTS,
     MARKET_ROTATION_SIZE,
     MAX_CAPACITY,
@@ -48,13 +52,13 @@ from city_engine.constants import (
     PROJECT_BOARD_SIZE,
     PROJECT_REROLL_MONEY,
     PUBLICATION_SCANDALS,
-    PUMP_DRAIN_BASE,
+    RACKET_BASE,
     RACKET_LEADER_BONUS,
     ROLE_IDS,
-    ROOF_BREAK_POINT_PER_ROOF,
     SANCTION_INFLUENCE_TIER,
     SANCTION_MONEY_TIER,
     SANCTION_ROLE_TIER,
+    UNDERDOG_INFLUENCE,
 )
 from city_engine.content import (
     ActionCardDefinition,
@@ -62,6 +66,7 @@ from city_engine.content import (
     ContentCatalog,
     ProjectDefinition,
     asset_points,
+    grey_face_effect,
     load_catalog,
 )
 from city_engine.errors import CityEngineError, IllegalActionError, InvalidCommandError, StaleRevisionError
@@ -229,7 +234,11 @@ class CityEngine:
                     >= (state.role_price * 3 if self.role_holder(state, role_id) else state.role_price)
                 )
         if can_act:
-            if player.capacity < MAX_CAPACITY and player.money >= CAPACITY_COSTS.get(player.capacity, 10**9):
+            if (
+                player.capacity < MAX_CAPACITY
+                and player.money >= CAPACITY_COSTS.get(player.capacity, 10**9)
+                and player.influence >= CAPACITY_INFLUENCE.get(player.capacity, 0)
+            ):
                 candidates.append(Command(type="buy_capacity", actor_id=actor_id))
             if len(player.assets) < player.capacity:
                 candidates.extend(
@@ -305,19 +314,20 @@ class CityEngine:
         candidates.extend(self._role_power_candidates(state, actor_id))
         # One grey operation a turn, so once it is spent none of them are on offer any more.
         can_run_grey = can_act and not self._flag(state, GREY_OPERATION_FLAG)
-        for asset_id in ("smear", "crypto"):
+        rivals_with_roofs = any(other.roofs > 0 for other in state.players if other.id != actor_id)
+        for asset_id in ("smear", "crypto", "roof_break"):
             if not can_run_grey or not self.grey_operation_unlocked(player, asset_id):
                 continue
+            # The roof break needs a Защита somewhere at the table: an offer that cannot change
+            # anything is noise in a panel of five.
+            if asset_id == "roof_break" and not rivals_with_roofs:
+                continue
             candidates.append(Command(type="grey_operation", actor_id=actor_id, payload={"asset_id": asset_id}))
-        for asset_id in ("roof_break", "datacenter", "influence_broker"):
+        for asset_id in self.GREY_TARGETED_IDS:
             if not can_run_grey or not self.grey_operation_unlocked(player, asset_id):
                 continue
             for target in state.players:
                 if target.id == actor_id:
-                    continue
-                # Both of these need something to take away: a roof to break, a role to leak. An
-                # offer that cannot change anything is noise in a panel of five.
-                if asset_id == "roof_break" and target.roofs < 1:
                     continue
                 if asset_id == "influence_broker" and target.role is None:
                     continue
@@ -956,12 +966,16 @@ class CityEngine:
         cost = CAPACITY_COSTS.get(player.capacity)
         if cost is None or player.capacity >= MAX_CAPACITY:
             raise IllegalActionError("maximum capacity reached")
+        influence = CAPACITY_INFLUENCE.get(player.capacity, 0)
         if player.money < cost:
             raise IllegalActionError("not enough money for capacity")
+        if player.influence < influence:
+            raise IllegalActionError(f"this slot also costs {influence} influence")
         self._spend_action(state)
         player.money -= cost
+        player.influence -= influence
         player.capacity += 1
-        state.append_event("capacity_bought", player.id, cost=cost, capacity=player.capacity)
+        state.append_event("capacity_bought", player.id, cost=cost, cost_influence=influence, capacity=player.capacity)
 
     def _buy_roof(self, state: GameState, command: Command) -> None:
         player = state.current_player
@@ -1197,13 +1211,12 @@ class CityEngine:
         player.hand.remove(held)
         # Softens a blind draw: returning a single unit made the discard a pure loss on a card
         # that cost 3$ and 1◆, so nobody ever used it on purpose.
+        value = CARD_DISCARD_MONEY if into == "money" else CARD_DISCARD_INFLUENCE
         if into == "money":
-            player.money += CARD_DISCARD_VALUE
+            player.money += value
         else:
-            player.influence += CARD_DISCARD_VALUE
-        state.append_event(
-            "action_card_converted", player.id, card_id=held.card_id, into=into, value=CARD_DISCARD_VALUE
-        )
+            player.influence += value
+        state.append_event("action_card_converted", player.id, card_id=held.card_id, into=into, value=value)
 
     def _play_action_card(self, state: GameState, command: Command) -> None:
         player = state.current_player
@@ -1232,6 +1245,10 @@ class CityEngine:
                 # side of the card is skipped, because there is no attacker: paying the leader
                 # bonus or the theft to the player who is also the victim would mint resources.
                 self._apply_targeted_card_effect(state, player, target, card)
+            elif card.kind in self.ROOF_CARD_KINDS:
+                # Aimed at the token itself, so the token cannot answer for it — the same rule as
+                # «Пробить защиту» and «Отобрать Защиту».
+                self._apply_targeted_card_effect(state, player, target, card)
             elif target.roofs > 0:
                 # Roof automatically absorbs the incoming effect — no player decision. The attacker's
                 # own side of the card is skipped with it: the loot, the influence and above all the
@@ -1251,9 +1268,16 @@ class CityEngine:
             deltas=self._resource_deltas(state, before),
         )
 
+    # Targeted cards whose effect *is* taking a Защита: the token does not answer for itself.
+    ROOF_CARD_KINDS = frozenset({"roof_strip", "roof_steal"})
+
     def _validate_card_target(self, card: ActionCardDefinition, target: PlayerState) -> None:
         if card.kind == "role_pressure" and target.role is None:
             raise IllegalActionError("role pressure requires a role holder")
+        if card.kind in self.ROOF_CARD_KINDS and target.roofs < 1:
+            raise IllegalActionError("the target holds no Защита")
+        if card.kind == "inspection_fine" and target.scandals < 1:
+            raise IllegalActionError("the inspection needs a target with a scandal")
 
     def _validate_card_costs(
         self,
@@ -1276,6 +1300,14 @@ class CityEngine:
             raise IllegalActionError(f"this card requires {card.value * POINTS_CARD_RATE} money")
         if card.kind == "capacity" and player.capacity >= MAX_CAPACITY:
             raise IllegalActionError("the business is already at the slot limit")
+        if card.kind == "roof_steal" and player.roofs >= self.roof_limit(player):
+            raise IllegalActionError("roof limit reached")
+        if card.kind == "shadow_cash" and self.district_count(player, "shadows") < 1:
+            raise IllegalActionError("the shadow cash pays per Серый сектор object and there is none")
+        if card.kind == "government_influence" and self.district_count(player, "government") < 1:
+            raise IllegalActionError("the card pays per administrative object and there is none")
+        if card.kind == "grey_roll" and self._flag(state, GREY_OPERATION_FLAG):
+            raise IllegalActionError("the grey operation of this turn has already been run")
         if card.kind == "zoning":
             district = self._payload_string(command, "district")
             if district not in DISTRICT_IDS:
@@ -1349,6 +1381,23 @@ class CityEngine:
             # card strictly worse than discarding it for influence.
             player.money -= CASH_TO_INFLUENCE_MONEY
             player.influence += card.value
+        elif kind == "shadow_cash":
+            # The Серый сектор's own payday: per object, capped like the tender, and the mafia
+            # collects a little influence on top — the role is the district's natural owner.
+            objects = self.district_count(player, "shadows")
+            player.money += min(card.value * objects, self._round_scaled(state, 10))
+            if self.has_role(player, "mafia"):
+                player.influence += 1
+        elif kind == "government_influence":
+            # No ceiling: six administrative objects are their own penalty.
+            player.influence += card.value * self.district_count(player, "government")
+        elif kind == "popular_support":
+            # Last at the table, ties included, gets the full support; everybody else the half.
+            mine = self.score(player)
+            last = all(self.score(other) >= mine for other in state.players)
+            player.influence += card.value * 2 if last else card.value
+        elif kind == "grey_roll":
+            state.turn_flags[GREY_ROLL_BONUS_FLAG] = int(state.turn_flags.get(GREY_ROLL_BONUS_FLAG, 0)) + card.value
         elif kind == "project":
             # The card pays the influence, not the condition: the project still has to be earned.
             project_id = str(command.payload["project_id"])
@@ -1442,6 +1491,18 @@ class CityEngine:
         elif kind == "mixed_fine":
             target.money = max(0, target.money - self._round_scaled(state, 2))
             target.influence = max(0, target.influence - 1)
+        elif kind == "roof_strip":
+            target.roofs = max(0, target.roofs - card.value)
+        elif kind == "roof_steal":
+            taken = min(card.value, target.roofs, self.roof_limit(attacker) - attacker.roofs)
+            target.roofs -= taken
+            attacker.roofs += taken
+        elif kind == "inspection_fine":
+            # A fine on a dirty rival; the military, whose trade this is, pockets it.
+            taken = min(self._round_scaled(state, card.value), target.money)
+            target.money -= taken
+            if self.has_role(attacker, "military"):
+                attacker.money += taken
         else:
             raise InvalidCommandError(f"unsupported targeted card kind: {kind}")
 
@@ -1551,7 +1612,7 @@ class CityEngine:
         # this role, and a demand that grows with the round alone rewards the calendar instead of
         # the tableau.
         money_demand = (
-            2
+            RACKET_BASE
             + 2 * self.district_count(player, "shadows")
             + floor(state.round_number / 3)
             + (RACKET_LEADER_BONUS if leader else 0)
@@ -1893,14 +1954,9 @@ class CityEngine:
     # makes it a mid-game play that has to be built towards.
     GREY_OPERATION_NEEDS_ALL = frozenset({"influence_broker"})
     GREY_ASSET_IDS = tuple(GREY_OPERATION_DISTRICTS)
-    # The smear and the pump reach every rival at once, so they ask for no target; the other three
-    # are pointed at one player.
-    GREY_TARGETED_IDS = ("roof_break", "datacenter", "influence_broker")
-    GREY_BASE_CHANCE = GREY_OPERATION_CHANCE
-
-    def grey_operation_points(self, asset_id: str) -> int:
-        """Victory points a successful run of this operation scores, before any per-effect bonus."""
-        return GREY_OPERATION_POINTS[asset_id]
+    # The smear, the pump and the roof break reach every rival at once; the hack and the leak are
+    # pointed at one player.
+    GREY_TARGETED_IDS = ("datacenter", "influence_broker")
 
     def grey_operation_unlocked(self, player: PlayerState, operation_id: str) -> bool:
         """Does the player hold an object in a district this operation runs out of?
@@ -1915,13 +1971,78 @@ class CityEngine:
         check = all if operation_id in self.GREY_OPERATION_NEEDS_ALL else any
         return bool(districts) and check(self.district_count(player, district) > 0 for district in districts)
 
-    def hack_influence_steal(self, state: GameState) -> int:
-        """How much influence a hack takes. Grows with the round — see HACK_INFLUENCE_BASE."""
-        return HACK_INFLUENCE_BASE + floor(state.round_number / 3)
+    @staticmethod
+    def game_third(state: GameState) -> int:
+        """0, 1 or 2: which third of the match this round is in. The game length is configurable."""
+        third = max(1, state.max_rounds // 3)
+        return 0 if state.round_number <= third else 1 if state.round_number <= 2 * third else 2
 
-    def pump_drain(self, state: GameState) -> int:
-        """What the pump takes from each rival, growing with the round like every money figure."""
-        return PUMP_DRAIN_BASE + floor(state.round_number / 2)
+    def _mafia_grey_roll(self, player: PlayerState) -> int:
+        if not self.has_role(player, "mafia"):
+            return 0
+        return min(MAFIA_GREY_ROLL_MAX, MAFIA_GREY_ROLL_PER_OBJECT * self.district_count(player, "shadows"))
+
+    def grey_roll_modifier(self, state: GameState, player: PlayerState) -> tuple[int, list[dict[str, Any]]]:
+        """What this player adds to the die, and where each part comes from. Capped at GREY_ROLL_CAP."""
+        sources: list[dict[str, Any]] = []
+        if self.has_role(player, "fraudster"):
+            sources.append({"source": "fraudster", "value": FRAUDSTER_GREY_ROLL})
+        mafia = self._mafia_grey_roll(player)
+        if mafia:
+            sources.append({"source": "mafia", "value": mafia})
+        if state.status == "playing" and state.current_player.id == player.id:
+            card = int(state.turn_flags.get(GREY_ROLL_BONUS_FLAG, 0))
+            if card:
+                sources.append({"source": "card", "value": card})
+        return min(GREY_ROLL_CAP, sum(int(item["value"]) for item in sources)), sources
+
+    @staticmethod
+    def grey_tier(face: int) -> str:
+        """Faces 1–2 do nothing, 3–4 the weak version, 5–6 the full one."""
+        return "fail" if face <= 2 else "weak" if face <= 4 else "full"
+
+    def grey_scandals(self, player: PlayerState, asset_id: str, face: int) -> int:
+        row = GREY_SCANDALS_BY_OPERATION.get(asset_id, GREY_SCANDALS)
+        return max(0, row[face - 1] - self.grey_scandal_reduction(player))
+
+    def grey_face_effect(self, state: GameState, asset_id: str, face: int) -> dict[str, Any]:
+        """The printed effect of one face: whole numbers, already for this third of the game."""
+        if asset_id not in self.GREY_ASSET_IDS:
+            raise InvalidCommandError("unknown grey operation asset")
+        return grey_face_effect(asset_id, face, self.game_third(state))
+
+    def grey_table(self, state: GameState, player: PlayerState, asset_id: str) -> dict[str, Any]:
+        """The operation's die, face by face, for this player right now.
+
+        One row per printed face: the face it reads as after the player's modifiers, the outcome,
+        the scandals and the effect. This is what the grey panel draws and what every bot prices —
+        one source, so the panel can never promise what the engine will not pay.
+        """
+        modifier, sources = self.grey_roll_modifier(state, player)
+        rows = []
+        for roll in range(1, GREY_DIE_SIDES + 1):
+            face = min(GREY_DIE_SIDES, roll + modifier)
+            rows.append(
+                {
+                    "roll": roll,
+                    "face": face,
+                    "tier": self.grey_tier(face),
+                    "scandals": self.grey_scandals(player, asset_id, face),
+                    "effect": self.grey_face_effect(state, asset_id, face),
+                }
+            )
+        return {
+            "asset_id": asset_id,
+            "unlocked": self.grey_operation_unlocked(player, asset_id),
+            "targeted": asset_id in self.GREY_TARGETED_IDS,
+            "modifier": modifier,
+            "sources": sources,
+            "third": self.game_third(state),
+            "rows": rows,
+        }
+
+    def grey_tables(self, state: GameState, player: PlayerState) -> list[dict[str, Any]]:
+        return [self.grey_table(state, player, asset_id) for asset_id in self.GREY_ASSET_IDS]
 
     def _grey_operation(self, state: GameState, command: Command) -> None:
         player = state.current_player
@@ -1935,137 +2056,120 @@ class CityEngine:
         target: PlayerState | None = None
         if asset_id in self.GREY_TARGETED_IDS:
             target = self._target_player(state, player, self._payload_string(command, "target_id"))
-        if asset_id == "roof_break" and (target is None or target.roofs < 1):
-            raise IllegalActionError("breaking a roof requires a target who holds one")
+        rivals = [other for other in state.players if other.id != player.id]
+        if asset_id == "roof_break" and not any(rival.roofs > 0 for rival in rivals):
+            raise IllegalActionError("there is no Защита at the table to break")
         if asset_id == "influence_broker" and (target is None or target.role is None):
             raise IllegalActionError("a compromat leak requires a target who holds a role")
         self._spend_action(state)
-        # Marked before the roll: the turn's one attempt is the attempt, not the hit. Refunding a
-        # miss would let a player re-roll the same operation until it landed, which is the opposite
-        # of a cap — and it would make the long-odds operations the safest ones to open with.
+        # Marked before the roll: the turn's one attempt is the attempt, not the hit.
         self._mark_flag(state, GREY_OPERATION_FLAG)
         before = self._resource_snapshot(state)
-
-        # One flat number. The old bonus was "+20% for the role, +10% more for any Технокластер
-        # object", and the crypto exchange is a Технокластер object, so the fraudster's own signature
-        # operation always granted both and landed on the 0.9 ceiling regardless of anything else.
-        fraud_bonus = FRAUDSTER_GREY_BONUS if self.has_role(player, "fraudster") else 0
-        chance = min(0.9, self.GREY_BASE_CHANCE[asset_id] + fraud_bonus)
-        success = GameRNG(state.rng).chance(chance)
-        points = 0
+        modifier, sources = self.grey_roll_modifier(state, player)
+        # «Подкуп охраны» waits for exactly one roll.
+        state.turn_flags.pop(GREY_ROLL_BONUS_FLAG, None)
+        roll = GameRNG(state.rng).randbelow(GREY_DIE_SIDES) + 1
+        face = min(GREY_DIE_SIDES, roll + modifier)
+        tier = self.grey_tier(face)
         blocked = False
-        if success:
-            # The roll is what the operation is paid for and charged for, not the damage. A run
-            # that meets nothing but Крыши still burns one token off every defender it reached,
-            # and that is a real result — spending three of the table's tokens for free was the
-            # cheapest board-wide play in the game. So a successful roll always costs its scandal
-            # and always pays its points, blocked or not.
-            landed, bonus_points = self._resolve_grey_success(state, player, target, asset_id)
-            blocked = not landed
-            points = self.grey_operation_points(asset_id) + bonus_points
-            player.bonus_points += points
-            self._charge_grey_scandals(state, player, GREY_SUCCESS_SCANDALS)
-        else:
-            # A miss does nothing at all — no stake lost, no object frozen, no roof burnt. The
-            # penalty is the extra scandal and the action, one rule for all five operations.
-            self._charge_grey_scandals(state, player, GREY_FAILURE_SCANDALS)
+        if tier != "fail":
+            blocked = not self._resolve_grey_effect(state, player, target, asset_id, face)
+        scandals = self.grey_scandals(player, asset_id, face)
+        # Scandals last: the effect is resolved first, and the attacker's own cost cannot cancel it.
+        self.add_scandal(state, player, scandals)
         state.append_event(
             "grey_operation_resolved",
             player.id,
             asset_id=asset_id,
             target_id=target.id if target else None,
-            success=success,
-            # A successful roll that a roof swallowed. Distinct from ``success=False``: the analytics
-            # need to tell "the odds failed" apart from "the defence held".
+            roll=roll,
+            modifier=modifier,
+            modifier_sources=[str(item["source"]) for item in sources],
+            face=face,
+            tier=tier,
+            success=tier != "fail",
+            # A hit a Защита swallowed. Distinct from ``success=False``: the analytics need to tell
+            # "the die failed" apart from "the defence held".
             blocked=blocked,
-            chance=chance,
-            points=points,
+            scandals=scandals,
             deltas=self._resource_deltas(state, before),
         )
 
-    def _charge_grey_scandals(self, state: GameState, player: PlayerState, amount: int) -> None:
-        """One scandal for a hit, two for a miss, less with the perk that exists to soften both.
+    def _grey_blocked(self, state: GameState, defender: PlayerState, asset_id: str) -> None:
+        """A Защита answers a grey operation in full and is not spent: the layer cannot strip tokens."""
+        state.append_event("targeted_effect_blocked", defender.id, asset_id=asset_id, by="roof", kept=True)
 
-        A Крыша never touches these: the scandal is the player's own doing, and add_scandal is the
-        line where that rule lives.
-        """
-        self.add_scandal(state, player, max(0, amount - self.grey_scandal_reduction(player)))
-
-    def _resolve_grey_success(
+    def _resolve_grey_effect(
         self,
         state: GameState,
         player: PlayerState,
         target: PlayerState | None,
         asset_id: str,
-    ) -> tuple[bool, int]:
-        """Apply the effect. Returns whether anything landed, and any points the effect itself earned.
+        face: int,
+    ) -> bool:
+        """Apply one face of the operation. ``False`` if every rival it reached stood behind a Защита.
 
-        ``False`` means every rival the operation reached was behind a Крыша, so no damage was
-        done. It does **not** mean the run was free: the caller still charges the scandal and pays
-        the points, because the tokens those Крыши spent are the result.
+        The Защита rule of the layer: a grey operation never removes a token and never gets through
+        one — only «Пробить защиту», whose whole job it is, takes them off. Before running anything
+        else the player has to make sure the target is open.
         """
+        effect = self.grey_face_effect(state, asset_id, face)
         rivals = [other for other in state.players if other.id != player.id]
         if asset_id == "smear":
-            # A scandal on every rival at once. Each roof answers for its own owner, so a single
-            # action can strip three of them — the only thing in the game that outpaces the
-            # defence, and the reason the odds sit below its neighbours'.
-            landed = False
+            hits = 0
             for rival in rivals:
                 if rival.roofs > 0:
-                    rival.roofs -= 1
-                    state.append_event("targeted_effect_blocked", rival.id, asset_id=asset_id, by="roof")
+                    self._grey_blocked(state, rival, asset_id)
                     continue
-                self.add_scandal(state, rival, 1)
-                landed = True
-            return landed, 0
+                self.add_scandal(state, rival, int(effect["scandal_each"]))
+                hits += 1
+            player.influence += hits * int(effect["influence_per_hit"])
+            return hits > 0
         if asset_id == "crypto":
-            # The pump drains the whole table into one wallet instead of paying its owner out of
-            # thin air and jabbing the leader on the side. It is the money operation, and it is the
-            # only one whose payout grows with the number of players.
-            drain = self.pump_drain(state)
             landed = False
             for rival in rivals:
                 if rival.roofs > 0:
-                    rival.roofs -= 1
-                    state.append_event("targeted_effect_blocked", rival.id, asset_id=asset_id, by="roof")
+                    self._grey_blocked(state, rival, asset_id)
                     continue
-                taken = min(drain, rival.money)
+                taken = min(int(effect["money_each"]), rival.money)
                 rival.money -= taken
                 player.money += taken
                 landed = True
-            return landed, 0
-        if asset_id == "roof_break" and target is not None:
-            # The one attack a Крыша cannot answer, because the Крыша is what it is aimed at.
-            # Blocking it with the very token it removes would make the stack self-defending and
-            # the whole operation unreachable.
-            taken = target.roofs
-            target.roofs = 0
-            state.append_event("roofs_broken", player.id, target_id=target.id, roofs=taken)
-            # A point per token: without it the operation is a pure set-up whose value is shared
-            # with everybody at the table, and nobody spends an action and a scandal on that.
-            return True, taken * ROOF_BREAK_POINT_PER_ROOF
-        if asset_id == "datacenter" and target is not None:
-            if target.roofs > 0:
-                # A roof absorbs any incoming negative effect, hacking included.
-                target.roofs -= 1
-                state.append_event("targeted_effect_blocked", target.id, asset_id=asset_id, by="roof")
-                return False, 0
-            stolen = min(self.hack_influence_steal(state), target.influence)
+            return landed
+        if asset_id == "roof_break":
+            # The one operation aimed at the token itself, so the token cannot answer for it — and
+            # it opens the whole table at once.
+            taken_total = 0
+            for rival in rivals:
+                if rival.roofs < 1 or not effect["strip_roofs"]:
+                    continue
+                taken = rival.roofs
+                rival.roofs = 0
+                taken_total += taken
+                state.append_event("roofs_broken", player.id, target_id=rival.id, roofs=taken)
+            player.influence += taken_total * int(effect["influence_per_roof"])
+            return taken_total > 0
+        if target is None:
+            return False
+        if target.roofs > 0:
+            self._grey_blocked(state, target, asset_id)
+            return False
+        if asset_id == "datacenter":
+            stolen = min(int(effect["influence"]), target.influence)
             target.influence -= stolen
             player.influence += stolen
-            return True, 0
-        if asset_id == "influence_broker" and target is not None:
-            if not self._resolve_compromat(state, player, target):
-                return False, 0
-            return True, 0
-        return False, 0
+            return True
+        if asset_id == "influence_broker":
+            if effect["strip_role"]:
+                self._resolve_compromat(state, player, target)
+            else:
+                self.add_scandal(state, target, int(effect["target_scandals"]))
+            player.influence += int(effect["influence"])
+            return True
+        return False
 
     def _resolve_compromat(self, state: GameState, player: PlayerState, target: PlayerState) -> bool:
-        """Strip the target's role unless a Крыша takes the hit instead. ``False`` if it was blocked."""
-        if target.roofs > 0:
-            target.roofs -= 1
-            state.append_event("targeted_effect_blocked", target.id, asset_id="influence_broker", by="roof")
-            return False
+        """Strip the target's role. The Защита check is the caller's: see ``_resolve_grey_effect``."""
         lost_role = target.role
         target.role = None
         self._apply_role_limits(target, state)
@@ -2199,6 +2303,7 @@ class CityEngine:
 
         state.round_number += 1
         state.turns_taken_in_round = 0
+        self._grant_underdog_influence(state)
         self._set_turn_order(state)
         state.turn_serial += 1
         self._rotate_market(state)
@@ -2206,6 +2311,25 @@ class CityEngine:
         self._rotate_project_board(state)
         self._prepare_current_player(state)
         state.append_event("round_started", round_number=state.round_number, player_id=state.current_player.id)
+
+    def _grant_underdog_influence(self, state: GameState) -> None:
+        """The trailing player — every one of them on a tie for last — opens the round with +1◆.
+
+        Not when the whole table is level: that is the opening, not a deficit. See UNDERDOG_INFLUENCE.
+        """
+        scores = {player.id: self.score(player) for player in state.players}
+        lowest = min(scores.values())
+        if all(value == lowest for value in scores.values()):
+            return
+        trailing = [player for player in state.players if scores[player.id] == lowest]
+        for player in trailing:
+            player.influence += UNDERDOG_INFLUENCE
+        state.append_event(
+            "underdog_bonus",
+            player_ids=[player.id for player in trailing],
+            influence=UNDERDOG_INFLUENCE,
+            round_number=state.round_number,
+        )
 
     @staticmethod
     def _seat_of(state: GameState, player_id: str) -> int:
@@ -2760,7 +2884,7 @@ class CityEngine:
         if power == "mafia_racket":
             leader = self.ranking(state)[0].id == target.id
             demand = (
-                2
+                RACKET_BASE
                 + 2 * self.district_count(player, "shadows")
                 + floor(state.round_number / 3)
                 + (RACKET_LEADER_BONUS if leader else 0)
@@ -2943,14 +3067,7 @@ class CityEngine:
             )
         elif player.role == "fraudster":
             rows.append({"key": "fraudster_actions", "value": 1, "needs": None})
-            rows.append(
-                {
-                    "key": "fraudster_chance",
-                    "value": int(FRAUDSTER_GREY_BONUS * 100),
-                    "potential": int(FRAUDSTER_GREY_BONUS * 100),
-                    "needs": None,
-                }
-            )
+            rows.append({"key": "fraudster_grey_roll", "value": FRAUDSTER_GREY_ROLL, "needs": None})
         elif player.role == "mafia":
             # The racket is an active power, not a passive, and its formula counts the rented
             # quarter — so these two rows have to read the same number the power will pay. Через
@@ -2958,7 +3075,7 @@ class CityEngine:
             rows.append(
                 {
                     "key": "mafia_racket_money",
-                    "value": 2 + 2 * self.district_count(player, "shadows"),
+                    "value": RACKET_BASE + 2 * self.district_count(player, "shadows"),
                     "needs": "shadows",
                 },
             )
@@ -2970,6 +3087,15 @@ class CityEngine:
                 },
             )
             rows.append({"key": "mafia_roofs", "value": self.roof_limit(player), "needs": None})
+            # The role's grey power: +1 to the roll per own Серый сектор object, at most +2.
+            rows.append(
+                {
+                    "key": "mafia_grey_roll",
+                    "value": self._mafia_grey_roll(player),
+                    "potential": MAFIA_GREY_ROLL_MAX,
+                    "needs": "shadows",
+                }
+            )
         elif player.role == "military":
             dirty = sum(1 for other in state.players if other.id != player.id and other.scandals >= SANCTION_MONEY_TIER)
             rows.append({"key": "military_sanction_targets", "value": dirty, "needs": None})

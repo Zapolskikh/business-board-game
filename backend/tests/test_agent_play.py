@@ -68,7 +68,7 @@ def test_client_transport_plays_a_full_turn_through_the_rest_api(tmp_path: Path)
         app.dependency_overrides.clear()
 
 
-def test_grey_operation_hint_reads_the_per_operation_score_table() -> None:
+def test_grey_operation_hint_describes_the_die() -> None:
     catalog = Catalog.from_meta(CityRoomService(InMemoryRoomRepository()).engine.catalog.public_meta())
     game = {
         "players": [{"id": "seat-1", "name": "Claude"}, {"id": "seat-2", "name": "Bot"}],
@@ -81,7 +81,7 @@ def test_grey_operation_hint_reads_the_per_operation_score_table() -> None:
 
     text = describe_action(1, action, game, me, catalog)
 
-    assert "+2 очка" in text
+    assert "кубик" in text and "5–6 полный" in text
 
 
 def test_journalist_publication_is_not_rendered_as_a_free_power() -> None:

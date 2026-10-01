@@ -174,6 +174,9 @@ export interface GameState {
   // Every perk of the viewer's role: what it pays now, the ceiling, and the district that
   // unlocks the difference. Computed by the engine — the client only prints labels.
   role_perks?: { key: string; value: number; potential?: number; needs?: string | null }[];
+  // The grey die of every operation, face by face, for the viewer: their role, their cards and
+  // the third of the game are already in the numbers. Computed by the engine — never here.
+  grey_tables?: GreyTable[];
   // What a Крыша costs the viewer right now: the price grows with the round and the Мафия pays
   // one less. Shipped rather than derived — a client-side copy of the formula drifts.
   roof_price?: number;
@@ -253,22 +256,26 @@ export interface ScoringMeta {
   patronage_points: number;
   crisis_pr_influence: number;
   action_card_cost: number;
-  // What discarding a card pays back, in money or in influence.
-  card_discard_value?: number;
+  // What discarding a card pays back: so much money, or so much influence.
+  card_discard_money?: number;
+  card_discard_influence?: number;
   // One entry per campaign tier: the same action buys more influence at a worsening rate.
   campaign_tiers: { spend: number; gain: number }[];
-  // The grey layer arrives as whole tables, keyed by operation id, so the panel never has to know
-  // which operations are the expensive ones.
-  grey_operation_points: Record<string, number>;
-  grey_operation_chance: Record<string, number>;
-  grey_success_scandals: number;
-  grey_failure_scandals: number;
-  // Both grow with the round: hack = base + ⌊раунд/3⌋, pump = base + ⌊раунд/2⌋.
-  hack_influence_base: number;
-  pump_drain_base: number;
-  roof_break_point_per_roof: number;
+  // The grey die. The face-by-face table of every operation comes with the game view
+  // (``GameState.grey_tables``), computed for the viewer; these are what the rules quote.
+  grey_die_sides?: number;
+  grey_roll_cap?: number;
+  fraudster_grey_roll?: number;
+  mafia_grey_roll_per_object?: number;
+  mafia_grey_roll_max?: number;
+  // What the trailing player gets at the start of a round.
+  underdog_influence?: number;
+  // Every operation's die for the rules book: scandals per face, effects per face per third.
+  grey_faces?: Record<string, { scandals: number[]; effects: Record<string, number | boolean>[][] }>;
   // Price of the next city slot, keyed by the capacity the player has now (JSON string keys).
   capacity_costs?: Record<string, number>;
+  // The influence the same slot costs on top of the money.
+  capacity_influence?: Record<string, number>;
   max_capacity?: number;
 }
 
@@ -283,4 +290,27 @@ export interface CityMeta {
   projects: ProjectMeta[];
   /** С какого раунда карты каждой редкости попадают на рынок. */
   rarity_min_round?: Record<string, number>;
+}
+
+export type GreyTier = "fail" | "weak" | "full";
+
+export interface GreyTableRow {
+  /** The face printed on the die. */
+  roll: number;
+  /** What it reads as after the player's modifiers (never above six). */
+  face: number;
+  tier: GreyTier;
+  scandals: number;
+  effect: Record<string, number | boolean>;
+}
+
+export interface GreyTable {
+  asset_id: string;
+  unlocked: boolean;
+  targeted: boolean;
+  modifier: number;
+  sources: { source: "fraudster" | "mafia" | "card" | string; value: number }[];
+  /** 0 opening, 1 middle, 2 endgame third of the match. */
+  third: number;
+  rows: GreyTableRow[];
 }
