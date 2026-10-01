@@ -180,6 +180,18 @@
     "addBot": "Přidat bota",
     "removeBot": "Odebrat bota",
     "botModel": "Bot",
+    "botStyle": {
+      "expert": "Soupeř na rozehřátí: hodnotí každou akci zvlášť, má rád karty a šedé operace.",
+      "ledger": "Účetní: plánuje celý tah, počítá každou minci až do konce hry a jde po vedoucím hráči.",
+      "oracle": "Ví, co přijde: vidí balíčky i karty soupeřů a propočítává jejich odpovědi. Jen kostky šedých operací mu zůstávají skryté.",
+      "boris": "Strategie testera: co nejrychleji maximální příjem, čtvrť 4/4 pro sladěnou roli, přebytky do mecenášství. Nikoho neútočí."
+    },
+    "botLevel": {
+      "easy": "Lehký",
+      "normal": "Normální",
+      "hard": "Těžký",
+      "strategy": "Strategie"
+    },
     "preferredRole": "Oblíbená role",
     "anyRoleOption": "Jakákoli role",
     "saveBot": "Uložit",

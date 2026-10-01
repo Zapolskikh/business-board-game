@@ -18,7 +18,7 @@ function player(overrides: Partial<PlayerState> = {}): PlayerState {
     id: "p-me",
     name: "Я",
     is_bot: false,
-    difficulty: "medium",
+    difficulty: "expert",
     money: 0,
     influence: 0,
     scandals: 0,

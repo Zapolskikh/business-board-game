@@ -29,7 +29,7 @@ class SimulationConfig:
     rounds: int = 15
     players: int = 4
     role_price: int = 3
-    bots: tuple[str, ...] = ("medium", "medium", "medium", "medium")
+    bots: tuple[str, ...] = ("expert", "expert", "expert", "expert")
     specialist_position: int | None = None
     specialist_role: str | None = None
     seed: int = 104_729

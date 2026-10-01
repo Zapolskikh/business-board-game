@@ -39,11 +39,11 @@ def parser() -> argparse.ArgumentParser:
         description="Run bot games through the production City engine",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
-            "Bot policies: easy/oleg, medium/codex, hard/claude\n"
+            "Bot policies: expert/reborn\n"
             f"Specialist roles: {', '.join(ROLE_IDS)}\n\n"
             "Examples:\n"
-            "  --players=4 --bots=oleg,codex,claude,codex\n"
-            "  --players=4 --bots=oleg,codex,claude,codex --specialist=2,mafia"
+            "  --players=4 --bots=reborn,reborn,reborn,reborn\n"
+            "  --players=4 --bots=reborn,reborn,reborn,reborn --specialist=2,mafia"
         ),
     )
     result.add_argument("--games", type=int, default=100, help="number of complete games")
@@ -53,7 +53,7 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument(
         "--bots",
         type=parse_bots,
-        default=parse_bots("codex,codex,codex,codex"),
+        default=parse_bots("reborn,reborn,reborn,reborn"),
         help="one comma-separated policy per seat",
     )
     result.add_argument(

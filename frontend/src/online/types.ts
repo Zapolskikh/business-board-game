@@ -1,4 +1,5 @@
-export type Difficulty = "easy" | "medium" | "hard" | "expert";
+// Only Claude Reborn is left; the server reads retired ids in saved games back as "expert".
+export type Difficulty = "expert" | "ledger" | "oracle" | "boris";
 export type RoomStatus = "waiting" | "playing" | "finished";
 
 export interface RoomSummary {

@@ -117,7 +117,7 @@ class CityClient:
         *,
         password: str,
         seat_index: int,
-        difficulty: str = "medium",
+        difficulty: str = "expert",
         preferred_role: str | None = None,
     ) -> dict[str, Any]:
         return self._call(

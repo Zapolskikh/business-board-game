@@ -28,7 +28,7 @@ function labelTable<K extends string>(prefix: string, keys: readonly K[]): Recor
 export const rarityLabels = labelTable("rarity", ["common", "uncommon", "rare", "epic", "legendary"]);
 
 export const difficultyLabels: Record<string, string> = {};
-for (const key of ["easy", "medium", "hard", "expert"]) {
+for (const key of ["expert"]) {
   Object.defineProperty(difficultyLabels, key, { enumerable: true, get: () => tr("common", `difficulty.${key}`) });
 }
 

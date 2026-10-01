@@ -6,7 +6,14 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from city_engine.constants import BOT_DIFFICULTIES, MAX_PLAYERS, MIN_PLAYERS, ROLE_IDS
+from city_engine.constants import (
+    BOT_DIFFICULTIES,
+    DEFAULT_BOT_DIFFICULTY,
+    MAX_PLAYERS,
+    MIN_PLAYERS,
+    ROLE_IDS,
+    normalize_bot_difficulty,
+)
 from city_engine.models import GameState
 from city_engine.serialization import canonical_json
 
@@ -21,7 +28,7 @@ class RoomSeat:
     kind: str = "empty"
     player_id: str | None = None
     name: str | None = None
-    difficulty: str = "medium"
+    difficulty: str = DEFAULT_BOT_DIFFICULTY
     preferred_role: str | None = None
 
     def validate(self) -> None:
@@ -54,7 +61,7 @@ class RoomSeat:
             kind=str(data.get("kind", "empty")),
             player_id=data.get("player_id"),
             name=data.get("name"),
-            difficulty=str(data.get("difficulty", "medium")),
+            difficulty=normalize_bot_difficulty(str(data.get("difficulty", DEFAULT_BOT_DIFFICULTY))),
             preferred_role=data.get("preferred_role"),
         )
 

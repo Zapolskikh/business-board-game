@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from city_engine.constants import (
     ACTION_DECK_COPIES,
     BOT_DIFFICULTIES,
+    DEFAULT_BOT_DIFFICULTY,
     MAX_PLAYERS,
     MAX_ROLE_PRICE,
     MAX_ROUNDS,
@@ -27,7 +28,7 @@ class PlayerSetup:
     id: str
     name: str
     is_bot: bool = False
-    difficulty: str = "medium"
+    difficulty: str = DEFAULT_BOT_DIFFICULTY
     preferred_role: str | None = None
 
 

@@ -1,4 +1,4 @@
-"""Mechanics-driven policies for Oleg, Codex and Claude bots.
+"""Claude Reborn: the mechanics-driven bot policy.
 
 Policies never mutate state and never implement game rules. They score the
 commands returned by ``CityEngine.legal_actions`` and the selected command is
@@ -11,6 +11,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from city_bots.boris import BORIS_ID, choose_boris_command
+from city_bots.ledger import LEDGER_ID, choose_ledger_command
+from city_bots.oracle import ORACLE_ID, choose_oracle_command
 from city_engine.commands import Command
 from city_engine.constants import (
     CAPACITY_COSTS,
@@ -46,10 +49,6 @@ class PolicyProfile:
     risk_penalty: float
     role_focus: float
     defence: float
-    # How hard the bot plays the project board instead of its own tableau. The older profiles
-    # were written when money was points and objects were the whole game; they still play that
-    # way, which is exactly why they are the easier opponents now.
-    planning: float = 0.0
     # Money the bot is happy to hold; everything above reads as capital it failed to deploy. One
     # slot plus one object is what a turn can actually absorb, so a bigger buffer is just hoarding.
     cash_comfort: int = 30
@@ -59,13 +58,9 @@ class PolicyProfile:
     # banked toward one still being built. See ``_project_planning_bonus``.
     cashable_influence: float = 1.4
     building_influence: float = 1.4
-    # What a point of recurring influence is worth against a dollar of recurring income. The older
-    # profiles keep 1.0 — the ratio they were tuned against. See ``_position_value``.
+    # What a point of recurring influence is worth against a dollar of recurring income.
+    # See ``_position_value``.
     influence_weight: float = 1.0
-    # Whether the bot values held money and influence at their exact rate instead of a floored one.
-    # Only the reborn profile does: see ``_fractional_score`` for what it buys, and the note above
-    # for why the older profiles are left playing the game they were tuned against.
-    exact_resources: bool = False
 
 
 # What one influence is worth in dollars when both are about to be spent, not hoarded: a project
@@ -93,9 +88,6 @@ INFLUENCE_RATE_HELD = LOBBYING_POINTS / LOBBYING_INFLUENCE / 2
 _MARKET_OBJECT_COST = 12
 
 PROFILES = {
-    "easy": PolicyProfile(horizon=3, aggression=0.12, risk_penalty=1.5, role_focus=1.4, defence=0.7),
-    "medium": PolicyProfile(horizon=8, aggression=0.25, risk_penalty=2.5, role_focus=2.0, defence=1.2),
-    "hard": PolicyProfile(horizon=6, aggression=0.45, risk_penalty=2.0, role_focus=1.7, defence=1.5),
     # These numbers are deliberately not more aggressive. Forcing money out of the wallet
     # (cash_comfort 18 / cash_drag 0.20) buys +1.1 projects a game and still loses 2.3 points and
     # 8 points of win share over 40 games, because a dollar left in the wallet is worth 0.1 points
@@ -107,31 +99,41 @@ PROFILES = {
         risk_penalty=1.8,
         role_focus=1.0,
         defence=1.0,
-        planning=1.0,
         influence_weight=INFLUENCE_IN_MONEY,
-        exact_resources=True,
     ),
 }
 
 BOT_POLICY_NAMES = {
-    "easy": "Олег",
-    "medium": "Codex",
-    "hard": "Claude",
     "expert": "Claude Reborn",
+    LEDGER_ID: "Claude Ledger",
+    ORACLE_ID: "Claude Oracle",
+    BORIS_ID: "BorisTheTraxer",
+}
+
+# The policies that live in their own module; each returns (action, value, alternatives).
+POLICY_MODULES = {
+    LEDGER_ID: choose_ledger_command,
+    ORACLE_ID: choose_oracle_command,
+    BORIS_ID: choose_boris_command,
 }
 
 BOT_POLICY_ALIASES = {
     **{difficulty: difficulty for difficulty in PROFILES},
-    "oleg": "easy",
-    "олег": "easy",
-    "codex": "medium",
-    "кодекс": "medium",
-    "claude": "hard",
-    "клод": "hard",
     "reborn": "expert",
     "claude-reborn": "expert",
     "claude reborn": "expert",
     "клод-реборн": "expert",
+    LEDGER_ID: LEDGER_ID,
+    "claude-ledger": LEDGER_ID,
+    "claude ledger": LEDGER_ID,
+    "клод-леджер": LEDGER_ID,
+    ORACLE_ID: ORACLE_ID,
+    "claude-oracle": ORACLE_ID,
+    "claude oracle": ORACLE_ID,
+    "клод-оракул": ORACLE_ID,
+    BORIS_ID: BORIS_ID,
+    "boristhetraxer": BORIS_ID,
+    "борис": BORIS_ID,
 }
 
 
@@ -142,7 +144,7 @@ def normalize_bot_policy(value: str) -> str:
     try:
         return BOT_POLICY_ALIASES[key]
     except KeyError as exc:
-        allowed = "easy/oleg, medium/codex, hard/claude"
+        allowed = "expert/reborn, ledger, oracle, boris"
         raise ValueError(f"unknown bot policy {value!r}; expected {allowed}") from exc
 
 
@@ -177,6 +179,19 @@ def choose_bot_command(
     legal = engine.legal_transitions(state, player_id) if legal is None else legal
     if not legal:
         raise RuntimeError(f"no legal action for bot {player_id}")
+    if player.difficulty in POLICY_MODULES:
+        chosen, utility, alternatives = POLICY_MODULES[player.difficulty](engine, state, player_id, legal)
+        return BotDecision(
+            command=Command(
+                type=chosen["type"],
+                actor_id=player_id,
+                payload=dict(chosen.get("payload") or {}),
+                command_id=f"bot:{state.game_id}:{state.revision}:{player_id}",
+                expected_revision=state.revision,
+            ),
+            utility=utility,
+            alternatives=tuple(alternatives),
+        )
     profile = PROFILES[player.difficulty]
     scored = [
         (action, _action_utility(engine, state, player, action, profile, transition.state))
@@ -227,16 +242,13 @@ def _action_utility(
     opponents_after = sum(score(other) for other in after_state.players if other.id != player.id)
     utility = after - before + (opponents_before - opponents_after) * profile.aggression
     utility += _strategic_action_bonus(engine, state, player, action, profile)
-    if profile.planning:
-        utility += _project_planning_bonus(engine, state, player, after_player, profile) * profile.planning
+    utility += _project_planning_bonus(engine, state, player, after_player, profile)
     return utility
 
 
 def _score_function(engine: CityEngine, profile: PolicyProfile) -> Callable[[PlayerState], float]:
-    """Which score a profile judges positions by. Only the reborn bot gets the exact one."""
-    if profile.exact_resources:
-        return lambda player: _fractional_score(engine, player)
-    return lambda player: _floored_score(engine, player)
+    """The score positions are judged by: the engine's, with unspent piles at their exact rate."""
+    return lambda player: _fractional_score(engine, player)
 
 
 def _fractional_score(engine: CityEngine, player: PlayerState) -> float:
@@ -247,15 +259,6 @@ def _fractional_score(engine: CityEngine, player: PlayerState) -> float:
     the victim happening to cross a ten-dollar boundary.
     """
     return engine.score(player) + player.money * MONEY_RATE_HELD + player.influence * INFLUENCE_RATE_HELD
-
-
-def _floored_score(engine: CityEngine, player: PlayerState) -> float:
-    """The same valuation, floored per currency: what the older profiles were tuned against."""
-    return (
-        engine.score(player)
-        + int(player.money * MONEY_RATE_HELD)
-        + int(player.influence * INFLUENCE_RATE_HELD)
-    )
 
 
 def _income_rate(
@@ -276,12 +279,7 @@ def _income_rate(
     the true rate rather than the premium is what makes a bot buy point-dense objects and press
     the sink instead of accumulating a pile it cannot spend: paying the premium flat is how a bot
     finished a measured game on 197$ with the worst tableau at the table.
-
-    Older profiles keep the flat premium: they were tuned against it, and the whole point of the
-    easier opponents is that they play the previous version of the game.
     """
-    if not profile.planning:
-        return MONEY_RATE_COMPOUNDING
     rounds_left = max(0, state.max_rounds - state.round_number)
     if rounds_left < 2:
         # Nothing bought now pays back; the pile is scored as it stands.
@@ -345,7 +343,7 @@ def _position_value(
     # slots on a shared board, the influence that money buys has nowhere to go, so the surplus
     # scored more sitting in the wallet at 0.1 points a dollar than it did converted. (Measured while
     # the engine still scored piles; it no longer does.)
-    cash_drag = max(0, player.money - profile.cash_comfort) * profile.cash_drag * profile.planning
+    cash_drag = max(0, player.money - profile.cash_comfort) * profile.cash_drag
     # The quantum centre's printed income is zero, so a pure income horizon misses its defining
     # effect.  It grants no action on the purchase turn, only on future turns.
     future_turns = min(profile.horizon, max(0, state.max_rounds - state.round_number))
@@ -507,7 +505,7 @@ def _strategic_action_bonus(
     if action_type == "claim_role":
         role_id = str(payload["role_id"])
         gain = _role_utility(engine, state, player, role_id)
-        if player.role and profile.planning:
+        if player.role:
             # Swapping means giving up what you hold: a bot traded the strongest role in the game
             # for a middling one in round three, paying influence and an action for a downgrade.
             gain -= _role_utility(engine, state, player, player.role)
@@ -541,12 +539,12 @@ def _strategic_action_bonus(
             deck = state.action_deck or list(engine.catalog.action_cards)
             bonus += sum(_card_value(engine, card_id, player) for card_id in deck) / len(deck)
         if effects.get("marketRefresh"):
-            bonus += 3.0 * profile.planning
+            bonus += 3.0
         doubled = str(effects.get("districtDouble", ""))
         if doubled:
             bonus += 2.5 * engine.owned_district_count(player, doubled)
         if effects.get("projectWaiver") and not player.project_waiver_used:
-            bonus += 5.0 * profile.planning
+            bonus += 5.0
     elif action_type == "buy_action_card":
         # A blind draw, so value it at the average card rather than a chosen one.
         deck = state.action_deck or list(engine.catalog.action_cards)
@@ -560,7 +558,7 @@ def _strategic_action_bonus(
         asset = engine.asset(market.card_id)
         wanted = engine.district_count(player, asset.district) in {1, 3}
         affordable = player.money >= engine.asset_price(state, player, market.card_id)
-        bonus += -6.0 if wanted and affordable else 2.5 * profile.planning
+        bonus += -6.0 if wanted and affordable else 2.5
     elif action_type == "play_action_card":
         held = next(card for card in player.hand if card.uid == payload["card_uid"])
         card = engine.action_card(held.card_id)
@@ -619,7 +617,7 @@ def _strategic_action_bonus(
         # is worth more than the points alone.
         project = engine.project(str(payload["project_id"]))
         bonus += project.points * 0.4 + len(state.players) * 0.5
-    elif action_type == "basic_action" and profile.planning:
+    elif action_type == "basic_action":
         if payload.get("kind") == "work":
             # Money past what the board can absorb is 0.1 points a dollar.
             bonus -= 1.5 if player.money > 25 else 0.0
@@ -652,7 +650,7 @@ def _strategic_action_bonus(
             bonus -= 2.0 if payable else 0.0
         else:
             bonus += 1.0 if _affordable_projects(engine, state, player) else 0.0
-    elif action_type == "buy_capacity" and profile.planning:
+    elif action_type == "buy_capacity":
         # An empty slot is worth the object that will fill it, and the bot has the money by now.
         best = max((engine.asset_value_of(item.card_id) for item in state.market), default=3)
         bonus += best * 0.8 + min(4.0, player.money / 25)
@@ -701,7 +699,7 @@ def _sell_asset_bonus(
     # So the surplus raises the priority of rebuilding rather than of dumping money into the sink —
     # the sink is the floor, the swap is the ceiling.
     surplus = max(0, player.money - profile.cash_comfort)
-    return upgrade * 1.5 - 1.0 + (1.0 + min(2.5, surplus / 40) if profile.planning else 0.0)
+    return upgrade * 1.5 - 1.0 + (1.0 + min(2.5, surplus / 40))
 
 
 def _seat_exposure(engine: CityEngine, state: GameState, player: PlayerState) -> float:

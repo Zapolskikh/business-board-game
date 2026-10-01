@@ -12,7 +12,7 @@ React/Vite -> REST -> FastAPI -> CityRoomService -> city_engine
 ```
 
 - `backend/city_engine/` — единственная реализация правил, состояния, replay и RNG;
-- `backend/city_bots/` — политики easy (Олег), medium (Codex), hard (Claude), expert (Reborn) и specialist;
+- `backend/city_bots/` — политики ботов Claude Reborn (лёгкий), Claude Ledger (нормальный) и Claude Oracle (сложный), а также BorisTheTraxer — стратегия тестера;
 - `backend/simulation/` — массовые партии через тот же движок и те же bot policy;
 - `backend/city_rooms/` — lobby, пароли, места, optimistic locking и хранилища;
 - `backend/app/` — REST API и HTTP hardening;

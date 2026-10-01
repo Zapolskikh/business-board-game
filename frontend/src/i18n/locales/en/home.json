@@ -174,6 +174,18 @@
     "addBot": "Add a bot",
     "removeBot": "Remove bot",
     "botModel": "Bot",
+    "botStyle": {
+      "expert": "A warm-up rival: weighs each action on its own and likes cards and grey operations.",
+      "ledger": "The accountant: plans the whole turn, books every coin up to the finale and hunts the leader.",
+      "oracle": "Knows what is coming: sees the decks and the rivals' hands and plays out their answers. Only the dice of grey operations are hidden from it.",
+      "boris": "The tester's line: maximum income as fast as possible, a 4/4 quarter for a fitting role, surplus into patronage. Attacks nobody."
+    },
+    "botLevel": {
+      "easy": "Easy",
+      "normal": "Normal",
+      "hard": "Hard",
+      "strategy": "Strategy"
+    },
     "preferredRole": "Favourite role",
     "anyRoleOption": "Any role",
     "saveBot": "Save",

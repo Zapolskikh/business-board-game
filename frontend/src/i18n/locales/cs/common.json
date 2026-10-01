@@ -33,10 +33,10 @@
     "hostOnly": "To může udělat jen zakladatel lobby."
   },
   "difficulty": {
-    "easy": "Lehký",
-    "medium": "Střední",
-    "hard": "Těžký",
-    "expert": "Reborn"
+    "expert": "Reborn",
+    "ledger": "Ledger",
+    "oracle": "Oracle",
+    "boris": "BorisTheTraxer"
   },
   "support": {
     "donate": "Podpořit na {{site}}",

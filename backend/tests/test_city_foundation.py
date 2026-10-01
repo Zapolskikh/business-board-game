@@ -24,7 +24,7 @@ CARDS = [f"card-{index}" for index in range(8)]
 PROJECTS = [f"project-{index}" for index in range(6)]
 PLAYERS = [
     PlayerSetup(id="p1", name="Alice"),
-    PlayerSetup(id="p2", name="Bot", is_bot=True, difficulty="medium", preferred_role="capitalist"),
+    PlayerSetup(id="p2", name="Bot", is_bot=True, difficulty="expert", preferred_role="capitalist"),
 ]
 
 

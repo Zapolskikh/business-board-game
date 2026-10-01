@@ -106,7 +106,7 @@ export const assetIndex = new Map(assets.map(asset => [asset.id, asset]));
 function player(overrides: Partial<PlayerState> & Pick<PlayerState, "id" | "name">): PlayerState {
   return {
     is_bot: true,
-    difficulty: "medium",
+    difficulty: "expert",
     preferred_role: null,
     money: 10,
     influence: 4,
@@ -163,7 +163,7 @@ const basePlayers: PlayerState[] = [
     projects: ["archive", "social_housing"],
   }),
   // Стресс-кейс левой колонки: длинная роль, пять объектов и предупреждение третьей строкой.
-  player({ id: "p-bot3", name: "Bot 3", difficulty: "easy", role: "mafia", money: 11, influence: 4,
+  player({ id: "p-bot3", name: "Bot 3", difficulty: "expert", role: "mafia", money: 11, influence: 4,
     roofs: 2, scandals: 4, capacity: 6, turns: 5, assets: [
       { uid: "o-9", card_id: "auto_warehouse" },
       { uid: "o-10", card_id: "pawnshops" },

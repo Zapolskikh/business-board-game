@@ -38,12 +38,24 @@ npm.cmd --prefix frontend run build
 Полный балансный smoke через production-движок:
 
 ```powershell
-.\.venv\Scripts\python.exe -m simulation.cli --games=10 --rounds=15 --players=4 --role-price=3 --bots=oleg,codex,codex,claude --workers=2
+.\.venv\Scripts\python.exe -m simulation.cli --games=10 --rounds=15 --players=4 --role-price=3 --bots=reborn,reborn,reborn,reborn --workers=2
 ```
 
-Боты: `oleg` (easy), `codex` (medium), `claude` (hard), `reborn` (expert). Порядок в `--bots`
-соответствует местам за столом. Для оценки баланса брать `reborn` — easy-боты почти не генерируют
-скандалов, поэтому всё, что работает через взаимодействие, показывает на них ноль.
+Ботов три, по уровням:
+
+- `reborn` (expert) — лёгкий: оценивает каждое действие по отдельности;
+- `ledger` — нормальный: планирует ход целиком и считает, во что ресурсы превратятся к финалу
+  (`backend/city_bots/ledger.py`, до ~0,3 с на решение);
+- `oracle` — сложный: видит колоды и чужие руки, доигрывает стол вперёд до своего следующего хода,
+  не видит только исходы серых операций (`backend/city_bots/oracle.py`, до ~5 с на ход, план
+  считается один раз за ход).
+
+Отдельно от уровней — `boris` (BorisTheTraxer): стратегия тестера на правилах без перебора —
+максимальный доход, район 4/4 под синергичную роль, излишки в патронаж и лоббирование, без серых
+операций и атак (`backend/city_bots/boris.py`, миллисекунды на решение).
+
+Старые Олег, Codex и Claude удалены. Порядок в `--bots` соответствует местам за столом, например
+`--bots=oracle,ledger,reborn,reborn`.
 
 `--specialist=2,mafia` означает, что второй игрок строит стратегию вокруг роли Мафиози. Полная серия
 по всем ролям сразу — `python -m simulation.suite --games=300 --workers=8`.

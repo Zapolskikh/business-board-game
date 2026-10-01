@@ -10,6 +10,7 @@ from copy import deepcopy
 
 from city_bots import choose_bot_command
 from city_engine.commands import Command
+from city_engine.constants import PREFERRED_ROLE_POLICIES, normalize_bot_difficulty
 from city_engine.engine import CityEngine
 from city_engine.errors import CityEngineError, StaleRevisionError
 from city_engine.factory import GameSettings, PlayerSetup, create_game_from_catalog
@@ -150,11 +151,7 @@ class CityRoomService:
             seat.name = clean_name
             if seat_token:
                 room.seat_token_hashes[seat.player_id] = _token_hash(seat_token)
-        if (
-            release_seat_index is not None
-            and release_seat_index != seat_index
-            and room.status == "waiting"
-        ):
+        if release_seat_index is not None and release_seat_index != seat_index and room.status == "waiting":
             previous = self._seat(room, release_seat_index)
             # Moving seats frees the old one — but only your own, proven by the same secret.
             if previous.kind == "human" and _token_matches(
@@ -188,8 +185,10 @@ class CityRoomService:
         seat.kind = "bot"
         seat.player_id = f"seat-{seat.index + 1}"
         seat.name = f"Bot {seat.index + 1}"
-        seat.difficulty = difficulty
-        seat.preferred_role = preferred_role
+        seat.difficulty = normalize_bot_difficulty(difficulty)
+        # Only Reborn reads a favourite role; stored for another policy it would sit in the room
+        # and in the journal as a promise nothing keeps.
+        seat.preferred_role = preferred_role if seat.difficulty in PREFERRED_ROLE_POLICIES else None
         try:
             seat.validate()
         except ValueError as exc:

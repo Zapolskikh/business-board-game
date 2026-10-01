@@ -26,7 +26,7 @@ def create_started_room() -> tuple[CityRoomService, str]:
     room = service.create_room(name="Test city", password="secret", capacity=3, owner_token="host-secret")
     service.join(room.id, password="secret", seat_index=0, player_name="Oleg", seat_token="oleg-secret")
     service.set_bot(
-        room.id, password="secret", seat_index=1, difficulty="hard", preferred_role="mafia", owner_token="host-secret"
+        room.id, password="secret", seat_index=1, difficulty="expert", preferred_role="mafia", owner_token="host-secret"
     )
     service.start(room.id, password="secret", seed=42, owner_token="host-secret")
     return service, room.id
@@ -282,3 +282,31 @@ def test_repository_rejects_two_writes_from_same_revision() -> None:
     with ThreadPoolExecutor(max_workers=2) as pool:
         results = list(pool.map(save, (left, right)))
     assert sorted(results) == ["conflict", "saved"]
+
+
+def test_rooms_saved_with_a_retired_bot_policy_load_as_reborn() -> None:
+    """Oleg, Codex and Claude were removed; a stored room or game naming them must still open."""
+    from city_engine.models import PlayerState
+    from city_rooms.models import RoomSeat
+
+    for retired in ("easy", "medium", "hard"):
+        stored = {"index": 1, "kind": "bot", "player_id": "seat-2", "name": "Bot 2", "difficulty": retired}
+        seat = RoomSeat.from_dict(stored)
+        seat.validate()
+        assert seat.difficulty == "expert"
+        player = PlayerState.from_dict({"id": "seat-2", "name": "Bot 2", "is_bot": True, "difficulty": retired})
+        assert player.difficulty == "expert"
+
+
+def test_only_reborn_keeps_a_favourite_role() -> None:
+    service = CityRoomService(InMemoryRoomRepository())
+    room = service.create_room(name="Roles", password="secret", capacity=3, owner_token="host")
+    service.set_bot(
+        room.id, password="secret", seat_index=1, difficulty="expert", preferred_role="mafia", owner_token="host"
+    )
+    service.set_bot(
+        room.id, password="secret", seat_index=2, difficulty="oracle", preferred_role="mafia", owner_token="host"
+    )
+    seats = service.get_room(room.id).seats
+    assert seats[1].preferred_role == "mafia"
+    assert seats[2].preferred_role is None

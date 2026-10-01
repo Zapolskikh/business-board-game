@@ -131,7 +131,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--games", type=int, default=25)
     parser.add_argument("--rounds", type=int, default=15)
     parser.add_argument("--seed", type=int, default=1000)
-    parser.add_argument("--bots", default="codex,codex,codex,codex", help="comma-separated bot policies")
+    parser.add_argument("--bots", default="reborn,reborn,reborn,reborn", help="comma-separated bot policies")
     args = parser.parse_args(argv)
 
     bots = tuple(normalize_bot_policy(item) for item in args.bots.split(",") if item.strip())

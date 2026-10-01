@@ -28,7 +28,7 @@ def test_client_transport_plays_a_full_turn_through_the_rest_api(tmp_path: Path)
         client = CityClient("http://testserver", transport=transport)
         room_id = client.create_room(name="Agent", password="agentplay", capacity=2, max_rounds=5)["id"]
         client.join(room_id, password="agentplay", seat_index=0, player_name="Claude")
-        client.set_bot(room_id, password="agentplay", seat_index=1, difficulty="medium")
+        client.set_bot(room_id, password="agentplay", seat_index=1, difficulty="expert")
         client.start(room_id, password="agentplay", seed=11)
 
         session = Session(

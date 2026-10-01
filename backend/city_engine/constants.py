@@ -38,7 +38,21 @@ ROLE_IDS = (
     "mafia",
     "military",
 )
-BOT_DIFFICULTIES = ("easy", "medium", "hard", "expert")
+# Bot policies, by the id stored on a seat: Claude Reborn (easy), Ledger (normal), Oracle (hard),
+# and BorisTheTraxer, the tester's rule-book strategy. The older
+# easy/medium/hard profiles played rules that no longer exist and were removed. A saved room or
+# game that still names one of them is read back as Reborn — see ``normalize_bot_difficulty``.
+BOT_DIFFICULTIES = ("expert", "ledger", "oracle", "boris")
+DEFAULT_BOT_DIFFICULTY = "expert"
+LEGACY_BOT_DIFFICULTIES = frozenset({"easy", "medium", "hard"})
+# The policies that read a seat's favourite role. The others choose their seat from the position.
+PREFERRED_ROLE_POLICIES = frozenset({"expert"})
+
+
+def normalize_bot_difficulty(value: str) -> str:
+    """A stored policy id, with the retired ones mapped onto the current default."""
+    return DEFAULT_BOT_DIFFICULTY if value in LEGACY_BOT_DIFFICULTIES else value
+
 
 MIN_PLAYERS = 2
 # Четверо — предел стола. Шестеро растягивали круг настолько, что между своими ходами

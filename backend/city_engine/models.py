@@ -9,6 +9,7 @@ from typing import Any
 from city_engine.constants import (
     BOT_DIFFICULTIES,
     CONTENT_VERSION,
+    DEFAULT_BOT_DIFFICULTY,
     MAX_CAPACITY,
     MAX_PLAYERS,
     MAX_ROLE_PRICE,
@@ -19,6 +20,7 @@ from city_engine.constants import (
     ROLE_IDS,
     RULES_VERSION,
     SCHEMA_VERSION,
+    normalize_bot_difficulty,
 )
 from city_engine.errors import StateValidationError
 from city_engine.rng import RNGState
@@ -102,7 +104,7 @@ class PlayerState:
     id: str
     name: str
     is_bot: bool = False
-    difficulty: str = "medium"
+    difficulty: str = DEFAULT_BOT_DIFFICULTY
     preferred_role: str | None = None
     money: int = 10
     influence: int = 2
@@ -135,6 +137,15 @@ class PlayerState:
     # «Городской устав» срабатывает один раз за партию и не возвращается с продажей объекта:
     # иначе его можно было бы перекупать ради второго срабатывания.
     project_waiver_used: bool = False
+
+    def clone(self) -> PlayerState:
+        """Field by field rather than ``deepcopy``: every field is a scalar or a list of two-string
+        records, and the generic copier spent most of a bot's thinking time rediscovering that."""
+        cloned = copy(self)
+        cloned.assets = [OwnedAsset(asset.uid, asset.card_id) for asset in self.assets]
+        cloned.hand = [HeldCard(card.uid, card.card_id) for card in self.hand]
+        cloned.projects = list(self.projects)
+        return cloned
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -170,7 +181,7 @@ class PlayerState:
             id=str(data["id"]),
             name=str(data["name"]),
             is_bot=bool(data.get("is_bot", False)),
-            difficulty=str(data.get("difficulty", "medium")),
+            difficulty=normalize_bot_difficulty(str(data.get("difficulty", DEFAULT_BOT_DIFFICULTY))),
             preferred_role=data.get("preferred_role"),
             money=int(data.get("money", 10)),
             influence=int(data.get("influence", 2)),
@@ -266,17 +277,20 @@ class GameState:
         # Historical events are append-only, so sharing their immutable objects
         # avoids copying an ever-growing replay log for every legal-action preview.
         cloned = copy(self)
-        cloned.players = deepcopy(self.players)
-        cloned.rng = deepcopy(self.rng)
+        cloned.players = [player.clone() for player in self.players]
+        cloned.rng = RNGState(self.rng.seed, self.rng.state, self.rng.draws)
         cloned.market_deck = list(self.market_deck)
         cloned.market_discard = list(self.market_discard)
-        cloned.market = deepcopy(self.market)
+        cloned.market = [
+            MarketAsset(item.uid, item.card_id, item.claimed_by, item.locked_by, item.locked_round)
+            for item in self.market
+        ]
         cloned.action_deck = list(self.action_deck)
         cloned.project_board = list(self.project_board)
         cloned.project_deck = list(self.project_deck)
         cloned.project_veto = dict(self.project_veto)
         cloned.turn_order = list(self.turn_order)
-        cloned.turn_flags = deepcopy(self.turn_flags)
+        cloned.turn_flags = dict(self.turn_flags)  # flat: booleans and one discount figure
         cloned.final_scores = dict(self.final_scores)
         cloned.processed_command_ids = list(self.processed_command_ids)
         cloned.command_log = list(self.command_log)

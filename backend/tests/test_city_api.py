@@ -43,7 +43,7 @@ def test_room_rest_flow_and_polling() -> None:
         assert (
             client.post(
                 f"/api/city/rooms/{room_id}/seats",
-                json={"password": "secret", "seat_index": 1, "kind": "bot", "difficulty": "medium"},
+                json={"password": "secret", "seat_index": 1, "kind": "bot", "difficulty": "expert"},
             ).status_code
             == 200
         )
@@ -103,6 +103,8 @@ def test_state_carries_the_viewers_own_market_prices() -> None:
 
         room = service.get_room(room_id)
         assert room.game is not None
+        # The seat request above still names a retired policy, as an old client would: it plays as Reborn.
+        assert room.seats[1].difficulty == "expert"
         expected = service.engine.market_prices(room.game, room.game.player_by_id("seat-1"))
         state = client.get(
             f"/api/city/rooms/{room_id}/state",
@@ -176,7 +178,7 @@ def test_rest_room_can_reach_a_persisted_final_state() -> None:
         ).raise_for_status()
         client.post(
             f"/api/city/rooms/{room_id}/seats",
-            json={"password": "secret", "seat_index": 1, "kind": "bot", "difficulty": "easy"},
+            json={"password": "secret", "seat_index": 1, "kind": "bot", "difficulty": "expert"},
         ).raise_for_status()
         client.post(
             f"/api/city/rooms/{room_id}/start",
@@ -223,7 +225,7 @@ def _start_two_seat_room(client: TestClient, *, name: str, max_rounds: int = 15)
     ).raise_for_status()
     client.post(
         f"/api/city/rooms/{room_id}/seats",
-        json={"password": "secret", "seat_index": 1, "kind": "bot", "difficulty": "easy"},
+        json={"password": "secret", "seat_index": 1, "kind": "bot", "difficulty": "expert"},
     ).raise_for_status()
     client.post(f"/api/city/rooms/{room_id}/start", json={"password": "secret", "seed": 7}).raise_for_status()
     return room_id

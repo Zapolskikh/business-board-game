@@ -250,7 +250,7 @@ function SeatCard({
         </span>
         <span>
           <strong>{seat.kind === "empty" ? t("seat.emptyTitle") : seat.name}</strong>
-          <small>{seat.kind === "bot" ? `${t(`common:difficulty.${seat.difficulty}`, { defaultValue: seat.difficulty })} · ${preferredRole ? preferredRole.title : t("seat.anyRole")}` : seat.kind === "human" ? (mine ? t("seat.youAreHere") : t("seat.humanPlayer")) : t(isOwner ? "seat.emptyHintHost" : "seat.emptyHint")}</small>
+          <small>{seat.kind === "bot" ? USES_PREFERRED_ROLE.has(seat.difficulty) ? `${t(`common:difficulty.${seat.difficulty}`, { defaultValue: seat.difficulty })} · ${preferredRole ? preferredRole.title : t("seat.anyRole")}` : t(`common:difficulty.${seat.difficulty}`, { defaultValue: seat.difficulty }) : seat.kind === "human" ? (mine ? t("seat.youAreHere") : t("seat.humanPlayer")) : t(isOwner ? "seat.emptyHintHost" : "seat.emptyHint")}</small>
         </span>
       </div>
 
@@ -296,7 +296,18 @@ function SeatCard({
 
 const SEAT_COLORS = ["#b9a2d4", "#7fc8bd", "#8fb3dd", "#df9a7a"];
 
-// Only Reborn is offered: the engine still accepts the retired policies, but they play the old economy.
+// The engine still accepts the retired policies, but they play the old economy, so only the two
+// current ones are offered.
+const BOT_POLICIES: { id: Difficulty; name: string; level: "easy" | "normal" | "hard" | "strategy" }[] = [
+  { id: "expert", name: "Claude Reborn", level: "easy" },
+  { id: "ledger", name: "Claude Ledger", level: "normal" },
+  { id: "oracle", name: "Claude Oracle", level: "hard" },
+  { id: "boris", name: "BorisTheTraxer", level: "strategy" },
+];
+// Only Reborn reads a favourite role; the other policies pick their seat from the position, so the
+// selector would promise them something they ignore.
+const USES_PREFERRED_ROLE: ReadonlySet<Difficulty> = new Set<Difficulty>(["expert"]);
+
 function BotConfigurator({ seat, roles, disabled, onApply }: {
   seat: RoomSeat;
   roles: RoleMeta[];
@@ -305,17 +316,26 @@ function BotConfigurator({ seat, roles, disabled, onApply }: {
 }) {
   const { t } = useTranslation("home");
   const [role, setRole] = useState(seat.preferred_role ?? "");
+  const [policy, setPolicy] = useState<Difficulty>(seat.kind === "bot" ? seat.difficulty : "expert");
   useEffect(() => { setRole(seat.preferred_role ?? ""); }, [seat.preferred_role]);
+  useEffect(() => { if (seat.kind === "bot") setPolicy(seat.difficulty); }, [seat.kind, seat.difficulty]);
   return (
     <div className="bot-controls-v2">
-      <div className="bot-model-v2"><span>{t("seat.botModel")}</span><b>Claude Reborn</b></div>
-      <label className="room-field">{t("seat.preferredRole")}
-        <select value={role} onChange={event => setRole(event.target.value)}>
-          <option value="">{t("seat.anyRoleOption")}</option>
-          {roles.map(item => <option value={item.id} key={item.id}>{item.icon} {item.title}</option>)}
+      <label className="room-field">{t("seat.botModel")}
+        <select value={policy} onChange={event => setPolicy(event.target.value as Difficulty)}>
+          {BOT_POLICIES.map(item => <option value={item.id} key={item.id}>{t(`seat.botLevel.${item.level}`)} · {item.name}</option>)}
         </select>
       </label>
-      <button type="button" className="rooms-button subtle" disabled={disabled} onClick={() => onApply("expert", role || null)}>{seat.kind === "bot" ? t("seat.saveBot") : t("seat.placeBot")}</button>
+      <p className="bot-style-v2">{t(`seat.botStyle.${policy}`)}</p>
+      {USES_PREFERRED_ROLE.has(policy) && (
+        <label className="room-field">{t("seat.preferredRole")}
+          <select value={role} onChange={event => setRole(event.target.value)}>
+            <option value="">{t("seat.anyRoleOption")}</option>
+            {roles.map(item => <option value={item.id} key={item.id}>{item.icon} {item.title}</option>)}
+          </select>
+        </label>
+      )}
+      <button type="button" className="rooms-button subtle" disabled={disabled} onClick={() => onApply(policy, USES_PREFERRED_ROLE.has(policy) ? role || null : null)}>{seat.kind === "bot" ? t("seat.saveBot") : t("seat.placeBot")}</button>
     </div>
   );
 }
