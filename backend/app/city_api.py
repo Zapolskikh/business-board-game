@@ -47,7 +47,7 @@ class SeatRequest(BaseModel):
     seat_index: int = Field(ge=0, le=MAX_PLAYERS - 1)
     kind: Literal["bot", "empty"]
     # Retired ids are still accepted from old clients and mapped onto the current policy.
-    difficulty: Literal["easy", "medium", "hard", "expert", "ledger", "oracle", "boris"] = "expert"
+    difficulty: Literal["easy", "medium", "hard", "expert", "ledger", "oracle", "boris", "atlas"] = "expert"
     preferred_role: str | None = None
     owner_token: str = Field(default="", max_length=128)
 

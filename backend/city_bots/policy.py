@@ -11,6 +11,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from city_bots.atlas import ATLAS_ID, choose_atlas_command
 from city_bots.boris import BORIS_ID, choose_boris_command
 from city_bots.ledger import LEDGER_ID, choose_ledger_command
 from city_bots.oracle import ORACLE_ID, choose_oracle_command
@@ -103,6 +104,7 @@ BOT_POLICY_NAMES = {
     LEDGER_ID: "Claude Ledger",
     ORACLE_ID: "Claude Oracle",
     BORIS_ID: "BorisTheTraxer",
+    ATLAS_ID: "Claude Atlas",
 }
 
 # The policies that live in their own module; each returns (action, value, alternatives).
@@ -110,6 +112,7 @@ POLICY_MODULES = {
     LEDGER_ID: choose_ledger_command,
     ORACLE_ID: choose_oracle_command,
     BORIS_ID: choose_boris_command,
+    ATLAS_ID: choose_atlas_command,
 }
 
 BOT_POLICY_ALIASES = {
@@ -128,6 +131,10 @@ BOT_POLICY_ALIASES = {
     "клод-оракул": ORACLE_ID,
     BORIS_ID: BORIS_ID,
     "boristhetraxer": BORIS_ID,
+    ATLAS_ID: ATLAS_ID,
+    "claude-atlas": ATLAS_ID,
+    "claude atlas": ATLAS_ID,
+    "клод-атлас": ATLAS_ID,
     "борис": BORIS_ID,
 }
 
@@ -139,7 +146,7 @@ def normalize_bot_policy(value: str) -> str:
     try:
         return BOT_POLICY_ALIASES[key]
     except KeyError as exc:
-        allowed = "expert/reborn, ledger, oracle, boris"
+        allowed = "expert/reborn, ledger, oracle, boris, atlas"
         raise ValueError(f"unknown bot policy {value!r}; expected {allowed}") from exc
 
 

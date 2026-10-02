@@ -22,6 +22,7 @@ Written from the rules rather than from Reborn, and on purpose with a different 
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -124,11 +125,15 @@ def choose_ledger_command(
     *,
     budget: float | None = None,
     widths: tuple[int, int] | None = None,
+    valuation: Valuation | None = None,
 ) -> tuple[dict[str, Any], float, list[tuple[str, float]]]:
     """The first action of the best plan found for the rest of this turn, its value and the runners-up.
 
     ``budget`` and ``widths`` override the search size; Oracle plays its rollouts with a small one.
+    ``valuation`` swaps the position value the search ranks plans by — Atlas searches the same way
+    with its own forecast — and defaults to Ledger's own.
     """
+    valuation = LEDGER_VALUATION if valuation is None else valuation
     started = time.perf_counter()
     budget = TIME_BUDGET if budget is None else budget
     first_width, next_width = (FIRST_WIDTH, WIDTH) if widths is None else widths
@@ -138,14 +143,14 @@ def choose_ledger_command(
         projects=tuple(state.project_board),
     )
     legal = engine.legal_transitions(state, player_id) if legal is None else legal
-    base = _utility(engine, state, root)
+    base = valuation.utility(engine, state, root)
 
     best: dict[str, tuple[float, dict[str, Any]]] = {}
     frontier: list[_Node] = []
     for action, transition in legal:
-        if not _allowed(action, root):
+        if not _allowed(action, root) or (valuation.allows and not valuation.allows(state, action)):
             continue
-        value, expandable = _child_value(engine, state, action, transition.state, root)
+        value, expandable = _child_value(engine, state, action, transition.state, root, valuation)
         label = _label(action)
         best[label] = (value, action)
         if expandable:
@@ -165,7 +170,7 @@ def choose_ledger_command(
             if time.perf_counter() - started > budget:
                 break
             for action, transition in engine.legal_transitions(node.state, player_id):
-                if not _allowed(action, root):
+                if not _allowed(action, root) or (valuation.allows and not valuation.allows(node.state, action)):
                     continue
                 labels = (*node.labels, _label(action))
                 # A plan and its permutation usually land in the same place; search one of them.
@@ -173,7 +178,7 @@ def choose_ledger_command(
                 if key in seen:
                     continue
                 seen.add(key)
-                value, expandable = _child_value(engine, node.state, action, transition.state, root)
+                value, expandable = _child_value(engine, node.state, action, transition.state, root, valuation)
                 first_label = node.labels[0]
                 if value > best[first_label][0]:
                     best[first_label] = (value, node.first)
@@ -206,17 +211,19 @@ def _child_value(
     action: dict[str, Any],
     after: GameState,
     root: _Root,
+    valuation: Valuation | None = None,
 ) -> tuple[float, bool]:
     """Value of the position an action leads to, and whether the plan may continue from it."""
+    valuation = LEDGER_VALUATION if valuation is None else valuation
     kind = action["type"]
     if kind == "grey_operation":
-        return _grey_expectation(engine, before, action, root), False
+        return _grey_expectation(engine, before, action, root, valuation), False
     if kind == "end_turn" or after.status != "playing" or after.current_player.id != root.player_id:
-        return _utility(engine, after, root), False
-    unspent = after.actions_left * UNSPENT_ACTION * _late_factor(after)
+        return valuation.utility(engine, after, root), False
+    unspent = after.actions_left * valuation.unspent_action * _late_factor(after)
     # A blind draw ends the plan: what follows would be planned with cards the bot cannot see.
     expandable = kind != "buy_action_card"
-    return _utility(engine, after, root) + unspent, expandable
+    return valuation.utility(engine, after, root) + unspent, expandable
 
 
 def grey_outcomes(engine: CityEngine, before: GameState, action: dict[str, Any]) -> list[tuple[float, GameState]]:
@@ -246,17 +253,42 @@ def grey_outcomes(engine: CityEngine, before: GameState, action: dict[str, Any])
     return outcomes
 
 
-def _grey_expectation(engine: CityEngine, before: GameState, action: dict[str, Any], root: _Root) -> float:
+def _grey_expectation(
+    engine: CityEngine,
+    before: GameState,
+    action: dict[str, Any],
+    root: _Root,
+    valuation: Valuation | None = None,
+) -> float:
     """The faces of the die, each at its printed probability — never the roll the state already holds."""
+    valuation = LEDGER_VALUATION if valuation is None else valuation
     value = 0.0
     for weight, after in grey_outcomes(engine, before, action):
         still_mine = after.status == "playing" and after.current_player.id == root.player_id
-        unspent = after.actions_left * UNSPENT_ACTION * _late_factor(after) if still_mine else 0.0
-        value += weight * (_utility(engine, after, root) + unspent)
+        unspent = after.actions_left * valuation.unspent_action * _late_factor(after) if still_mine else 0.0
+        value += weight * (valuation.utility(engine, after, root) + unspent)
     return value
 
 
 # --- valuation -----------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class Valuation:
+    """What a plan's end position is worth to the search, and what an action left unspent adds.
+
+    Ledger books spare actions at a flat ``UNSPENT_ACTION``; a valuation that forecasts the rest of
+    the turn itself (Atlas) sets it to zero, or the same actions would be counted twice.
+    """
+
+    utility: Callable[[CityEngine, GameState, _Root], float]
+    unspent_action: float
+    # An extra rule on what the search may play at a node; ``None`` lets everything Ledger allows.
+    allows: Callable[[GameState, dict[str, Any]], bool] | None = None
+
+
+def _ledger_utility(engine: CityEngine, state: GameState, root: _Root) -> float:
+    return _utility(engine, state, root)
 
 
 def _utility(engine: CityEngine, state: GameState, root: _Root) -> float:
@@ -423,4 +455,6 @@ def _label(action: dict[str, Any]) -> str:
     return f"{action['type']}({details})"
 
 
-__all__ = ["LEDGER_ID", "choose_ledger_command"]
+LEDGER_VALUATION = Valuation(utility=_ledger_utility, unspent_action=UNSPENT_ACTION)
+
+__all__ = ["LEDGER_ID", "LEDGER_VALUATION", "Valuation", "choose_ledger_command"]

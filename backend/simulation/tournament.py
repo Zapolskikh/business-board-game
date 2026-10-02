@@ -723,7 +723,7 @@ FORK_KINDS = (
     "basic_action",
     "crisis_pr",
 )
-SEARCHING = frozenset({"ledger", "oracle"})
+SEARCHING = frozenset({"ledger", "oracle", "atlas"})
 # Шанс развилки в прицельном режиме, когда подозрительное решение доступно в позиции.
 FOCUS_FORK_CHANCE = 0.5
 CONTINUATION_BUDGET = 0.03

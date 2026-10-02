@@ -46,7 +46,7 @@ ROLE_IDS = (
 # and BorisTheTraxer, the tester's rule-book strategy. The older
 # easy/medium/hard profiles played rules that no longer exist and were removed. A saved room or
 # game that still names one of them is read back as Reborn — see ``normalize_bot_difficulty``.
-BOT_DIFFICULTIES = ("expert", "ledger", "oracle", "boris")
+BOT_DIFFICULTIES = ("expert", "ledger", "oracle", "boris", "atlas")
 DEFAULT_BOT_DIFFICULTY = "expert"
 LEGACY_BOT_DIFFICULTIES = frozenset({"easy", "medium", "hard"})
 # The policies that read a seat's favourite role. The others choose their seat from the position.

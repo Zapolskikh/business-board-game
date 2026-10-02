@@ -456,3 +456,26 @@ def test_boris_guards_a_seat_near_its_limit_with_a_roof_first() -> None:
     player.money = 30
     action, _value, _reasons = choose_boris_command(engine, state, player.id)
     assert action == {"type": "buy_roof", "payload": {}}
+
+
+def test_atlas_finishes_a_game_without_touching_the_state() -> None:
+    engine = CityEngine()
+    state = ledger_game("atlas", "ledger", "boris")
+    for _ in range(2_000):
+        if state.status == "finished":
+            break
+        before = state_hash(state)
+        decision = choose_bot_command(engine, state, state.current_player.id)
+        assert state_hash(state) == before
+        state = engine.apply(state, decision.command).state
+    assert state.status == "finished"
+
+
+def test_atlas_does_not_sell_with_no_action_left_to_replace_it() -> None:
+    from city_bots.atlas import _allows
+
+    state = ledger_game("atlas", "expert")
+    state.actions_left = 0
+    assert not _allows(state, {"type": "sell_asset", "payload": {"asset_uid": "x"}})
+    state.actions_left = 1
+    assert _allows(state, {"type": "sell_asset", "payload": {"asset_uid": "x"}})

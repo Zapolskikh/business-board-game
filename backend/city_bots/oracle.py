@@ -297,7 +297,7 @@ def _play_forward(engine: CityEngine, start: GameState, player_id: str, luck: in
     from city_bots.policy import choose_bot_command  # the rival model; imported late to avoid a cycle
 
     state = start.clone()
-    searching = {LEDGER_ID, ORACLE_ID}
+    searching = {LEDGER_ID, ORACLE_ID, "atlas"}
     fast = {
         player.id
         for player in state.players
