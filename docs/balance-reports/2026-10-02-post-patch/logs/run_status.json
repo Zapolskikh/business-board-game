@@ -1,6 +1,6 @@
 {
  "started": "2026-10-02T01:02:27",
- "finished": null,
+ "finished": "2026-10-03T01:20:33",
  "steps": {
   "3.1": {
    "name": "TOURNAMENT_4p",
@@ -72,7 +72,11 @@
    "name": "TOURNAMENT_focus_4p",
    "command": "-m simulation.tournament --games=480 --players=4 --rotations=4 --forks=8 --fork-focus=suspects.txt --seed=3021 --workers=6 --output=TOURNAMENT_focus_4p.md",
    "started": "2026-10-02T07:03:52",
-   "attempts": 0
+   "attempts": 2,
+   "finished": "2026-10-03T01:20:33",
+   "minutes": 1096.7,
+   "returncode": 1,
+   "ok": false
   }
  },
  "commit": "5a7d73aa136f77db6c097b2be55b0a859b985522",
