@@ -1,0 +1,80 @@
+{
+ "started": "2026-10-02T01:02:27",
+ "finished": null,
+ "steps": {
+  "3.1": {
+   "name": "TOURNAMENT_4p",
+   "command": "-m simulation.tournament --games=768 --players=4 --rotations=4 --forks=8 --seed=3001 --workers=6 --output=TOURNAMENT_4p.md",
+   "started": "2026-10-02T01:02:27",
+   "attempts": 1,
+   "finished": "2026-10-02T05:44:41",
+   "minutes": 282.2,
+   "returncode": 0,
+   "ok": true
+  },
+  "3.4": {
+   "name": "TOURNAMENT_ctrl_reborn",
+   "command": "-m simulation.tournament --games=240 --lineup=expert,expert,expert,expert --rotations=4 --forks=0 --seed=3011 --workers=6 --output=TOURNAMENT_ctrl_reborn.md",
+   "started": "2026-10-02T05:44:41",
+   "attempts": 1,
+   "finished": "2026-10-02T05:47:06",
+   "minutes": 2.4,
+   "returncode": 0,
+   "ok": true
+  },
+  "3.5": {
+   "name": "TOURNAMENT_ctrl_ledger",
+   "command": "-m simulation.tournament --games=240 --lineup=ledger,ledger,ledger,ledger --rotations=4 --forks=0 --seed=3012 --workers=6 --output=TOURNAMENT_ctrl_ledger.md",
+   "started": "2026-10-02T05:47:06",
+   "attempts": 1,
+   "finished": "2026-10-02T06:22:22",
+   "minutes": 35.3,
+   "returncode": 0,
+   "ok": true
+  },
+  "3.6": {
+   "name": "TOURNAMENT_ctrl_boris",
+   "command": "-m simulation.tournament --games=240 --lineup=boris,boris,boris,boris --rotations=4 --forks=0 --seed=3013 --workers=6 --output=TOURNAMENT_ctrl_boris.md",
+   "started": "2026-10-02T06:22:22",
+   "attempts": 1,
+   "finished": "2026-10-02T06:23:56",
+   "minutes": 1.6,
+   "returncode": 0,
+   "ok": true
+  },
+  "3.7": {
+   "name": "TOURNAMENT_ctrl_oracle",
+   "command": "-m simulation.tournament --games=48 --lineup=oracle,oracle,oracle,oracle --rotations=4 --forks=0 --seed=3014 --workers=6 --output=TOURNAMENT_ctrl_oracle.md",
+   "started": "2026-10-02T06:23:56",
+   "attempts": 1,
+   "finished": "2026-10-02T07:03:52",
+   "minutes": 39.9,
+   "returncode": 0,
+   "ok": true
+  },
+  "3.8": {
+   "name": "suspects_4p",
+   "command": "-m simulation.suspects TOURNAMENT_4p.json --output=suspects_4p.txt",
+   "started": "2026-10-02T07:03:52",
+   "attempts": 1,
+   "finished": "2026-10-02T07:03:52",
+   "minutes": 0.0,
+   "returncode": 0,
+   "ok": true
+  },
+  "3.9": {
+   "name": "suspects",
+   "lines": 27,
+   "ok": true,
+   "finished": "2026-10-02T07:03:52"
+  },
+  "3.10": {
+   "name": "TOURNAMENT_focus_4p",
+   "command": "-m simulation.tournament --games=480 --players=4 --rotations=4 --forks=8 --fork-focus=suspects.txt --seed=3021 --workers=6 --output=TOURNAMENT_focus_4p.md",
+   "started": "2026-10-02T07:03:52",
+   "attempts": 0
+  }
+ },
+ "commit": "5a7d73aa136f77db6c097b2be55b0a859b985522",
+ "workers": "6"
+}

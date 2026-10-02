@@ -1,0 +1,29 @@
+# Подозрительные решения
+
+- `buy_asset:quantum` — ценность +6.20 за действие, значимо выше своего типа
+- `buy_asset:planning_charter` — ценность +5.20 за действие, значимо выше своего типа
+- `city_project:engineering_bureau` — ценность +4.35 за действие, значимо выше своего типа
+- `buy_asset:anticorruption` — ценность +5.05 за действие, значимо выше своего типа
+- `buy_asset:licensing_department` — ценность +3.70 за действие, значимо выше своего типа
+- `city_project:social_housing` — ценность +4.10 за действие, значимо выше своего типа
+- `city_project:charity_fund` — ценность +0.70 за действие, значимо ниже своего типа
+- `use_role_power:journalist_publish` — ценность -1.80 за действие, значимо ниже своего типа
+- `buy_asset:cowork` — ценность +1.35 за действие, значимо ниже своего типа
+- `buy_asset:market` — ценность +1.35 за действие, значимо ниже своего типа
+- `buy_asset:startup_cowork` — ценность +1.35 за действие, значимо ниже своего типа
+- `city_project:security_hub` — ценность +1.95 за действие, значимо ниже своего типа
+- `buy_asset:robotics` — отдача 17.5 очка с покупки, выше средней 9.2
+- `buy_asset:union_council` — отдача 16.4 очка с покупки, выше средней 9.2
+- `buy_asset:defence_contract` — отдача 14.0 очка с покупки, выше средней 9.2
+- `buy_asset:state_concern` — отдача 13.9 очка с покупки, выше средней 9.2
+- `buy_asset:offshore` — отдача 4.9 очка с покупки, ниже средней 9.2
+- `buy_asset:agglomeration` — владелец выигрывает на +16 п.п. чаще
+- `buy_asset:cash` — владелец выигрывает на -22 п.п. чаще
+- `buy_asset:lobby_office` — владелец выигрывает на +13 п.п. чаще
+- `buy_asset:underground_casino` — владелец выигрывает на -24 п.п. чаще
+- `use_role_power:fraudster_crypto_scam` — выбрано в 0.0% из 1855 доступных
+- `reroll_projects` — выбрано в 0.2% из 130173 доступных
+- `grey_operation:crypto` — выбрано в 0.4% из 89445 доступных
+- `use_role_power:mafia_lock` — выбрано в 0.5% из 2821 доступных
+- `claim_role:mafia` — выбрано в 0.8% из 77294 доступных
+- `use_role_power:politician_veto` — выбрано в 1.3% из 30381 доступных
