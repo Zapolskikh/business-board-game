@@ -841,7 +841,12 @@ def _card_value(engine: CityEngine, card_id: str, player: PlayerState) -> float:
         # bot has the money — the slot is the half of the purchase it cannot buy any other way.
         return 0.5 if player.capacity >= MAX_CAPACITY else 8
     if card.kind == "project":
-        return 6
+        # A whole project for nothing: its points, no influence and no money.
+        return 9
+    if card.kind == "free_object":
+        # The object it takes scores half its price and pays every round; with no free slot it
+        # is a discard waiting to happen.
+        return 0.5 if len(player.assets) >= player.capacity else 10
     return max(1, card.value)
 
 

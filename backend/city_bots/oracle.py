@@ -114,15 +114,45 @@ def choose_oracle_command(
             plan.revision += 1
             if not plan.actions:
                 _PLANS.pop(key, None)
+            spare = _spend_the_spare(engine, state, player_id, action, legal)
+            if spare is not None:
+                _PLANS.pop(key, None)
+                return spare
             return action, plan.value, plan.alternatives
     _PLANS.pop(key, None)
 
     action, value, alternatives, rest = _replan(engine, state, player_id, legal)
+    spare = _spend_the_spare(engine, state, player_id, action, legal)
+    if spare is not None:
+        return spare
     if rest:
         if len(_PLANS) >= _PLAN_CACHE_LIMIT:
             _PLANS.clear()
         _PLANS[key] = _Plan(state.game_id, state.turn_serial, state.revision + 1, rest, value, alternatives)
     return action, value, alternatives
+
+
+def _spend_the_spare(
+    engine: CityEngine,
+    state: GameState,
+    player_id: str,
+    action: dict[str, Any],
+    legal: list[tuple[dict[str, Any], Transition]] | None,
+) -> tuple[dict[str, Any], float, list[tuple[str, float]]] | None:
+    """A plan that ends the turn with ⚡ still on the table hands the rest of the turn to Ledger.
+
+    The rollouts compare whole plans by where the table stands a round later, and a spare «Городской
+    заказ» or a campaign moves that number by less than the noise between two rollouts — so an early
+    end looked as good as spending the action, and Oracle ended one turn in twelve with ⚡ unspent
+    (the tester's games, 2026-10-02). Ledger's search never does; it gets the say only when Oracle's
+    plan would throw actions away, and only if it finds something better than ending the turn.
+    """
+    if action.get("type") != "end_turn" or state.actions_left < 1:
+        return None
+    choice, value, alternatives = choose_ledger_command(engine, state, player_id, legal)
+    if choice.get("type") == "end_turn":
+        return None
+    return choice, value, alternatives
 
 
 def _replan(

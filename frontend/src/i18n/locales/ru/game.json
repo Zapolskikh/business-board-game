@@ -103,8 +103,8 @@
     },
     "military_roof_seize": {
       "label": "Отобрать Защиту",
-      "what": "Забирает одну Защиту у соперника и отдаёт её вам. Защита от этого не спасает.",
-      "cost": "действие + 3◆"
+      "what": "Снимает одну Защиту с соперника и отдаёт её вам. Если у вас уже максимум Защит, она просто сгорает. Защита от этого не спасает.",
+      "cost": "действие + 2◆"
     }
   },
   "gate": {
@@ -206,7 +206,8 @@
     "buyCard": "Купить «{{title}}»",
     "sellCard": "Продать карту → +{{value}}$",
     "discardCard": "Сбросить карту → +{{value}}◆",
-    "cardProject": " · «{{title}}» ({{money}}$ → {{points}} оч.)",
+    "cardProject": " · «{{title}}» (бесплатно → {{points}} оч.)",
+    "cardObject": " · забрать «{{title}}» бесплатно",
     "object": "объект",
     "slot": "слот",
     "card": "Карта",
@@ -244,6 +245,7 @@
     "inspectionRoof": " (Защита)",
     "roofSeized": " отбирает Защиту у ",
     "roofSeizedTail": "; теперь Защит: ",
+    "roofSeizedBurnt": "; у вас уже максимум Защит — снятая сгорает",
     "marketClaimed": " ставит метку на «{{title}}»: карта работает на него, но её всё ещё можно купить",
     "marketLocked": " закрывает «{{title}}» серой меткой: до конца следующего раунда её не купит никто другой",
     "marketRefreshed": " пересдаёт слот рынка: «{{title}}» уходит в отбой",
@@ -251,6 +253,7 @@
     "crisisPr": " антикризисный PR (",
     "crisisPrTail": ", осталось {{count}}⚠)",
     "assetBought": " покупает «{{title}}» за ",
+    "assetFree": " бесплатно забирает «{{title}}» по карте «{{card}}»",
     "assetSold": " продаёт «{{title}}» за ",
     "roleClaimed": " получает роль «{{role}}» (",
     "roleTakeover": " — перехват у ",
@@ -368,7 +371,7 @@
     "military_seize_targets": {
       "label": "Защиты, которые можно забрать",
       "unit": "",
-      "hint": "У кого есть Защита: 3◆ и действие — забрать одну себе"
+      "hint": "У кого есть Защита: 2◆ и действие — снять одну"
     },
     "role_district_income": {
       "label": "Свой район роли",
@@ -641,9 +644,11 @@
       "sellTitle": "Продажа за {{value}}$ — не тратит действие",
       "districtRow": "Район",
       "districtValue": "{{icon}} {{title}} · у вас {{count}} из 4",
-      "incomeRow": "Доход",
-      "incomeNow": "+{{money}}$ за раунд сейчас · на карте +{{printed}}$",
-      "incomeNowInfluence": "+{{money}}$ и +{{influence}}◆ за раунд сейчас · на карте +{{printed}}$",
+      "printedRow": "Доход по карте",
+      "printedValue": "+{{money}}$ за раунд",
+      "incomeRow": "Доход сейчас",
+      "incomeNow": "+{{money}}$ за раунд",
+      "incomeNowInfluence": "+{{money}}$ и +{{influence}}◆ за раунд",
       "incomePrinted": "+{{money}}$ за раунд",
       "scoreRow": "В счёт",
       "scoreValue": "{{count}} оч.",
@@ -674,7 +679,8 @@
       "priceRow": "Цена",
       "scoreRow": "Очки",
       "saleRow": "Стоимость продажи",
-      "incomeRow": "Доход",
+      "printedRow": "Доход по карте",
+      "incomeRow": "Доход в вашем городе",
       "perRound": "за раунд",
       "purchaseRow": "Даёт при покупке",
       "districtRules": "Условия района",
@@ -691,6 +697,9 @@
       "points": "Победные очки",
       "assets": "· {{count}} об.",
       "turn": "✦ Ходит",
+      "turnDone": "✓ сходил",
+      "turnWaiting": "ждёт хода",
+      "turnsTitle": "Ходов сделано: {{count}} из {{max}}",
       "jail": "Арест: в следующем ходу только 1 действие",
       "risk": "Ещё один скандал — и роль будет потеряна",
       "riskBadge": "⚠ роль",
@@ -831,6 +840,16 @@
       "railNew": "{{count}} новых · открыть",
       "railAll": "{{count}} событий · открыть",
       "railOpen": "Открыть всю хронику"
+    },
+    "greyResult": {
+      "title": "Серая операция: {{operation}}",
+      "target": "цель — {{name}}",
+      "roll": "выпало {{roll}}",
+      "face": "итог",
+      "sources": "Модификатор: {{sources}}",
+      "sourceCard": "карта",
+      "scale": "1–2 — провал · 3–4 — слабый эффект · 5–6 — полный эффект",
+      "ok": "ОК"
     },
     "common": {
       "spent": "уже в этом ходу",

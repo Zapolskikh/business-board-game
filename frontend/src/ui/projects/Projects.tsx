@@ -254,12 +254,15 @@ const ProjectCard = forwardRef<
             ⛔
           </span>
         )}
+        {/* Та же плашка, что у уходящего слота рынка: крупно и цветом, а не бледной иконкой. */}
         {leaving && (
           <span
-            className="rounded bg-[#ead5ae] px-1 text-3xs text-[var(--color-warning)]"
+            className="flex items-center gap-0.5 rounded-full border border-black/40 bg-[#b5651d] px-1.5 text-[11px]
+              font-bold leading-tight whitespace-nowrap text-white shadow-[0_1px_3px_rgb(0_0_0/0.6)]"
             title={t("ui.projects.leaving")}
           >
-            ⏳
+            <span className="text-[13px] leading-none">⏳</span>
+            {!portrait && t("ui.market.leaving")}
           </span>
         )}
         <span className="flex shrink-0 items-center gap-0.5 whitespace-nowrap" title={t("ui.projects.points", { count: project.points })}>

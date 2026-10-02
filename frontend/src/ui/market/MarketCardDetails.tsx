@@ -61,6 +61,7 @@ export function MarketCardDetails({
     card?: boolean;
     scandals?: number;
   };
+  const own = item.own_yield ?? item.preview;
   const purchaseInfluence = asset.influence + (purchase.influence ?? 0);
   const purchaseRewards: { icon: ResourceIconName; value: string }[] = [];
   if (purchaseInfluence) purchaseRewards.push({ icon: "influence", value: `+${purchaseInfluence}` });
@@ -93,18 +94,22 @@ export function MarketCardDetails({
           <dd className="flex items-center gap-1 font-semibold text-points"><ResourceIcon name="score" />{points}</dd>
           <dt className="text-ink-dim">{t("ui.market.saleRow")}</dt>
           <dd className="flex items-center gap-1 font-semibold text-money"><ResourceIcon name="money" />{points}</dd>
-          <dt className="text-ink-dim">{t("ui.market.incomeRow")}</dt>
+          {/* Два числа: напечатанное на карте и доля карты в вашем городе — её же покажет
+            * карточка в городе после покупки. */}
+          <dt className="text-ink-dim">{t("ui.market.printedRow")}</dt>
           <dd className="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-medium">
-            <span className="flex items-center gap-1 text-money">
-              <ResourceIcon name="money" />{sign(item.preview?.money ?? asset.income)}{Math.abs(item.preview?.money ?? asset.income)}
-            </span>
-            {item.preview?.influence !== undefined && item.preview.influence !== 0 && (
-              <span className="flex items-center gap-1 text-influence">
-                <ResourceIcon name="influence" />{sign(item.preview.influence)}{Math.abs(item.preview.influence)}
-              </span>
-            )}
+            <YieldValue value={{ money: asset.income, influence: 0 }} sign={sign} />
             <span className="text-ink-muted">{t("ui.market.perRound")}</span>
           </dd>
+          {own && (
+            <>
+              <dt className="text-ink-dim">{t("ui.market.incomeRow")}</dt>
+              <dd className="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-medium">
+                <YieldValue value={own} sign={sign} />
+                <span className="text-ink-muted">{t("ui.market.perRound")}</span>
+              </dd>
+            </>
+          )}
           {(purchaseRewards.length > 0 || purchase.card) && (
             <>
               <dt className="text-ink-dim">{t("ui.market.purchaseRow")}</dt>
@@ -184,6 +189,21 @@ export function MarketCardDetails({
           {marketCardReason(state)}
         </button>
       </PopoverFooter>
+    </>
+  );
+}
+
+function YieldValue({ value, sign }: { value: { money: number; influence: number }; sign: (value: number) => string }) {
+  return (
+    <>
+      <span className="flex items-center gap-1 text-money">
+        <ResourceIcon name="money" />{sign(value.money)}{Math.abs(value.money)}
+      </span>
+      {value.influence !== 0 && (
+        <span className="flex items-center gap-1 text-influence">
+          <ResourceIcon name="influence" />{sign(value.influence)}{Math.abs(value.influence)}
+        </span>
+      )}
     </>
   );
 }

@@ -309,6 +309,16 @@ class CityEngine:
                     )
                     for project_id in state.project_board
                 )
+            elif card.kind == "free_object":
+                candidates.extend(
+                    Command(
+                        type="play_action_card",
+                        actor_id=actor_id,
+                        payload={"card_uid": held.uid, "market_uid": item.uid},
+                    )
+                    for item in state.market
+                    if not self.market_locked_for(state, item, player)
+                )
             else:
                 candidates.append(Command(type="play_action_card", actor_id=actor_id, payload={"card_uid": held.uid}))
         candidates.extend(self._role_power_candidates(state, actor_id))
@@ -1326,6 +1336,15 @@ class CityEngine:
                 raise IllegalActionError("this card takes a project from the city board")
             if not self.project_requirement_met(player, self.project(project_id)):
                 raise IllegalActionError("the project condition is not met")
+        if card.kind == "free_object":
+            market_uid = self._payload_string(command, "market_uid")
+            item = next((entry for entry in state.market if entry.uid == market_uid), None)
+            if item is None:
+                raise IllegalActionError("this card takes an object from the market")
+            if self.market_locked_for(state, item, player):
+                raise IllegalActionError("a grey mark closes this slot")
+            if len(player.assets) >= player.capacity:
+                raise IllegalActionError("no free asset capacity")
 
     def _apply_self_card_effect(
         self,
@@ -1399,12 +1418,10 @@ class CityEngine:
         elif kind == "grey_roll":
             state.turn_flags[GREY_ROLL_BONUS_FLAG] = int(state.turn_flags.get(GREY_ROLL_BONUS_FLAG, 0)) + card.value
         elif kind == "project":
-            # The card pays the influence, not the condition: the project still has to be earned.
+            # The card pays the whole price, money and influence (content 2026-10-02c): the
+            # condition is the one thing it does not buy — the project still has to be earned.
             project_id = str(command.payload["project_id"])
             project = self.project(project_id)
-            if player.money < project.cost_money:
-                raise IllegalActionError("not enough money for the project")
-            player.money -= project.cost_money
             state.project_board = [item for item in state.project_board if item != project_id]
             player.projects.append(project_id)
             self._refill_project_board(state)
@@ -1414,7 +1431,22 @@ class CityEngine:
                 project_id=project_id,
                 points=project.points,
                 cost_influence=0,
-                cost_money=project.cost_money,
+                cost_money=0,
+                source_card_id=card.id,
+            )
+        elif kind == "free_object":
+            # «Приватизация»: the object off the market for nothing — no money, no action. A free
+            # slot is still needed, and a grey mark still closes the slot (checked on play).
+            market_uid = str(command.payload["market_uid"])
+            market_asset = next(item for item in state.market if item.uid == market_uid)
+            asset = self.asset(market_asset.card_id)
+            self._gain_asset(state, player, market_asset, asset)
+            state.append_event(
+                "asset_bought",
+                player.id,
+                asset_id=asset.id,
+                market_uid=market_uid,
+                cost=0,
                 source_card_id=card.id,
             )
         else:
@@ -1884,6 +1916,10 @@ class CityEngine:
         defends itself makes the whole line unreachable. The transfer replaces the sweep that took
         one from everybody: the sweep was a board-wide answer to a defence that is already the most
         contested resource in the game, and it paid points on top.
+
+        A full stack does not close the power (1.18.0): the token is still taken off the target, it
+        just has nowhere to go. Otherwise the military with a Крыша of their own could not touch
+        anybody else's — the one rival who needs it most.
         """
         player = state.current_player
         self._require_role(player, "military")
@@ -1892,13 +1928,13 @@ class CityEngine:
             raise IllegalActionError("the target holds no roof")
         if player.influence < MILITARY_SEIZE_INFLUENCE:
             raise IllegalActionError(f"seizing a roof requires {MILITARY_SEIZE_INFLUENCE} influence")
-        if player.roofs >= self.roof_limit(player):
-            raise IllegalActionError("roof limit reached")
         self._spend_action(state)
         player.influence -= MILITARY_SEIZE_INFLUENCE
         target.roofs -= 1
-        player.roofs += 1
-        state.append_event("roof_seized", player.id, target_id=target.id, roofs=player.roofs)
+        kept = player.roofs < self.roof_limit(player)
+        if kept:
+            player.roofs += 1
+        state.append_event("roof_seized", player.id, target_id=target.id, roofs=player.roofs, kept=kept)
 
     def _fraudster_crypto_scam(self, state: GameState, command: Command) -> None:
         player = state.current_player
@@ -2653,6 +2689,25 @@ class CityEngine:
             player.assets, player.marked_card_id = saved_assets, saved_mark
         return {"money": after[0] - before[0], "influence": after[1] - before[1]}
 
+    def purchase_yield(self, state: GameState, player: PlayerState, market_uid: str) -> dict[str, int]:
+        """What this market card itself would pay the player a round once bought — its city share.
+
+        ``purchase_preview`` is the whole board's gain, which also counts the synergy the purchase
+        switches on in cards already owned and the role's passives. The market face showed that,
+        the city face shows the card's own share, and the same card looked as if it lost income on
+        the way into the city. This is the number the city card will show.
+        """
+        item = next(item for item in state.market if item.uid == market_uid)
+        saved_assets, saved_mark = player.assets, player.marked_card_id
+        owned = OwnedAsset(uid=f"preview:{item.uid}", card_id=item.card_id)
+        try:
+            player.assets = [*saved_assets, owned]
+            if item.claimed_by == player.id:
+                player.marked_card_id = None
+            return self.owned_yield(state, player, owned)
+        finally:
+            player.assets, player.marked_card_id = saved_assets, saved_mark
+
     def owned_yield(self, state: GameState, player: PlayerState, owned: OwnedAsset) -> dict[str, int]:
         """What one standing object pays its owner a round: its own share of the settlement.
 
@@ -2907,7 +2962,9 @@ class CityEngine:
             preview["scandals"] = 1
             preview["self_scandals"] = 1
         elif power == "military_roof_seize":
-            preview["roofs"] = 1
+            # A full stack still strips the target; the token is simply not kept.
+            preview["roofs"] = 1 if player.roofs < self.roof_limit(player) else 0
+            preview["target_roofs"] = -1
         elif power == "military_inspection":
             # No target is picked — the district picks them — so the preview says, rival by rival,
             # who the inspection reaches. A rival outside the Серый сектор gets no scandal row.
@@ -3013,7 +3070,6 @@ class CityEngine:
         elif power == "military_roof_seize":
             gate("influence", player.influence, MILITARY_SEIZE_INFLUENCE)
             gate("roofed_rival", sum(1 for other in rivals if other.roofs > 0), 1)
-            gate("roof_room", self.roof_limit(player) - player.roofs, 1)
         return gates
 
     def role_perks(self, state: GameState, player: PlayerState) -> list[dict[str, Any]]:

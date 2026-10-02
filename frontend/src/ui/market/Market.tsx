@@ -65,6 +65,7 @@ export function MarketGrid({
                 className="min-h-0 min-w-0 [transform-style:preserve-3d]"
               >
                 <MarketCard
+                  game={game}
                   item={item}
                   asset={asset}
                   district={districts.get(asset.district)}

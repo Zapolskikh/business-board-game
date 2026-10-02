@@ -361,6 +361,22 @@ def test_oracle_plays_its_plan_without_thinking_again(monkeypatch) -> None:
     assert len(replans) <= 1 + grey_runs
 
 
+def test_oracle_does_not_end_a_turn_with_actions_ledger_can_use(monkeypatch) -> None:
+    """A plan that would end the turn with ⚡ left goes to Ledger for the rest of the turn."""
+    import city_bots.oracle as oracle
+
+    oracle.forget_plans()
+    engine = CityEngine()
+    state = ledger_game("oracle", "expert")
+    player = state.current_player
+    player.money, player.influence = 40, 12
+    end = {"type": "end_turn", "payload": {}}
+    monkeypatch.setattr(oracle, "_replan", lambda *args: (end, 0.0, [], []))
+    action, _value, _alternatives = oracle.choose_oracle_command(engine, state, player.id)
+    assert state.actions_left > 0
+    assert action["type"] != "end_turn"
+
+
 def test_oracle_finishes_a_game_at_a_mixed_table(monkeypatch) -> None:
     import city_bots.oracle as oracle
 
@@ -407,3 +423,36 @@ def test_boris_cashes_surplus_money_into_patronage() -> None:
     state.market = []  # nothing to swap into: the surplus has only the printed sinks left
     action, _value, _reasons = choose_boris_command(engine, state, player.id)
     assert action == {"type": "basic_action", "payload": {"kind": "patronage"}}
+
+
+def test_boris_campaigns_for_the_next_slot_instead_of_working() -> None:
+    """Five full slots and no influence: the sixth slot needs ◆, so a spare action buys it, not 2$."""
+    from city_bots.boris import choose_boris_command
+
+    engine = CityEngine()
+    state = ledger_game("boris", "expert")
+    player = state.current_player
+    player.role = "capitalist"
+    player.capacity = 5
+    player.assets = [OwnedAsset(uid=f"owned:{index}", card_id="cowork") for index in range(5)]
+    player.money = 30
+    player.influence = 0
+    player.roofs = 1  # the seat is already guarded: the choice left is campaign or work
+    state.market = []
+    action, _value, _reasons = choose_boris_command(engine, state, player.id)
+    assert action["type"] == "basic_action"
+    assert action["payload"]["kind"] == "campaign"
+
+
+def test_boris_guards_a_seat_near_its_limit_with_a_roof_first() -> None:
+    from city_bots.boris import choose_boris_command
+
+    engine = CityEngine()
+    state = ledger_game("boris", "expert")
+    player = state.current_player
+    player.role = "capitalist"
+    player.scandals = engine.scandal_limit(player) - 2
+    player.roofs = 0
+    player.money = 30
+    action, _value, _reasons = choose_boris_command(engine, state, player.id)
+    assert action == {"type": "buy_roof", "payload": {}}

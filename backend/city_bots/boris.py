@@ -114,8 +114,23 @@ def _endgame(engine: CityEngine, state: GameState, player: PlayerState, offered)
 
 
 def _keep_the_role(engine: CityEngine, state: GameState, player: PlayerState, offered) -> tuple[dict, str] | None:
-    """A seat one scandal from the limit is a seat any card can take: clean it before anything."""
-    if player.role is None or engine.scandal_limit(player) - player.scandals > SCANDAL_MARGIN:
+    """A seat near its limit is a seat any card can take: guard it, then clean it.
+
+    A Крыша comes first: it costs money, which a working engine has to spare, and it stops the next
+    hit outright. Cleaning costs influence and an action, so it is done once a turn — twice a turn
+    against a journalist publishing every round cost two actions and 6◆ to answer one action and 3◆,
+    and the lobbying the influence was for never happened. A second clean is spent only when the
+    seat is one scandal from the limit.
+    """
+    if player.role is None:
+        return None
+    room = engine.scandal_limit(player) - player.scandals
+    if room > SCANDAL_MARGIN:
+        return None
+    roof = offered.get(("buy_roof",))
+    if roof and player.roofs == 0:
+        return roof[0], "guarding a seat near its scandal limit"
+    if room > 1 and _cleaned_this_turn(state, player):
         return None
     for key in (
         ("use_role_power", "fraudster_cleanup"),
@@ -344,12 +359,17 @@ def _fill(engine: CityEngine, state: GameState, player: PlayerState, offered) ->
         return None
     found = offered.get(("basic_action", "campaign"))
     campaign = found[0] if found else None
-    needs_influence = player.role is None and player.influence < state.role_price
-    if campaign and needs_influence and player.money - 5 >= _money_reserve(engine, state, player) / 2:
-        return campaign, "influence for a seat"
-    # Patronage takes 20$ once a turn, and a working engine out-earns that: the rest of the surplus
-    # becomes influence, which lobbying turns into points at a better rate than patronage pays.
-    if campaign and player.money - 5 >= _money_reserve(engine, state, player) + PATRONAGE_MONEY:
+    reserve = _money_reserve(engine, state, player)
+    # The seat and the next slot both need influence the engine does not earn by itself: without it
+    # the fifth slot was the last one, and the swaps that build the quarter never opened.
+    needs_influence = player.influence < _influence_reserve(engine, state, player)
+    if campaign and needs_influence and player.money - 5 >= reserve / 2:
+        return campaign, "influence for the seat or the next slot"
+    # Patronage takes 20$ once a turn and a working engine out-earns that, so the money above the
+    # build's reserve becomes influence for the next lobbying — 3◆ an action against the 2$ of work.
+    # Only as much as lobbying can take: influence past that sits as idly as the money did.
+    wants_lobbying = player.influence < _influence_reserve(engine, state, player) + LOBBYING_INFLUENCE
+    if campaign and wants_lobbying and player.money - 5 >= reserve:
         return campaign, "surplus money into influence for lobbying"
     work = offered.get(("basic_action", "work"))
     if work:
@@ -487,6 +507,19 @@ def _sold_this_turn(state: GameState, player: PlayerState) -> bool:
         if event.type == "turn_started":
             return False
         if event.type == "asset_sold" and event.actor_id == player.id:
+            return True
+    return False
+
+
+def _cleaned_this_turn(state: GameState, player: PlayerState) -> bool:
+    for event in reversed(state.event_log):
+        if event.type == "turn_started":
+            return False
+        if event.actor_id != player.id:
+            continue
+        if event.type == "crisis_pr" or (
+            event.type == "role_power_used" and str(event.data.get("power", "")).endswith("_cleanup")
+        ):
             return True
     return False
 

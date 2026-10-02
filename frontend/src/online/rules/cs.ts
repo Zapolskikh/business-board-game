@@ -146,8 +146,8 @@ const roles: Record<string, RoleGuide> = {
       {
         name: "Sebrat Ochranu",
         cost: "1 akce a 2◆",
-        limit: "potřebujete volné místo na Ochranu",
-        effect: "Vezměte soupeři 1 Ochranu.",
+        limit: "cíl musí mít Ochranu",
+        effect: "Vezměte soupeři 1 Ochranu; pokud už máte maximum, Ochrana jen zmizí.",
       },
     ],
   },

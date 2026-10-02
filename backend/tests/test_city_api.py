@@ -322,6 +322,7 @@ def test_state_carries_purchase_previews_and_object_yields() -> None:
         assert game["market"]
         for item in game["market"]:
             assert set(item["preview"]) == {"money", "influence"}
+            assert set(item["own_yield"]) == {"money", "influence"}
         for player in game["players"]:
             assert set(player["asset_yields"]) == {owned["uid"] for owned in player["assets"]}
     finally:

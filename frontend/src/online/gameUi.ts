@@ -395,7 +395,11 @@ export function actionLabel(action: LegalAction, context: LabelContext): string 
     const detail = target ? ` → ${target.name}`
       : district ? ` · ${district.title}`
       : role ? ` · ${role.title}`
-      : project ? tg("action.cardProject", { title: project.title, money: project.cost_money, points: project.points })
+      : project ? tg("action.cardProject", { title: project.title, points: project.points })
+      : payload.market_uid !== undefined
+        ? tg("action.cardObject", {
+            title: assets.get(game.market.find(item => item.uid === payload.market_uid)?.card_id ?? "")?.title ?? tg("action.object"),
+          })
       : auto;
     return `${title}${detail}`;
   }
@@ -633,6 +637,10 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       return lead(...tail);
     }
     case "roof_seized":
+      // `kept: false` — a full stack: the target still loses the token, nobody gains it (1.18.0).
+      if (data.kept === false) {
+        return lead(txt(tg("event.roofSeized")), playerSeg(game, stringValue(data.target_id)), txt(tg("event.roofSeizedBurnt")));
+      }
       return lead(
         txt(tg("event.roofSeized")),
         playerSeg(game, stringValue(data.target_id)),
@@ -652,6 +660,11 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
     case "crisis_pr":
       return lead(txt(tg("event.crisisPr")), signed(-numberValue(data.cost), "◆"), txt(", "), num("−1⚠", "good"), txt(tg("event.crisisPrTail", { count: numberValue(data.scandals) })));
     case "asset_bought":
+      // «Приватизация» takes the object for nothing: say which card paid, not «за 0$».
+      if (data.source_card_id) {
+        const source = meta.action_cards.find(item => item.id === stringValue(data.source_card_id));
+        return lead(txt(tg("event.assetFree", { title: asset ?? assetId, card: source?.title ?? stringValue(data.source_card_id) })), ...deltas);
+      }
       // Deltas expose the grey-tag scandal and the purchase bonuses, which have no events of their own.
       return lead(txt(tg("event.assetBought", { title: asset ?? assetId })), num(`${numberValue(data.cost)}$`, "bad"), ...deltas);
     case "asset_sold": {

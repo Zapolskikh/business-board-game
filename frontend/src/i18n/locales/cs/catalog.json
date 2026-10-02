@@ -36,7 +36,7 @@
     "military": {
       "title": "Bezpečák",
       "passive": "Podniky v Průmyslové zóně: +1$. Sankce tvrdě dopadají na ty, kdo mají víc skandálů.",
-      "power": "Sankce (jednou za tah, 1 akce): cíl se 2 skandály dá peníze, se 3 — i vliv, se 4 — i roli. Kontrola (1 akce): skandál každému soupeři s podnikem v Šedé zóně. Sebrat Ochranu (1 akce a 2◆): jedna Ochrana soupeře přejde k vám."
+      "power": "Sankce (jednou za tah, 1 akce): cíl se 2 skandály dá peníze, se 3 — i vliv, se 4 — i roli. Kontrola (1 akce): skandál každému soupeři s podnikem v Šedé zóně. Sebrat Ochranu (1 akce a 2◆): jedna Ochrana soupeře přejde k vám, a při plné zásobě prostě zmizí."
     }
   },
   "assets": {
@@ -133,7 +133,8 @@
     "mobilization": {"title": "Všechny ruce na palubu", "text": "Získejte hned +1 běžnou akci."},
     "investor_call": { "title": "Jmenný fond", "text": "Zaplaťte 15$ a získejte +5 bodů do konečného skóre. Místo není potřeba." },
     "bailout": { "title": "Záchranný balíček", "text": "Zdarma vám dá 1 nové místo pro podnik (nejvýš šest)." },
-    "urban_project": { "title": "Občanská iniciativa", "text": "Vezměte projekt z městské desky bez placení vlivu. Podmínku projektu a jeho cenu v penězích musíte splnit." },
+    "urban_project": { "title": "Občanská iniciativa", "text": "Vezměte projekt z městské desky zdarma — bez vlivu i bez peněz. Podmínku projektu musíte splnit." },
+    "privatization": { "title": "Privatizace", "text": "Vezměte libovolný podnik z trhu zdarma — bez peněz a bez akce. Potřebujete volné místo; šedá blokace Mafiána zavírá místo i pro tuto kartu." },
     "lawyers": { "title": "Firemní právníci", "text": "Smažte 2 skandály." },
     "insurance": { "title": "Pojistka", "text": "Získáte 1 Ochranu (do svého limitu)." },
     "injunction": { "title": "Soudní zákaz", "text": "Získáte 1 Ochranu." },

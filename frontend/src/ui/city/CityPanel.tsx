@@ -263,12 +263,15 @@ function OwnedDetails({
               t("ui.city.districtRow"),
               t("ui.city.districtValue", { icon: districtIcon ?? "", title: districtTitle ?? asset.district, count: owns }),
             ],
+            // Напечатанный доход — отдельной строкой: без неё не понять, сколько из «сейчас»
+            // дают синергии района, а сколько сама карта.
+            [t("ui.city.printedRow"), t("ui.city.printedValue", { money: asset.income })],
             [
               t("ui.city.incomeRow"),
               (() => {
                 const share = context.me.asset_yields?.[uid];
                 if (!share) return t("ui.city.incomePrinted", { money: asset.income });
-                const values = { money: share.money, influence: share.influence, printed: asset.income };
+                const values = { money: share.money, influence: share.influence };
                 return share.influence ? t("ui.city.incomeNowInfluence", values) : t("ui.city.incomeNow", values);
               })(),
             ],

@@ -765,6 +765,25 @@ def test_military_seizes_a_roof_through_the_roof_it_takes() -> None:
     assert any(event.type == "roof_seized" for event in state.event_log)
 
 
+def test_seizing_a_roof_with_a_full_stack_still_strips_the_target() -> None:
+    engine = CityEngine()
+    state = make_state()
+    military = state.current_player
+    military.role = "military"
+    military.influence = MILITARY_SEIZE_INFLUENCE
+    military.roofs = engine.roof_limit(military)
+    target = rival_of(state, military)
+    target.roofs = 1
+
+    state = run(engine, state, "use_role_power", {"power": "military_roof_seize", "target_id": target.id})
+
+    assert state.current_player.roofs == engine.roof_limit(state.current_player)
+    assert state.player_by_id(target.id).roofs == 0
+    assert state.current_player.influence == 0
+    seized = next(event for event in reversed(state.event_log) if event.type == "roof_seized")
+    assert seized.data["kept"] is False
+
+
 def test_seizing_a_roof_needs_a_target_holding_one() -> None:
     engine = CityEngine()
     state = make_state()
@@ -1090,6 +1109,8 @@ def test_every_action_card_has_a_working_engine_path(card_id: str) -> None:
         state.project_board = ["art_museum", *state.project_board[:-1]]
         state.project_deck = [item for item in state.project_deck if item not in state.project_board]
         payload["project_id"] = "art_museum"
+    elif card.kind == "free_object":
+        payload["market_uid"] = state.market[0].uid
 
     next_state = run(engine, state, "play_action_card", payload)
     assert held.uid not in {item.uid for item in next_state.current_player.hand}
@@ -1951,6 +1972,31 @@ def test_purchase_preview_is_the_whole_board_difference() -> None:
     assert preview["influence"] == after["influence"]["total"] - before["influence"]["total"]
 
 
+def test_purchase_yield_is_what_the_city_card_will_show() -> None:
+    """The market face and the city face of one card must agree: the card's own share."""
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.role = None
+    first, second = _residential_ids(engine)[:2]
+    player.assets = [OwnedAsset(uid="own-1", card_id=first)]
+    player.money = 100
+    state.market[0] = MarketAsset(uid="slot-x", card_id=second)
+
+    own = engine.purchase_yield(state, player, "slot-x")
+    whole = engine.purchase_preview(state, player, "slot-x")
+    # The new card's own share is smaller than the board's gain: the +1$ on the first one is not its.
+    assert own["money"] == whole["money"] - 1
+    snapshot = state.to_dict()
+    engine.purchase_yield(state, player, "slot-x")
+    assert state.to_dict() == snapshot
+
+    state = run(engine, state, "buy_asset", {"market_uid": "slot-x"})
+    bought = state.player_by_id(player.id)
+    standing = next(owned for owned in bought.assets if owned.card_id == second)
+    assert engine.owned_yield(state, bought, standing) == own
+
+
 def test_purchase_preview_leaves_the_state_untouched() -> None:
     engine = CityEngine()
     state = make_state()
@@ -2427,3 +2473,74 @@ def test_mobilisation_now_gives_one_action() -> None:
     state = run(engine, state, "play_action_card", {"card_uid": held.uid})
 
     assert state.actions_left == actions + 1
+
+
+def test_urban_project_takes_a_project_for_free() -> None:
+    """«Общественная инициатива» pays the whole price; only the condition still has to be met."""
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    # The unconditional project is always takeable (see the card-path test above).
+    state.project_board = ["art_museum", *state.project_board[:-1]]
+    state.project_deck = [item for item in state.project_deck if item not in state.project_board]
+    project_id = "art_museum"
+    held = give_card(state, player, "urban_project")
+    player.money, player.influence = 0, 0
+    actions = state.actions_left
+
+    state = run(engine, state, "play_action_card", {"card_uid": held.uid, "project_id": project_id})
+
+    me = state.player_by_id(player.id)
+    assert project_id in me.projects
+    assert (me.money, me.influence) == (0, 0)
+    assert state.actions_left == actions
+    taken = next(event for event in reversed(state.event_log) if event.type == "city_project_taken")
+    assert taken.data["cost_money"] == 0 and taken.data["cost_influence"] == 0
+
+
+def test_privatization_takes_a_market_object_for_free() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    assert len(player.assets) < player.capacity
+    held = give_card(state, player, "privatization")
+    item = state.market[0]
+    player.money = 0
+    actions = state.actions_left
+
+    state = run(engine, state, "play_action_card", {"card_uid": held.uid, "market_uid": item.uid})
+
+    me = state.player_by_id(player.id)
+    assert any(owned.card_id == item.card_id for owned in me.assets)
+    assert me.money == 0
+    assert state.actions_left == actions
+    assert all(entry.uid != item.uid for entry in state.market)
+    bought = next(event for event in reversed(state.event_log) if event.type == "asset_bought")
+    assert bought.data["cost"] == 0 and bought.data["source_card_id"] == "privatization"
+
+
+def test_privatization_needs_a_free_slot_and_respects_a_grey_mark() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    held = give_card(state, player, "privatization")
+    player.assets = [
+        OwnedAsset(uid=f"own-{index}", card_id=state.market[1].card_id) for index in range(player.capacity)
+    ]
+    with pytest.raises(IllegalActionError, match="no free asset capacity"):
+        run(engine, state, "play_action_card", {"card_uid": held.uid, "market_uid": state.market[0].uid})
+
+    state = make_state()
+    player = state.current_player
+    held = give_card(state, player, "privatization")
+    rival = rival_of(state, player)
+    state.market[0].locked_by = rival.id
+    state.market[0].locked_round = state.round_number + 1
+    offered = [
+        action["payload"].get("market_uid")
+        for action in engine.legal_actions(state, player.id)
+        if action["type"] == "play_action_card" and action["payload"].get("card_uid") == held.uid
+    ]
+    assert state.market[0].uid not in offered
+    with pytest.raises(IllegalActionError, match="grey mark"):
+        run(engine, state, "play_action_card", {"card_uid": held.uid, "market_uid": state.market[0].uid})

@@ -137,8 +137,10 @@ def room_view(
         # Cards that pay off the player's own best district pick it themselves, so the amount
         # is knowable before the play — and has to be, or the card is a blind click.
         game["card_previews"] = {
-            card.id: {"district": engine.best_cash_district(viewer_for_role),
-                      "money": engine.district_cash_payout(room.game, viewer_for_role, card.value)}
+            card.id: {
+                "district": engine.best_cash_district(viewer_for_role),
+                "money": engine.district_cash_payout(room.game, viewer_for_role, card.value),
+            }
             for card in engine.catalog.action_cards.values()
             if card.kind == "district_cash"
         }
@@ -165,6 +167,8 @@ def room_view(
         # a figure the client could only get by re-implementing the settlement.
         if viewer is not None:
             item["preview"] = engine.purchase_preview(room.game, viewer, item["uid"])
+            # The card's own share once bought — the figure its city face will show.
+            item["own_yield"] = engine.purchase_yield(room.game, viewer, item["uid"])
     # What each standing object pays its owner right now, for every player: city cards show their
     # own share of the settlement rather than the printed income plus a client-side guess.
     for player_state in room.game.players:

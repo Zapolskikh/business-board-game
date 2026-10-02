@@ -178,12 +178,12 @@ const basePlayers: PlayerState[] = [
 ];
 
 const baseMarket: MarketAsset[] = [
-  { uid: "m-1", card_id: "invest_fund", price: 8 },
+  { uid: "m-1", card_id: "invest_fund", price: 8, claimed_by: "p-bot4" },
   { uid: "m-2", card_id: "auto_warehouse", price: 5, leaving: true },
   { uid: "m-3", card_id: "datacenter", price: 12, leaving: true },
   { uid: "m-4", card_id: "city_ecosystem", price: 16 },
   { uid: "m-5", card_id: "media_net", price: 7, leaving: true },
-  { uid: "m-6", card_id: "pawnshops", price: 9 },
+  { uid: "m-6", card_id: "pawnshops", price: 9, locked_by: "p-bot3", locked_round: 7 },
 ];
 
 // Таблицы граней для книги правил — как их отдаёт /meta (scoring.grey_faces).

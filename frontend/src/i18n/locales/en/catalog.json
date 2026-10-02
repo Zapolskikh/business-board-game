@@ -36,7 +36,7 @@
     "military": {
       "title": "Enforcer",
       "passive": "Industrial Zone businesses: +1$. Sanctions hit harder when the target has more scandals.",
-      "power": "Sanctions (once per turn, 1 action): a target with 2 scandals gives money, with 3 — also influence, with 4 — also the role. Inspection (1 action): a scandal to every rival with a Grey Sector business. Take Protection (1 action and 2◆): one Protection of a rival becomes yours."
+      "power": "Sanctions (once per turn, 1 action): a target with 2 scandals gives money, with 3 — also influence, with 4 — also the role. Inspection (1 action): a scandal to every rival with a Grey Sector business. Take Protection (1 action and 2◆): one Protection of a rival becomes yours, or is simply removed if your stack is full."
     }
   },
   "assets": {
@@ -133,7 +133,8 @@
     "mobilization": {"title": "All Hands", "text": "Get +1 normal action right now."},
     "investor_call": { "title": "Named Fund", "text": "Pay 15$ and get +5 points in the final score. No slot needed." },
     "bailout": { "title": "Bailout", "text": "Gives you 1 new business slot for free (six at most)." },
-    "urban_project": { "title": "Community Initiative", "text": "Take a project from the city board without paying influence. You still need to meet its condition and pay its money price." },
+    "urban_project": { "title": "Community Initiative", "text": "Take a project from the city board for free — no influence and no money. You still need to meet its condition." },
+    "privatization": { "title": "Privatization", "text": "Take any business from the market for free — no money and no action. You need a free slot; a Mobster's grey hold closes the slot to this card too." },
     "lawyers": { "title": "Company Lawyers", "text": "Remove 2 scandals." },
     "insurance": { "title": "Insurance Cover", "text": "Get 1 Protection (up to your limit)." },
     "injunction": { "title": "Court Order", "text": "Get 1 Protection." },

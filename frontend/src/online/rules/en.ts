@@ -146,8 +146,8 @@ const roles: Record<string, RoleGuide> = {
       {
         name: "Take Protection",
         cost: "1 action and 2◆",
-        limit: "you need room for Protection",
-        effect: "Take 1 Protection from a rival.",
+        limit: "the target must hold Protection",
+        effect: "Take 1 Protection from a rival; if you already hold the maximum, it is simply removed.",
       },
     ],
   },

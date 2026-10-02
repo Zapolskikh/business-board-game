@@ -6,7 +6,7 @@ import type { CityMeta, GameState, LegalAction, PlayerState } from "../../online
 import { CardPopover } from "../primitives/CardPopover";
 import { Panel, SectionHead } from "../primitives/atoms";
 import type { ActionContext } from "../lib/actions";
-import { atScandalRisk, playerColor, scandalLimit, type Indexes } from "../lib/board";
+import { atScandalRisk, playerColor, scandalLimit, turnPosition, type Indexes } from "../lib/board";
 import { PlayerDetails } from "./PlayerDetails";
 import { playerFrame, roleIcon, statIcon } from "../assets/cards";
 
@@ -79,6 +79,10 @@ const PlayerRow = forwardRef<HTMLButtonElement, PlayerRowProps>(function PlayerR
   const role = player.role ? index.roles.get(player.role) : undefined;
   const score = game.score_breakdown?.[player.id]?.total ?? 0;
   const turn = game.players[game.current_player_index]?.id === player.id;
+  /* Сходил ли игрок в этом раунде: порядок хода перетасовывается каждый раунд по счёту, и без
+   * этой плашки не понять, кто ещё успеет ответить до выплат. */
+  const done = !turn && turnPosition(game, player.id) < (game.turns_taken_in_round ?? 0);
+  const turnsTitle = t("ui.players.turnsTitle", { count: player.turns, max: game.max_rounds });
   const risky = atScandalRisk(player);
   const color = playerColor(game, player.id);
   const shielded = player.roofs > 0;
@@ -156,11 +160,19 @@ const PlayerRow = forwardRef<HTMLButtonElement, PlayerRowProps>(function PlayerR
                 {difficultyLabels[player.difficulty] ?? player.difficulty}
               </span>
             )}
-            {turn && (
-              <span className="player-card-turn-pill shrink-0 rounded-full px-1.5 font-semibold">
+            {game.status === "playing" && (turn ? (
+              <span className="player-card-turn-pill shrink-0 rounded-full px-1.5 font-semibold" title={turnsTitle}>
                 {t("ui.players.turn")}
               </span>
-            )}
+            ) : done ? (
+              <span data-ui="player-turn-done" className="shrink-0 rounded-full bg-[#cfe3cf] px-1.5 font-semibold text-[#2f6b3a]" title={turnsTitle}>
+                {t("ui.players.turnDone")}
+              </span>
+            ) : (
+              <span data-ui="player-turn-waiting" className="shrink-0 rounded-full bg-panel/60 px-1.5 text-ink-dim" title={turnsTitle}>
+                {t("ui.players.turnWaiting")}
+              </span>
+            ))}
             {player.jail_turns > 0 ? (
               <span
                 className="shrink-0 rounded bg-[#e6c8c4] px-1 font-semibold text-bad"

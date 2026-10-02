@@ -11,8 +11,9 @@ SCHEMA_VERSION = 1
 # Bumped whenever a rule changes what a snapshot means. 1.15.0: a holder with a Крыша cannot be
 # bought out of their role at all, the mafia's grey mark lasts through the next round, and a tie
 # goes to whoever took more city projects. 1.16.0: an action-card draw costs 6$ instead of 3$, and the late market
-# is a weighted draw instead of the recycled round-one commons.
-RULES_VERSION = "city-1.17.0"
+# is a weighted draw instead of the recycled round-one commons. 1.18.0: «Отобрать Защиту» works with
+# a full stack too — it then only strips the target.
+RULES_VERSION = "city-1.18.0"
 
 # Bumped whenever the catalog changes, even if no rule moved: card texts are part of the agreement
 # too. 2026-09-30: removed the unsupported cash-exchange purchase payout. 2026-09-30b: «Судебный
@@ -20,7 +21,10 @@ RULES_VERSION = "city-1.17.0"
 # 2026-10-01: «Крыша» is «Защита» in every Russian text; round-scaled cards say «номер раунда»
 # (which is what the engine always added) instead of «за каждый прошедший раунд».
 # 2026-10-01b: city projects repriced by how hard their condition is — see CHANGELOG.
-CONTENT_VERSION = "city-content-2026-10-02"
+# 2026-10-02b: the military's «Отобрать Защиту» text covers a full stack.
+# 2026-10-02c: «Общественная инициатива» takes a project for free; new card «Приватизация» takes a
+# market object for free.
+CONTENT_VERSION = "city-content-2026-10-02c"
 
 DISTRICT_IDS = (
     "residential",

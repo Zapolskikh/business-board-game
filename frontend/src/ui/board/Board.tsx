@@ -18,6 +18,7 @@ import { RulesBook } from "./RulesBook";
 import { ChronicleRail } from "./ChronicleRail";
 import { useTurnBriefing } from "./briefing";
 import { TurnBriefingModal } from "./TurnBriefing";
+import { GreyResult } from "./GreyResult";
 import { BoardScaler } from "./BoardScaler";
 import { MobileFrame } from "./MobileFrame";
 import { Header, StatusBar } from "./Header";
@@ -183,6 +184,7 @@ export function BoardView({
       />
 
       <TurnBriefingModal briefing={briefing} onClose={closeBriefing} />
+      <GreyResult game={game} meta={meta} meId={context.me.id} />
 
       <DetailsModal open={score} onClose={() => setScore(false)} label={t("ui.finish.scoreModal")}>
         <ScoreDetails game={game} me={context.me} meta={meta} />

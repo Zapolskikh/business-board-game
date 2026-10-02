@@ -105,12 +105,33 @@ describe("BoardView", () => {
     expect(render("Богатый ход")).not.toContain("Ваш ход");
   });
 
-  it("на карточках рынка оставляет только заметные часы уходящего слота", () => {
+  it("на карточках рынка ставит заметную плашку уходящего слота", () => {
     const html = render("Богатый ход");
 
-    expect(html).toContain("text-2xl font-black");
-    expect(html).toContain("aria-label=\"Слот уходит в конце раунда\"");
+    expect(html).toContain("data-ui=\"market-stamp-leaving\"");
+    expect(html).toContain("title=\"Слот уходит в конце раунда\"");
     expect(html).not.toContain("район 0/4");
+  });
+
+  it("показывает метку Капиталиста на лице карточки рынка", () => {
+    const room = scenarios["Богатый ход"];
+    const game = room.game as GameState;
+    const rival = game.players.find(player => player.id !== ME) as PlayerState;
+    const market = game.market.map((item, position) => (position === 0 ? { ...item, claimed_by: rival.id } : item));
+    const me = game.players.find(player => player.id === ME) as PlayerState;
+    const html = renderToString(
+      <BoardView
+        game={{ ...game, market }}
+        meta={meta}
+        context={{ game: { ...game, market }, me, legal: [] }}
+        onAction={() => {}}
+        busy={false}
+        error=""
+        onExit={() => {}}
+      />,
+    );
+    expect(html).toContain("data-ui=\"market-stamp-claim\"");
+    expect(html).toContain(rival.name);
   });
 
   it("переживает игрока без роли, без карт и без объектов", () => {

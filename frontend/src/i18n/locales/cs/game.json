@@ -60,7 +60,7 @@
       "what": "Skandál každému soupeři, který má podnik v Šedé zóně. Míří na čtvrť, ne na jednoho hráče, takže se nikdo neschová. Ochrana chrání svého majitele a spotřebuje se.",
       "cost": "akce, jednou za tah"
     },
-    "military_roof_seize": { "label": "Sebrat Ochranu", "what": "Vezme jednu Ochranu soupeři a dá ji vám. Ochrana proti tomu nechrání.", "cost": "akce + 3◆" }
+    "military_roof_seize": { "label": "Sebrat Ochranu", "what": "Vezme jednu Ochranu soupeři a dá ji vám. Pokud už máte maximum, Ochrana jen zmizí. Ochrana proti tomu nechrání.", "cost": "akce + 2◆" }
   },
   "gate": {
     "action": "v tomto tahu už nemáte akce",
@@ -135,7 +135,8 @@
     "buyCard": "Koupit „{{title}}“",
     "sellCard": "Prodat kartu → +{{value}}$",
     "discardCard": "Zahodit kartu → +{{value}}◆",
-    "cardProject": " · „{{title}}“ ({{money}}$ → {{points}} b.)",
+    "cardProject": " · „{{title}}“ (zdarma → {{points}} b.)",
+    "cardObject": " · vzít „{{title}}“ zdarma",
     "object": "podnik",
     "slot": "místo",
     "card": "Karta",
@@ -173,6 +174,7 @@
     "inspectionRoof": " (Ochrana)",
     "roofSeized": " bere Ochranu hráči ",
     "roofSeizedTail": "; teď má Ochran: ",
+    "roofSeizedBurnt": "; Ochran už má maximum — sebraná zmizí",
     "marketClaimed": " zabírá „{{title}}“: karta pracuje pro něj, ale pořád jde koupit",
     "marketLocked": " dává šedou blokaci na „{{title}}“: do konce příštího kola ji nikdo jiný nekoupí",
     "marketRefreshed": " znovu rozdává místo na trhu: „{{title}}“ jde do odhozu",
@@ -180,6 +182,7 @@
     "crisisPr": " krizové PR (",
     "crisisPrTail": ", zbývá {{count}}⚠)",
     "assetBought": " kupuje „{{title}}“ za ",
+    "assetFree": " bere „{{title}}“ zdarma kartou „{{card}}“",
     "assetSold": " prodává „{{title}}“ za ",
     "roleClaimed": " bere roli „{{role}}“ (",
     "roleTakeover": " — převzato od ",
@@ -247,7 +250,7 @@
     "mafia_roofs": { "label": "Limit Ochrany", "unit": "", "hint": "2 místo 1 a každá o 1$ levnější" },
     "military_sanction_targets": { "label": "Cíle pro sankce", "unit": "", "hint": "Soupeři se 2+ skandály: 2 — peníze, 3 — peníze a vliv, 4 — i role" },
     "military_inspection_targets": { "label": "Kontrola zasáhne", "unit": " soup.", "hint": "Soupeři s podnikem v Šedé zóně dostanou každý skandál; Ochrana to zastaví" },
-    "military_seize_targets": { "label": "Ochrany, které jde sebrat", "unit": "", "hint": "Kdo má Ochranu: 3◆ a akce — jednu si vezmete" },
+    "military_seize_targets": { "label": "Ochrany, které jde sebrat", "unit": "", "hint": "Kdo má Ochranu: 2◆ a akce — jednu sebrat" },
     "role_district_income": { "label": "Vlastní čtvrť role", "unit": "$/kolo", "hint": "+1$ příjmu za každý váš podnik ve čtvrti role" }
   },
   "effect": {
@@ -400,9 +403,9 @@
       "openPrice": "Cena: {{money}}$ a jedna akce. Peníze se nevracejí.", "openPriceInfluence": "Cena: {{money}}$, {{influence}}◆ a jedna akce. Nic se nevrací.", "openConfirm": "Otevřít místo", "lockedSlot": "🔒 Místo {{number}}", "open": "Otevřít · ",
       "district": "čtvrť {{count}}/4", "districtTitle": "Vaše podniky v této čtvrti. Synergie začíná při 2 a při 4.",
       "sellTitle": "Prodat za {{value}}$ — nestojí akci", "districtRow": "Čtvrť",
-      "districtValue": "{{icon}} {{title}} · máte {{count}} ze 4", "incomeRow": "Příjem",
-      "incomeNow": "+{{money}}$ za kolo teď · na kartě +{{printed}}$",
-      "incomeNowInfluence": "+{{money}}$ a +{{influence}}◆ za kolo teď · na kartě +{{printed}}$",
+      "districtValue": "{{icon}} {{title}} · máte {{count}} ze 4", "printedRow": "Příjem na kartě", "printedValue": "+{{money}}$ za kolo", "incomeRow": "Příjem teď",
+      "incomeNow": "+{{money}}$ za kolo",
+      "incomeNowInfluence": "+{{money}}$ a +{{influence}}◆ za kolo",
       "incomePrinted": "+{{money}}$ za kolo", "scoreRow": "Do skóre", "scoreValue": "{{count}} b.", "saleRow": "Prodej",
       "saleValue": "{{value}}$ — polovina ceny · bez akce", "properties": "Vlastnosti podniku", "districtRules": "Pravidla čtvrti",
       "saleNote": "Prodej vrátí přesně tolik peněz, kolik podnik dává bodů. Smysl prodeje je koupit na toto místo něco lepšího. Místo se uvolní hned a nestojí to akci.",
@@ -415,7 +418,7 @@
       "lockedTitle": "Šedá blokace Mafiána: do konce příštího kola může toto místo koupit jen on",
       "district": "čtvrť {{count}}/4", "districtTitle": "Vaše podniky v této čtvrti. Synergie začíná při 2 a při 4.",
       "details": "{{title}} — podrobnosti", "districtRow": "Čtvrť", "districtValue": "máte {{count}} ze 4",
-      "priceRow": "Cena", "scoreRow": "Body", "saleRow": "Prodejní cena", "incomeRow": "Příjem", "perRound": "za kolo",
+      "priceRow": "Cena", "scoreRow": "Body", "saleRow": "Prodejní cena", "printedRow": "Příjem na kartě", "incomeRow": "Příjem ve vašem městě", "perRound": "za kolo",
       "purchaseRow": "Při koupi",
       "districtRules": "Podmínky čtvrti", "leavingNote": "Na konci kola karta odejde z trhu do odhozu. Později se může vrátit.",
       "lock": "🔒 Šedá blokace — koupit to místo budete moct jen vy (1 Ochrana)",
@@ -424,7 +427,7 @@
     },
     "players": {
       "title": "Hráči", "count": "{{count}} ve hře", "details": "{{name}} — podrobnosti", "noRole": "Bez role",
-      "points": "Vítězné body", "assets": "· {{count}} pod.", "turn": "✦ Hraje", "jail": "Zatčení: v příštím tahu jen 1 akce",
+      "points": "Vítězné body", "assets": "· {{count}} pod.", "turn": "✦ Hraje", "turnDone": "✓ odehrál", "turnWaiting": "čeká", "turnsTitle": "Odehraných tahů: {{count}} z {{max}}", "jail": "Zatčení: v příštím tahu jen 1 akce",
       "risk": "Ještě jeden skandál a role je pryč", "riskBadge": "⚠ role", "money": "Peníze", "influence": "Vliv",
       "scandals": "Skandály", "roofs": "Ochrana", "powerFree": "Schopnost role · bez akce", "powerAction": "Schopnost role · stojí akci",
       "greyHint": "Šedý kšeft · jeden za tah", "card": "Karta", "cardHint": "Karta · zdarma, bez limitu za tah", "score": "Skóre",
@@ -471,6 +474,10 @@
       "nothing": "Nic nenalezeno", "chapter": "Kapitola {{number}}", "close": "Zavřít knihu"
     },
     "mobile": { "left": "Hráči a kronika", "right": "Akce a ruka", "closePanel": "Zavřít panel", "close": "Zavřít", "hideLeft": "‹ Skrýt", "hideRight": "Skrýt ›" },
+    "greyResult": {
+      "title": "Šedý kšeft: {{operation}}", "target": "cíl — {{name}}", "roll": "padlo {{roll}}", "face": "výsledek",
+      "sources": "Modifikátor: {{sources}}", "sourceCard": "karta", "scale": "1–2 — neúspěch · 3–4 — slabý účinek · 5–6 — plný účinek", "ok": "OK"
+    },
     "chronicle": {
       "title": "📜 Kronika hry", "events": "{{count}} událostí", "empty": "Zatím se nic nestalo.", "copyTitle": "Zkopírovat záznam hry",
       "copy": "📋 Kopírovat", "mdTitle": "Stáhnout záznam hry ve formátu Markdown", "md": "💾 Stáhnout .md",

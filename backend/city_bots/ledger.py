@@ -278,7 +278,10 @@ def _equity(engine: CityEngine, state: GameState, player: PlayerState, root: _Ro
     money_rate, influence_rate = engine._round_rates(state, player)
     money = player.money - player.debt + money_rate * payouts
     influence = player.influence + influence_rate * payouts
-    per_turn = 4 if player.role == "fraudster" else 3
+    # The actions every future turn starts with, as the engine deals them: the fraudster's fourth
+    # and an object's extra one (capped at one, as in _prepare_current_player). Counting only the
+    # fraudster made «Квантовый вычислительный центр» look like an object with no special effect.
+    per_turn = (4 if player.role == "fraudster" else 3) + min(1, engine.effect_total(player, "extraActions"))
     free_slots = max(0, player.capacity - len(player.assets)) + max(0, MAX_CAPACITY - player.capacity) * 0.5
 
     value = float(engine.score(player))

@@ -60,7 +60,7 @@
       "what": "A scandal for every rival who has a Grey Sector business. It hits the district, not one player, so nobody can hide. Protection keeps its owner safe and is used up.",
       "cost": "action, once per turn"
     },
-    "military_roof_seize": { "label": "Take Protection", "what": "Takes one Protection from a rival and gives it to you. Protection does not defend against this.", "cost": "action + 3◆" }
+    "military_roof_seize": { "label": "Take Protection", "what": "Takes one Protection from a rival and gives it to you. If you already hold the maximum, it is simply removed. Protection does not defend against this.", "cost": "action + 2◆" }
   },
   "gate": {
     "action": "no actions left this turn",
@@ -135,7 +135,8 @@
     "buyCard": "Buy “{{title}}”",
     "sellCard": "Sell the card → +{{value}}$",
     "discardCard": "Discard the card → +{{value}}◆",
-    "cardProject": " · “{{title}}” ({{money}}$ → {{points}} pts)",
+    "cardProject": " · “{{title}}” (free → {{points}} pts)",
+    "cardObject": " · take “{{title}}” for free",
     "object": "business",
     "slot": "slot",
     "card": "Card",
@@ -173,6 +174,7 @@
     "inspectionRoof": " (Protection)",
     "roofSeized": " takes Protection from ",
     "roofSeizedTail": "; Protection now: ",
+    "roofSeizedBurnt": "; your Protection is already full — the token is removed",
     "marketClaimed": " claims “{{title}}”: the card works for them, but it can still be bought",
     "marketLocked": " puts a grey hold on “{{title}}”: nobody else can buy it until the end of the next round",
     "marketRefreshed": " re-deals a market slot: “{{title}}” goes to the discard",
@@ -180,6 +182,7 @@
     "crisisPr": " crisis PR (",
     "crisisPrTail": ", {{count}}⚠ left)",
     "assetBought": " buys “{{title}}” for ",
+    "assetFree": " takes “{{title}}” for free with “{{card}}”",
     "assetSold": " sells “{{title}}” for ",
     "roleClaimed": " takes the role “{{role}}” (",
     "roleTakeover": " — taken from ",
@@ -247,7 +250,7 @@
     "mafia_roofs": { "label": "Protection limit", "unit": "", "hint": "2 instead of 1, and each costs 1$ less" },
     "military_sanction_targets": { "label": "Targets for sanctions", "unit": "", "hint": "Rivals with 2+ scandals: 2 — money, 3 — money and influence, 4 — the role too" },
     "military_inspection_targets": { "label": "Inspection will reach", "unit": " rivals", "hint": "Rivals with a Grey Sector business get a scandal each; Protection stops it" },
-    "military_seize_targets": { "label": "Protection you can take", "unit": "", "hint": "Anyone with Protection: 3◆ and an action — take one for yourself" },
+    "military_seize_targets": { "label": "Protection you can take", "unit": "", "hint": "Anyone with Protection: 2◆ and an action — take one away" },
     "role_district_income": { "label": "Role's own district", "unit": "$/round", "hint": "+1$ income for each of your businesses in the role's district" }
   },
   "effect": {
@@ -399,9 +402,9 @@
       "openPrice": "Price: {{money}}$ and one action. The money is not refunded.", "openPriceInfluence": "Price: {{money}}$, {{influence}}◆ and one action. Nothing is refunded.", "openConfirm": "Open the slot", "lockedSlot": "🔒 Slot {{number}}", "open": "Open · ",
       "district": "district {{count}}/4", "districtTitle": "Your businesses in this district. Synergy starts at 2 and at 4.",
       "sellTitle": "Sell for {{value}}$ — costs no action", "districtRow": "District",
-      "districtValue": "{{icon}} {{title}} · you have {{count}} of 4", "incomeRow": "Income",
-      "incomeNow": "+{{money}}$ per round now · printed +{{printed}}$",
-      "incomeNowInfluence": "+{{money}}$ and +{{influence}}◆ per round now · printed +{{printed}}$",
+      "districtValue": "{{icon}} {{title}} · you have {{count}} of 4", "printedRow": "Printed income", "printedValue": "+{{money}}$ per round", "incomeRow": "Income now",
+      "incomeNow": "+{{money}}$ per round",
+      "incomeNowInfluence": "+{{money}}$ and +{{influence}}◆ per round",
       "incomePrinted": "+{{money}}$ per round", "scoreRow": "Score", "scoreValue": "{{count}} pts", "saleRow": "Sale",
       "saleValue": "{{value}}$ — half the price · no action", "properties": "Business effects", "districtRules": "District rules",
       "saleNote": "Selling gives back exactly as much money as the business gives points. The point of selling is to buy something better for this slot. The slot is free at once, and it costs no action.",
@@ -414,7 +417,7 @@
       "lockedTitle": "Mobster's grey hold: only they can buy this slot until the end of the next round",
       "district": "district {{count}}/4", "districtTitle": "Your businesses in this district. Synergy starts at 2 and at 4.",
       "details": "{{title}} — details", "districtRow": "District", "districtValue": "you have {{count}} of 4",
-      "priceRow": "Price", "scoreRow": "Score", "saleRow": "Sale value", "incomeRow": "Income", "perRound": "per round",
+      "priceRow": "Price", "scoreRow": "Score", "saleRow": "Sale value", "printedRow": "Printed income", "incomeRow": "Income in your city", "perRound": "per round",
       "purchaseRow": "When purchased",
       "districtRules": "District conditions", "leavingNote": "At the end of the round the card leaves the market for the discard. It may come back later.",
       "lock": "🔒 Grey hold — only you can buy this slot (1 Protection)",
@@ -423,7 +426,7 @@
     },
     "players": {
       "title": "Players", "count": "{{count}} in the game", "details": "{{name}} — details", "noRole": "No role",
-      "points": "Victory points", "assets": "· {{count}} bus.", "turn": "✦ Playing", "jail": "Arrested: only 1 action next turn",
+      "points": "Victory points", "assets": "· {{count}} bus.", "turn": "✦ Playing", "turnDone": "✓ done", "turnWaiting": "waiting", "turnsTitle": "Turns taken: {{count}} of {{max}}", "jail": "Arrested: only 1 action next turn",
       "risk": "One more scandal and the role is lost", "riskBadge": "⚠ role", "money": "Money", "influence": "Influence",
       "scandals": "Scandals", "roofs": "Protection", "powerFree": "Role power · no action", "powerAction": "Role power · costs an action",
       "greyHint": "Shady deal · one per turn", "card": "Card", "cardHint": "Card · free, no limit per turn", "score": "Score",
@@ -469,6 +472,10 @@
       "nothing": "Nothing found", "chapter": "Chapter {{number}}", "close": "Close the book"
     },
     "mobile": { "left": "Players and log", "right": "Actions and hand", "closePanel": "Close the panel", "close": "Close", "hideLeft": "‹ Hide", "hideRight": "Hide ›" },
+    "greyResult": {
+      "title": "Shady deal: {{operation}}", "target": "target — {{name}}", "roll": "rolled {{roll}}", "face": "result",
+      "sources": "Modifier: {{sources}}", "sourceCard": "card", "scale": "1–2 — failure · 3–4 — weak effect · 5–6 — full effect", "ok": "OK"
+    },
     "chronicle": {
       "title": "📜 Game log", "events": "{{count}} events", "empty": "Nothing has happened yet.", "copyTitle": "Copy the game log",
       "copy": "📋 Copy", "mdTitle": "Download the game log as Markdown", "md": "💾 Download .md",
