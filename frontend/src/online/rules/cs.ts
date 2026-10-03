@@ -37,7 +37,7 @@ const roles: Record<string, RoleGuide> = {
     powers: [
       {
         name: "🏷️ Zabrat kartu",
-        cost: "1 akce a 1 skandál",
+        cost: "1 akce",
         limit: "značka může být jen jedna: nová ruší starou",
         effect: "Označte podnik na trhu. Pracuje pro vás, jako by byl váš: přináší příjem, počítá se do synergie a do podmínek projektů a otevírá šedé kšefty. Body nedává a místo nezabírá. Koupit ho pořád může kdokoli. Značka zmizí, když ztratíte roli. Značka nemění koloběh trhu: starý označený podnik ze stolu stejně odejde.",
       },
@@ -53,14 +53,14 @@ const roles: Record<string, RoleGuide> = {
       { name: "Urovnat skandál", cost: "1 akce a 2◆", limit: "lze opakovat", effect: "Smažte 1 svůj skandál." },
       {
         name: "Domluvíme se",
-        cost: "3◆ a 1 skandál, bez akce; potřebujete svůj podnik v Šedé zóně",
+        cost: "3◆, bez akce; potřebujete svůj podnik v Šedé zóně",
         limit: "jednou za tah",
         effect: "Získáte pronájem libovolné čtvrti (viz „Pronájem čtvrti“).",
       },
       {
         name: "Veto",
-        cost: "1 akce",
-        limit: "veto může být jen jedno",
+        cost: "bez akce",
+        limit: "jednou za tah; veto může být jen jedno",
         effect: "Vyberte projekt na desce: vzít ho můžete jen vy, ostatní hráči ho získat nemohou. Veto vidí všichni. Zmizí, když projekt odejde z desky nebo když ztratíte roli.",
       },
     ],
@@ -75,7 +75,7 @@ const roles: Record<string, RoleGuide> = {
     powers: [
       {
         name: "Nafouknout aféru",
-        cost: "zdarma, bez akce",
+        cost: "1◆, bez akce",
         limit: "jednou za tah",
         effect: "Vy i vybraný soupeř dostanete po 1 skandálu. Pokud úder zastaví Ochrana soupeře, nedostanete svůj skandál ani vy.",
       },
@@ -95,7 +95,7 @@ const roles: Record<string, RoleGuide> = {
         name: "Kryptopodvod",
         cost: "1 akce; potřebujete svou „Městskou kryptoburzu“",
         limit: "jednou za tah",
-        effect: "Vezměte 25 % peněz každému soupeři. Dostanete 5 skandálů. Účinky, které snižují skandály ze šedých kšeftů, snižují i tyto.",
+        effect: "Vezměte 25 % peněz každému soupeři. Dostanete 3 skandály. Účinky, které snižují skandály ze šedých kšeftů, snižují i tyto.",
       },
     ],
   },
@@ -104,12 +104,13 @@ const roles: Record<string, RoleGuide> = {
     perks: [
       "Podniky v Šedé zóně dávají +1$.",
       "Ochrana vás stojí o 1$ méně a můžete mít 2 Ochrany místo jedné.",
+      "Když roli převezmete, dostanete 1 Ochranu.",
       "+1 k hodu šedého kšeftu za každý váš podnik v Šedé zóně, nejvýš +2 — hlavní síla role.",
     ],
     powers: [
       {
         name: "Výpalné",
-        cost: "1 akce; potřebujete svůj podnik v Šedé zóně",
+        cost: "1 akce",
         limit: "jednou za tah",
         effect: "Vyberte soupeře. Dá vám peníze: 3$, další 2$ za každý váš podnik v Šedé zóně a číslo kola děleno 3. Pokud je cíl lídr, přidejte ještě 5$. Cíl vám navíc dá 1◆ za každý váš podnik ve Vládní čtvrti. Cíl nemůže dát víc, než má. Pokud nemáte podnik ve Vládní čtvrti, dostanete 1 skandál.",
       },
@@ -323,7 +324,7 @@ export function bookCs(ctx: RulesContext): RulesChapter[] {
       title: "Šedé kšefty",
       html: `
       <p>Šedý kšeft otevírá čtvrť: stačí mít aspoň jeden podnik ve správné čtvrti. Kšeft stojí 1 akci a za tah můžete udělat jen jeden.</p>
-      <p><b>Hoďte kostkou.</b> Stěny 1–2 jsou neúspěch, nic se nestane. Stěny 3–4 dají slabý účinek, 5–6 plný. Kolik skandálů dostanete vy, závisí také na stěně: na jedničce 2, na 2–5 jeden, na šestce žádný. Šedé kšefty nedávají body — vše, co přinesou, je napsáno v účinku.</p>
+      <p><b>Hoďte kostkou.</b> Stěny 1–2 jsou neúspěch, nic se nestane. Stěny 3–4 dají slabý účinek, 5–6 plný. Skandály dostanete jen za neúspěch: na jedničce 2, na dvojce 1, od trojky výš žádný. Šedé kšefty nedávají body — vše, co přinesou, je napsáno v účinku.</p>
       <p><b>Modifikátory</b> se přičítají k hodu, cokoli nad 6 se počítá jako šestka: Podvodník +${n.fraudsterRoll}, Mafie +1 za každý vlastní podnik v Šedé zóně (nejvýš +${n.mafiaRollMax}), karta «Podplatit ochranku» +2 k jednomu hodu. Dohromady nikdy víc než +${n.rollCap}. Ve hře okno šedých kšeftů ukazuje tabulku už přepočtenou pro vás.</p>
       <p><b>Ochrana</b> cíle zablokuje jakýkoli šedý kšeft celý a nespotřebuje se. Ochranu sundá jen «Prolomit Ochranu» — tím se stůl otevře před úderem. Kšefty proti všem zasáhnou jen soupeře bez Ochrany.</p>
       ${ctx.html.greyTables(greyLabels)}
@@ -356,7 +357,7 @@ export function bookCs(ctx: RulesContext): RulesChapter[] {
       <p><b>Šedý kšeft Ochrana zablokuje celý a nespotřebuje se.</b> Ochranu sundá jen kšeft «Prolomit Ochranu», karty «Obejít ochranku» a «Přetáhnout ochranku», Výpalné Mafie nebo schopnost Siláka «Sebrat Ochranu».</p>
       <p><b>Dokud máte Ochranu, nikdo vám nemůže vzít roli.</b> Ochrana se přitom nespotřebuje.</p>
       <p>Útočník nedostane zpět, co za úder utratil, pokud popis úderu neříká jinak.</p>
-      <p>Před vašimi vlastními činy Ochrana nechrání. Skandál za vlastní šedý kšeft nebo kryptopodvod dostanete vždycky.</p>
+      <p>Před vašimi vlastními činy Ochrana nechrání. Skandál za neúspěšný vlastní šedý kšeft nebo za kryptopodvod dostanete vždycky.</p>
       <h3>Jak získat Ochranu</h3>
       <p>Kupte ji za 1 akci a <code>3$ + (číslo kola − 1) ÷ 2</code>. Mít můžete jen 1 Ochranu. Některé role, podniky a projekty tento limit zvyšují nebo dávají Ochranu zdarma.</p>
       `,

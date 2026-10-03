@@ -11,27 +11,27 @@
     "capitalist": {
       "title": "Kapitalista",
       "passive": "Každý váš podnik: +1$. Podniky v Obchodní čtvrti: ještě +1$. Každý váš podnik v Průmyslové zóně: +1◆ za kolo.",
-      "power": "Zábor (1 akce a 1 skandál): karta z trhu pracuje pro vás, jako by byla vaše — příjem, synergie, podmínky projektů, šedé kšefty. Kdokoli ji ale pořád může koupit a body nedává. Zábor máte jen jeden."
+      "power": "Zábor (1 akce): karta z trhu pracuje pro vás, jako by byla vaše — příjem, synergie, podmínky projektů, šedé kšefty. Kdokoli ji ale pořád může koupit a body nedává. Zábor máte jen jeden."
     },
     "politician": {
       "title": "Politik",
       "passive": "Podniky ve Vládní čtvrti: +1$. Každý podnik na Sídlišti na stole, i cizí: +1◆ za kolo.",
-      "power": "Urovnat skandál: 1 akce a 2◆ → −1 skandál. Domluvíme se (jednou za tah, bez akce, potřebujete podnik v Šedé zóně): 3◆ a 1 skandál — do konce kola se jakákoli čtvrť počítá jako vaše. Veto: 1 akce — projekt na desce můžete vzít jen vy."
+      "power": "Urovnat skandál: 1 akce a 2◆ → −1 skandál. Domluvíme se (jednou za tah, bez akce, potřebujete podnik v Šedé zóně): 3◆ — do konce kola se jakákoli čtvrť počítá jako vaše. Veto (jednou za tah, bez akce): projekt na desce můžete vzít jen vy."
     },
     "journalist": {
       "title": "Novinář",
       "passive": "Na konci kola: 1$ za každý cizí skandál (2$, pokud máte podnik v Obchodní čtvrti) a +1◆ za každý svůj skandál, pokud máte podnik na Sídlišti. Roli ztrácíte až při 6 skandálech, ne při 5.",
-      "power": "Nafouknout aféru (jednou za tah, bez akce): vám i cíli po 1 skandálu. Článek (jednou za tah): 1 akce a 3◆ → cíl dostane 2 skandály. Ochrana cíle zastaví obojí."
+      "power": "Nafouknout aféru (jednou za tah, bez akce, 1◆): vám i cíli po 1 skandálu. Článek (jednou za tah): 1 akce a 3◆ → cíl dostane 2 skandály. Ochrana cíle zastaví obojí."
     },
     "fraudster": {
       "title": "Podvodník",
       "passive": "4 akce za tah. Šedé kšefty: +1 k hodu. Podniky v Tech klastru: +1$.",
-      "power": "Kryptopodvod (jednou za tah, 1 akce, potřebujete vlastní Městskou kryptoburzu): vezměte 25 % peněz každému soupeři a dostanete 5 skandálů. Ochrana chrání svého majitele. Zamést stopy: 1 akce → −1 skandál, lze opakovat."
+      "power": "Kryptopodvod (jednou za tah, 1 akce, potřebujete vlastní Městskou kryptoburzu): vezměte 25 % peněz každému soupeři a dostanete 3 skandály. Ochrana chrání svého majitele. Zamést stopy: 1 akce → −1 skandál, lze opakovat."
     },
     "mafia": {
       "title": "Mafián",
-      "passive": "Podniky v Šedé zóně: +1$. Šedé kšefty: +1 k hodu za každý váš podnik v Šedé zóně (nejvýš +2). Ochrana stojí o 1$ méně a můžete mít 2, ne 1.",
-      "power": "Výpalné (jednou za tah, 1 akce, potřebujete podnik v Šedé zóně): vezměte cíli peníze a vliv; Ochrana cíle to zastaví. Ututlat: 1 akce a 3$ → −2 skandály (potřebujete podnik ve Vládní čtvrti). Šedá blokace (jednou za tah, 1 Ochrana, bez akce): do konce příštího kola může místo na trhu koupit jen vy."
+      "passive": "Podniky v Šedé zóně: +1$. Šedé kšefty: +1 k hodu za každý váš podnik v Šedé zóně (nejvýš +2). Ochrana stojí o 1$ méně a můžete mít 2, ne 1. Při převzetí role +1 Ochrana.",
+      "power": "Výpalné (jednou za tah, 1 akce): vezměte cíli peníze a vliv; Ochrana cíle to zastaví. Ututlat: 1 akce a 3$ → −2 skandály (potřebujete podnik ve Vládní čtvrti). Šedá blokace (jednou za tah, 1 Ochrana, bez akce): do konce příštího kola může místo na trhu koupit jen vy."
     },
     "military": {
       "title": "Bezpečák",
@@ -46,7 +46,7 @@
     "retail": { "title": "Obchodní centrum na rohu", "text": "+2$, pokud máte podnik v Obchodní čtvrti." },
     "campaign_hq": { "title": "Volební štáb", "text": "+2$ příjmu, dokud jste Politik." },
     "diplomatic_quarter": { "title": "Diplomatické rezidence", "text": "+1$ pro Politika a +2$, pokud máte podnik ve Vládní čtvrti. Celá čtvrť (4 podniky): +1◆ za kolo." },
-    "agglomeration": { "title": "Aglomerace", "text": "Každý váš podnik na Sídlišti se počítá dvakrát: pro synergii i podmínky projektů. Celá čtvrť (4 podniky): +1◆ za kolo." },
+    "agglomeration": { "title": "Aglomerace", "text": "Každý váš podnik na Sídlišti se počítá dvakrát: pro synergii i podmínky projektů. Na pasivy rolí se zdvojení nevztahuje. Celá čtvrť (4 podniky): +1◆ za kolo." },
     "cowork": { "title": "Flexibilní kanceláře", "text": "Levný příjem a 1 vliv při koupi." },
     "accounting": { "title": "Účetnictví v cloudu", "text": "Jednoduchý peněžní podnik bez podmínek." },
     "bank": { "title": "Digitální banka", "text": "+1$ za každý další váš podnik v Obchodní čtvrti. Kapitalista má ještě +1$." },
@@ -133,8 +133,8 @@
     "mobilization": {"title": "Všechny ruce na palubu", "text": "Získejte hned +1 běžnou akci."},
     "investor_call": { "title": "Jmenný fond", "text": "Zaplaťte 15$ a získejte +5 bodů do konečného skóre. Místo není potřeba." },
     "bailout": { "title": "Záchranný balíček", "text": "Zdarma vám dá 1 nové místo pro podnik (nejvýš šest)." },
-    "urban_project": { "title": "Občanská iniciativa", "text": "Vezměte projekt z městské desky zdarma — bez vlivu i bez peněz. Podmínku projektu musíte splnit." },
-    "privatization": { "title": "Privatizace", "text": "Vezměte libovolný podnik z trhu zdarma — bez peněz a bez akce. Potřebujete volné místo; šedá blokace Mafiána zavírá místo i pro tuto kartu." },
+    "urban_project": { "title": "Občanská iniciativa", "text": "Vezměte projekt z městské desky bez vlivu a o 3$ levněji. Podmínku projektu musíte splnit." },
+    "privatization": { "title": "Privatizace", "text": "Kupte libovolný podnik z trhu za polovinu ceny (zaokrouhleno dolů) a bez akce. Potřebujete volné místo; šedá blokace Mafiána zavírá místo i pro tuto kartu." },
     "lawyers": { "title": "Firemní právníci", "text": "Smažte 2 skandály." },
     "insurance": { "title": "Pojistka", "text": "Získáte 1 Ochranu (do svého limitu)." },
     "injunction": { "title": "Soudní zákaz", "text": "Získáte 1 Ochranu." },
@@ -142,9 +142,9 @@
     "evidence": { "title": "Zničit důkazy", "text": "Smažte 3 skandály a ztratíte 2◆." },
     "city_prize": { "title": "Cena města", "text": "Zaplaťte 9$ a získejte +3 body do konečného skóre. Místo není potřeba." },
     "quarter_restoration": { "title": "Obnova staré čtvrti", "text": "Zaplaťte 18$ a získejte +6 bodů do konečného skóre. Místo není potřeba." },
-    "guard_bypass": {"title": "Obejít ochranku", "text": "Cíl ztratí 1 Ochranu."},
+    "guard_bypass": {"title": "Obejít ochranku", "text": "Cíl ztratí 1 Ochranu a vy získáte +1◆."},
     "guard_intercept": {"title": "Přetáhnout ochranku", "text": "Vezměte soupeři 1 Ochranu pro sebe (v rámci svého limitu)."},
-    "shadow_cash": {"title": "Šedá pokladna", "text": "+2$ za každý váš podnik Šedé zóny (nejvýš 10 + číslo kola); pokud jste Mafie — ještě +1◆."},
+    "shadow_cash": {"title": "Šedá pokladna", "text": "+3$ za každý váš podnik Šedé zóny (nejvýš 10 + číslo kola); pokud jste Mafie — ještě +1◆."},
     "inspection_order": {"title": "Zakázka na kontrolu", "text": "Cíl s alespoň jedním skandálem ztratí (2 + číslo kola)$; pokud jste Silák — peníze jsou vaše."},
     "admin_resource": {"title": "Úřední páky", "text": "+1◆ za každý váš podnik Vládní čtvrti."},
     "popular_support": {"title": "Lidová podpora", "text": "+4◆, pokud máte u stolu nejnižší skóre (i při shodě); jinak +2◆."},

@@ -20,6 +20,7 @@ import math
 from collections import Counter, defaultdict
 
 from city_bots.policy import BOT_POLICY_NAMES
+from city_engine.constants import ACTION_CARD_COST
 from city_engine.engine import CityEngine
 from simulation.balance import ANCHORS, BUCKETS, MONEY_EXIT_RATE
 from simulation.names import Names
@@ -549,7 +550,8 @@ def _cards(engine: CityEngine, tally: Tally, names: Names, bots: list[str], bot_
             gained += total(tally.value, None, key)
     drawn = sum(tally.card_drawn.values())
     per_card = gained / drawn if drawn else 0.0
-    cost = 6 * MONEY_EXIT_RATE + INFLUENCE_EXIT_RATE
+    # The price from the rules, not a copy: a hard-coded 6$ kept printing 2.10 after the cards fell to 4$.
+    cost = ACTION_CARD_COST * MONEY_EXIT_RATE + INFLUENCE_EXIT_RATE
     lines = [
         "## Карты действий",
         "",

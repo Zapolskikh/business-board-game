@@ -37,7 +37,7 @@ const roles: Record<string, RoleGuide> = {
     powers: [
       {
         name: "🏷️ Place a claim",
-        cost: "1 action and 1 scandal",
+        cost: "1 action",
         limit: "only one claim: a new one removes the old one",
         effect: "Mark a business on the market. It works for you as if it were yours: it brings income, counts for synergy and project conditions, and unlocks shady deals. It gives no points and takes no slot. Any player can still buy it. The claim is gone if you lose the role. The claim does not change the market cycle: an old claimed business still leaves the table.",
       },
@@ -53,14 +53,14 @@ const roles: Record<string, RoleGuide> = {
       { name: "Settle a scandal", cost: "1 action and 2◆", limit: "can be repeated", effect: "Remove 1 of your scandals." },
       {
         name: "Make a deal",
-        cost: "3◆ and 1 scandal, no action; you need a Grey Sector business",
+        cost: "3◆, no action; you need a Grey Sector business",
         limit: "once per turn",
         effect: "Rent any district (see “District rent”).",
       },
       {
         name: "Veto",
-        cost: "1 action",
-        limit: "only one veto",
+        cost: "no action",
+        limit: "once per turn; only one veto",
         effect: "Pick a project on the board: only you can take it, other players can no longer get it. Everyone can see the veto. It is removed when the project leaves the board or you lose the role.",
       },
     ],
@@ -75,7 +75,7 @@ const roles: Record<string, RoleGuide> = {
     powers: [
       {
         name: "Blow up a story",
-        cost: "free, no action",
+        cost: "1◆, no action",
         limit: "once per turn",
         effect: "You and the rival you pick each get 1 scandal. If the rival's Protection stops the hit, you do not get your scandal either.",
       },
@@ -95,7 +95,7 @@ const roles: Record<string, RoleGuide> = {
         name: "Crypto scam",
         cost: "1 action; you need your own “City Crypto Exchange”",
         limit: "once per turn",
-        effect: "Take 25% of each rival's money. You get 5 scandals. Effects that lower scandals from shady deals lower these too.",
+        effect: "Take 25% of each rival's money. You get 3 scandals. Effects that lower scandals from shady deals lower these too.",
       },
     ],
   },
@@ -104,12 +104,13 @@ const roles: Record<string, RoleGuide> = {
     perks: [
       "Grey Sector businesses give +1$.",
       "Protection costs you 1$ less, and you can hold 2 Protection instead of one.",
+      "When you take the role, you get 1 Protection.",
       "+1 to the shady deal roll for each of your Grey Sector businesses, at most +2 — the main strength of the role.",
     ],
     powers: [
       {
         name: "Racket",
-        cost: "1 action; you need a Grey Sector business",
+        cost: "1 action",
         limit: "once per turn",
         effect: "Pick a rival. They give you money: 3$, another 2$ for each of your Grey Sector businesses, and the round number divided by 3. If the target is the leader, add 5$ more. The target also gives you 1◆ for each of your Government Quarter businesses. The target cannot give more than they have. If you have no Government Quarter business, you get 1 scandal.",
       },
@@ -323,7 +324,7 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
       title: "Shady deals",
       html: `
       <p>A shady deal is unlocked by a district: it is enough to have one business in the right district. A deal costs 1 action, and you can make only one per turn.</p>
-      <p><b>Roll the die.</b> Faces 1–2 fail and nothing happens. Faces 3–4 give the weak effect, 5–6 the full one. How many scandals you get depends on the face too: 2 on a one, 1 on 2–5, none on a six. Shady deals score no points — everything they give is written in the effect.</p>
+      <p><b>Roll the die.</b> Faces 1–2 fail and nothing happens. Faces 3–4 give the weak effect, 5–6 the full one. You get scandals only for a miss: 2 on a one, 1 on a two, none from three up. Shady deals score no points — everything they give is written in the effect.</p>
       <p><b>Modifiers</b> are added to the roll, anything above 6 counts as a six: the Fraudster +${n.fraudsterRoll}, the Mafia +1 for each own Grey Sector business (at most +${n.mafiaRollMax}), the «Bribe the Guards» card +2 to one roll. Together never more than +${n.rollCap}. In the game the shady deals window shows the table already recomputed for you.</p>
       <p><b>Protection</b> on the target blocks any shady deal in full and is not used up. Only «Break Protection» removes it — it opens the table before a strike. Deals that hit everyone only reach rivals without Protection.</p>
       ${ctx.html.greyTables(greyLabels)}
@@ -356,7 +357,7 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
       <p><b>A shady deal is blocked by Protection in full, and the Protection is not used up.</b> Protection can only be removed by the «Break Protection» deal, the «Slip Past the Guards» and «Poach the Guards» cards, the Mafia's Racket or the Enforcer's «Take Protection».</p>
       <p><b>While you have Protection, nobody can take your role.</b> The Protection is not used up by this.</p>
       <p>The attacker does not get back what they spent on the hit, unless the hit says otherwise.</p>
-      <p>Protection does not save you from your own actions. You always get the scandal for your own shady deal or crypto scam.</p>
+      <p>Protection does not save you from your own actions. You always get the scandal for a failed shady deal of your own or for a crypto scam.</p>
       <h3>How to get Protection</h3>
       <p>Buy it for 1 action and <code>3$ + (round number − 1) ÷ 2</code>. You can hold only 1 Protection. Some roles, businesses and projects raise this limit or give Protection for free.</p>
       `,

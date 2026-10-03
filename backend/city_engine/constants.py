@@ -12,8 +12,12 @@ SCHEMA_VERSION = 1
 # bought out of their role at all, the mafia's grey mark lasts through the next round, and a tie
 # goes to whoever took more city projects. 1.16.0: an action-card draw costs 6$ instead of 3$, and the late market
 # is a weighted draw instead of the recycled round-one commons. 1.18.0: «Отобрать Защиту» works with
-# a full stack too — it then only strips the target.
-RULES_VERSION = "city-1.18.0"
+# a full stack too — it then only strips the target. 1.19.0: grey operations are dirty only on a
+# miss; the crypto scam costs three scandals; «Раздуть историю» costs 1◆; the capitalist's mark and
+# the politician's deal cost no scandal; the veto costs no action; the racket needs no own Серый
+# сектор object and the mafia takes a Защита with the role; the «Агломерация» doubles its quarter
+# for district synergy and project conditions, not for the role passives.
+RULES_VERSION = "city-1.19.0"
 
 # Bumped whenever the catalog changes, even if no rule moved: card texts are part of the agreement
 # too. 2026-09-30: removed the unsupported cash-exchange purchase payout. 2026-09-30b: «Судебный
@@ -24,7 +28,10 @@ RULES_VERSION = "city-1.18.0"
 # 2026-10-02b: the military's «Отобрать Защиту» text covers a full stack.
 # 2026-10-02c: «Общественная инициатива» takes a project for free; new card «Приватизация» takes a
 # market object for free.
-CONTENT_VERSION = "city-content-2026-10-02c"
+# 2026-10-03: «Приватизация» — an object at half its price, no action; «Общественная инициатива» —
+# a project without influence and 3$ off; «Теневая касса» 3$ an object; «Обход охраны» +1◆;
+# «Автономная офшорная юрисдикция» 15 → 12$.
+CONTENT_VERSION = "city-content-2026-10-03"
 
 DISTRICT_IDS = (
     "residential",
@@ -146,8 +153,11 @@ GREY_ROLL_CAP = 3
 FRAUDSTER_GREY_ROLL = 1
 MAFIA_GREY_ROLL_PER_OBJECT = 1
 MAFIA_GREY_ROLL_MAX = 2
-# Scandals for the attacker, face by face (index 0 is face 1). Clean on a six, two on a one.
-GREY_SCANDALS = (2, 1, 1, 1, 1, 0)
+# Scandals for the attacker, face by face (index 0 is face 1). Only a miss is dirty (1.19.0): two on a
+# one, one on a two, clean from three up. Every operation but «Пробить защиту» lost to an ordinary
+# move in the nightly forks (Памп и дамп −2.4 over 3898 forks, Вброс −6.1, Слив компромата −7.5),
+# and the ~0.8 scandal a run was most of the price: five of them cost the role.
+GREY_SCANDALS = (2, 1, 0, 0, 0, 0)
 # «Пробить защиту» is the one operation whose whole job is to open the table for the next turn, so
 # it is cleaner on a hit.
 GREY_SCANDALS_BY_OPERATION = {"roof_break": (2, 1, 1, 0, 0, 0)}
@@ -174,7 +184,9 @@ GREY_OPERATION_FLAG = "grey_operation_used"
 # its entire scandal budget. Bare, the role loses itself; stacked reduction perks can make the
 # prepared strategy safe. A roof protects its owner's wallet, just like from the ordinary pump.
 CRYPTO_SCAM_SHARE = 25
-CRYPTO_SCAM_SCANDALS = 5
+# 1.19.0: three, not five. Five was the whole scandal budget, so the scam cost the role it needs —
+# −7.3 against the table in the nightly forks, picked in 0 of 2002 chances.
+CRYPTO_SCAM_SCANDALS = 3
 # What the racket adds when its target is leading the table. The rest of the demand comes from the
 # mafia's own districts: 2$ per Серый сектор object, plus a slow drift with the round.
 RACKET_LEADER_BONUS = 5
@@ -197,6 +209,13 @@ BASE_SCANDAL_LIMIT = 5
 # gated on BASE_SCANDAL_LIMIT for everybody, so the extra headroom can never be laundered into
 # another seat.
 JOURNALIST_SCANDAL_LIMIT = 6
+# «Раздуть историю» was free and the most used power in the game (6795 presses over 768 games), and
+# the main way the capitalist and the politician lost their seats. 1.19.0: it costs influence.
+JOURNALIST_INFLATE_INFLUENCE = 1
+# What the mafia takes with the seat (1.19.0): a Защита, within the role's own limit of two. Claiming
+# the role lost 5.7 points against the table over 2648 forks — it paid off only on a Серый сектор
+# already built, so the seat now brings something on the turn it is taken.
+MAFIA_CLAIM_ROOFS = 1
 # --- the marks three roles write on the shared board --------------------------------------------
 # «Договоримся»: the politician rents a district for the round the way «Зонирование» does. Priced
 # in the two things the role has to weigh rather than in an action, because the politician's turn

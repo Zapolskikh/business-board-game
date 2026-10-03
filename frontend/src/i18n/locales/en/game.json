@@ -14,30 +14,30 @@
     "capitalist_claim": {
       "label": "Place a claim",
       "what": "Puts your claim on a market card. The claimed card works for you as if it were yours: it gives income, counts for synergy and project conditions, and unlocks shady deals. But anyone can still buy it, and it gives no points. You have one claim: a new one moves the old one, and it disappears if you lose the role.",
-      "cost": "action + 1 scandal"
+      "cost": "action"
     },
     "politician_cleanup": { "label": "Settle a scandal", "what": "Removes one of your scandals. Cheaper than normal crisis PR, but it also costs an action.", "cost": "action + 2◆" },
     "politician_deal": {
       "label": "Make a deal",
       "what": "Until the end of the round, any district you pick counts as yours: it unlocks that district's projects and shady deals and counts for synergy. You don't need a business there, but you need your own Grey Sector business: that is where the deal is struck.",
-      "cost": "3◆ + 1 scandal, no action, once per turn"
+      "cost": "3◆, no action, once per turn"
     },
     "politician_veto": {
       "label": "Veto",
       "what": "Closes a project on the board: while the veto stands, only you can take it. The project leaves the board as usual and takes the veto with it. You have one veto, and everyone can see it.",
-      "cost": "action + 3◆"
+      "cost": "no action, once per turn"
     },
     "journalist_inflate": {
       "label": "Blow up a story",
       "what": "One scandal for a rival and one for you: you get dirty too. If the target has Protection, it stops the hit — and then you get no scandal either.",
-      "cost": "free, no action, once per turn"
+      "cost": "1◆, no action, once per turn"
     },
     "journalist_publish": { "label": "Publish an exposé", "what": "Two scandals for a rival, nothing for you. The target's Protection stops the whole thing.", "cost": "action + 3◆, once per turn" },
     "fraudster_cleanup": { "label": "Cover your tracks", "what": "Removes one of your scandals for free.", "cost": "action" },
     "fraudster_crypto_scam": {
       "label": "Crypto scam",
-      "what": "Takes a quarter of every rival's money at once. Protection keeps its owner safe and is used up. It costs five scandals — unless your businesses and projects lower scandals from shady deals, you lose your role.",
-      "cost": "action + 5 scandals, once per turn"
+      "what": "Takes a quarter of every rival's money at once. Protection keeps its owner safe and is used up. It costs three scandals.",
+      "cost": "action + 3 scandals, once per turn"
     },
     "mafia_racket": {
       "label": "Racket",
@@ -135,8 +135,8 @@
     "buyCard": "Buy “{{title}}”",
     "sellCard": "Sell the card → +{{value}}$",
     "discardCard": "Discard the card → +{{value}}◆",
-    "cardProject": " · “{{title}}” (free → {{points}} pts)",
-    "cardObject": " · take “{{title}}” for free",
+    "cardProject": " · “{{title}}” (no influence, −3$ → {{points}} pts)",
+    "cardObject": " · buy “{{title}}” at half price",
     "object": "business",
     "slot": "slot",
     "card": "Card",
@@ -182,7 +182,7 @@
     "crisisPr": " crisis PR (",
     "crisisPrTail": ", {{count}}⚠ left)",
     "assetBought": " buys “{{title}}” for ",
-    "assetFree": " takes “{{title}}” for free with “{{card}}”",
+    "assetFree": " privatises “{{title}}” at half price with “{{card}}”",
     "assetSold": " sells “{{title}}” for ",
     "roleClaimed": " takes the role “{{role}}” (",
     "roleTakeover": " — taken from ",

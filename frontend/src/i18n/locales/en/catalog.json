@@ -11,27 +11,27 @@
     "capitalist": {
       "title": "Capitalist",
       "passive": "Each of your businesses: +1$. Business District businesses: +1$ more. Each of your Industrial Zone businesses: +1◆ per round.",
-      "power": "Claim (1 action and 1 scandal): a market card works for you as if it were yours — income, synergy, project conditions, shady deals. But anyone can still buy it, and it gives no points. You have one claim."
+      "power": "Claim (1 action): a market card works for you as if it were yours — income, synergy, project conditions, shady deals. But anyone can still buy it, and it gives no points. You have one claim."
     },
     "politician": {
       "title": "Politician",
       "passive": "Government Quarter businesses: +1$. Every residential business on the table, even other players': +1◆ per round.",
-      "power": "Settle a scandal: 1 action and 2◆ → −1 scandal. Make a deal (once per turn, no action, you need a Grey Sector business): 3◆ and 1 scandal — any district counts as yours until the end of the round. Veto: 1 action — only you can take a project on the board."
+      "power": "Settle a scandal: 1 action and 2◆ → −1 scandal. Make a deal (once per turn, no action, you need a Grey Sector business): 3◆ — any district counts as yours until the end of the round. Veto (once per turn, no action): only you can take a project on the board."
     },
     "journalist": {
       "title": "Journalist",
       "passive": "At the end of the round: 1$ for each scandal of other players (2$ if you have a Business District business) and +1◆ for each of your own scandals if you have a Residential Area business. You lose the role at 6 scandals, not 5.",
-      "power": "Blow up a story (once per turn, no action): 1 scandal to you and to the target. Publish (once per turn): 1 action and 3◆ → 2 scandals to the target. The target's Protection stops both."
+      "power": "Blow up a story (once per turn, no action, 1◆): 1 scandal to you and to the target. Publish (once per turn): 1 action and 3◆ → 2 scandals to the target. The target's Protection stops both."
     },
     "fraudster": {
       "title": "Hustler",
       "passive": "4 actions per turn. Shady deals: +1 to the roll. Tech Cluster businesses: +1$.",
-      "power": "Crypto scam (once per turn, 1 action, you need your own City Crypto Exchange): take 25% of every rival's money and get 5 scandals. Protection keeps its owner safe. Cover your tracks: 1 action → −1 scandal, you can repeat it."
+      "power": "Crypto scam (once per turn, 1 action, you need your own City Crypto Exchange): take 25% of every rival's money and get 3 scandals. Protection keeps its owner safe. Cover your tracks: 1 action → −1 scandal, you can repeat it."
     },
     "mafia": {
       "title": "Mobster",
-      "passive": "Grey Sector businesses: +1$. Shady deals: +1 to the roll for each of your Grey Sector businesses (at most +2). Protection costs 1$ less, and you can hold 2, not 1.",
-      "power": "Racket (once per turn, 1 action, you need a Grey Sector business): take money and influence from the target; the target's Protection stops it. Hush it up: 1 action and 3$ → −2 scandals (you need a Government business). Grey hold (once per turn, 1 Protection, no action): until the end of the next round, only you can buy a market slot."
+      "passive": "Grey Sector businesses: +1$. Shady deals: +1 to the roll for each of your Grey Sector businesses (at most +2). Protection costs 1$ less, and you can hold 2, not 1. Taking the role gives +1 Protection.",
+      "power": "Racket (once per turn, 1 action): take money and influence from the target; the target's Protection stops it. Hush it up: 1 action and 3$ → −2 scandals (you need a Government business). Grey hold (once per turn, 1 Protection, no action): until the end of the next round, only you can buy a market slot."
     },
     "military": {
       "title": "Enforcer",
@@ -46,7 +46,7 @@
     "retail": { "title": "Neighbourhood Mall", "text": "+2$ if you have a Business District business." },
     "campaign_hq": { "title": "Election Office", "text": "+2$ income while you are the Politician." },
     "diplomatic_quarter": { "title": "Diplomatic Residences", "text": "+1$ for the Politician and +2$ if you have a Government business. Full district (4 businesses): +1◆ per round." },
-    "agglomeration": { "title": "Urban Sprawl", "text": "Each of your Residential Area businesses counts as two: for synergy and project conditions. Full district (4 businesses): +1◆ per round." },
+    "agglomeration": { "title": "Urban Sprawl", "text": "Each of your Residential Area businesses counts as two: for synergy and project conditions. Role passives do not double. Full district (4 businesses): +1◆ per round." },
     "cowork": { "title": "Flexible Offices", "text": "Cheap income and 1 influence when you buy it." },
     "accounting": { "title": "Cloud Accounting", "text": "Simple money business, no conditions." },
     "bank": { "title": "Digital Bank", "text": "+1$ for each of your other Business District businesses. The Capitalist gets +1$ more." },
@@ -133,8 +133,8 @@
     "mobilization": {"title": "All Hands", "text": "Get +1 normal action right now."},
     "investor_call": { "title": "Named Fund", "text": "Pay 15$ and get +5 points in the final score. No slot needed." },
     "bailout": { "title": "Bailout", "text": "Gives you 1 new business slot for free (six at most)." },
-    "urban_project": { "title": "Community Initiative", "text": "Take a project from the city board for free — no influence and no money. You still need to meet its condition." },
-    "privatization": { "title": "Privatization", "text": "Take any business from the market for free — no money and no action. You need a free slot; a Mobster's grey hold closes the slot to this card too." },
+    "urban_project": { "title": "Community Initiative", "text": "Take a project from the city board with no influence and 3$ off. You still need to meet its condition." },
+    "privatization": { "title": "Privatization", "text": "Buy any business from the market at half price (rounded down) and with no action. You need a free slot; a Mobster's grey hold closes the slot to this card too." },
     "lawyers": { "title": "Company Lawyers", "text": "Remove 2 scandals." },
     "insurance": { "title": "Insurance Cover", "text": "Get 1 Protection (up to your limit)." },
     "injunction": { "title": "Court Order", "text": "Get 1 Protection." },
@@ -142,9 +142,9 @@
     "evidence": { "title": "Destroy the Evidence", "text": "Remove 3 scandals and lose 2◆." },
     "city_prize": { "title": "City Award", "text": "Pay 9$ and get +3 points in the final score. No slot needed." },
     "quarter_restoration": { "title": "Old Town Restoration", "text": "Pay 18$ and get +6 points in the final score. No slot needed." },
-    "guard_bypass": {"title": "Slip Past the Guards", "text": "The target loses 1 Protection."},
+    "guard_bypass": {"title": "Slip Past the Guards", "text": "The target loses 1 Protection, and you get +1◆."},
     "guard_intercept": {"title": "Poach the Guards", "text": "Take 1 Protection from a rival for yourself (within your limit)."},
-    "shadow_cash": {"title": "Shadow Till", "text": "+2$ for each of your Grey Sector businesses (at most 10 + round number); if you are the Mafia — +1◆ more."},
+    "shadow_cash": {"title": "Shadow Till", "text": "+3$ for each of your Grey Sector businesses (at most 10 + round number); if you are the Mafia — +1◆ more."},
     "inspection_order": {"title": "Inspection Order", "text": "A target with at least one scandal loses (2 + round number)$; if you are the Enforcer — the money is yours."},
     "admin_resource": {"title": "Pulling Strings", "text": "+1◆ for each of your Government Quarter businesses."},
     "popular_support": {"title": "Popular Support", "text": "+4◆ if you have the lowest score at the table (ties count); otherwise +2◆."},

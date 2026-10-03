@@ -910,10 +910,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     tally = run_tournament(config)
     output = Path(args.output)
-    output.write_text(render(tally, config), encoding="utf-8")
+    # The counters first: they are the hours of play, the report is a view of them. A render that
+    # fails (a catalog changed on disk mid-run, 2026-10-02) used to take 17 hours of forks with it.
     output.with_suffix(".json").write_text(
         json.dumps(machine_report(tally, config), ensure_ascii=False, indent=1, default=str), encoding="utf-8"
     )
+    output.write_text(render(tally, config), encoding="utf-8")
     print(f"Отчёт: {output} ({tally.games} партий)")
     return 0
 

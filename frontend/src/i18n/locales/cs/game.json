@@ -14,30 +14,30 @@
     "capitalist_claim": {
       "label": "Zabrat kartu",
       "what": "Dá váš zábor na kartu z trhu. Zabraná karta pracuje pro vás, jako by byla vaše: dává příjem, počítá se do synergie a podmínek projektů a otevírá šedé kšefty. Kdokoli ji ale pořád může koupit a body nedává. Zábor máte jen jeden: nový přesune ten starý a při ztrátě role zmizí.",
-      "cost": "akce + 1 skandál"
+      "cost": "akce"
     },
     "politician_cleanup": { "label": "Urovnat skandál", "what": "Smaže jeden váš skandál. Levnější než běžné krizové PR, ale taky stojí akci.", "cost": "akce + 2◆" },
     "politician_deal": {
       "label": "Domluvíme se",
       "what": "Do konce kola se jakákoli čtvrť, kterou vyberete, počítá jako vaše: otevírá projekty a šedé kšefty té čtvrti a počítá se do synergie. Podnik v ní mít nemusíte, ale potřebujete vlastní podnik v Šedé zóně: tam se dohoda uzavírá.",
-      "cost": "3◆ + 1 skandál, bez akce, jednou za tah"
+      "cost": "3◆, bez akce, jednou za tah"
     },
     "politician_veto": {
       "label": "Veto",
       "what": "Zavře projekt na desce: dokud veto platí, vzít ho můžete jen vy. Projekt odchází z desky jako obvykle a veto si bere s sebou. Veto máte jen jedno a všichni ho vidí.",
-      "cost": "akce + 3◆"
+      "cost": "bez akce, jednou za tah"
     },
     "journalist_inflate": {
       "label": "Nafouknout aféru",
       "what": "Jeden skandál soupeři a jeden vám: ušpiníte se taky. Pokud má cíl Ochranu, zastaví úder — a pak nedostanete skandál ani vy.",
-      "cost": "zdarma, bez akce, jednou za tah"
+      "cost": "1◆, bez akce, jednou za tah"
     },
     "journalist_publish": { "label": "Zveřejnit článek", "what": "Dva skandály soupeři, vám nic. Ochrana cíle zastaví celý článek.", "cost": "akce + 3◆, jednou za tah" },
     "fraudster_cleanup": { "label": "Zamést stopy", "what": "Zdarma smaže jeden váš skandál.", "cost": "akce" },
     "fraudster_crypto_scam": {
       "label": "Kryptopodvod",
-      "what": "Vezme čtvrtinu peněz každému soupeři najednou. Ochrana chrání svého majitele a spotřebuje se. Stojí pět skandálů — pokud nemáte podniky a projekty, které snižují skandály ze šedých kšeftů, přijdete o roli.",
-      "cost": "akce + 5 skandálů, jednou za tah"
+      "what": "Vezme čtvrtinu peněz každému soupeři najednou. Ochrana chrání svého majitele a spotřebuje se. Stojí tři skandály.",
+      "cost": "akce + 3 skandály, jednou za tah"
     },
     "mafia_racket": {
       "label": "Výpalné",
@@ -135,8 +135,8 @@
     "buyCard": "Koupit „{{title}}“",
     "sellCard": "Prodat kartu → +{{value}}$",
     "discardCard": "Zahodit kartu → +{{value}}◆",
-    "cardProject": " · „{{title}}“ (zdarma → {{points}} b.)",
-    "cardObject": " · vzít „{{title}}“ zdarma",
+    "cardProject": " · „{{title}}“ (bez vlivu, −3$ → {{points}} b.)",
+    "cardObject": " · koupit „{{title}}“ za polovinu ceny",
     "object": "podnik",
     "slot": "místo",
     "card": "Karta",
@@ -182,7 +182,7 @@
     "crisisPr": " krizové PR (",
     "crisisPrTail": ", zbývá {{count}}⚠)",
     "assetBought": " kupuje „{{title}}“ za ",
-    "assetFree": " bere „{{title}}“ zdarma kartou „{{card}}“",
+    "assetFree": " privatizuje „{{title}}“ za polovinu ceny kartou „{{card}}“",
     "assetSold": " prodává „{{title}}“ za ",
     "roleClaimed": " bere roli „{{role}}“ (",
     "roleTakeover": " — převzato od ",

@@ -103,6 +103,12 @@ def _endgame(engine: CityEngine, state: GameState, player: PlayerState, offered)
         points, action = max(buys, key=lambda item: item[0])
         if points > 0:
             return action, f"last round, an object for {points} points"
+    # Full slots: trade the cheapest object for the dearest. This rule used to answer with lobbying and
+    # patronage before the swap rule was ever asked, and Boris ended the game on 53$ (test of
+    # 2026-10-03) that a swap turns into half their worth in points.
+    swap = _swap(engine, state, player, offered)
+    if swap:
+        return swap
     for kind in ("lobbying", "patronage"):
         found = offered.get(("basic_action", kind))
         if found:
@@ -216,6 +222,33 @@ def _build(engine: CityEngine, state: GameState, player: PlayerState, offered) -
     return action, f"an object adding {value:.1f} to the round"
 
 
+def _privatize(engine: CityEngine, state: GameState, player: PlayerState, offered) -> tuple[dict, str] | None:
+    """«Приватизация» before an ordinary purchase: the same object at half price and without an action.
+
+    The general card rule comes after the build, and the build fills every free slot first, so the
+    card never found a slot to land in: Boris played it in 0.9% of the chances against 93–99% for
+    the other bots. Valued like a purchase, aimed at the same quarter.
+    """
+    district = _target_district(engine, state, player)
+    scored = []
+    for action, _ in _of_type(offered, "play_action_card"):
+        uid = action["payload"].get("market_uid")
+        held = next((card for card in player.hand if card.uid == action["payload"]["card_uid"]), None)
+        if uid is None or held is None or engine.action_card(held.card_id).kind != "free_object":
+            continue
+        card = engine.asset(next(item.card_id for item in state.market if item.uid == uid))
+        value = _purchase_gain(engine, state, player, uid)
+        if district and card.district == district and engine.district_count(player, district) < DISTRICT_TARGET:
+            value += DISTRICT_FIT
+        scored.append((value, card.cost, action))
+    if not scored:
+        return None
+    value, _cost, action = max(scored, key=lambda item: (item[0], item[1]))
+    if value <= 0:
+        return None
+    return action, f"privatising an object adding {value:.1f} to the round"
+
+
 def _expand(engine: CityEngine, state: GameState, player: PlayerState, offered) -> tuple[dict, str] | None:
     """A full portfolio buys the next slot as soon as there is something worth putting in it."""
     found = offered.get(("buy_capacity",))
@@ -237,7 +270,11 @@ def _swap(engine: CityEngine, state: GameState, player: PlayerState, offered) ->
     it is piling up and almost free in the last round, where nothing else can spend it — that is when
     trading a cheap object for an expensive one is the best sink left.
     """
-    if len(player.assets) < player.capacity or player.capacity < MAX_CAPACITY or state.actions_left < 1:
+    if len(player.assets) < player.capacity or state.actions_left < 1:
+        return None
+    # Before the last round a swap waits for the sixth slot — a free slot is the cheaper way to grow.
+    # In the last round there is no growing left, only the money to turn into points.
+    if player.capacity < MAX_CAPACITY and state.round_number < state.max_rounds:
         return None
     if _sold_this_turn(state, player):
         return None
@@ -382,6 +419,7 @@ RULES = (
     _keep_the_role,
     _role,
     _swap,
+    _privatize,
     _build,
     _expand,
     _convert,
