@@ -95,7 +95,8 @@ def _catalog_projects() -> tuple[float, float, float, float]:
     )
     count = len(projects)
     perk = sum(
-        float(project.perk.get("passiveMoney", 0)) + _INFLUENCE_IN_MONEY * float(project.perk.get("passiveInfluence", 0))
+        float(project.perk.get("passiveMoney", 0))
+        + _INFLUENCE_IN_MONEY * float(project.perk.get("passiveInfluence", 0))
         for project in projects
     )
     return (
@@ -381,7 +382,8 @@ def hand_value(
     """The cards in a hand: the decider's own seen cards at their worth, everything else at the deck's."""
     if sight is None:
         return sum(
-            _DISCARD_POINTS + params.hold_share * (card_points(engine, state, player, held.card_id, params) - _DISCARD_POINTS)
+            _DISCARD_POINTS
+            + params.hold_share * (card_points(engine, state, player, held.card_id, params) - _DISCARD_POINTS)
             for held in player.hand
         )
     unseen = sight.deck_value.get(player.id, _DISCARD_POINTS)

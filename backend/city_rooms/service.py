@@ -15,7 +15,7 @@ from city_engine.engine import CityEngine
 from city_engine.errors import CityEngineError, StaleRevisionError
 from city_engine.factory import GameSettings, PlayerSetup, create_game_from_catalog
 from city_rooms.errors import RoomAccessError, RoomConflictError, RoomNameTakenError, RoomValidationError
-from city_rooms.models import RoomSeat, RoomState
+from city_rooms.models import ClientInfo, RoomSeat, RoomState
 from city_rooms.repository import RoomRepository
 from city_rooms.security import hash_password, verify_password
 
@@ -118,6 +118,7 @@ class CityRoomService:
         player_name: str,
         release_seat_index: int | None = None,
         seat_token: str = "",
+        client: ClientInfo | None = None,
     ) -> RoomState:
         room = self.repository.get(room_id)
         expected = room.revision
@@ -145,12 +146,14 @@ class CityRoomService:
             # room password could sit down over another player and play their hand.
             if not _token_matches(seat_token, room.seat_token_hashes.get(seat.player_id or "", "")):
                 raise RoomConflictError("this seat is taken")
+            room.record_client(seat.player_id or "", client)
         else:
             seat.kind = "human"
             seat.player_id = f"seat-{seat.index + 1}"
             seat.name = clean_name
             if seat_token:
                 room.seat_token_hashes[seat.player_id] = _token_hash(seat_token)
+            room.record_client(seat.player_id, client, joined=True)
         if release_seat_index is not None and release_seat_index != seat_index and room.status == "waiting":
             previous = self._seat(room, release_seat_index)
             # Moving seats frees the old one — but only your own, proven by the same secret.
@@ -245,7 +248,9 @@ class CityRoomService:
         self.repository.save(room, expected)
         return room
 
-    def apply_command(self, room_id: str, *, password: str, command: Command) -> RoomState:
+    def apply_command(
+        self, room_id: str, *, password: str, command: Command, client: ClientInfo | None = None
+    ) -> RoomState:
         room = self.repository.get(room_id)
         expected = room.revision
         self._authorize(room, password)
@@ -261,6 +266,7 @@ class CityRoomService:
         except CityEngineError as exc:
             raise RoomValidationError(str(exc)) from exc
         room.game = transition.state
+        room.record_client(command.actor_id, client)
         self._advance_bots(room)
         if room.game.status == "finished":
             room.status = "finished"

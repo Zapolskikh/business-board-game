@@ -327,3 +327,60 @@ def test_state_carries_purchase_previews_and_object_yields() -> None:
             assert set(player["asset_yields"]) == {owned["uid"] for owned in player["assets"]}
     finally:
         app.dependency_overrides.clear()
+
+
+ADMIN = "admin-token-for-tests-0123456789"
+
+
+def test_admin_sees_who_sits_where_and_watches_any_seat(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setenv("ADMIN_TOKEN", ADMIN)
+    service = CityRoomService(InMemoryRoomRepository())
+    app.dependency_overrides[get_room_service] = lambda: service
+    client = TestClient(app)
+    try:
+        room_id = client.post("/api/city/rooms", json={"name": "Watched", "password": "secret", "capacity": 3}).json()[
+            "id"
+        ]
+        for seat, name, ip in ((0, "Anna", "203.0.113.5"), (1, "Boris", "203.0.113.5, 10.0.0.1")):
+            joined = client.post(
+                f"/api/city/rooms/{room_id}/join",
+                json={"password": "secret", "seat_index": seat, "player_name": name},
+                headers={"X-Forwarded-For": ip, "User-Agent": f"browser-{name}"},
+            )
+            assert joined.status_code == 200
+            # Players never see each other's addresses.
+            assert "203.0.113.5" not in joined.text
+        client.post(
+            f"/api/city/rooms/{room_id}/seats",
+            json={"password": "secret", "seat_index": 2, "kind": "bot", "difficulty": "expert"},
+        )
+        client.post(f"/api/city/rooms/{room_id}/start", json={"password": "secret", "seed": 7})
+        assert "203.0.113.5" not in client.get(f"/api/city/rooms/{room_id}").text
+
+        # Without the key — or with a wrong one — the admin endpoints do not exist.
+        assert client.get("/api/city/admin/rooms").status_code == 404
+        assert client.get("/api/city/admin/rooms", headers={"X-Admin-Token": "wrong"}).status_code == 404
+
+        rooms = client.get("/api/city/admin/rooms", headers={"X-Admin-Token": ADMIN}).json()
+        room = next(item for item in rooms if item["id"] == room_id)
+        anna = room["seats"][0]
+        assert anna["client"]["ip"] == "203.0.113.5" and anna["client"]["user_agent"] == "browser-Anna"
+        assert room["seats"][2]["client"] is None
+        assert room["shared_ips"] == {"203.0.113.5": ["Anna", "Boris"]}
+
+        # Any seat, the bot's included, without the room password — and nothing to press.
+        watched = client.get(
+            f"/api/city/rooms/{room_id}/state",
+            params={"viewer_id": "seat-3"},
+            headers={"X-Admin-Token": ADMIN},
+        )
+        assert watched.status_code == 200
+        assert watched.json()["game"] is not None and watched.json()["legal_actions"] == []
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_admin_endpoints_stay_closed_with_a_short_key(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setenv("ADMIN_TOKEN", "short")
+    client = TestClient(app)
+    assert client.get("/api/city/admin/rooms", headers={"X-Admin-Token": "short"}).status_code == 404

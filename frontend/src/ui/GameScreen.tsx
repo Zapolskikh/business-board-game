@@ -15,18 +15,21 @@ export function GameScreen({
   playerId,
   meta,
   onExit,
+  adminToken,
 }: {
   roomId: string;
   password: string;
   playerId: string;
   meta: CityMeta;
   onExit: () => void;
+  /** Режим наблюдателя-админа: состояние читается по токену, действий нет. */
+  adminToken?: string;
 }) {
   const [client] = useState(createGameQueryClient);
 
   return (
     <GameQueryProvider client={client}>
-      <GameSession roomId={roomId} password={password} playerId={playerId} meta={meta}>
+      <GameSession roomId={roomId} password={password} playerId={playerId} meta={meta} adminToken={adminToken}>
         <Gate onExit={onExit} />
       </GameSession>
     </GameQueryProvider>

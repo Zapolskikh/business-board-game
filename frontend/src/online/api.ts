@@ -1,4 +1,4 @@
-import type { CityMeta, Difficulty, LegalAction, RoomSummary, RoomView } from "./types";
+import type { AdminRoom, CityMeta, Difficulty, LegalAction, RoomSummary, RoomView } from "./types";
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -40,13 +40,16 @@ export const cityApi = {
     request<RoomView>(`/api/city/rooms/${id}/seats`, json(body)),
   start: (id: string, password: string, ownerToken?: string) =>
     request<RoomView>(`/api/city/rooms/${id}/start`, json({ password, owner_token: ownerToken })),
-  state: (id: string, password: string, viewerId: string, afterRevision?: number) => {
+  state: (id: string, password: string, viewerId: string, afterRevision?: number, adminToken?: string) => {
     const params = new URLSearchParams({ viewer_id: viewerId });
     if (afterRevision !== undefined) params.set("after_revision", String(afterRevision));
-    return request<RoomView>(`/api/city/rooms/${id}/state?${params}`, {
-      headers: { "X-Room-Password": password },
-    });
+    const headers: Record<string, string> = { "X-Room-Password": password };
+    if (adminToken) headers["X-Admin-Token"] = adminToken;
+    return request<RoomView>(`/api/city/rooms/${id}/state?${params}`, { headers });
   },
+  // Админка: все комнаты с местами, адресами и браузерами. Без верного токена сервер отвечает 404.
+  adminRooms: (token: string) =>
+    request<AdminRoom[]>("/api/city/admin/rooms", { headers: { "X-Admin-Token": token } }),
   // Replayable record of a finished match: the seed and the command journal, which `/state` hides
   // while the game is running. Rooms expire, so an unexported game is gone for good.
   journal: (id: string, password: string, viewerId: string) =>

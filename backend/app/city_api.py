@@ -2,18 +2,19 @@
 
 from __future__ import annotations
 
+import hmac
 import os
 from functools import lru_cache
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, Header, Query, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
 
 from city_engine.commands import Command
 from city_engine.constants import MAX_PLAYERS, MIN_PLAYERS
 from city_engine.content import load_catalog
 from city_rooms.errors import RoomValidationError
-from city_rooms.models import RoomState
+from city_rooms.models import ClientInfo, RoomState
 from city_rooms.repository import InMemoryRoomRepository
 from city_rooms.service import CityRoomService
 from city_rooms.upstash import UpstashRoomRepository
@@ -98,6 +99,70 @@ def _market_prices(service: CityRoomService, room: RoomState, viewer_id: str | N
     return service.engine.market_prices(room.game, player)
 
 
+def _client(request: Request) -> ClientInfo:
+    """The caller's address as the platform reports it, and the browser's label.
+
+    Behind Vercel the socket address is the proxy's, so the forwarded headers come first; the first
+    entry of ``X-Forwarded-For`` is the client the proxy saw.
+    """
+    forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    ip = forwarded or request.headers.get("x-real-ip", "").strip() or (request.client.host if request.client else "")
+    return ClientInfo(ip=ip[:64], user_agent=request.headers.get("user-agent", "")[:256])
+
+
+# The administrator's key, from the environment. Shorter than this or unset, the admin endpoints
+# answer as if they did not exist: a guessable key is worse than none.
+_ADMIN_TOKEN_MIN = 16
+
+
+def _is_admin(token: str) -> bool:
+    expected = os.getenv("ADMIN_TOKEN", "")
+    return len(expected) >= _ADMIN_TOKEN_MIN and bool(token) and hmac.compare_digest(token, expected)
+
+
+def require_admin(admin_token: str = Header(default="", alias="X-Admin-Token")) -> None:
+    if not _is_admin(admin_token):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
+
+
+def _admin_room(service: CityRoomService, room: RoomState) -> dict[str, Any]:
+    """Everything the administrator sees about a room: seats, who sits in them, and the score so far."""
+    game = room.game
+    scores = {player.id: service.engine.score(player) for player in game.players} if game else {}
+    seats = []
+    for seat in room.seats:
+        item = seat.to_dict()
+        item["client"] = room.seat_clients.get(seat.player_id or "") if seat.kind == "human" else None
+        item["score"] = scores.get(seat.player_id or "")
+        seats.append(item)
+    addresses: dict[str, list[str]] = {}
+    for item in seats:
+        for ip in (item["client"] or {}).get("ips", []):
+            addresses.setdefault(ip, []).append(item["name"] or "")
+    return {
+        **room.public_summary(),
+        "created_at": room.created_at,
+        "max_rounds": room.max_rounds,
+        "round": game.round_number if game else None,
+        "seats": seats,
+        # Addresses two or more human seats share — one person at several seats, or one household.
+        "shared_ips": {ip: names for ip, names in addresses.items() if len(names) > 1},
+    }
+
+
+@router.get("/admin/rooms", dependencies=[Depends(require_admin)])
+def admin_rooms(
+    limit: int = Query(default=100, ge=1, le=100),
+    service: CityRoomService = Depends(get_room_service),
+) -> list[dict[str, Any]]:
+    return [_admin_room(service, room) for room in service.list_rooms(limit)]
+
+
+@router.get("/admin/rooms/{room_id}", dependencies=[Depends(require_admin)])
+def admin_room(room_id: str, service: CityRoomService = Depends(get_room_service)) -> dict[str, Any]:
+    return _admin_room(service, service.get_room(room_id))
+
+
 @router.get("/meta")
 def meta() -> dict[str, Any]:
     return load_catalog().public_meta()
@@ -144,9 +209,10 @@ def delete_room(
 def join_room(
     room_id: str,
     request: JoinRoomRequest,
+    http: Request,
     service: CityRoomService = Depends(get_room_service),
 ) -> dict[str, Any]:
-    room = service.join(room_id, **request.model_dump())
+    room = service.join(room_id, **request.model_dump(), client=_client(http))
     viewer_id = room.seats[request.seat_index].player_id
     return room_view(room, viewer_id)
 
@@ -191,6 +257,7 @@ def get_room_state(
     viewer_id: str | None = Query(default=None),
     after_revision: int | None = Query(default=None, ge=0),
     room_password: str = Header(default="", alias="X-Room-Password"),
+    admin_token: str = Header(default="", alias="X-Admin-Token"),
     service: CityRoomService = Depends(get_room_service),
 ) -> dict[str, Any]:
     if after_revision is not None:
@@ -198,9 +265,15 @@ def get_room_state(
         if current_revision == after_revision:
             return {"changed": False, "revision": current_revision}
     room = service.get_room(room_id)
-    service.authorize_viewer(room, room_password, viewer_id)
+    admin = _is_admin(admin_token)
+    if not admin:
+        service.authorize_viewer(room, room_password, viewer_id)
+    # The administrator watches through any seat but never plays it: no legal actions, and commands
+    # still need the room password and a human seat.
     legal_actions = (
-        service.engine.legal_actions(room.game, viewer_id) if room.game is not None and viewer_id is not None else []
+        service.engine.legal_actions(room.game, viewer_id)
+        if room.game is not None and viewer_id is not None and not admin
+        else []
     )
     return {"changed": True, **room_view(room, viewer_id, legal_actions, _market_prices(service, room, viewer_id))}
 
@@ -210,6 +283,7 @@ def get_room_journal(
     room_id: str,
     viewer_id: str | None = Query(default=None),
     room_password: str = Header(default="", alias="X-Room-Password"),
+    admin_token: str = Header(default="", alias="X-Admin-Token"),
     service: CityRoomService = Depends(get_room_service),
 ) -> dict[str, Any]:
     """Replayable record of a finished match: seed, command journal and the final snapshot.
@@ -218,7 +292,8 @@ def get_room_journal(
     after the fact instead of only readable in the chronicle while the room still exists.
     """
     room = service.get_room(room_id)
-    service.authorize_viewer(room, room_password, viewer_id)
+    if not _is_admin(admin_token):
+        service.authorize_viewer(room, room_password, viewer_id)
     try:
         return room_journal(room)
     except ValueError as exc:
@@ -229,9 +304,12 @@ def get_room_journal(
 def apply_command(
     room_id: str,
     request: CommandRequest,
+    http: Request,
     service: CityRoomService = Depends(get_room_service),
 ) -> dict[str, Any]:
     data = request.model_dump(exclude={"password"})
-    room = service.apply_command(room_id, password=request.password, command=Command.from_dict(data))
+    room = service.apply_command(
+        room_id, password=request.password, command=Command.from_dict(data), client=_client(http)
+    )
     legal_actions = service.engine.legal_actions(room.game, request.actor_id) if room.game is not None else []
     return room_view(room, request.actor_id, legal_actions, _market_prices(service, room, request.actor_id))

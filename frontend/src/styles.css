@@ -711,3 +711,20 @@ a.support-link:hover { transform: translateY(-1px); }
 .home-screen .rooms-hero, .home-screen .hero-copy { min-width: 0; max-width: 100%; }
 .home-screen .hero-title { overflow-wrap: anywhere; }
 @media (max-width: 360px) { .rooms-hero .hero-title { font-size: 36px; } }
+
+/* Скрытая страница администратора (/admin): список комнат и кто за ними сидит. */
+.admin-page { display: block; padding: 24px 16px; }
+.admin-panel { max-width: 1100px; margin: 0 auto; }
+.admin-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; justify-content: space-between; margin-bottom: 16px; }
+.admin-head h1 { font-size: 22px; }
+.admin-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-login { display: grid; gap: 10px; max-width: 420px; margin-bottom: 16px; }
+.admin-room { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--rooms-line); border-radius: 9px; }
+.admin-room header { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; margin-bottom: 8px; color: var(--rooms-muted); font-size: 12px; }
+.admin-room header strong { color: var(--rooms-text, inherit); font-size: 15px; }
+.admin-warning { margin: 6px 0; padding: 7px 10px; color: #f3d39b; background: #2a2212; border: 1px solid #6b5420; border-radius: 7px; font-size: 12px; }
+.admin-table { overflow-x: auto; }
+.admin-table table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.admin-table th, .admin-table td { padding: 6px 8px; text-align: left; white-space: nowrap; border-top: 1px solid var(--rooms-line); }
+.admin-table th { color: var(--rooms-dim); font-weight: 600; }
+.admin-shared { color: #f3d39b; font-weight: 600; }

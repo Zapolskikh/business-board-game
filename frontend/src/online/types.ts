@@ -24,6 +24,31 @@ export interface RoomSeat {
   preferred_role: string | null;
 }
 
+/** Кто сидит на месте — видно только админу: адрес и браузер при входе и последние, с которых ходили. */
+export interface SeatClient {
+  ip: string;
+  user_agent: string;
+  joined_at: string;
+  last_ip: string;
+  last_user_agent: string;
+  last_seen_at: string;
+  ips: string[];
+}
+
+export interface AdminSeat extends RoomSeat {
+  client: SeatClient | null;
+  score: number | null;
+}
+
+export interface AdminRoom extends RoomSummary {
+  created_at: string;
+  max_rounds: number;
+  round: number | null;
+  seats: AdminSeat[];
+  /** Адреса, с которых сидят два и больше человеческих места: адрес → имена. */
+  shared_ips: Record<string, string[]>;
+}
+
 export interface OwnedAsset {
   uid: string;
   card_id: string;

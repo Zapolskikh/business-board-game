@@ -5,6 +5,7 @@ import { useLocalizedMeta } from "../i18n/catalog";
 import { Lobby } from "./Lobby";
 import { RoomBrowser } from "./RoomBrowser";
 import { FeedbackPage } from "./FeedbackPage";
+import { AdminPage, onAdminPage } from "./AdminPage";
 import { FEEDBACK_URL } from "./support";
 import type { CityMeta } from "./types";
 // Ленивая загрузка: браузер комнат и лобби не должны тянуть Motion, Radix и Query.
@@ -45,6 +46,8 @@ export default function App() {
   if (feedback) return <FeedbackPage onBack={closeFeedback} />;
   if (fatal) return <main className="rooms-app app-state"><section className="rooms-panel"><span className="eyebrow">{t("app.connectionError")}</span><h1>{t("app.serverDown")}</h1><p className="rooms-alert">{fatal}</p><button className="rooms-button primary" onClick={() => location.reload()}>{t("app.retry")}</button></section></main>;
   if (!meta) return <div className="rooms-app app-state"><span className="loading-ring" /><p>{t("app.loadingCatalog")}</p></div>;
+  // Скрытая страница администратора: не связана ни с одной кнопкой интерфейса.
+  if (onAdminPage()) return <AdminPage meta={meta} onExit={() => { history.pushState(null, "", "/"); location.reload(); }} />;
   if (!roomId) return <RoomBrowser meta={meta} onFeedback={openFeedback} onOpen={(id, password = "", joinAs) => { setRoomId(id); setInitialPassword(password); setAutoJoinName(joinAs ?? null); }} />;
   if (playing && session) {
     return (

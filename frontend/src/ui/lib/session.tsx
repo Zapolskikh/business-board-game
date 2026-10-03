@@ -24,6 +24,8 @@ interface SessionIdentity {
   password: string;
   playerId: string;
   meta: CityMeta;
+  /** Админ смотрит партию глазами любого места: только чтение, без пароля комнаты. */
+  adminToken?: string;
 }
 
 const SessionContext = createContext<SessionIdentity | null>(null);
@@ -51,7 +53,7 @@ export function createGameQueryClient(): QueryClient {
 export function GameSession({ children, ...identity }: SessionIdentity & { children: ReactNode }) {
   const value = useMemo(
     () => identity,
-    [identity.roomId, identity.password, identity.playerId, identity.meta],
+    [identity.roomId, identity.password, identity.playerId, identity.meta, identity.adminToken],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
@@ -63,7 +65,7 @@ export function GameQueryProvider({ client, children }: { client: QueryClient; c
 const roomKey = (roomId: string, playerId: string) => ["room", roomId, playerId] as const;
 
 export function useRoom() {
-  const { roomId, password, playerId } = useSession();
+  const { roomId, password, playerId, adminToken } = useSession();
   const client = useQueryClient();
   const key = roomKey(roomId, playerId);
 
@@ -73,7 +75,7 @@ export function useRoom() {
       // Сохраняем условную выборку: сервер отвечает `changed: false` без тела партии,
       // и тогда возвращается та же ссылка — React не перерисовывает доску вхолостую.
       const previous = client.getQueryData<RoomView>(key);
-      const next = await cityApi.state(roomId, password, playerId, previous?.revision);
+      const next = await cityApi.state(roomId, password, playerId, previous?.revision, adminToken);
       return next.changed === false && previous ? previous : next;
     },
     // Опрос останавливается на финише партии. В фоне Query паузит интервал сам и

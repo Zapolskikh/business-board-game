@@ -22,6 +22,19 @@ def utc_now() -> str:
     return datetime.now(UTC).isoformat()
 
 
+@dataclass(frozen=True, slots=True)
+class ClientInfo:
+    """Where a request came from: the address the platform reports and the browser's own label."""
+
+    ip: str = ""
+    user_agent: str = ""
+
+
+# Distinct addresses kept per seat: enough to see a player move between networks, small enough that a
+# long game does not grow the room record.
+SEAT_CLIENT_IPS = 5
+
+
 @dataclass(slots=True)
 class RoomSeat:
     index: int
@@ -86,6 +99,23 @@ class RoomState:
     # only the creator may clear or reconfigure an occupied seat. Never part of a public view.
     owner_token_hash: str = ""
     seat_token_hashes: dict[str, str] = field(default_factory=dict)
+    # Who sits in each human seat, for the administrator only (keyed by player id): the address and
+    # browser at the join, and the last ones a command came from. Never part of a public view — the
+    # admin endpoints are the only reader — so players cannot see each other's addresses.
+    seat_clients: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+    def record_client(self, player_id: str, client: ClientInfo | None, *, joined: bool = False) -> None:
+        if client is None:
+            return
+        now = utc_now()
+        entry = {} if joined else dict(self.seat_clients.get(player_id) or {})
+        if joined or "joined_at" not in entry:
+            entry.update(joined_at=now, ip=client.ip, user_agent=client.user_agent)
+        ips = [ip for ip in entry.get("ips", []) if ip != client.ip]
+        if client.ip:
+            ips.append(client.ip)
+        entry.update(last_ip=client.ip, last_user_agent=client.user_agent, last_seen_at=now, ips=ips[-SEAT_CLIENT_IPS:])
+        self.seat_clients[player_id] = entry
 
     def validate(self) -> None:
         if not self.id or not self.name.strip():
@@ -128,6 +158,7 @@ class RoomState:
             "is_open": self.is_open,
             "owner_token_hash": self.owner_token_hash,
             "seat_token_hashes": dict(self.seat_token_hashes),
+            "seat_clients": {key: dict(value) for key, value in self.seat_clients.items()},
         }
 
     @classmethod
@@ -147,6 +178,7 @@ class RoomState:
             is_open=bool(data.get("is_open", False)),
             owner_token_hash=str(data.get("owner_token_hash", "")),
             seat_token_hashes={str(key): str(value) for key, value in (data.get("seat_token_hashes") or {}).items()},
+            seat_clients={str(key): dict(value) for key, value in (data.get("seat_clients") or {}).items()},
         )
         state.validate()
         return state
