@@ -1,0 +1,29 @@
+# Подозрительные решения
+
+- `buy_asset:planning_charter` — ценность +5.20 за действие, значимо выше своего типа
+- `city_project:silicon_quarter` — ценность +4.10 за действие, значимо выше своего типа
+- `city_project:tech_incubator` — ценность +4.10 за действие, значимо выше своего типа
+- `buy_asset:city_block_complex` — ценность +3.35 за действие, значимо выше своего типа
+- `buy_asset:offshore` — ценность +4.45 за действие, значимо выше своего типа
+- `city_project:river_port` — ценность +3.85 за действие, значимо выше своего типа
+- `city_project:charity_fund` — ценность +0.70 за действие, значимо ниже своего типа
+- `use_role_power:politician_deal` — ценность -2.80 за действие, значимо ниже своего типа
+- `use_role_power:journalist_publish` — ценность -1.80 за действие, значимо ниже своего типа
+- `buy_asset:cowork` — ценность +1.35 за действие, значимо ниже своего типа
+- `city_project:security_hub` — ценность +1.95 за действие, значимо ниже своего типа
+- `buy_asset:market` — ценность +1.35 за действие, значимо ниже своего типа
+- `buy_asset:robotics` — отдача 17.0 очка с покупки, выше средней 9.0
+- `buy_asset:defence_contract` — отдача 14.5 очка с покупки, выше средней 9.0
+- `buy_asset:agglomeration` — отдача 11.7 очка с покупки, выше средней 9.0
+- `buy_asset:state_concern` — отдача 14.0 очка с покупки, выше средней 9.0
+- `buy_asset:anticorruption` — отдача 4.1 очка с покупки, ниже средней 9.0
+- `buy_asset:cash` — отдача 4.6 очка с покупки, ниже средней 9.0
+- `buy_asset:passport_office` — владелец выигрывает на -26 п.п. чаще
+- `buy_asset:influence_broker` — владелец выигрывает на -11 п.п. чаще
+- `buy_asset:protection_racket` — владелец выигрывает на -9 п.п. чаще
+- `use_role_power:fraudster_crypto_scam` — выбрано в 0.0% из 2002 доступных
+- `reroll_projects` — выбрано в 0.2% из 131569 доступных
+- `use_role_power:mafia_lock` — выбрано в 0.4% из 2490 доступных
+- `grey_operation:crypto` — выбрано в 0.5% из 91252 доступных
+- `claim_role:mafia` — выбрано в 0.7% из 85372 доступных
+- `use_role_power:politician_veto` — выбрано в 1.1% из 31325 доступных
