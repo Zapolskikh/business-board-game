@@ -47,6 +47,9 @@ export const cityApi = {
     if (adminToken) headers["X-Admin-Token"] = adminToken;
     return request<RoomView>(`/api/city/rooms/${id}/state?${params}`, { headers });
   },
+  // Обучение: закрытый стол с заготовленной позицией, уже начатый; игрок на первом месте.
+  tutorial: (playerName: string, lang: string) =>
+    request<{ password: string; player_id: string; room: RoomView }>("/api/city/tutorial", json({ player_name: playerName, lang })),
   // Админка: все комнаты с местами, адресами и браузерами. Без верного токена сервер отвечает 404.
   adminRooms: (token: string) =>
     request<AdminRoom[]>("/api/city/admin/rooms", { headers: { "X-Admin-Token": token } }),

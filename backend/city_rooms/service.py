@@ -18,6 +18,8 @@ from city_rooms.errors import RoomAccessError, RoomConflictError, RoomNameTakenE
 from city_rooms.models import ClientInfo, RoomSeat, RoomState
 from city_rooms.repository import RoomRepository
 from city_rooms.security import hash_password, verify_password
+from city_rooms.tutorial import PLAYER_ID as TUTORIAL_PLAYER_ID
+from city_rooms.tutorial import build_tutorial_room, extra_command, load_the_die
 
 _ROOM_NAME_RE = re.compile(r"\s+")
 
@@ -81,6 +83,19 @@ class CityRoomService:
         )
         self.repository.create(room)
         return room
+
+    def create_tutorial(
+        self, *, player_name: str, lang: str, client: ClientInfo | None = None
+    ) -> tuple[RoomState, str]:
+        """A private tutorial table and the password that opens it (city_rooms.tutorial)."""
+        clean_name = _ROOM_NAME_RE.sub(" ", player_name).strip()
+        if not 1 <= len(clean_name) <= 32:
+            raise RoomValidationError("player name must contain 1-32 characters")
+        password = secrets.token_urlsafe(12)
+        room = build_tutorial_room(clean_name, lang, hash_password(password))
+        room.record_client(TUTORIAL_PLAYER_ID, client, joined=True)
+        self.repository.create(room)
+        return room, password
 
     def list_rooms(self, limit: int = 50) -> list[RoomState]:
         return self.repository.list_active(min(max(limit, 1), 100))
@@ -259,6 +274,9 @@ class CityRoomService:
         seat = next((seat for seat in room.seats if seat.player_id == command.actor_id), None)
         if seat is None or seat.kind != "human":
             raise RoomAccessError("commands require an occupied human seat")
+        if room.tutorial and command.type == "grey_operation":
+            # The lesson's operation is a full success: the die is loaded before the command reads it.
+            load_the_die(room.game)
         try:
             transition = self.engine.apply(room.game, command)
         except StaleRevisionError as exc:
@@ -288,6 +306,9 @@ class CityRoomService:
                 raise RoomValidationError(f"game player {actor_id} has no room seat")
             if seat.kind != "bot":
                 return
+            if room.tutorial:
+                room.game = self.engine.apply(game, extra_command(self.engine, game, actor_id)).state
+                continue
             decision = choose_bot_command(self.engine, game, actor_id)
             room.game = self.engine.apply(game, decision.command).state
         raise RoomValidationError("bot execution guard reached; possible policy loop")

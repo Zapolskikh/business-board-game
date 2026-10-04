@@ -9,7 +9,7 @@ import { resolve, usedThisTurn, type ActionContext } from "../lib/actions";
 import type { Indexes } from "../lib/board";
 import { useIsPortrait } from "../lib/layout";
 import { projectArt, projectIcon, projectKind, statIcon } from "../assets/cards";
-import { ResourceText } from "../primitives/ResourceIcon";
+import { ResourceText, resourceTooltip } from "../primitives/ResourceIcon";
 import { ConfirmModal } from "../primitives/Modal";
 
 /* Доска проектов. Общая для всех: кто взял — тот и забрал, остальным проект недоступен.
@@ -115,6 +115,7 @@ export function Projects({
                * не дожидаясь конца анимации. */
               <motion.div
                 key={projectId}
+                data-tutorial={`project-${projectId}`}
                 layout
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -275,7 +276,7 @@ const ProjectCard = forwardRef<
       {/* Постоянный бонус — ради него половину проектов и берут, поэтому он крупно и с
         * иконкой категории. Единица начисления — ровно та, что в правилах. */}
       {!portrait && (
-        <span className="project-card-plate flex min-w-0 items-center gap-1.5 overflow-hidden" title={perk}>
+        <span className="project-card-plate flex min-w-0 items-center gap-1.5 overflow-hidden" title={perk ? resourceTooltip(perk) : undefined}>
           {icon && <img src={icon} alt="" className="size-[20px] shrink-0 object-contain" />}
           <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[11.5px] font-semibold
             text-[var(--project-ink)]">

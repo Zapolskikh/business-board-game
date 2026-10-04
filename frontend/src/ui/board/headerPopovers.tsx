@@ -30,12 +30,14 @@ export function ScoreDetails({ game, me, meta }: { game: GameState; me: PlayerSt
           />
         )}
         <p className="mb-2">
-          {t("ui.score.leftover", {
-            patronageMoney: patronage(meta).money,
-            patronagePoints: patronage(meta).points,
-            lobbyingInfluence: lobbying(meta).influence,
-            lobbyingPoints: lobbying(meta).points,
-          })}
+          <ResourceText>
+            {t("ui.score.leftover", {
+              patronageMoney: patronage(meta).money,
+              patronagePoints: patronage(meta).points,
+              lobbyingInfluence: lobbying(meta).influence,
+              lobbyingPoints: lobbying(meta).points,
+            })}
+          </ResourceText>
         </p>
 
         {forecast && (

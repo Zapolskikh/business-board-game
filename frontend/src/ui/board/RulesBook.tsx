@@ -4,6 +4,7 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { buildRulesBook } from "../../online/rulesDocument";
 import type { CityMeta } from "../../online/types";
 import { MIN_QUERY, highlightHtml, searchRules } from "./rulesSearch";
+import { ResourceText } from "../primitives/ResourceIcon";
 
 /* Книга правил города.
  *
@@ -134,7 +135,7 @@ export function RulesBook({
                     className="rules-book-result"
                   >
                     <span className="rules-book-result-head">
-                      <span aria-hidden>{chapters[hit.chapter].icon}</span>
+                      <span aria-hidden><ResourceText>{chapters[hit.chapter].icon}</ResourceText></span>
                       <b>{chapters[hit.chapter].title.split(" — ")[0]}</b>
                       <small>{hit.count}</small>
                     </span>
@@ -159,7 +160,7 @@ export function RulesBook({
                       className="rules-book-tab"
                     >
                       <span className="rules-book-tab-num">{index + 1}</span>
-                      <span aria-hidden>{item.icon}</span>
+                      <span aria-hidden><ResourceText>{item.icon}</ResourceText></span>
                       <span className="min-w-0">{item.title.split(" — ")[0]}</span>
                     </button>
                   </li>
@@ -173,7 +174,7 @@ export function RulesBook({
             <header className="rules-book-chapter-head">
               <span>{t("ui.book.chapter", { number: page + 1 })}</span>
               <h2 className="card-serif">
-                {chapter.icon} {chapter.title}
+                <ResourceText>{`${chapter.icon} ${chapter.title}`}</ResourceText>
               </h2>
               <Dialog.Close className="rules-book-close" aria-label={t("ui.book.close")}>
                 ✕

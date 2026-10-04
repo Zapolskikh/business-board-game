@@ -8,12 +8,15 @@ import type { CityMeta, RoomSummary } from "./types";
 import { AboutDialog } from "./AboutDialog";
 import { SupportLinks } from "./SupportLinks";
 import { StudioLogo } from "./StudioMark";
+import { ResourceText } from "../ui/primitives/ResourceIcon";
 
 interface Props {
   meta: CityMeta;
   /** `joinAs` — имя, под которым игрок сразу сядет за стол (после создания или «случайной игры»). */
   onOpen: (roomId: string, initialPassword?: string, joinAs?: string) => void;
   onFeedback: () => void;
+  /** Обучение с проводником. */
+  onTutorial: () => void;
 }
 
 const PLAYER_NAME_KEY = "city-player-name";
@@ -28,8 +31,8 @@ const GREY_OPERATIONS = ["smear", "crypto", "roof_break", "datacenter", "influen
 const RulesBook = lazy(() => import("../ui/RulesBookEntry"));
 
 
-export function RoomBrowser({ meta, onOpen, onFeedback }: Props) {
-  const { t, i18n } = useTranslation(["home", "common", "game"]);
+export function RoomBrowser({ meta, onOpen, onFeedback, onTutorial }: Props) {
+  const { t, i18n } = useTranslation(["home", "common", "game", "tutorial"]);
   const [about, setAbout] = useState(false);
   const [rules, setRules] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -45,9 +48,25 @@ export function RoomBrowser({ meta, onOpen, onFeedback }: Props) {
   const [playerName, setPlayerName] = useState(() => localStorage.getItem(PLAYER_NAME_KEY) ?? "");
   const [isOpen, setIsOpen] = useState(false);
   const [randomNote, setRandomNote] = useState("");
-  const savePlayerName = (value: string) => { setPlayerName(value); localStorage.setItem(PLAYER_NAME_KEY, value); };
+  const savePlayerName = (value: string) => {
+    setPlayerName(value);
+    localStorage.setItem(PLAYER_NAME_KEY, value);
+    if (value.trim()) setNameMissing(false);
+  };
   // Имя обязательно в обоих путях в игру — и при создании лобби, и в «случайной игре».
   const playerNameOk = playerName.trim().length > 0;
+  // Имя обязательно: попытка войти без него подсвечивает поле, а не молча гасит кнопки.
+  const [nameMissing, setNameMissing] = useState(false);
+  const flagMissingName = () => {
+    setNameMissing(true);
+    const field = nameRef.current;
+    if (!field) return;
+    field.focus();
+    // Перезапуск встряхивания: и на первое, и на каждое следующее нажатие без имени.
+    field.classList.remove("field-shake");
+    void field.offsetWidth;
+    field.classList.add("field-shake");
+  };
   const joinName = () => playerName.trim();
   // Правая панель — одна на две вкладки: так главная помещается в экран без прокрутки.
   const [tab, setTab] = useState<"create" | "rooms">("create");
@@ -92,10 +111,13 @@ export function RoomBrowser({ meta, onOpen, onFeedback }: Props) {
   const roundsValue = roundsInput === "" ? 15 : parsedRounds;
   const nameTaken = Boolean(name.trim()) && rooms.some(room => nameKey(room.name) === nameKey(name));
   const passwordOk = isOpen || password.length >= 4;
-  const canCreate = Boolean(playerNameOk && name.trim() && !nameTaken && passwordOk && roundsValid && !busy);
+  // Всё, кроме имени: без имени кнопка остаётся нажимаемой и при нажатии показывает, что не так.
+  const roomReady = Boolean(name.trim() && !nameTaken && passwordOk && roundsValid && !busy);
+  const canCreate = playerNameOk && roomReady;
   const waitingCount = useMemo(() => rooms.filter(room => room.status === "waiting").length, [rooms]);
 
   const create = async () => {
+    if (!playerNameOk) return flagMissingName();
     if (!canCreate) return;
     setBusy(true); setError("");
     try {
@@ -113,7 +135,7 @@ export function RoomBrowser({ meta, onOpen, onFeedback }: Props) {
    * Если таких нет — игрок сам открывает лобби с базовыми настройками и становится его хозяином:
    * следующий, кто нажмёт «Случайная игра», попадёт уже к нему. */
   const joinRandom = async () => {
-    if (!playerNameOk) return;
+    if (!playerNameOk) return flagMissingName();
     setBusy(true); setError(""); setRandomNote("");
     try {
       const fresh = await cityApi.rooms();
@@ -204,6 +226,13 @@ export function RoomBrowser({ meta, onOpen, onFeedback }: Props) {
           <p className="hero-slogan">{t("hero.titleLine1")}<br /><em>{t("hero.titleLine2")}</em></p>
           <p className="hero-lead">{t("hero.lead")}</p>
           <p className="hero-hook">{t("hero.hook")}</p>
+          {/* Обучение — отдельной крупной кнопкой рядом с основными: новичку стоит начать с него. */}
+          <div className="hero-row">
+          <button type="button" className="hero-tutorial" onClick={onTutorial} title={t("menu.hint", { ns: "tutorial" })}>
+            <small>{t("menu.recommended", { ns: "tutorial" })}</small>
+            <b>{t("menu.cta", { ns: "tutorial" })}</b>
+          </button>
+          <div className="hero-row-main">
           <div className="hero-actions">
             <button type="button" className="rooms-button primary hero-cta" onClick={startGame}>{t("hero.ctaPlay")}</button>
             <button type="button" className="rooms-button hero-cta ghost" onClick={() => setRules(true)}>{t("hero.ctaRules")}</button>
@@ -215,6 +244,8 @@ export function RoomBrowser({ meta, onOpen, onFeedback }: Props) {
             <li><b>{meta.assets.length}</b><span>{t("hero.factAssets")}</span></li>
             <li><b>{meta.projects.length}</b><span>{t("hero.factProjects")}</span></li>
           </ul>
+          </div>
+          </div>
         </div>
       </section>
 
@@ -293,8 +324,19 @@ export function RoomBrowser({ meta, onOpen, onFeedback }: Props) {
           </header>
           <form onSubmit={event => { event.preventDefault(); void create(); }}>
             <label className="room-field">
-              <span>{t("create.playerName")}</span>
-              <input ref={nameRef} value={playerName} maxLength={32} placeholder={t("create.playerNamePlaceholder")} onChange={event => savePlayerName(event.target.value)} />
+              <span>{t("create.playerName")} <i className="required-mark" aria-hidden="true">*</i></span>
+              <input
+                ref={nameRef}
+                value={playerName}
+                maxLength={32}
+                placeholder={t("create.playerNamePlaceholder")}
+                aria-required="true"
+                aria-invalid={nameMissing}
+                aria-describedby={nameMissing ? "player-name-missing" : undefined}
+                onAnimationEnd={event => event.currentTarget.classList.remove("field-shake")}
+                onChange={event => savePlayerName(event.target.value)}
+              />
+              {nameMissing && <small id="player-name-missing" className="field-error" role="alert">{t("create.hintPlayerName")}</small>}
             </label>
             <label className="room-field">
               <span>{t("create.name")}</span>
@@ -365,7 +407,7 @@ export function RoomBrowser({ meta, onOpen, onFeedback }: Props) {
               <label className="room-field"><span>{t("create.rolePrice")}</span><input type="number" min={2} max={10} value={rolePrice} onChange={event => setRolePrice(Number(event.target.value))} /><small>{t("create.rolePriceHint")}</small></label>
             </details>
 
-            <button className="rooms-button primary create-submit" type="submit" disabled={!canCreate}>
+            <button className="rooms-button primary create-submit" type="submit" disabled={!roomReady}>
               <span>{busy ? t("create.submitting") : t("create.submit")}</span><span aria-hidden="true">→</span>
             </button>
             <p className={`form-hint ${canCreate ? "" : "missing"}`}>
@@ -375,7 +417,7 @@ export function RoomBrowser({ meta, onOpen, onFeedback }: Props) {
             {/* Внизу панели — второй путь в игру: без своей комнаты, в любое открытое лобби. */}
             <div className="random-join">
               <span className="or-divider" aria-hidden="true"><i>{t("random.or")}</i></span>
-              <button type="button" className="rooms-button primary create-submit random-submit" disabled={busy || !playerNameOk} onClick={() => void joinRandom()}>
+              <button type="button" className="rooms-button primary create-submit random-submit" disabled={busy} onClick={() => void joinRandom()}>
                 <span>{t("random.button")}</span><span aria-hidden="true">→</span>
               </button>
               <p className="form-hint">{randomNote || (playerNameOk ? t("random.hint") : t("create.hintPlayerName"))}</p>
@@ -411,7 +453,7 @@ export function RoomBrowser({ meta, onOpen, onFeedback }: Props) {
           <span>{t("hero.projectsText")}</span>
           <ul className="pillar-chips plain">
             {[...meta.projects].sort((a, b) => b.points - a.points).slice(0, 4).map(project => (
-              <li key={project.id}>★{project.points} {project.title}</li>
+              <li key={project.id}><ResourceText>{`★${project.points} ${project.title}`}</ResourceText></li>
             ))}
           </ul>
         </li>

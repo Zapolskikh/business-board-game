@@ -56,6 +56,7 @@ export function MarketGrid({
             return (
               <motion.div
                 key={item.uid}
+                data-tutorial={`market-${item.card_id}`}
                 // Переворот: карта уходит с рынка гранью, новая приходит с другой стороны.
                 // Ключ — uid из движка, поэтому Motion сам понимает, какой слот сменился.
                 initial={{ rotateY: -90, opacity: 0 }}

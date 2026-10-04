@@ -45,6 +45,12 @@ export function ResourceText({ children, className }: { children: string; classN
   return <span className={className}>{parts}</span>;
 }
 
+/** Text for a native tooltip (`title`), which cannot hold an image: the influence glyph becomes a
+ * crown character, so a hint never shows the retired diamond next to the crown icon on the card. */
+export function resourceTooltip(text: string): string {
+  return text.replace(/◆/g, "♛");
+}
+
 /** Apply inline icon references to rulebook HTML that is rendered with dangerouslySetInnerHTML. */
 export function resourceIconsInHtml(html: string): string {
   return html.replace(/\$|◆|⚡|⚠|🛡|★|💵|💰/g, glyph => {

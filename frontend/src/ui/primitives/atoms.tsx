@@ -84,6 +84,7 @@ export function ActionButton({
   onClick,
   tone = "plain",
   spent,
+  tutorial,
 }: {
   label: string;
   cost: ReactNode;
@@ -92,6 +93,8 @@ export function ActionButton({
   tone?: "plain" | "danger";
   /** Уже использовано в этом ходу — отдельный вид, чтобы не путать с нехваткой ресурсов. */
   spent?: boolean;
+  /** Метка, по которой обучение подсвечивает кнопку. */
+  tutorial?: string;
 }) {
   const ready = state.kind === "ready";
   const status = spent ? "spent" : state.kind;
@@ -100,6 +103,7 @@ export function ActionButton({
       type="button"
       data-ui="action-button"
       data-state={status}
+      data-tutorial={tutorial}
       disabled={!ready}
       onClick={onClick}
       title={state.kind === "blocked" ? state.reason : undefined}
@@ -159,7 +163,7 @@ export const DrawerRow = forwardRef<
       <span className="min-w-0">
         <b className="block text-[14px] font-semibold text-ink">{title}</b>
         <small className="block overflow-hidden text-ellipsis whitespace-nowrap text-[11.5px] text-ink-muted">
-          {hint}
+          {typeof hint === "string" ? <ResourceText>{hint}</ResourceText> : hint}
         </small>
       </span>
       {badge !== undefined ? (
@@ -168,7 +172,7 @@ export const DrawerRow = forwardRef<
             badgeOn ? "bg-panel text-good" : "bg-panel-3 text-ink-muted"
           }`}
         >
-          {badge}
+          {typeof badge === "string" ? <ResourceText>{badge}</ResourceText> : badge}
         </span>
       ) : (
         <span className="text-[18px] text-ink-dim">›</span>

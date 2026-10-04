@@ -3,6 +3,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import * as Popover from "@radix-ui/react-popover";
 import { useState, type ReactNode } from "react";
 import { useIsPortrait } from "../lib/layout";
+import { ResourceText } from "./ResourceIcon";
 
 /* Обёртка поповера — единственное место, знающее про Radix.
  *
@@ -98,7 +99,10 @@ export function CardPopover({
 export function PopoverHeader({ title, subtitle }: { title: ReactNode; subtitle?: ReactNode }) {
   return (
     <div className="flex min-w-0 items-baseline gap-2 border-b border-line px-3 py-2.5">
-      <b className="min-w-0 flex-1 text-[13.5px] font-bold">{title}</b>
+      {/* Заголовки вроде «🛡 Защита» несут символ ресурса: строку показываем иконками игры. */}
+      <b className="min-w-0 flex-1 text-[13.5px] font-bold">
+        {typeof title === "string" ? <ResourceText>{title}</ResourceText> : title}
+      </b>
       {subtitle && <span className="shrink-0 text-2xs text-ink-dim">{subtitle}</span>}
     </div>
   );

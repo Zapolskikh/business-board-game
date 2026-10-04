@@ -46,6 +46,7 @@ export function Hand({
         <button
           type="button"
           data-ui="draw-card-button"
+          data-tutorial="draw-card"
           disabled={draw.kind !== "ready"}
           onClick={() => draw.kind === "ready" && onAction(draw.action)}
           title={draw.kind === "blocked" ? draw.reason : t("ui.hand.drawHint")}
@@ -76,6 +77,7 @@ export function Hand({
             return (
               <motion.div
                 key={held.uid}
+                data-tutorial={`hand-${held.card_id}`}
                 layout
                 initial={{ x: 20, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}

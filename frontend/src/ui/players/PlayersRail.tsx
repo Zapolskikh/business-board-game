@@ -5,6 +5,7 @@ import { difficultyLabels } from "../../online/gameUi";
 import type { CityMeta, GameState, LegalAction, PlayerState } from "../../online/types";
 import { CardPopover } from "../primitives/CardPopover";
 import { Panel, SectionHead } from "../primitives/atoms";
+import { ResourceText } from "../primitives/ResourceIcon";
 import type { ActionContext } from "../lib/actions";
 import { atScandalRisk, playerColor, scandalLimit, turnPosition, type Indexes } from "../lib/board";
 import { PlayerDetails } from "./PlayerDetails";
@@ -50,7 +51,13 @@ export function PlayersRail({
               />
             }
           >
-            <PlayerRow player={player} game={game} index={index} isMe={player.id === context.me.id} />
+            <PlayerRow
+              player={player}
+              game={game}
+              index={index}
+              isMe={player.id === context.me.id}
+              data-tutorial={`player-${player.id}`}
+            />
           </CardPopover>
         ))}
       </div>
@@ -185,7 +192,7 @@ const PlayerRow = forwardRef<HTMLButtonElement, PlayerRowProps>(function PlayerR
                 className="shrink-0 rounded bg-[#ecd3b4] px-1 font-semibold text-warning"
                 title={t("ui.players.risk")}
               >
-                {t("ui.players.riskBadge")}
+                <ResourceText>{t("ui.players.riskBadge")}</ResourceText>
               </span>
             ) : null}
           </span>

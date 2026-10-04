@@ -137,6 +137,7 @@ export function ActionsPanel({
             label={t("ui.actions.work")}
             cost={<><span className="font-semibold text-money"><ResourceText>+2$</ResourceText></span>{t("ui.actions.workCost")}</>}
             state={work}
+            tutorial="work"
             onClick={() => act(work)}
           />
           {tiers.map(tier => {
@@ -152,6 +153,7 @@ export function ActionsPanel({
                   </>
                 }
                 state={campaign}
+                tutorial="campaign"
                 onClick={() => act(campaign)}
               />
             );
@@ -177,6 +179,7 @@ export function ActionsPanel({
               </>
             }
             state={lobbyAction}
+            tutorial="lobbying"
             spent={usedThisTurn(game, "lobbying")}
             onClick={() => act(lobbyAction)}
           />
@@ -208,6 +211,7 @@ export function ActionsPanel({
               </>
             }
             state={roof}
+            tutorial="roof"
             onClick={() => act(roof)}
           />
         </div>
@@ -220,14 +224,15 @@ export function ActionsPanel({
           </div>
           <div className="mt-2 grid grid-cols-2 gap-1.5">
             {powers.map(power => (
-              <PowerButton
-                key={power}
-                power={power}
-                game={game}
-                districts={meta.districts}
-                context={context}
-                onAction={onAction}
-              />
+              <div key={power} data-tutorial={`power-${power}`} className="grid min-w-0">
+                <PowerButton
+                  power={power}
+                  game={game}
+                  districts={meta.districts}
+                  context={context}
+                  onAction={onAction}
+                />
+              </div>
             ))}
           </div>
         </Panel>
@@ -242,6 +247,7 @@ export function ActionsPanel({
         <div className="grid content-start gap-1.5 overflow-auto p-px">
           <DrawerRow
             icon="🏷️"
+            data-tutorial="roles"
             title={t("ui.actions.roles")}
             hint={role ? t("ui.actions.rolesMine", { role: role.title, free: freeRoles }) : t("ui.actions.rolesNone", { price: game.role_price })}
             onClick={() => setDrawer("roles")}
@@ -256,6 +262,7 @@ export function ActionsPanel({
 
           <DrawerRow
             icon="🌒"
+            data-tutorial="grey"
             title={t("ui.actions.grey")}
             hint={
               greySpent
@@ -286,6 +293,7 @@ export function ActionsPanel({
       <button
         type="button"
         disabled={endTurn.kind !== "ready"}
+        data-tutorial="end-turn"
         onClick={() => act(endTurn)}
         /* Главная кнопка темы — единственная залитая акцентом на всей доске. */
         className="primary-button card-serif rounded-[7px] px-2 py-2.5 text-center text-[16px]

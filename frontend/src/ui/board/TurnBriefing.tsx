@@ -54,10 +54,12 @@ function Segments({ segments }: { segments: LogSegment[] }) {
 }
 
 export function TurnBriefingModal({ briefing, onClose }: { briefing: Briefing | null; onClose: () => void }) {
+  // The hook before the early return: the briefing appears after the first render, and a hook that
+  // only runs once it does changes the hook order between renders.
+  const { t } = useTranslation("game");
   if (!briefing) return null;
 
   const arrow = "→";
-  const { t } = useTranslation("game");
 
   return (
     <Modal

@@ -43,6 +43,11 @@ class JoinRoomRequest(BaseModel):
     seat_token: str = Field(default="", max_length=128)
 
 
+class TutorialRequest(BaseModel):
+    player_name: str = Field(min_length=1, max_length=32)
+    lang: Literal["ru", "en", "cs"] = "ru"
+
+
 class SeatRequest(BaseModel):
     password: str = Field(default="", max_length=128)
     seat_index: int = Field(ge=0, le=MAX_PLAYERS - 1)
@@ -144,6 +149,7 @@ def _admin_room(service: CityRoomService, room: RoomState) -> dict[str, Any]:
         "created_at": room.created_at,
         "max_rounds": room.max_rounds,
         "round": game.round_number if game else None,
+        "tutorial": room.tutorial,
         "seats": seats,
         # Addresses two or more human seats share — one person at several seats, or one household.
         "shared_ips": {ip: names for ip, names in addresses.items() if len(names) > 1},
@@ -173,7 +179,8 @@ def list_rooms(
     limit: int = Query(default=50, ge=1, le=100),
     service: CityRoomService = Depends(get_room_service),
 ) -> list[dict[str, Any]]:
-    return [room.public_summary() for room in service.list_rooms(limit)]
+    # Tutorial tables are private: nobody can join one, so they never reach the list.
+    return [room.public_summary() for room in service.list_rooms(limit) if not room.tutorial]
 
 
 @router.post("/rooms", status_code=status.HTTP_201_CREATED)
@@ -184,6 +191,23 @@ def create_room(
     data = request.model_dump(exclude={"open"})
     room = service.create_room(**data, is_open=request.open)
     return room_view(room)
+
+
+@router.post("/tutorial", status_code=status.HTTP_201_CREATED)
+def create_tutorial(
+    request: TutorialRequest,
+    http: Request,
+    service: CityRoomService = Depends(get_room_service),
+) -> dict[str, Any]:
+    """A private tutorial table, already started, with the player on seat 1 to move first."""
+    room, password = service.create_tutorial(player_name=request.player_name, lang=request.lang, client=_client(http))
+    viewer_id = room.seats[0].player_id
+    legal = service.engine.legal_actions(room.game, viewer_id) if room.game is not None else []
+    return {
+        "password": password,
+        "player_id": viewer_id,
+        "room": room_view(room, viewer_id, legal, _market_prices(service, room, viewer_id)),
+    }
 
 
 @router.get("/rooms/{room_id}")

@@ -12,6 +12,9 @@ import csCatalog from "./locales/cs/catalog.json";
 import ruGame from "./locales/ru/game.json";
 import enGame from "./locales/en/game.json";
 import csGame from "./locales/cs/game.json";
+import ruTutorial from "./locales/ru/tutorial.json";
+import enTutorial from "./locales/en/tutorial.json";
+import csTutorial from "./locales/cs/tutorial.json";
 
 /* Локализация.
  *
@@ -35,9 +38,9 @@ export const DEFAULT_LANGUAGE: Language = "en";
 const STORAGE_KEY = "city-lang";
 
 export const resources = {
-  ru: { common: ruCommon, home: ruHome, catalog: ruCatalog, game: ruGame },
-  en: { common: enCommon, home: enHome, catalog: enCatalog, game: enGame },
-  cs: { common: csCommon, home: csHome, catalog: csCatalog, game: csGame },
+  ru: { common: ruCommon, home: ruHome, catalog: ruCatalog, game: ruGame, tutorial: ruTutorial },
+  en: { common: enCommon, home: enHome, catalog: enCatalog, game: enGame, tutorial: enTutorial },
+  cs: { common: csCommon, home: csHome, catalog: csCatalog, game: csGame, tutorial: csTutorial },
 } as const;
 
 const isLanguage = (value: string | null | undefined): value is Language =>
@@ -69,7 +72,7 @@ void i18next.use(initReactI18next).init({
   resources,
   lng: detectLanguage(),
   fallbackLng: ["en", "ru"],
-  ns: ["common", "home", "catalog", "game"],
+  ns: ["common", "home", "catalog", "game", "tutorial"],
   defaultNS: "common",
   interpolation: { escapeValue: false },
   returnNull: false,

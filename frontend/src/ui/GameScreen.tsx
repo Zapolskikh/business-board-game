@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { errorText } from "../i18n/errors";
-import { useState } from "react";
-import type { CityMeta } from "../online/types";
+import { useState, type ReactNode } from "react";
+import type { CityMeta, LegalAction } from "../online/types";
 import { Board } from "./board/Board";
 import { GameQueryProvider, GameSession, createGameQueryClient, useRoom } from "./lib/session";
 import "./theme.css";
@@ -16,6 +16,8 @@ export function GameScreen({
   meta,
   onExit,
   adminToken,
+  allowAction,
+  overlay,
 }: {
   roomId: string;
   password: string;
@@ -24,13 +26,25 @@ export function GameScreen({
   onExit: () => void;
   /** Режим наблюдателя-админа: состояние читается по токену, действий нет. */
   adminToken?: string;
+  /** Обучение: какие действия сейчас можно нажать. */
+  allowAction?: (action: LegalAction) => boolean;
+  /** Обучение: слой подсказок поверх доски, внутри той же сессии. */
+  overlay?: ReactNode;
 }) {
   const [client] = useState(createGameQueryClient);
 
   return (
     <GameQueryProvider client={client}>
-      <GameSession roomId={roomId} password={password} playerId={playerId} meta={meta} adminToken={adminToken}>
+      <GameSession
+        roomId={roomId}
+        password={password}
+        playerId={playerId}
+        meta={meta}
+        adminToken={adminToken}
+        allowAction={allowAction}
+      >
         <Gate onExit={onExit} />
+        {overlay}
       </GameSession>
     </GameQueryProvider>
   );

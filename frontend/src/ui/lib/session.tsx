@@ -26,6 +26,8 @@ interface SessionIdentity {
   meta: CityMeta;
   /** Админ смотрит партию глазами любого места: только чтение, без пароля комнаты. */
   adminToken?: string;
+  /** Обучение пропускает на доску только действие текущего шага: остальные кнопки гаснут сами. */
+  allowAction?: (action: LegalAction) => boolean;
 }
 
 const SessionContext = createContext<SessionIdentity | null>(null);
@@ -53,7 +55,7 @@ export function createGameQueryClient(): QueryClient {
 export function GameSession({ children, ...identity }: SessionIdentity & { children: ReactNode }) {
   const value = useMemo(
     () => identity,
-    [identity.roomId, identity.password, identity.playerId, identity.meta, identity.adminToken],
+    [identity.roomId, identity.password, identity.playerId, identity.meta, identity.adminToken, identity.allowAction],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
@@ -104,7 +106,9 @@ export function useMe(): PlayerState {
 
 /** Разрешённые действия считает движок. Клиент их только читает — никогда не выводит сам. */
 export function useLegalActions(): LegalAction[] {
-  return useRoom().data?.legal_actions ?? [];
+  const legal = useRoom().data?.legal_actions ?? [];
+  const { allowAction } = useSession();
+  return useMemo(() => (allowAction ? legal.filter(allowAction) : legal), [legal, allowAction]);
 }
 
 export interface CommandHandle {

@@ -103,6 +103,9 @@ class RoomState:
     # browser at the join, and the last ones a command came from. Never part of a public view — the
     # admin endpoints are the only reader — so players cannot see each other's addresses.
     seat_clients: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # A tutorial table (city_rooms.tutorial): never listed, its bots are extras that only pass, and
+    # its grey operation lands on a prepared face.
+    tutorial: bool = False
 
     def record_client(self, player_id: str, client: ClientInfo | None, *, joined: bool = False) -> None:
         if client is None:
@@ -159,6 +162,7 @@ class RoomState:
             "owner_token_hash": self.owner_token_hash,
             "seat_token_hashes": dict(self.seat_token_hashes),
             "seat_clients": {key: dict(value) for key, value in self.seat_clients.items()},
+            "tutorial": self.tutorial,
         }
 
     @classmethod
@@ -179,6 +183,7 @@ class RoomState:
             owner_token_hash=str(data.get("owner_token_hash", "")),
             seat_token_hashes={str(key): str(value) for key, value in (data.get("seat_token_hashes") or {}).items()},
             seat_clients={str(key): dict(value) for key, value in (data.get("seat_clients") or {}).items()},
+            tutorial=bool(data.get("tutorial", False)),
         )
         state.validate()
         return state
