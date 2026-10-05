@@ -85,6 +85,7 @@ export function ActionButton({
   tone = "plain",
   spent,
   tutorial,
+  hint,
 }: {
   label: string;
   cost: ReactNode;
@@ -95,6 +96,8 @@ export function ActionButton({
   spent?: boolean;
   /** Метка, по которой обучение подсвечивает кнопку. */
   tutorial?: string;
+  /** Что кнопка делает — всплывает при наведении. Причина блокировки дописывается следом. */
+  hint?: string;
 }) {
   const ready = state.kind === "ready";
   const status = spent ? "spent" : state.kind;
@@ -106,7 +109,7 @@ export function ActionButton({
       data-tutorial={tutorial}
       disabled={!ready}
       onClick={onClick}
-      title={state.kind === "blocked" ? state.reason : undefined}
+      title={[hint, state.kind === "blocked" ? state.reason : undefined].filter(Boolean).join("\n\n") || undefined}
       className={`grid min-w-0 gap-0.5 rounded-md border border-line bg-panel-2 px-2 py-1.5
         data-[state=ready]:border-line-2 enabled:hover:border-accent enabled:hover:bg-panel-3
         data-[state=blocked]:opacity-35

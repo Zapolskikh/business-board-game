@@ -41,6 +41,13 @@ export function Projects({
   /* Чьё вето стоит на проекте с точки зрения зрителя. Правило считает движок — вето просто
    * не появится в legal_actions, — но карточка обязана сказать почему, иначе проект выглядит
    * недоступным без причины. */
+  /** Кто держит вето на проекте — для пояснения в окне карточки. */
+  function vetoHolder(state: GameState, viewerId: string, projectId: string): { name: string; mine: boolean } | undefined {
+    const owner = state.project_veto?.[projectId];
+    if (!owner) return undefined;
+    return { name: state.players.find(player => player.id === owner)?.name ?? owner, mine: owner === viewerId };
+  }
+
   function vetoOf(state: GameState, viewerId: string, projectId: string): "mine" | "theirs" | undefined {
     const owner = state.project_veto?.[projectId];
     if (!owner) return undefined;
@@ -152,6 +159,7 @@ export function Projects({
                           action.payload.project_id === project.id,
                       )}
                       onVeto={onAction}
+                      vetoBy={vetoHolder(game, context.me.id, project.id)}
                     />
                   }
                 >
@@ -361,6 +369,7 @@ function ProjectDetails({
   onTake,
   veto,
   onVeto,
+  vetoBy,
 }: {
   project: ProjectMeta;
   meta: CityMeta;
@@ -371,6 +380,8 @@ function ProjectDetails({
   /** Вето политика на этот проект, если движок его сейчас разрешает. */
   veto?: LegalAction;
   onVeto: (action: LegalAction) => void;
+  /** Чьё вето уже стоит на проекте. Плашка на лице говорит «вето», окно объясняет, что оно значит. */
+  vetoBy?: { name: string; mine: boolean };
 }) {
   const { t } = useTranslation("game");
   return (
@@ -400,6 +411,17 @@ function ProjectDetails({
         <p className="mb-2">
           <strong>{t("ui.projects.perk")}</strong> <ResourceText>{projectPerkText(project)}</ResourceText>
         </p>
+        {vetoBy && (
+          <section
+            data-ui="project-veto-info"
+            className={`mb-2 rounded-md border px-2 py-1.5 ${
+              vetoBy.mine ? "border-[#2f6b4a] bg-[#1d3b2a] text-[#a8e8c2]" : "border-[#6b3a41] bg-[#2a171b] text-[#ffc2cc]"
+            }`}
+          >
+            <p className="mb-0.5 font-semibold">{t("ui.projects.vetoInfoTitle")}</p>
+            <p>{vetoBy.mine ? t("ui.projects.vetoInfoMine") : t("ui.projects.vetoInfo", { name: vetoBy.name })}</p>
+          </section>
+        )}
         {leaving && <p className="text-gold">{t("ui.projects.leavingNote")}</p>}
         <hr className="my-3 border-line" />
         <p className="mb-2 italic text-ink-muted">

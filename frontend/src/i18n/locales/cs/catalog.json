@@ -16,7 +16,7 @@
     "politician": {
       "title": "Politik",
       "passive": "Podniky ve Vládní čtvrti: +1$. Každý podnik na Sídlišti na stole, i cizí: +1◆ za kolo.",
-      "power": "Urovnat skandál: 1 akce a 2◆ → −1 skandál. Domluvíme se (jednou za tah, bez akce, potřebujete podnik v Šedé zóně): 3◆ — do konce kola se jakákoli čtvrť počítá jako vaše. Veto (jednou za tah, bez akce): projekt na desce můžete vzít jen vy."
+      "power": "Urovnat skandál: 1 akce a 2◆ → −1 skandál. Veto (jednou za tah, bez akce): projekt na desce můžete vzít jen vy."
     },
     "journalist": {
       "title": "Novinář",
@@ -128,7 +128,6 @@
     "tender": { "title": "Městská zakázka", "text": "2$ za každý váš podnik ve vaší největší čtvrti (vybere se sama). Nejvýš (10 + číslo kola)$." },
     "campaign": { "title": "Mediální kampaň", "text": "Utraťte 2$ a získejte 4◆." },
     "upgrade_subsidy": { "title": "Mecenášství", "text": "Zaplaťte 12$ a získejte +4 body do konečného skóre. Místo není potřeba." },
-    "zoning": { "title": "Změna územního plánu", "text": "Do konce kola se vybraná čtvrť počítá, jako byste v ní měli o 1 podnik víc: pro podmínky projektů, šedé kšefty, schopnosti role a synergii. Pasivy role ji nepočítají." },
     "temporary_mandate": { "title": "Městská mozaika", "text": "+1 bod za každou čtvrť, kde máte 2 a více podniků." },
     "mobilization": {"title": "Všechny ruce na palubu", "text": "Získejte hned +1 běžnou akci."},
     "investor_call": { "title": "Jmenný fond", "text": "Zaplaťte 15$ a získejte +5 bodů do konečného skóre. Místo není potřeba." },

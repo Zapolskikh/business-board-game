@@ -366,7 +366,11 @@ def _liquidation(money: float, influence: float, *, turns: int, actions: int, sl
         money -= patronages * PATRONAGE_MONEY
         actions_left -= patronages
 
-        campaigns = min(money / _CAMPAIGN_SPEND, actions_left, lobby_room / _CAMPAIGN_GAIN)
+        # At most one campaign a turn is booked. Uncapped, the ~36 actions left at mid-game let the
+        # forecast pour every future dollar into campaigns at 0.36 a $, so a dollar spent now on
+        # patronage (0.25 a $) looked like a loss and the bot took «Городской заказ» with 70$ in hand.
+        # The turns also go to objects, projects and attacks; one campaign is what is really left.
+        campaigns = min(money / _CAMPAIGN_SPEND, actions_left, lobby_room / _CAMPAIGN_GAIN, turns)
         points += campaigns * _CAMPAIGN_SPEND * CAMPAIGN_RATE
         money -= campaigns * _CAMPAIGN_SPEND
     points += max(0.0, money) * SPARE_MONEY_RATE + influence * SPARE_INFLUENCE_RATE
@@ -379,15 +383,17 @@ def _seat_value(engine: CityEngine, state: GameState, player: PlayerState, turns
     """The role's future powers, the risk of losing it, and the defence a token buys."""
     value = 0.0
     limit = engine.scandal_limit(player)
+    threat = _threat(engine, state, player)
     if player.role:
         held = ROLE_TURN_VALUE.get(player.role, 0.25) * min(turns, ROLE_HORIZON)
-        # One step short of the limit, any rival's scandal costs the seat and its +3.
+        # One step short of the limit, any rival's scandal costs the seat and its +3. With a
+        # journalist or a military at the table that is close to certain: Oracle claimed the
+        # capitalist six times at four scandals in one game and lost it five times within the round.
         room = limit - player.scandals
-        hazard = 0.45 if room <= 1 else 0.15 if room == 2 else 0.0
+        hazard = (0.45 + 0.4 * threat) if room <= 1 else 0.15 if room == 2 else 0.0
         value += held - hazard * (held + 3)
     elif player.scandals >= BASE_SCANDAL_LIMIT:
         value -= 1.0  # cannot even buy a seat until the counter drops
-    threat = _threat(engine, state, player)
     if player.roofs and turns + 1 > 0:
         covered = min(player.roofs, 2)
         value += threat * (2.2 if covered >= 1 else 0) + threat * (0.8 if covered >= 2 else 0)

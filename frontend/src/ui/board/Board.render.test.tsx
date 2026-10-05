@@ -134,6 +134,52 @@ describe("BoardView", () => {
     expect(html).toContain(rival.name);
   });
 
+  it("объясняет чужие метку и серую блокировку в окне карточки рынка", () => {
+    const room = scenarios["Богатый ход"];
+    const game = room.game as GameState;
+    const me = game.players.find(player => player.id === ME) as PlayerState;
+    const rival = game.players.find(player => player.id !== ME) as PlayerState;
+    const assets = new Map(meta.assets.map(asset => [asset.id, asset]));
+    const item = { ...game.market[0], claimed_by: rival.id, locked_by: rival.id, locked_round: 7 };
+    const asset = assets.get(item.card_id)!;
+    const details = text(
+      renderToString(
+        <MarketCardDetails
+          item={item}
+          asset={asset}
+          district={meta.districts.find(district => district.id === asset.district)}
+          me={me}
+          meta={meta}
+          assets={assets}
+          state={marketCardState({ item, asset, game, me, legal: [] })}
+          onBuy={() => {}}
+          onMark={() => {}}
+          playerName={id => game.players.find(player => player.id === id)?.name ?? id}
+        />,
+      ),
+    );
+    expect(details).toContain('data-ui="market-claim-info"');
+    expect(details).toContain('data-ui="market-lock-info"');
+    expect(details).toContain(`${rival.name} поставил метку`);
+    expect(details).toContain("до конца раунда 7");
+  });
+
+  it("на кнопке чистки Мафиози — цена и два скандала, а не «−1»", () => {
+    const room = scenarios["Богатый ход"];
+    const game = room.game as GameState;
+    const players = game.players.map(player => (player.id === ME ? { ...player, role: "mafia", scandals: 3 } : player));
+    const me = players.find(player => player.id === ME) as PlayerState;
+    const html = render("Богатый ход", {
+      game: { ...game, players },
+      me,
+      legal: [{ type: "use_role_power", payload: { power: "mafia_cleanup" } }],
+    });
+    expect(html).toContain("🧯 Замять дело");
+    // Цена 3$ и результат −2⚠; символы $ и ⚠ рисуются иконками.
+    expect(html).toMatch(/<span>3<img[^>]*stat-money[^>]*><\/span><\/b> → <span>−2<img[^>]*stat-scandal/);
+    expect(html).not.toContain("−1 ⚠ скандал");
+  });
+
   it("переживает игрока без роли, без карт и без объектов", () => {
     const room = scenarios["Богатый ход"];
     const game = room.game as GameState;

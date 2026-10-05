@@ -338,6 +338,23 @@ def _ready_project(
     return best[1], f"{best[2]} is already met"
 
 
+def _project_influence_gap(engine: CityEngine, state: GameState, player: PlayerState) -> int:
+    """◆ still missing for the cheapest board project whose condition is met and that pays its price."""
+    best: int | None = None
+    for project_id in state.project_board:
+        if state.project_veto.get(project_id) not in (None, player.id):
+            continue
+        project = engine.project(project_id)
+        if not engine.project_requirement_met(player, project):
+            continue
+        influence, money = engine.project_cost(player, project)
+        if project.points <= money * 5 / PATRONAGE_MONEY + influence * 6 / LOBBYING_INFLUENCE:
+            continue
+        gap = max(0, influence - player.influence)
+        best = gap if best is None else min(best, gap)
+    return best or 0
+
+
 def _project(engine: CityEngine, state: GameState, player: PlayerState, offered) -> tuple[dict, str] | None:
     return _ready_project(engine, state, player, offered)
 
@@ -408,6 +425,11 @@ def _fill(engine: CityEngine, state: GameState, player: PlayerState, offered) ->
     wants_lobbying = player.influence < _influence_reserve(engine, state, player) + LOBBYING_INFLUENCE
     if campaign and wants_lobbying and player.money - 5 >= reserve:
         return campaign, "surplus money into influence for lobbying"
+    # A project whose condition the build already meets, short only of influence: the surplus money
+    # buys the missing ◆. Without this the cap above stopped the campaigns at the lobbying reserve,
+    # and Boris ended games on 80-100$ with two projects while the board held met ones.
+    if campaign and _project_influence_gap(engine, state, player) > 0 and player.money - 5 >= reserve:
+        return campaign, "surplus money into influence for a met project"
     work = offered.get(("basic_action", "work"))
     if work:
         return work[0], "work"

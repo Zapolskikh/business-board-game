@@ -2,7 +2,8 @@ import { useTranslation } from "react-i18next";
 import { AnimatePresence, motion } from "motion/react";
 import type { CSSProperties } from "react";
 import { actionCardCost, actionLabel, cardDiscardValue } from "../../online/gameUi";
-import type { ActionMeta, CityMeta, GameState, HeldCard, LegalAction } from "../../online/types";
+import type { ActionMeta, CardEffect, CityMeta, GameState, HeldCard, LegalAction } from "../../online/types";
+import { tr } from "../../i18n";
 import { CardPopover, PopoverBody, PopoverFooter, PopoverHeader } from "../primitives/CardPopover";
 import { ResourceText } from "../primitives/ResourceIcon";
 import { ListItem, Panel, SectionHead } from "../primitives/atoms";
@@ -74,6 +75,7 @@ export function Hand({
             /* Карты, где выбор был формальным, движок решает сам и присылает итог.
              * Сумма на лице карты — чтобы её было видно без открытия поповера. */
             const preview = game.card_previews?.[card.id];
+            const effect = cardEffectText(game.card_effects?.[card.id]);
             return (
               <motion.div
                 key={held.uid}
@@ -116,6 +118,8 @@ export function Hand({
                     <small className="overflow-hidden text-ellipsis whitespace-nowrap text-[11.5px] text-ink-muted">
                       {preview ? (
                         <b className="font-semibold text-money">{t("ui.hand.now", { money: preview.money })}</b>
+                      ) : effect ? (
+                        <b className="font-semibold text-good"><ResourceText>{t("ui.hand.effectNow", { effect })}</ResourceText></b>
                       ) : (
                         <ResourceText>{card.text}</ResourceText>
                       )}
@@ -195,6 +199,11 @@ function HandCardDetails({
               : t("ui.hand.previewNone", { money: game.card_previews[card.id].money })}
           </p>
         )}
+        {cardEffectText(game.card_effects?.[card.id]) && (
+          <p data-ui="hand-card-effect" className="mb-2 font-semibold text-good">
+            <ResourceText>{t("ui.hand.effectNow", { effect: cardEffectText(game.card_effects?.[card.id]) })}</ResourceText>
+          </p>
+        )}
         <p className="mb-2">
           {t("ui.hand.freeStart")}
           <strong>{t("ui.hand.freeStrong")}</strong>
@@ -247,4 +256,23 @@ function HandCardDetails({
       </PopoverFooter>
     </>
   );
+}
+
+/** «+1◆», «+14$», «цель −11$ · вам +10$» — одна строка из превью движка. Пусто, если карта
+ * ничего не изменит (например, «Теневая касса» без объектов Серого сектора: «сейчас даст 0»
+ * тоже ответ, его и печатаем). */
+function cardEffectText(effect: CardEffect | undefined): string {
+  if (!effect) return "";
+  const own: string[] = [];
+  if (effect.money) own.push(`${effect.money > 0 ? "+" : "−"}${Math.abs(effect.money)}$`);
+  if (effect.influence) own.push(`${effect.influence > 0 ? "+" : "−"}${Math.abs(effect.influence)}◆`);
+  if (effect.points) own.push(tr("game", "ui.hand.effectPoints", { count: effect.points }));
+  const targetLoss: string[] = [];
+  if (effect.target_money) targetLoss.push(`−${effect.target_money}$`);
+  if (effect.target_influence) targetLoss.push(`−${effect.target_influence}◆`);
+  if (targetLoss.length > 0) {
+    const target = tr("game", "ui.hand.effectTarget", { loss: targetLoss.join(" ") });
+    return own.length > 0 ? `${target} · ${tr("game", "ui.hand.effectYou", { gain: own.join(" ") })}` : target;
+  }
+  return own.length > 0 ? own.join(" ") : "0";
 }

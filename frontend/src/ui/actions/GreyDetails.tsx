@@ -9,6 +9,7 @@ import type { CityMeta, GameState, GreyTable, GreyTier, LegalAction } from "../.
 import { PopoverBody, PopoverHeader } from "../primitives/CardPopover";
 import { ResourceText } from "../primitives/ResourceIcon";
 import { findActions, usedThisTurn, type ActionContext } from "../lib/actions";
+import { scoreOf, targetStats } from "../lib/powerPreview";
 import type { Indexes } from "../lib/board";
 
 /* Серые операции — бросок кубика. Таблица граней приходит от движка уже посчитанной под игрока
@@ -218,28 +219,102 @@ function OperationBlock({
         <p className="mt-1 text-[11px] text-ink-dim">{t("ui.grey.capNote", { third: t(`ui.grey.third.${table.third as 0 | 1 | 2}`) })}</p>
       )}
 
+      {/* Цели — таблицей с деньгами, влиянием, скандалами, Защитой и очками, как у Рэкета:
+        * без неё состояние соперников приходилось держать в голове или закрывать окно. Эффект по
+        * граням — в таблице выше; что выпадет, решает кубик. */}
+      <GreyTargets
+        game={game}
+        context={context}
+        operationId={operationId}
+        options={options}
+        onAction={onAction}
+      />
       <div className="mt-2 flex flex-wrap gap-2">
         {!available && <span className="text-[12px] text-ink-dim">{reason}</span>}
-        {options.map((action, position) => {
-          const targetId = action.payload.target_id as string | undefined;
-          const target = targetId ? game.players.find(player => player.id === targetId) : undefined;
-          const defended = Boolean(target && (target.roofs ?? 0) > 0);
-          return (
+        {!table.targeted &&
+          options.map((action, position) => (
             <button
               key={`${operationId}-${position}`}
               type="button"
               onClick={() => onAction(action)}
-              title={defended ? t("ui.grey.defended") : undefined}
-              className={`rounded-[7px] border px-3 py-1.5 text-[13px] ${
-                defended ? "border-line-2 text-ink-dim" : "border-primary text-ink hover:bg-panel-3"
-              }`}
+              className="rounded-[7px] border border-primary px-3 py-1.5 text-[13px] text-ink hover:bg-panel-3"
             >
-              {target ? t("ui.grey.runAt", { name: target.name }) : t("ui.grey.run")}
-              {defended && " 🛡"}
+              {t("ui.grey.run")}
             </button>
-          );
-        })}
+          ))}
       </div>
     </section>
+  );
+}
+
+/** Соперники с их состоянием. У адресной операции в строке — кнопка запуска по этой цели,
+ * у массовой — просто список тех, кого она заденет. */
+function GreyTargets({
+  game,
+  context,
+  operationId,
+  options,
+  onAction,
+}: {
+  game: GameState;
+  context: ActionContext;
+  operationId: string;
+  options: LegalAction[];
+  onAction: (action: LegalAction) => void;
+}) {
+  const { t } = useTranslation("game");
+  const byTarget = new Map(
+    options
+      .filter(action => action.payload.target_id !== undefined)
+      .map(action => [String(action.payload.target_id), action]),
+  );
+  const rivals = game.players.filter(player => player.id !== context.me.id);
+  // «Пробить защиту» как раз снимает Защиту — у неё Защита ничего не гасит.
+  const roofBlocks = operationId !== "roof_break";
+  return (
+    <table data-ui="grey-targets" className="mt-2 w-full border-collapse text-left text-xs">
+      <thead>
+        <tr className="text-3xs uppercase tracking-[0.06em] text-ink-dim">
+          <th className="px-1.5 pb-1 font-semibold">{t("ui.grey.targetsTitle")}</th>
+          <th className="px-1.5 pb-1 font-semibold">{t("ui.grey.targetsState")}</th>
+          <th className="px-1.5 pb-1 text-right font-semibold">{t("ui.grey.targetsScore")}</th>
+          {byTarget.size > 0 && <th className="pb-1" />}
+        </tr>
+      </thead>
+      <tbody>
+        {rivals.map(target => {
+          const action = byTarget.get(target.id);
+          const defended = roofBlocks && (target.roofs ?? 0) > 0;
+          return (
+            <tr key={target.id} className="border-t border-line align-middle">
+              <td className="px-1.5 py-1.5 font-semibold text-ink">{target.name}</td>
+              <td className="px-1.5 py-1.5 text-ink-muted">
+                <ResourceText>{targetStats(target, undefined, roofBlocks)}</ResourceText>
+              </td>
+              <td className="px-1.5 py-1.5 text-right tabular-nums text-points">
+                {t("ui.actions.pts", { count: scoreOf(game, target.id) })}
+              </td>
+              {byTarget.size > 0 && (
+                <td className="py-1.5 pl-1 text-right">
+                  {action && (
+                    <button
+                      type="button"
+                      onClick={() => onAction(action)}
+                      title={defended ? t("ui.grey.defended") : undefined}
+                      className={`rounded-md border px-2 py-1 font-semibold ${
+                        defended ? "border-line-2 text-ink-dim" : "border-primary text-ink hover:bg-panel-3"
+                      }`}
+                    >
+                      {t("ui.grey.runAt", { name: target.name })}
+                      {defended && " 🛡"}
+                    </button>
+                  )}
+                </td>
+              )}
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }

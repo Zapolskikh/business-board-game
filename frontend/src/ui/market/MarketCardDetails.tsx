@@ -32,6 +32,7 @@ export function MarketCardDetails({
   mark,
   onMark,
   refresh,
+  playerName,
 }: {
   item: MarketAsset;
   asset: AssetMeta;
@@ -44,6 +45,8 @@ export function MarketCardDetails({
   mark?: LegalAction;
   onMark: (action: LegalAction) => void;
   refresh?: LegalAction;
+  /** Имя игрока по id — для пояснения чужих меток. Без него печатается id. */
+  playerName?: (id: string) => string;
 }) {
   const owned = district ? districtCount(me, district.id, assets) : 0;
   const points = assetPoints(asset);
@@ -146,6 +149,31 @@ export function MarketCardDetails({
           </section>
         )}
 
+        {/* Плашка на лице только называет метку; что она значит — здесь, словами. Новичок видит
+          * чужую метку и по нажатию узнаёт, что карта работает на другого и кто может её купить. */}
+        {item.claimed_by && (
+          <MarkInfo
+            ui="market-claim-info"
+            title={t("ui.market.claimInfoTitle")}
+            text={
+              item.claimed_by === me.id
+                ? t("ui.market.claimInfoMine")
+                : t("ui.market.claimInfo", { name: playerName?.(item.claimed_by) ?? item.claimed_by })
+            }
+          />
+        )}
+        {item.locked_by && (
+          <MarkInfo
+            ui="market-lock-info"
+            title={t("ui.market.lockInfoTitle")}
+            text={
+              item.locked_by === me.id
+                ? t("ui.market.lockInfoMine", { round: item.locked_round })
+                : t("ui.market.lockInfo", { name: playerName?.(item.locked_by) ?? item.locked_by, round: item.locked_round })
+            }
+          />
+        )}
+
         {item.leaving && (
           <p className="flex items-start gap-1.5 font-semibold text-[var(--color-warning)]">
             <span aria-hidden="true" className="text-lg leading-none">⏳</span>
@@ -205,5 +233,14 @@ function YieldValue({ value, sign }: { value: { money: number; influence: number
         </span>
       )}
     </>
+  );
+}
+
+function MarkInfo({ ui, title, text }: { ui: string; title: string; text: string }) {
+  return (
+    <section data-ui={ui} className="mb-2 rounded-md border border-line-2 bg-panel-2 px-2 py-1.5">
+      <p className="mb-0.5 font-semibold text-ink">{title}</p>
+      <p className="text-ink-muted">{text}</p>
+    </section>
   );
 }

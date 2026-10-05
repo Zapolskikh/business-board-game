@@ -52,12 +52,6 @@ const roles: Record<string, RoleGuide> = {
     powers: [
       { name: "Urovnat skandál", cost: "1 akce a 2◆", limit: "lze opakovat", effect: "Smažte 1 svůj skandál." },
       {
-        name: "Domluvíme se",
-        cost: "3◆, bez akce; potřebujete svůj podnik v Šedé zóně",
-        limit: "jednou za tah",
-        effect: "Získáte pronájem libovolné čtvrti (viz „Pronájem čtvrti“).",
-      },
-      {
         name: "Veto",
         cost: "bez akce",
         limit: "jednou za tah; veto může být jen jedno",
@@ -95,7 +89,7 @@ const roles: Record<string, RoleGuide> = {
         name: "Kryptopodvod",
         cost: "1 akce; potřebujete svou „Městskou kryptoburzu“",
         limit: "jednou za tah",
-        effect: "Vezměte 25 % peněz každému soupeři. Dostanete 3 skandály. Účinky, které snižují skandály ze šedých kšeftů, snižují i tyto.",
+        effect: "Vezměte 25 % peněz každému soupeři. Dostanete 3 skandály. Je to schopnost role, ne šedý kšeft: účinky, které snižují skandály ze šedých kšeftů, tyto nesnižují.",
       },
     ],
   },
@@ -112,7 +106,7 @@ const roles: Record<string, RoleGuide> = {
         name: "Výpalné",
         cost: "1 akce",
         limit: "jednou za tah",
-        effect: "Vyberte soupeře. Dá vám peníze: 3$, další 2$ za každý váš podnik v Šedé zóně a číslo kola děleno 3. Pokud je cíl lídr, přidejte ještě 5$. Cíl vám navíc dá 1◆ za každý váš podnik ve Vládní čtvrti. Cíl nemůže dát víc, než má. Pokud nemáte podnik ve Vládní čtvrti, dostanete 1 skandál.",
+        effect: "Vyberte soupeře. Dá vám peníze: 3$, další 2$ za každý váš podnik v Šedé zóně a číslo kola děleno 3. Pokud je cíl lídr, přidejte ještě 5$. Cíl vám navíc vždy dá vliv: 1◆, k tomu číslo kola děleno 5 a ještě 1◆ za každý váš podnik ve Vládní čtvrti. Cíl nemůže dát víc, než má. Pokud nemáte podnik ve Vládní čtvrti, dostanete 1 skandál.",
       },
       {
         name: "Ututlat",
@@ -241,8 +235,6 @@ export function bookCs(ctx: RulesContext): RulesChapter[] {
         <li><b>2–3 podniky</b> ve čtvrti: každý dává +1$.</li>
         <li><b>4 podniky a víc</b>: každý dává +2$. Taková čtvrť je <b>plná</b>: epické a legendární podniky plné čtvrti dávají ještě +1◆ na konci každého kola.</li>
       </ul>
-      <h3>Pronájem čtvrti</h3>
-      <p>Některé účinky dávají <b>pronájem čtvrti</b>: do konce kola se vybraná čtvrť počítá, jako byste v ní měli o 1 podnik víc. Pronájem platí pro synergii, podmínky projektů, šedé kšefty a schopnosti rolí. Trvalé bonusy rolí ho nevidí — počítají jen skutečné podniky. Pronájem může být jen jeden: nový nahrazuje starý.</p>
       <h3>Štítky a vzácnost</h3>
       <p>Každá karta podniku má <b>štítky</b>: ${["finance", "data", "logistics", "production"].map(tag => `„${ctx.e(ctx.tag(tag))}“`).join(", ")} a další. Kontrolují je podmínky mnoha projektů.</p>
       <p><b>Vzácnost</b> určuje cenu podniku a kolo, od kterého se objevuje na trhu:</p>
@@ -296,7 +288,7 @@ export function bookCs(ctx: RulesContext): RulesChapter[] {
         <li>${n.rotation} podniky, které jsou na trhu nejdéle (označené ⏳), odejdou ze stolu a jejich místa zaplní nové z balíčku. Staré podniky jdou do odhozu.</li>
         <li>Projekt úplně vlevo (označený ⏳) jde na spodek balíčku projektů. Ostatní projekty se posunou o místo doleva a jako poslední se přidá nový projekt z balíčku.</li>
       </ol>
-      <p><b>Balíček trhu.</b> Do ${lateRound}. kola vycházejí podniky z balíčku popořadě — od obyčejných k legendárním, jak se otevírá jejich vzácnost. Od ${lateRound}. kola, kdy jsou otevřené všechny vzácnosti, vycházejí vzácné, epické a legendární karty z balíčku pořád první a ostatní místa zaplní náhodná karta z balíčku a odhozu. Čím vzácnější karta, tím větší šance, že padne: obyčejné a neobvyklé podniky jsou na konci hry jen výplň.</p>
+      <p><b>Balíček trhu.</b> Do ${lateRound}. kola vycházejí podniky z balíčku popořadě — od obyčejných k legendárním, jak se otevírá jejich vzácnost. Od ${lateRound}. kola, kdy jsou otevřené všechny vzácnosti, vycházejí vzácné, epické a legendární karty z balíčku pořád první a ostatní místa zaplní náhodná karta z balíčku a odhozu. Čím vzácnější karta, tím větší šance, že padne: obyčejné a neobvyklé podniky jsou na konci hry jen výplň. Při jednom rozdání vyjdou nejvýš dva legendární podniky.</p>
       <div class="warn"><b>Po posledním kole se příjem nevyplácí.</b> Všechno, co byste vydělali na konci posledního kola, je nula, takže peníze a vliv utraťte během posledního kola.</div>
       `,
     },
@@ -342,7 +334,7 @@ export function bookCs(ctx: RulesContext): RulesChapter[] {
         <li><b>6 skandálů:</b> zatčení.</li>
       </ul>
       <h3>Zatčení</h3>
-      <p>Při zatčení klesnou vaše skandály na 3 a přijdete o roli a o 1 Ochranu. V příštím tahu budete mít jen 1 akci. Pokud vás zatknou ve vašem tahu, tah hned skončí.</p>
+      <p>Při zatčení klesnou vaše skandály na 0 a přijdete o roli a o 1 Ochranu. V příštím tahu budete mít jen 1 akci. Pokud vás zatknou ve vašem tahu, tah hned skončí.</p>
       <h3>Jak se zbavit skandálů</h3>
       <p><b>Krizové PR</b> může použít každý: 1 akce a ${n.crisisPr}◆ smažou 1 skandál. Můžete ho opakovat, dokud máte akce a vliv. Další způsoby dávají role, karty akcí, podniky a projekty — je to na nich napsané. Ve hře najdete všechny své možnosti pod tlačítkem „Čištění“.</p>
       <p>Pokud nemáte roli, na začátku každého vašeho tahu sám zmizí 1 skandál.</p>
@@ -471,7 +463,6 @@ export function bookCs(ctx: RulesContext): RulesChapter[] {
           <tr><td class="name"><b>Místo</b></td><td>Místo pro jeden podnik. Na začátku 3, nejvýš 6.</td></tr>
           <tr><td class="name"><b>Ochrana</b></td><td>Ochrana🛡 před jedním úderem soupeře. Viz „Ochrana“.</td></tr>
           <tr><td class="name"><b>Plná čtvrť</b></td><td>Čtvrť, kde máte 4 podniky a víc.</td></tr>
-          <tr><td class="name"><b>Pronájem čtvrti</b></td><td>Do konce kola se čtvrť počítá, jako byste v ní měli o 1 podnik víc. Viz „Pronájem čtvrti“.</td></tr>
           <tr><td class="name"><b>Synergie</b></td><td>Příplatek k příjmu za 2 a víc podniků v jedné čtvrti.</td></tr>
         </tbody>
       </table>

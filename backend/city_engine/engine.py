@@ -37,6 +37,7 @@ from city_engine.constants import (
     JOURNALIST_INFLATE_INFLUENCE,
     JOURNALIST_SCANDAL_LIMIT,
     LATE_FILLER_RARITIES,
+    LEGENDARIES_PER_REFILL,
     LOBBYING_INFLUENCE,
     LOBBYING_POINTS,
     MAFIA_CLAIM_ROOFS,
@@ -49,12 +50,13 @@ from city_engine.constants import (
     PATRONAGE_MONEY,
     PATRONAGE_POINTS,
     POINTS_CARD_RATE,
-    POLITICIAN_DEAL_INFLUENCE,
     POLITICIAN_VETO_INFLUENCE,
     PROJECT_BOARD_SIZE,
     PROJECT_REROLL_MONEY,
     PUBLICATION_SCANDALS,
     RACKET_BASE,
+    RACKET_INFLUENCE_BASE,
+    RACKET_INFLUENCE_ROUND_STEP,
     RACKET_LEADER_BONUS,
     ROLE_IDS,
     SANCTION_INFLUENCE_TIER,
@@ -293,15 +295,6 @@ class CityEngine:
                     for target in state.players
                     if target.id != actor_id or card.self_target
                 )
-            elif card.kind == "zoning":
-                candidates.extend(
-                    Command(
-                        type="play_action_card",
-                        actor_id=actor_id,
-                        payload={"card_uid": held.uid, "district": district},
-                    )
-                    for district in DISTRICT_IDS
-                )
             elif card.kind == "project":
                 candidates.extend(
                     Command(
@@ -363,14 +356,6 @@ class CityEngine:
                     actor_id=actor_id,
                     payload={"power": "politician_cleanup"},
                 )
-            )
-            candidates.extend(
-                Command(
-                    type="use_role_power",
-                    actor_id=actor_id,
-                    payload={"power": "politician_deal", "district": district},
-                )
-                for district in DISTRICT_IDS
             )
             candidates.extend(
                 Command(
@@ -648,16 +633,13 @@ class CityEngine:
     def district_count(self, player: PlayerState, district: str) -> int:
         """Everything that makes the player present in a district.
 
-        Three sources, all public: objects standing in their city, the district «Зонирование»
-        rents them for the round, and the market card the capitalist has marked. This is the
-        number every gate reads — project conditions, grey unlocks, object synergy — so a mark
-        opens exactly what a purchase would have opened.
+        Two sources, both public: objects standing in their city and the market card the
+        capitalist has marked. This is the number every gate reads — project conditions, grey
+        unlocks, object synergy — so a mark opens exactly what a purchase would have opened.
+        (The rented district of «Зонирование» and «Договоримся» is gone since 1.20.0; the snapshot
+        field ``zoning_district`` stays for old saves and is never set.)
         """
-        return (
-            self.owned_district_count(player, district)
-            + int(player.zoning_district == district)
-            + int(self.marked_district(player) == district)
-        )
+        return self.owned_district_count(player, district) + int(self.marked_district(player) == district)
 
     def marked_district(self, player: PlayerState) -> str | None:
         """The district of the capitalist's marked card, if there is one."""
@@ -1329,14 +1311,6 @@ class CityEngine:
             raise IllegalActionError("the card pays per administrative object and there is none")
         if card.kind == "grey_roll" and self._flag(state, GREY_OPERATION_FLAG):
             raise IllegalActionError("the grey operation of this turn has already been run")
-        if card.kind == "zoning":
-            district = self._payload_string(command, "district")
-            if district not in DISTRICT_IDS:
-                raise InvalidCommandError(f"unknown district: {district}")
-            # «Зонирование» opens a district the player does not have; requiring them to own one
-            # already made it a multiplier on a quarter they had rather than a way into a new one,
-            # which is the only reason to play it: a government project, a grey operation, or the
-            # synergy step that needs one more object.
         if card.kind == "district_cash" and self.best_cash_district(player) is None:
             raise IllegalActionError("the card pays per owned object and there is none")
         if card.kind == "market_discount" and (len(player.assets) >= player.capacity or not state.market):
@@ -1413,8 +1387,6 @@ class CityEngine:
             player.influence += card.value
         elif kind == "market_discount":
             state.turn_flags["market_discount"] = card.value
-        elif kind == "zoning":
-            player.zoning_district = str(command.payload["district"])
         elif kind == "buy_points":
             # The one sink that does not need a slot, which is why it exists at all.
             player.money -= card.value * POINTS_CARD_RATE
@@ -1489,6 +1461,47 @@ class CityEngine:
             )
         else:
             raise InvalidCommandError(f"unsupported non-targeted card kind: {kind}")
+
+    # Cards whose payout depends on the table — the round, the player's districts, their standing.
+    # A fixed card says its number in its text; these could only be priced by playing them.
+    STATE_DEPENDENT_SELF_CARDS = frozenset(
+        {"grant", "shadow_cash", "government_influence", "popular_support", "district_points"}
+    )
+    STATE_DEPENDENT_TARGETED_CARDS = frozenset({"fine", "steal", "mixed_fine", "inspection_fine"})
+
+    def card_play_preview(self, state: GameState, player: PlayerState, card_id: str) -> dict[str, int] | None:
+        """What playing this card would move right now, computed by the play code itself on a copy.
+
+        Self cards report the player's own deltas. Targeted cards report the nominal hit — what a
+        target with deep pockets and no Защита would lose, and what the player would gain — since
+        the real figure is clamped by whoever is picked. ``None`` for cards whose effect is printed.
+        """
+        card = self.action_card(card_id)
+        if card.kind not in self.STATE_DEPENDENT_SELF_CARDS | self.STATE_DEPENDENT_TARGETED_CARDS:
+            return None
+        trial = state.clone()
+        me = trial.player_by_id(player.id)
+        before = (me.money, me.influence, me.bonus_points)
+        if card.kind in self.STATE_DEPENDENT_SELF_CARDS:
+            self._apply_self_card_effect(trial, me, card, Command(type="play_action_card", actor_id=me.id, payload={}))
+            return {
+                "money": me.money - before[0],
+                "influence": me.influence - before[1],
+                "points": me.bonus_points - before[2],
+            }
+        rival = next((other for other in trial.players if other.id != me.id), None)
+        if rival is None:
+            return None
+        rival.money, rival.influence, rival.roofs = 999, 99, 0
+        self._apply_attacker_card_bonus(trial, me, rival, card)
+        self._apply_targeted_card_effect(trial, me, rival, card)
+        return {
+            "money": me.money - before[0],
+            "influence": me.influence - before[1],
+            "points": me.bonus_points - before[2],
+            "target_money": 999 - rival.money,
+            "target_influence": 99 - rival.influence,
+        }
 
     def _apply_attacker_card_bonus(
         self,
@@ -1638,8 +1651,6 @@ class CityEngine:
             self._capitalist_claim(state, command)
         elif power == "mafia_lock":
             self._mafia_lock(state, command)
-        elif power == "politician_deal":
-            self._politician_deal(state, command)
         elif power == "politician_veto":
             self._politician_veto(state, command)
         elif power == "fraudster_cleanup":
@@ -1668,6 +1679,28 @@ class CityEngine:
             raise IllegalActionError("this power has already been used this turn")
         self._mark_flag(state, key)
 
+    def racket_demand(self, state: GameState, player: PlayerState, target: PlayerState) -> tuple[int, int]:
+        """What the racket asks of this target before it is clamped by what they hold: ($, ◆).
+
+        Money hangs off the Серый сектор the role lives in, plus a slow drift with the round and a
+        surcharge on the leader. Influence is taken always since 1.20.0 — a flat part that grows
+        with the round, plus one per own administrative object. Money alone was the resource every
+        seat had too much of by mid-game; influence is what actually slows a rival down.
+        """
+        leader = self.ranking(state)[0].id == target.id
+        money = (
+            RACKET_BASE
+            + 2 * self.district_count(player, "shadows")
+            + floor(state.round_number / 3)
+            + (RACKET_LEADER_BONUS if leader else 0)
+        )
+        influence = (
+            RACKET_INFLUENCE_BASE
+            + floor(state.round_number / RACKET_INFLUENCE_ROUND_STEP)
+            + self.district_count(player, "government")
+        )
+        return money, influence
+
     def _mafia_racket(self, state: GameState, command: Command) -> None:
         player = state.current_player
         self._require_role(player, "mafia")
@@ -1680,19 +1713,7 @@ class CityEngine:
         if target.roofs > 0:
             target.roofs -= 1
             return
-        leader = self.ranking(state)[0].id == target.id
-        # Both halves of the demand hang off districts, which is the point of the role: money
-        # from the Серый сектор it lives in, influence from the Административный квартал its cleanup
-        # already pushes it toward. Housing is deliberately not counted: it belongs to no part of
-        # this role, and a demand that grows with the round alone rewards the calendar instead of
-        # the tableau.
-        money_demand = (
-            RACKET_BASE
-            + 2 * self.district_count(player, "shadows")
-            + floor(state.round_number / 3)
-            + (RACKET_LEADER_BONUS if leader else 0)
-        )
-        influence_demand = self.district_count(player, "government")
+        money_demand, influence_demand = self.racket_demand(state, player, target)
         money = min(money_demand, target.money)
         influence = min(influence_demand, target.influence)
         target.money -= money
@@ -1873,28 +1894,6 @@ class CityEngine:
             until_round=item.locked_round,
         )
 
-    def _politician_deal(self, state: GameState, command: Command) -> None:
-        """«Договоримся»: rent a district for the round, the way «Зонирование» does.
-
-        Costs no action — the politician's ordinary turn is already spent on projects — but it
-        does cost the two things the role has to weigh: three influence and a scandal. The Серый
-        сектор is the gate: the deal is struck there, and a clean politician cannot strike it.
-        """
-        player = state.current_player
-        self._require_role(player, "politician")
-        self._once_per_turn(state, "politician_deal")
-        if self.district_count(player, "shadows") < 1:
-            raise IllegalActionError("the deal requires a shadows object")
-        if player.influence < POLITICIAN_DEAL_INFLUENCE:
-            raise IllegalActionError(f"the deal requires {POLITICIAN_DEAL_INFLUENCE} influence")
-        district = self._payload_string(command, "district")
-        if district not in DISTRICT_IDS:
-            raise InvalidCommandError(f"unknown district: {district}")
-        player.influence -= POLITICIAN_DEAL_INFLUENCE
-        player.zoning_district = district
-        # No scandal since 1.19.0: with it the deal lost 3.0 points against the table in the forks.
-        state.append_event("zoning_set", player.id, district=district, source="politician_deal")
-
     def _politician_veto(self, state: GameState, command: Command) -> None:
         """Veto a project: nobody but the politician may take it while the mark stands.
 
@@ -2003,7 +2002,9 @@ class CityEngine:
             target.money -= taken
             gained += taken
         player.money += gained
-        self.add_scandal(state, player, max(0, CRYPTO_SCAM_SCANDALS - self.grey_scandal_reduction(player)))
+        # The role's own power, not a grey operation: «−1 скандал от серых операций» on objects and
+        # projects does not reach it (1.20.0). With the cut the scam cost one scandal instead of three.
+        self.add_scandal(state, player, CRYPTO_SCAM_SCANDALS)
 
     # An operation is gated on a district, not on one exact card out of 71 that also has to hold
     # one of the six slots. A card-shaped gate is a gate nobody opens; compare the racket, which
@@ -2323,7 +2324,9 @@ class CityEngine:
         jailed = next_value >= limit + 1
         player.role = None
         if jailed:
-            player.scandals = 3
+            # A clean slate (1.20.0). At 3 the arrested player woke up with one action and no
+            # Защита, and a journalist could put them back in with two presses, turn after turn.
+            player.scandals = 0
             player.roofs = max(0, player.roofs - 1)
             player.jail_turns = 1
         else:
@@ -2503,11 +2506,18 @@ class CityEngine:
         """
         drawn: list[str] = []
         late = state.round_number >= max(self.catalog.rarity_min_round.values())
+
+        def legendary_room() -> bool:
+            # Legendaries come out a few a refill rather than as a wave (LEGENDARIES_PER_REFILL).
+            return sum(1 for card_id in drawn if self.asset(card_id).rarity == "legendary") < LEGENDARIES_PER_REFILL
+
         remaining: list[str] = []
         for card_id in state.market_deck:
             in_order = self._rarity_open(state, card_id) and (
                 not late or self.asset(card_id).rarity not in LATE_FILLER_RARITIES
             )
+            if in_order and self.asset(card_id).rarity == "legendary" and not legendary_room():
+                in_order = False
             if len(drawn) < needed and in_order:
                 drawn.append(card_id)
             else:
@@ -2515,11 +2525,12 @@ class CityEngine:
         state.market_deck = remaining
         rng = GameRNG(state.rng)
         while len(drawn) < needed:
+            room = legendary_room()
             pool = [
                 (source, card_id)
                 for source in (state.market_deck, state.market_discard)
                 for card_id in source
-                if self._rarity_open(state, card_id)
+                if self._rarity_open(state, card_id) and (room or self.asset(card_id).rarity != "legendary")
             ]
             if not pool:
                 break
@@ -2621,7 +2632,6 @@ class CityEngine:
             )
             player.influence += sum(influence_sources[player.id].values())
             player.debt = 0
-            player.zoning_district = None
             player.scandal_gained_this_round = 0
         state.append_event(
             "round_settled",
@@ -2938,7 +2948,7 @@ class CityEngine:
     # powers the engine does not implement.
     ROLE_POWERS = {
         "capitalist": ("capitalist_claim",),
-        "politician": ("politician_cleanup", "politician_deal", "politician_veto"),
+        "politician": ("politician_cleanup", "politician_veto"),
         "journalist": ("journalist_inflate", "journalist_publish"),
         "fraudster": ("fraudster_cleanup", "fraudster_crypto_scam"),
         "mafia": ("mafia_racket", "mafia_cleanup", "mafia_lock"),
@@ -2951,7 +2961,6 @@ class CityEngine:
         {
             "journalist_inflate",
             "journalist_publish",
-            "politician_deal",
             "politician_veto",
             "mafia_racket",
             "mafia_lock",
@@ -2965,7 +2974,6 @@ class CityEngine:
     # whole point of those three, so it cannot be left to a client-side guess.
     POWER_SPENDS_ACTION = {
         "journalist_inflate": False,
-        "politician_deal": False,
         "politician_veto": False,
         "mafia_lock": False,
     }
@@ -2992,16 +3000,10 @@ class CityEngine:
         blocked = target.roofs > 0 and self.POWER_BLOCKED_BY_ROOF.get(power, True)
         preview: dict[str, Any] = {"power": power, "target_id": target.id, "blocked_by_roof": blocked}
         if power == "mafia_racket":
-            leader = self.ranking(state)[0].id == target.id
-            demand = (
-                RACKET_BASE
-                + 2 * self.district_count(player, "shadows")
-                + floor(state.round_number / 3)
-                + (RACKET_LEADER_BONUS if leader else 0)
-            )
-            preview["money"] = min(demand, target.money)
-            preview["influence"] = min(self.district_count(player, "government"), target.influence)
-            preview["leader_bonus"] = leader
+            money_demand, influence_demand = self.racket_demand(state, player, target)
+            preview["money"] = min(money_demand, target.money)
+            preview["influence"] = min(influence_demand, target.influence)
+            preview["leader_bonus"] = self.ranking(state)[0].id == target.id
             # The scandal is the price of a racket run without a piece of the city hall.
             preview["self_scandals"] = int(self.district_count(player, "government") < 1)
         elif power == "military_sanction":
@@ -3087,9 +3089,6 @@ class CityEngine:
         elif power == "politician_cleanup":
             gate("influence", player.influence, 2)
             gate("own_scandal", player.scandals, 1)
-        elif power == "politician_deal":
-            gate("influence", player.influence, POLITICIAN_DEAL_INFLUENCE)
-            gate("district", self.district_count(player, "shadows"), 1, district="shadows")
         elif power == "politician_veto":
             gate("influence", player.influence, POLITICIAN_VETO_INFLUENCE)
             gate(
@@ -3192,7 +3191,9 @@ class CityEngine:
             rows.append(
                 {
                     "key": "mafia_racket_influence",
-                    "value": self.district_count(player, "government"),
+                    "value": RACKET_INFLUENCE_BASE
+                    + floor(state.round_number / RACKET_INFLUENCE_ROUND_STEP)
+                    + self.district_count(player, "government"),
                     "needs": "government",
                 },
             )

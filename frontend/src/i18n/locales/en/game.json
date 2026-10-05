@@ -17,11 +17,6 @@
       "cost": "action"
     },
     "politician_cleanup": { "label": "Settle a scandal", "what": "Removes one of your scandals. Cheaper than normal crisis PR, but it also costs an action.", "cost": "action + 2◆" },
-    "politician_deal": {
-      "label": "Make a deal",
-      "what": "Until the end of the round, any district you pick counts as yours: it unlocks that district's projects and shady deals and counts for synergy. You don't need a business there, but you need your own Grey Sector business: that is where the deal is struck.",
-      "cost": "3◆, no action, once per turn"
-    },
     "politician_veto": {
       "label": "Veto",
       "what": "Closes a project on the board: while the veto stands, only you can take it. The project leaves the board as usual and takes the veto with it. You have one veto, and everyone can see it.",
@@ -41,7 +36,7 @@
     },
     "mafia_racket": {
       "label": "Racket",
-      "what": "Take a cut from one rival: money for your Grey Sector businesses, influence for your Government Quarter businesses. If you have no Government business, you also get a scandal. The target's Protection stops it and is used up.",
+      "what": "Take a cut from one rival: money for your Grey Sector businesses, influence always: 1◆, plus 1◆ for every 5 rounds, plus 1◆ for each of your Government Quarter businesses. If you have no Government business, you also get a scandal. The target's Protection stops it and is used up.",
       "cost": "action, once per turn"
     },
     "mafia_cleanup": { "label": "Hush it up", "what": "Removes two of your scandals at once. You need a Government Quarter business.", "cost": "action + 3$" },
@@ -110,11 +105,12 @@
   },
   "capacity": { "max": "Maximum — 6 slots", "next": "Slot {{slot}}: {{cost}}$", "nextInfluence": "Slot {{slot}}: {{cost}}$ + {{influence}}◆" },
   "cleanup": {
+    "free": "free",
     "base": "The normal way is crisis PR: 1 action and {{cost}}◆ per scandal.",
-    "politician_cleanup": { "label": "🧯 Settle a scandal: 2◆ → −1⚠", "tooltip": "Politician power: 1 action and 2◆ per scandal — 1◆ cheaper than for everyone else. {{base}}" },
-    "fraudster_cleanup": { "label": "🧯 Cover your tracks: free → −1⚠", "tooltip": "Hustler power: just 1 action per scandal. The role has four actions per turn, so this is the cheapest cleanup in the game. {{base}}" },
-    "mafia_cleanup": { "label": "🧯 Hush it up: 3$ → −2⚠", "tooltip": "Mobster power: 1 action and 3$ remove two scandals at once. You need a Government Quarter business — without it the button offers the normal way. {{base}}" },
-    "default": { "label": "🧯 Crisis PR: {{cost}}◆ → −1⚠", "tooltip": "1 action and {{cost}}◆ to remove 1 of your scandals. The Politician, Hustler and Mobster clean scandals cheaper — this same button will show their price." }
+    "politician_cleanup": { "label": "🧯 Settle a scandal", "tooltip": "Politician power: 1 action and 2◆ per scandal — 1◆ cheaper than for everyone else. {{base}}" },
+    "fraudster_cleanup": { "label": "🧯 Cover your tracks", "tooltip": "Hustler power: just 1 action per scandal. The role has four actions per turn, so this is the cheapest cleanup in the game. {{base}}" },
+    "mafia_cleanup": { "label": "🧯 Hush it up", "tooltip": "Mobster power: 1 action and 3$ remove two scandals at once. You need a Government Quarter business — without it the button offers the normal way. {{base}}" },
+    "default": { "label": "🧯 Crisis PR", "tooltip": "1 action and {{cost}}◆ to remove 1 of your scandals. The Politician, Hustler and Mobster clean scandals cheaper — this same button will show their price." }
   },
   "action": {
     "work": "City job: +2$",
@@ -246,7 +242,7 @@
     "fraudster_grey_roll": {"label": "Shady deal roll bonus", "unit": "", "hint": "+1 to every roll"},
     "mafia_grey_roll": {"label": "Shady deal roll bonus", "unit": "", "hint": "+1 per own Grey Sector business, at most +2"},
     "mafia_racket_money": { "label": "Racket money", "unit": "$", "hint": "2$ plus 2$ for each of your Grey Sector businesses (+5$ if the target is the leader)" },
-    "mafia_racket_influence": { "label": "Racket influence", "unit": "◆", "hint": "1◆ for each of your Government Quarter businesses" },
+    "mafia_racket_influence": { "label": "Racket influence", "unit": "◆", "hint": "1◆ + round number / 5 + 1◆ for each of your Government Quarter businesses" },
     "mafia_roofs": { "label": "Protection limit", "unit": "", "hint": "2 instead of 1, and each costs 1$ less" },
     "military_sanction_targets": { "label": "Targets for sanctions", "unit": "", "hint": "Rivals with 2+ scandals: 2 — money, 3 — money and influence, 4 — the role too" },
     "military_inspection_targets": { "label": "Inspection will reach", "unit": " rivals", "hint": "Rivals with a Grey Sector business get a scandal each; Protection stops it" },
@@ -380,7 +376,7 @@
       "requirement": "Condition", "yourProgress": "Your progress", "met": "done", "notMet": "not done",
       "ofNeeded": "{{have}} of {{needed}}", "perk": "🎁 Lasting bonus:",
       "leavingNote": "⏳ Leaves at the end of the round — to the bottom of the deck.",
-      "veto": "⛔ Veto — close the project for everyone else (action + 3◆)",
+      "veto": "⛔ Veto — close the project for everyone else (no action, once per turn)", "vetoInfoTitle": "🚫 Politician veto", "vetoInfo": "{{name}} has vetoed this project: while it is on the board, only they can take it. The veto ends when the project leaves the board or the Politician loses the role.", "vetoInfoMine": "Your veto: while the project is on the board and you are the Politician, only you can take it. You have one veto: a new one replaces the old one.",
       "take": "Take · {{influence}}◆ + {{money}}$", "taking": "Taking…"
     },
     "asset": {
@@ -421,7 +417,7 @@
       "purchaseRow": "When purchased",
       "districtRules": "District conditions", "leavingNote": "At the end of the round the card leaves the market for the discard. It may come back later.",
       "lock": "🔒 Grey hold — only you can buy this slot (1 Protection)",
-      "mark": "🏷️ Claim — the card works for you (action + scandal)",
+      "mark": "🏷️ Claim — the card works for you (action)", "claimInfoTitle": "📌 Capitalist claim", "claimInfo": "{{name}} has claimed this card: it pays them income, counts for their synergy and project conditions, and unlocks their shady deals — as if they owned it. A claim gives no points. Anyone can still buy the card — then the claim is removed.", "claimInfoMine": "Your claim: the card pays you income, counts for synergy and project conditions, and unlocks shady deals — as if you owned it. It gives no points. Anyone can still buy the card — then the claim is removed. You have one claim: a new one replaces the old one, and it is lost with the role.", "lockInfoTitle": "🔒 Mafia grey hold", "lockInfo": "{{name}} has closed this slot: until the end of round {{round}} only they can buy the card. Then the slot is open to everyone again.", "lockInfoMine": "Your grey hold: until the end of round {{round}} only you can buy this card.",
       "refresh": "🔁 Re-deal the slot — once per round, no action"
     },
     "players": {
@@ -448,7 +444,7 @@
     },
     "hand": {
       "title": "Hand", "meta": "{{count}} / 3 · deck {{deck}}", "drawHint": "Takes two random cards from the deck",
-      "draw": "+ Draw 2 cards", "variants": "{{title}} — options", "now": "now {{money}}$", "empty": "empty",
+      "draw": "+ Draw 2 cards", "variants": "{{title}} — options", "now": "now {{money}}$", "effectNow": "Right now: {{effect}}", "effectPoints": "+{{count}} pts", "effectTarget": "target {{loss}}", "effectYou": "you {{gain}}", "empty": "empty",
       "tone": { "deal": "deal", "attack": "attack", "defence": "defence" },
       "previewDistrict": "Right now it gives {{money}}$ — district {{district}}.",
       "previewNone": "Right now it gives {{money}}$ — you have no businesses yet.",
@@ -548,7 +544,7 @@
         "2": "endgame"
       },
       "run": "Run",
-      "runAt": "Against: {{name}}",
+      "runAt": "Against: {{name}}", "targetsTitle": "Rival", "targetsState": "Money · influence · scandals · Protection", "targetsScore": "Points",
       "defended": "The target holds Protection — the deal will not work and the Protection stays",
       "effect": {
         "none": "—",

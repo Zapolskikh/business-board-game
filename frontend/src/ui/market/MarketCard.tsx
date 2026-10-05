@@ -92,6 +92,7 @@ export function MarketCard({
           mark={mark}
           onMark={onMark}
           refresh={refresh}
+          playerName={id => game.players.find(player => player.id === id)?.name ?? id}
         />
       }
     >

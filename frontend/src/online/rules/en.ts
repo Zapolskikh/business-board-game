@@ -52,12 +52,6 @@ const roles: Record<string, RoleGuide> = {
     powers: [
       { name: "Settle a scandal", cost: "1 action and 2◆", limit: "can be repeated", effect: "Remove 1 of your scandals." },
       {
-        name: "Make a deal",
-        cost: "3◆, no action; you need a Grey Sector business",
-        limit: "once per turn",
-        effect: "Rent any district (see “District rent”).",
-      },
-      {
         name: "Veto",
         cost: "no action",
         limit: "once per turn; only one veto",
@@ -95,7 +89,7 @@ const roles: Record<string, RoleGuide> = {
         name: "Crypto scam",
         cost: "1 action; you need your own “City Crypto Exchange”",
         limit: "once per turn",
-        effect: "Take 25% of each rival's money. You get 3 scandals. Effects that lower scandals from shady deals lower these too.",
+        effect: "Take 25% of each rival's money. You get 3 scandals. This is a role power, not a shady deal: effects that lower scandals from shady deals do not lower these.",
       },
     ],
   },
@@ -112,7 +106,7 @@ const roles: Record<string, RoleGuide> = {
         name: "Racket",
         cost: "1 action",
         limit: "once per turn",
-        effect: "Pick a rival. They give you money: 3$, another 2$ for each of your Grey Sector businesses, and the round number divided by 3. If the target is the leader, add 5$ more. The target also gives you 1◆ for each of your Government Quarter businesses. The target cannot give more than they have. If you have no Government Quarter business, you get 1 scandal.",
+        effect: "Pick a rival. They give you money: 3$, another 2$ for each of your Grey Sector businesses, and the round number divided by 3. If the target is the leader, add 5$ more. The target also always gives you influence: 1◆, plus the round number divided by 5, plus 1◆ for each of your Government Quarter businesses. The target cannot give more than they have. If you have no Government Quarter business, you get 1 scandal.",
       },
       {
         name: "Hush it up",
@@ -241,8 +235,6 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
         <li><b>2–3 businesses</b> in a district: each gives +1$.</li>
         <li><b>4 businesses or more</b>: each gives +2$. Such a district is <b>full</b>: epic and legendary businesses of a full district also give +1◆ at the end of each round.</li>
       </ul>
-      <h3>District rent</h3>
-      <p>Some effects give you <b>district rent</b>: until the end of the round the chosen district counts as if you had 1 more business there. Rent counts for synergy, project conditions, shady deals and role powers. Lasting role bonuses do not see it — they count only real businesses. You can have only one rent: a new one replaces the old one.</p>
       <h3>Tags and rarity</h3>
       <p>Every business card has <b>tags</b>: ${["finance", "data", "logistics", "production"].map(tag => `“${ctx.e(ctx.tag(tag))}”`).join(", ")} and others. Many project conditions check them.</p>
       <p><b>Rarity</b> sets the price of a business and the round when it comes to the market:</p>
@@ -296,7 +288,7 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
         <li>The ${n.rotation} businesses that have been on the market the longest (marked ⏳) leave the table, and new ones from the deck take their place. The old businesses go to the discard.</li>
         <li>The leftmost project (marked ⏳) goes to the bottom of the project deck. The other projects move one place left, and a new project from the deck is added last.</li>
       </ol>
-      <p><b>The market deck.</b> Until round ${lateRound}, businesses come out of the deck in order — from common to legendary, as each rarity opens. From round ${lateRound}, when every rarity is open, the rare, epic and legendary cards of the deck still come first, and the other places are filled with a random card from the deck and the discard. The rarer the card, the better its chance: late in the game, common and uncommon businesses are only fillers.</p>
+      <p><b>The market deck.</b> Until round ${lateRound}, businesses come out of the deck in order — from common to legendary, as each rarity opens. From round ${lateRound}, when every rarity is open, the rare, epic and legendary cards of the deck still come first, and the other places are filled with a random card from the deck and the discard. The rarer the card, the better its chance: late in the game, common and uncommon businesses are only fillers. No more than two legendary businesses come out in one deal.</p>
       <div class="warn"><b>There is no income after the last round.</b> Everything you would earn at the end of the last round is zero, so spend your money and influence during the last round.</div>
       `,
     },
@@ -342,7 +334,7 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
         <li><b>6 scandals:</b> arrest.</li>
       </ul>
       <h3>Arrest</h3>
-      <p>When you are arrested, your scandals drop to 3, and you lose your role and 1 Protection. On your next turn you have only 1 action. If you are arrested on your own turn, the turn ends at once.</p>
+      <p>When you are arrested, your scandals reset to 0, and you lose your role and 1 Protection. On your next turn you have only 1 action. If you are arrested on your own turn, the turn ends at once.</p>
       <h3>How to get rid of scandals</h3>
       <p><b>Crisis PR</b> is open to everyone: 1 action and ${n.crisisPr}◆ remove 1 scandal. You can repeat it while you have actions and influence. Roles, action cards, businesses and projects give other ways — it is written on them. In the game all your ways are under the “Clean up” button.</p>
       <p>If you have no role, 1 scandal goes away by itself at the start of each of your turns.</p>
@@ -466,7 +458,6 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
       <table>
         <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
         <tbody>
-          <tr><td class="name"><b>District rent</b></td><td>Until the end of the round a district counts as if you had 1 more business there. See “District rent”.</td></tr>
           <tr><td class="name"><b>Full district</b></td><td>A district where you have 4 businesses or more.</td></tr>
           <tr><td class="name"><b>Leader</b></td><td>The player with the most points★. Goes last.</td></tr>
           <tr><td class="name"><b>Protection</b></td><td>Protection🛡 from one hit by a rival. See “Protection”.</td></tr>

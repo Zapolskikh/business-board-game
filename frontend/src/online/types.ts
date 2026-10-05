@@ -197,6 +197,9 @@ export interface GameState {
   power_previews?: PowerPreview[];
   // Для карт, которые больше не спрашивают район: движок сам берёт лучший и говорит сумму.
   card_previews?: Record<string, { district: string | null; money: number }>;
+  // «Сейчас даст X» для карт в руке, чья выплата зависит от стола: движок разыгрывает карту на
+  // копии состояния. У адресных — номинальный удар по цели без Защиты и с полным кошельком.
+  card_effects?: Record<string, CardEffect>;
   project_board: string[];
   // Every perk of the viewer's role: what it pays now, the ceiling, and the district that
   // unlocks the difference. Computed by the engine — the client only prints labels.
@@ -340,4 +343,12 @@ export interface GreyTable {
   /** 0 opening, 1 middle, 2 endgame third of the match. */
   third: number;
   rows: GreyTableRow[];
+}
+
+export interface CardEffect {
+  money: number;
+  influence: number;
+  points: number;
+  target_money?: number;
+  target_influence?: number;
 }

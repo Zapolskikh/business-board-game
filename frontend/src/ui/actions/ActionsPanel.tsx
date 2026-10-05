@@ -8,7 +8,6 @@ import {
   patronage,
   powerDescriptions,
   powerLabels,
-  crisisPrInfluence,
 } from "../../online/gameUi";
 import type { CityMeta, GameState, LegalAction, PlayerState } from "../../online/types";
 import { CardPopover, PopoverBody, PopoverHeader } from "../primitives/CardPopover";
@@ -81,12 +80,16 @@ export function ActionsPanel({
   const roof = resolve(context, "buy_roof");
   const endTurn = resolve(context, "end_turn");
 
-  // Антикризис: если у роли есть своя чистка — она дешевле, движок пришлёт именно её.
-  const cleanupPower = cleanupPowerFor(me.role);
-  const cleanup = cleanupPower
-    ? resolve(context, "use_role_power", { power: cleanupPower })
-    : resolve(context, "crisis_pr");
-  const cleanupLabel = cleanupPower ? cleanupOffer(cleanupPower, meta).label : t("ui.actions.cleanup");
+  // Антикризис: если у роли есть своя чистка — она дешевле, движок пришлёт именно её. Когда своя
+  // чистка закрыта (у Мафиози нет объекта Администрации, не хватает 2◆ у Политика), а обычный PR
+  // доступен — кнопка предлагает PR, как и обещает подсказка, а не висит серой.
+  const rolePower = cleanupPowerFor(me.role);
+  const roleCleanup = rolePower ? resolve(context, "use_role_power", { power: rolePower }) : undefined;
+  const crisis = resolve(context, "crisis_pr");
+  const useRole = roleCleanup !== undefined && (roleCleanup.kind !== "blocked" || crisis.kind === "blocked");
+  const cleanupPower = useRole ? rolePower : undefined;
+  const cleanup = useRole && roleCleanup ? roleCleanup : crisis;
+  const cleanupInfo = cleanupOffer(cleanupPower, meta);
 
   // Активные способности роли, кроме чисток — они уже на кнопке выше — и кроме тех, чья цель
   // нарисована в другом месте доски. Метку на карту рынка и вето на проект жмут на самой
@@ -186,18 +189,25 @@ export function ActionsPanel({
           {/* «Антикризис» ничего не говорил о том, что делает кнопка. У ролевой чистки
             * своё название из каталога — оно точнее, его и оставляем. */}
           <ActionButton
-            label={cleanupPower ? cleanupLabel : t("ui.actions.cleanup")}
+            label={cleanupInfo.label}
+            hint={cleanupInfo.tooltip}
             cost={
-              cleanupPower ? (
-                <ResourceText>{t("ui.actions.scandalMinus")}</ResourceText>
-              ) : (
-                <>
-                  <Need short={me.influence < crisisPrInfluence(meta)} tone="influence">
-                    <ResourceText>{`${crisisPrInfluence(meta)}◆`}</ResourceText>
-                  </Need>{" → "}
-                  <ResourceText>{t("ui.actions.scandalMinus")}</ResourceText>
-                </>
-              )
+              <>
+                {cleanupInfo.cost.money > 0 && (
+                  <Need short={me.money < cleanupInfo.cost.money} tone="money">
+                    <ResourceText>{`${cleanupInfo.cost.money}$`}</ResourceText>
+                  </Need>
+                )}
+                {cleanupInfo.cost.money > 0 && cleanupInfo.cost.influence > 0 && " + "}
+                {cleanupInfo.cost.influence > 0 && (
+                  <Need short={me.influence < cleanupInfo.cost.influence} tone="influence">
+                    <ResourceText>{`${cleanupInfo.cost.influence}◆`}</ResourceText>
+                  </Need>
+                )}
+                {cleanupInfo.cost.money === 0 && cleanupInfo.cost.influence === 0 && t("cleanup.free")}
+                {" → "}
+                <ResourceText>{`−${cleanupInfo.cost.scandals}⚠`}</ResourceText>
+              </>
             }
             state={cleanup}
             onClick={() => act(cleanup)}

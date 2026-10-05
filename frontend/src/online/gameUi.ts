@@ -45,7 +45,6 @@ const POWER_IDS = [
   "fraudster_crypto_scam",
   "capitalist_claim",
   "mafia_lock",
-  "politician_deal",
   "politician_veto",
 ] as const;
 
@@ -160,9 +159,9 @@ export function numberValue(value: unknown): number {
 }
 
 /* Присутствие игрока в районе — ровно то, что считает движок (`district_count`): построенные
- * объекты, район, арендованный «Зонированием» на раунд, и карта рынка, помеченная Капиталистом.
- * Плюс «Агломерация»: объект с `districtDouble` считает каждый ваш объект своего района за два —
- * умножается только построенное, аренда и метка не удваиваются.
+ * объекты и карта рынка, помеченная Капиталистом. Плюс «Агломерация»: объект с `districtDouble`
+ * считает каждый ваш объект своего района за два — умножается только построенное, метка не
+ * удваивается. (Аренда района «Зонированием» и «Договоримся» убрана в правилах 1.20.0.)
  *
  * Считать здесь меньше, чем считает движок, нельзя: карточка напечатает «2/4» там, где движок
  * видит 4/4, и синергия будет выглядеть невключённой ровно тогда, когда она платит. */
@@ -172,7 +171,7 @@ export function districtCount(player: PlayerState, district: string, assets: Map
     item => assets.get(item.card_id)?.effects?.districtDouble === district,
   ).length;
   const marked = player.marked_card_id ? assets.get(player.marked_card_id)?.district === district : false;
-  return owned * (1 + doubles) + Number(player.zoning_district === district) + Number(marked);
+  return owned * (1 + doubles) + Number(marked);
 }
 
 // The engine ships the itemised score in `/state` (`score_breakdown`); it is never recomputed
@@ -237,11 +236,36 @@ export function cleanupPowerFor(role: string | null): string | undefined {
   return role ? cleanupPowers[role] : undefined;
 }
 
-export function cleanupOffer(power: string | undefined, meta: CityMeta): { label: string; tooltip: string } {
+/* Цена и результат каждой чистки — те же числа, что берёт движок (`_politician_cleanup`,
+ * `_fraudster_cleanup`, `_mafia_cleanup`, `_crisis_pr`). На кнопке печаталось «−1⚠» для всех
+ * ролей, а «Замять дело» снимает два скандала за 3$, — игрок узнавал цену только из хроники. */
+export type CleanupCost = { money: number; influence: number; scandals: number };
+
+export function cleanupCost(power: string | undefined, meta: CityMeta): CleanupCost {
+  switch (power) {
+    case "politician_cleanup":
+      return { money: 0, influence: 2, scandals: 1 };
+    case "fraudster_cleanup":
+      return { money: 0, influence: 0, scandals: 1 };
+    case "mafia_cleanup":
+      return { money: 3, influence: 0, scandals: 2 };
+    default:
+      return { money: 0, influence: crisisPrInfluence(meta), scandals: 1 };
+  }
+}
+
+export function cleanupOffer(
+  power: string | undefined,
+  meta: CityMeta,
+): { label: string; tooltip: string; cost: CleanupCost } {
   const cost = crisisPrInfluence(meta);
   const base = tg("cleanup.base", { cost });
   const key = power && ["politician_cleanup", "fraudster_cleanup", "mafia_cleanup"].includes(power) ? power : "default";
-  return { label: tg(`cleanup.${key}.label`, { cost }), tooltip: tg(`cleanup.${key}.tooltip`, { cost, base }) };
+  return {
+    label: tg(`cleanup.${key}.label`, { cost }),
+    tooltip: tg(`cleanup.${key}.tooltip`, { cost, base }),
+    cost: cleanupCost(key === "default" ? undefined : key, meta),
+  };
 }
 
 export function actionCardCost(meta: CityMeta): number {
@@ -717,7 +741,7 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
       const tail: LogSegment[] = [txt(tg("event.scandalLimit", { limit }))];
       tail.push(roleTitle ? txt(tg("event.roleLost", { role: roleTitle })) : txt(tg("event.noRole")));
       if (data.jailed) {
-        tail.push(txt(tg("event.jailed")), num("3⚠", "neutral"), txt(tg("event.jailedTail")));
+        tail.push(txt(tg("event.jailed")), num(`${numberValue(data.scandals)}⚠`, "neutral"), txt(tg("event.jailedTail")));
       }
       return lead(...tail);
     }
@@ -946,7 +970,7 @@ export function assetEffectLines(
   const roleTitle = (id: string): string => meta.roles.find(item => item.id === id)?.title ?? id;
   const hasRole = (role: string): boolean => owner.role === role;
   /* Ровно `has_district_link` движка: район засчитывается тому, у кого он есть — построен,
-   * арендован «Зонированием» или помечен меткой Капиталиста. Виртуальных связей роли с районом
+   * или помечен меткой Капиталиста. Виртуальных связей роли с районом
    * нет ни у кого: лишняя такая связь рисует галочку у условия, которого движок не засчитывает. */
   const hasLink = (district: string): boolean => districtCount(owner, district, assets) > 0;
   const push = (

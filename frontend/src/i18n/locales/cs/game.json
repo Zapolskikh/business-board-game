@@ -17,11 +17,6 @@
       "cost": "akce"
     },
     "politician_cleanup": { "label": "Urovnat skandál", "what": "Smaže jeden váš skandál. Levnější než běžné krizové PR, ale taky stojí akci.", "cost": "akce + 2◆" },
-    "politician_deal": {
-      "label": "Domluvíme se",
-      "what": "Do konce kola se jakákoli čtvrť, kterou vyberete, počítá jako vaše: otevírá projekty a šedé kšefty té čtvrti a počítá se do synergie. Podnik v ní mít nemusíte, ale potřebujete vlastní podnik v Šedé zóně: tam se dohoda uzavírá.",
-      "cost": "3◆, bez akce, jednou za tah"
-    },
     "politician_veto": {
       "label": "Veto",
       "what": "Zavře projekt na desce: dokud veto platí, vzít ho můžete jen vy. Projekt odchází z desky jako obvykle a veto si bere s sebou. Veto máte jen jedno a všichni ho vidí.",
@@ -41,7 +36,7 @@
     },
     "mafia_racket": {
       "label": "Výpalné",
-      "what": "Výběr od jednoho soupeře: peníze za vaše podniky v Šedé zóně, vliv za podniky ve Vládní čtvrti. Když nemáte vládní podnik, dostanete navíc skandál. Ochrana cíle výpalné zastaví a spotřebuje se.",
+      "what": "Výběr od jednoho soupeře: peníze za vaše podniky v Šedé zóně, vliv vždy: 1◆, k tomu 1◆ za každých 5 kol a ještě 1◆ za každý váš podnik ve Vládní čtvrti. Když nemáte vládní podnik, dostanete navíc skandál. Ochrana cíle výpalné zastaví a spotřebuje se.",
       "cost": "akce, jednou za tah"
     },
     "mafia_cleanup": { "label": "Ututlat", "what": "Smaže najednou dva vaše skandály. Potřebujete podnik ve Vládní čtvrti.", "cost": "akce + 3$" },
@@ -110,11 +105,12 @@
   },
   "capacity": { "max": "Maximum — 6 míst", "next": "Místo {{slot}}: {{cost}}$", "nextInfluence": "Slot {{slot}}: {{cost}}$ + {{influence}}◆" },
   "cleanup": {
+    "free": "zdarma",
     "base": "Běžný způsob je krizové PR: 1 akce a {{cost}}◆ za jeden skandál.",
-    "politician_cleanup": { "label": "🧯 Urovnat skandál: 2◆ → −1⚠", "tooltip": "Schopnost Politika: 1 akce a 2◆ za jeden skandál — o 1◆ levněji než pro ostatní. {{base}}" },
-    "fraudster_cleanup": { "label": "🧯 Zamést stopy: zdarma → −1⚠", "tooltip": "Schopnost Podvodníka: jen 1 akce za jeden skandál. Role má čtyři akce za tah, takže je to nejlevnější čištění ve hře. {{base}}" },
-    "mafia_cleanup": { "label": "🧯 Ututlat: 3$ → −2⚠", "tooltip": "Schopnost Mafiána: 1 akce a 3$ smažou dva skandály najednou. Potřebujete podnik ve Vládní čtvrti — bez něj tlačítko nabídne běžný způsob. {{base}}" },
-    "default": { "label": "🧯 Krizové PR: {{cost}}◆ → −1⚠", "tooltip": "1 akce a {{cost}}◆ smažou 1 váš skandál. Politik, Podvodník a Mafián čistí skandály levněji — stejné tlačítko ukáže jejich cenu." }
+    "politician_cleanup": { "label": "🧯 Urovnat skandál", "tooltip": "Schopnost Politika: 1 akce a 2◆ za jeden skandál — o 1◆ levněji než pro ostatní. {{base}}" },
+    "fraudster_cleanup": { "label": "🧯 Zamést stopy", "tooltip": "Schopnost Podvodníka: jen 1 akce za jeden skandál. Role má čtyři akce za tah, takže je to nejlevnější čištění ve hře. {{base}}" },
+    "mafia_cleanup": { "label": "🧯 Ututlat", "tooltip": "Schopnost Mafiána: 1 akce a 3$ smažou dva skandály najednou. Potřebujete podnik ve Vládní čtvrti — bez něj tlačítko nabídne běžný způsob. {{base}}" },
+    "default": { "label": "🧯 Krizové PR", "tooltip": "1 akce a {{cost}}◆ smažou 1 váš skandál. Politik, Podvodník a Mafián čistí skandály levněji — stejné tlačítko ukáže jejich cenu." }
   },
   "action": {
     "work": "Městská zakázka: +2$",
@@ -246,7 +242,7 @@
     "fraudster_grey_roll": {"label": "Bonus k hodu šedých operací", "unit": "", "hint": "+1 ke každému hodu"},
     "mafia_grey_roll": {"label": "Bonus k hodu šedých operací", "unit": "", "hint": "+1 za každý vlastní podnik Šedé zóny, nejvýš +2"},
     "mafia_racket_money": { "label": "Peníze z výpalného", "unit": "$", "hint": "2$ plus 2$ za každý váš podnik v Šedé zóně (+5$, pokud je cíl lídr)" },
-    "mafia_racket_influence": { "label": "Vliv z výpalného", "unit": "◆", "hint": "1◆ za každý váš podnik ve Vládní čtvrti" },
+    "mafia_racket_influence": { "label": "Vliv z výpalného", "unit": "◆", "hint": "1◆ + číslo kola / 5 + 1◆ za každý váš podnik ve Vládní čtvrti" },
     "mafia_roofs": { "label": "Limit Ochrany", "unit": "", "hint": "2 místo 1 a každá o 1$ levnější" },
     "military_sanction_targets": { "label": "Cíle pro sankce", "unit": "", "hint": "Soupeři se 2+ skandály: 2 — peníze, 3 — peníze a vliv, 4 — i role" },
     "military_inspection_targets": { "label": "Kontrola zasáhne", "unit": " soup.", "hint": "Soupeři s podnikem v Šedé zóně dostanou každý skandál; Ochrana to zastaví" },
@@ -380,7 +376,7 @@
       "requirement": "Podmínka", "yourProgress": "Váš postup", "met": "splněno", "notMet": "nesplněno",
       "ofNeeded": "{{have}} z {{needed}}", "perk": "🎁 Trvalý bonus:",
       "leavingNote": "⏳ Odchází na konci kola — na spodek balíčku.",
-      "veto": "⛔ Veto — zavřít projekt pro všechny ostatní (akce + 3◆)",
+      "veto": "⛔ Veto — zavřít projekt pro všechny ostatní (bez akce, jednou za tah)", "vetoInfoTitle": "🚫 Veto Politika", "vetoInfo": "{{name}} vetoval tento projekt: dokud je na desce, může ho vzít jen on. Veto končí, když projekt odejde z desky nebo Politik přijde o roli.", "vetoInfoMine": "Vaše veto: dokud je projekt na desce a vy jste Politik, můžete ho vzít jen vy. Veto máte jen jedno: nové ruší staré.",
       "take": "Vzít · {{influence}}◆ + {{money}}$", "taking": "Bereme…"
     },
     "asset": {
@@ -422,7 +418,7 @@
       "purchaseRow": "Při koupi",
       "districtRules": "Podmínky čtvrti", "leavingNote": "Na konci kola karta odejde z trhu do odhozu. Později se může vrátit.",
       "lock": "🔒 Šedá blokace — koupit to místo budete moct jen vy (1 Ochrana)",
-      "mark": "🏷️ Zábor — karta pracuje pro vás (akce + skandál)",
+      "mark": "🏷️ Zábor — karta pracuje pro vás (akce)", "claimInfoTitle": "📌 Zábor Kapitalisty", "claimInfo": "{{name}} si kartu zabral: přináší mu příjem, počítá se do jeho synergie a podmínek jeho projektů a otevírá mu šedé kšefty — jako by ji vlastnil. Body zábor nedává. Kartu může dál koupit kdokoli — pak zábor zmizí.", "claimInfoMine": "Váš zábor: karta vám přináší příjem, počítá se do synergie a podmínek projektů a otevírá šedé kšefty — jako vlastní. Body nedává. Kartu může dál koupit kdokoli — pak zábor zmizí. Zábor máte jen jeden: nový ruší starý, se ztrátou role zmizí.", "lockInfoTitle": "🔒 Šedá blokace Mafiána", "lockInfo": "{{name}} zablokoval toto místo: do konce kola {{round}} může kartu koupit jen on. Pak se místo otevře všem.", "lockInfoMine": "Vaše šedá blokace: do konce kola {{round}} můžete tuto kartu koupit jen vy.",
       "refresh": "🔁 Znovu rozdat místo — jednou za kolo, bez akce"
     },
     "players": {
@@ -449,7 +445,7 @@
     },
     "hand": {
       "title": "Ruka", "meta": "{{count}} / 3 · balíček {{deck}}", "drawHint": "Vezme dvě náhodné karty z balíčku",
-      "draw": "+ Líznout 2 karty", "variants": "{{title}} — možnosti", "now": "teď {{money}}$", "empty": "prázdné",
+      "draw": "+ Líznout 2 karty", "variants": "{{title}} — možnosti", "now": "teď {{money}}$", "effectNow": "Teď dá: {{effect}}", "effectPoints": "+{{count}} b.", "effectTarget": "cíl {{loss}}", "effectYou": "vám {{gain}}", "empty": "prázdné",
       "tone": { "deal": "obchod", "attack": "útok", "defence": "obrana" },
       "previewDistrict": "Teď to dá {{money}}$ — čtvrť {{district}}.",
       "previewNone": "Teď to dá {{money}}$ — zatím nemáte žádné podniky.",
@@ -550,7 +546,7 @@
         "2": "konec"
       },
       "run": "Spustit",
-      "runAt": "Proti: {{name}}",
+      "runAt": "Proti: {{name}}", "targetsTitle": "Soupeř", "targetsState": "Peníze · vliv · skandály · Ochrana", "targetsScore": "Body",
       "defended": "Cíl má Ochranu — operace nezabere a Ochrana zůstane",
       "effect": {
         "none": "—",

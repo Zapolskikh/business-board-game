@@ -349,7 +349,8 @@ def test_sixth_scandal_jails_the_actor_and_burns_the_rest_of_the_turn() -> None:
     state = run(engine, state, "play_action_card", {"card_uid": held.uid, "target_id": target.id})
 
     jailed = state.player_by_id(actor.id)
-    assert jailed.scandals == 3
+    # 1.20.0: an arrest is a clean slate.
+    assert jailed.scandals == 0
     assert jailed.jail_turns == 1
     assert state.current_player.id == target.id
     assert any(event.type == "player_jailed" for event in state.event_log)
@@ -1020,7 +1021,7 @@ def test_crypto_scam_is_one_fixed_quarter_wallet_command() -> None:
     assert state.current_player.role == "fraudster"  # 1.19.0: three scandals no longer cost the seat
 
 
-def test_crypto_scam_respects_roofs_and_stacked_reduction() -> None:
+def test_crypto_scam_respects_roofs_and_ignores_grey_reduction() -> None:
     engine = CityEngine()
     state = make_state()
     actor = state.current_player
@@ -1040,7 +1041,8 @@ def test_crypto_scam_respects_roofs_and_stacked_reduction() -> None:
 
     assert state.player_by_id(target.id).money == 100
     assert state.player_by_id(target.id).roofs == 0
-    assert state.current_player.scandals == CRYPTO_SCAM_SCANDALS - 3
+    # The scam is the role's power, not a grey operation: «−1 от серых операций» does not cut it.
+    assert state.current_player.scandals == CRYPTO_SCAM_SCANDALS
     assert state.current_player.role == "fraudster"
 
 
@@ -1630,7 +1632,7 @@ def test_being_jailed_by_somebody_else_is_announced() -> None:
     event = state.event_log[-1]
     assert event.type == "scandal_limit_reached"
     assert (event.data["jailed"], event.data["role_id"]) == (True, "mafia")
-    assert (victim.scandals, victim.jail_turns) == (3, 1)
+    assert (victim.scandals, victim.jail_turns) == (0, 1)
 
 
 def test_one_token_answers_a_takeover_a_leak_and_a_scandal() -> None:
@@ -1906,7 +1908,6 @@ def test_the_engine_says_which_powers_are_free_and_which_the_roof_stops() -> Non
 ROLE_POWER_KEYWORDS = {
     "capitalist_claim": "етк",  # «Поставить метку» / «метка»
     "politician_cleanup": "Урегулировать",
-    "politician_deal": "Договоримся",
     "politician_veto": "вето",
     "journalist_inflate": "Раздуть",
     "journalist_publish": "Публикация",
@@ -2573,7 +2574,7 @@ def test_racket_needs_no_shadows_object_and_the_mafia_seat_brings_a_defence() ->
     assert state.current_player.money > money
 
 
-def test_capitalist_mark_and_politician_deal_cost_no_scandal_and_the_veto_no_action() -> None:
+def test_capitalist_mark_costs_no_scandal_and_the_veto_no_action() -> None:
     engine = CityEngine()
     state = make_state()
     state.current_player.role = "capitalist"
@@ -2584,9 +2585,6 @@ def test_capitalist_mark_and_politician_deal_cost_no_scandal_and_the_veto_no_act
     player = state.current_player
     player.role = "politician"
     player.influence = 10
-    give_asset(state, player, "cash")
-    state = run(engine, state, "use_role_power", {"power": "politician_deal", "district": "tech"})
-    assert state.current_player.scandals == 0
     actions = state.actions_left
     project_id = state.project_board[0]
     state = run(engine, state, "use_role_power", {"power": "politician_veto", "project_id": project_id})
@@ -2634,3 +2632,72 @@ def test_privatization_needs_a_free_slot_and_respects_a_grey_mark() -> None:
     assert state.market[0].uid not in offered
     with pytest.raises(IllegalActionError, match="grey mark"):
         run(engine, state, "play_action_card", {"card_uid": held.uid, "market_uid": state.market[0].uid})
+
+
+def test_the_politician_deal_and_the_zoning_card_are_gone() -> None:
+    """1.20.0: «Договоримся» and «Изменение зонирования» were removed — hard to read, rarely used."""
+    engine = CityEngine()
+    assert "politician_deal" not in engine.ROLE_POWERS["politician"]
+    assert "zoning" not in load_catalog().action_cards
+    state = make_state()
+    player = state.current_player
+    player.role = "politician"
+    player.influence = 10
+    give_asset(state, player, "cash")
+    with pytest.raises((IllegalActionError, InvalidCommandError)):
+        run(engine, state, "use_role_power", {"power": "politician_deal", "district": "tech"})
+
+
+def test_racket_always_takes_influence_that_grows_with_the_round() -> None:
+    """1.20.0: 1◆ + ⌊round/5⌋ + 1◆ per own administrative object, whatever the districts."""
+    engine = CityEngine()
+    state = make_state()
+    actor = state.current_player
+    actor.role = "mafia"
+    target = rival_of(state, actor)
+    target.money, target.influence, target.roofs = 50, 10, 0
+    state.round_number = 10
+
+    preview = engine.power_preview(state, actor, "mafia_racket", target)
+    assert preview["influence"] == 1 + 10 // 5
+
+    state = run(engine, state, "use_role_power", {"power": "mafia_racket", "target_id": target.id})
+    assert state.player_by_id(target.id).influence == 10 - 3
+    assert state.player_by_id(actor.id).influence == actor.influence + 3
+
+
+def test_legendaries_open_in_round_nine_at_most_two_a_refill() -> None:
+    engine = CityEngine()
+    catalog = load_catalog()
+    assert catalog.rarity_min_round["legendary"] == 9
+    legendaries = [card_id for card_id, asset in catalog.assets.items() if asset.rarity == "legendary"]
+    state = make_state()
+    state.round_number = 9
+    state.market = []
+    # Legendaries on top of the deck: dealt in order they would fill every slot at once.
+    state.market_deck = legendaries + [card_id for card_id in state.market_deck if card_id not in legendaries]
+    engine._refill_market(state, 6)
+    dealt = [item.card_id for item in state.market]
+    assert len(dealt) == 6
+    assert sum(1 for card_id in dealt if card_id in legendaries) == 2
+
+    state.round_number = 8
+    state.market = []
+    engine._refill_market(state, 6)
+    assert not any(item.card_id in legendaries for item in state.market)
+
+
+def test_card_play_preview_reads_the_table_without_touching_it() -> None:
+    """«Сейчас даст X»: the play code itself, run on a copy, for cards whose payout reads the table."""
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    give_asset(state, player, "archive")  # one administrative object
+    money, influence = player.money, player.influence
+
+    assert engine.card_play_preview(state, player, "admin_resource") == {"money": 0, "influence": 1, "points": 0}
+    hit = engine.card_play_preview(state, player, "audit")
+    assert hit is not None and hit["target_money"] > 0
+    # A card that prints its own number gets no preview.
+    assert engine.card_play_preview(state, player, "upgrade_subsidy") is None
+    assert (player.money, player.influence) == (money, influence)

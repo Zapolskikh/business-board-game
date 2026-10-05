@@ -8,7 +8,7 @@ import { findPreview, previewTargetLoss, previewYouGet, scoreOf, targetStats } f
  *
  * Отдельная от `ActionButton`, потому что окно (Radix Trigger с `asChild`) передаёт кнопке свой
  * обработчик клика и ref, а `ActionButton` принимает только свои свойства и молча их теряет: так
- * «Договоримся» нажималась и ничего не открывала. Здесь всё лишнее уходит прямо в <button>. */
+ * кнопка способности нажималась и ничего не открывала. Здесь всё лишнее уходит прямо в <button>. */
 export const PowerTrigger = forwardRef<
   HTMLButtonElement,
   { label: string; hint: string; danger?: boolean } & ButtonHTMLAttributes<HTMLButtonElement>

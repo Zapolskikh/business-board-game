@@ -16,8 +16,12 @@ SCHEMA_VERSION = 1
 # miss; the crypto scam costs three scandals; «Раздуть историю» costs 1◆; the capitalist's mark and
 # the politician's deal cost no scandal; the veto costs no action; the racket needs no own Серый
 # сектор object and the mafia takes a Защита with the role; the «Агломерация» doubles its quarter
-# for district synergy and project conditions, not for the role passives.
-RULES_VERSION = "city-1.19.0"
+# for district synergy and project conditions, not for the role passives. 1.20.0: the racket always
+# takes influence (1 + round/5, plus one per own administrative object); the crypto scam's three
+# scandals are not cut by grey-scandal reductions; an arrest resets scandals to 0; the politician's
+# «Договоримся» and the card «Изменение зонирования» are gone; legendaries open in round 9 and come
+# out at most two a refill.
+RULES_VERSION = "city-1.20.0"
 
 # Bumped whenever the catalog changes, even if no rule moved: card texts are part of the agreement
 # too. 2026-09-30: removed the unsupported cash-exchange purchase payout. 2026-09-30b: «Судебный
@@ -31,7 +35,9 @@ RULES_VERSION = "city-1.19.0"
 # 2026-10-03: «Приватизация» — an object at half its price, no action; «Общественная инициатива» —
 # a project without influence and 3$ off; «Теневая касса» 3$ an object; «Обход охраны» +1◆;
 # «Автономная офшорная юрисдикция» 15 → 12$.
-CONTENT_VERSION = "city-content-2026-10-03"
+# 2026-10-05: the racket takes influence always; «Изменение зонирования» removed; legendaries open in
+# round 9.
+CONTENT_VERSION = "city-content-2026-10-05"
 
 DISTRICT_IDS = (
     "residential",
@@ -123,6 +129,10 @@ MARKET_DISCARD_WEIGHTS = {"common": 1, "uncommon": 2, "rare": 6, "epic": 12, "le
 # Rarities that stop being dealt in deck order once every rarity is open: from then on they only
 # come out of the weighted draw, as filler.
 LATE_FILLER_RARITIES = frozenset({"common", "uncommon"})
+# At most this many legendaries per refill (1.20.0). They used to open as a wave: by round 8-9 the
+# market was full of them and by 10-11 they were all bought or sunk in the discard. Two a refill
+# from round 9: eight legendaries over seven refills still all reach the table, but spread out.
+LEGENDARIES_PER_REFILL = 2
 
 # The catch-up: at the start of every round the trailing player (all of them, on a tie for last)
 # gets this much influence. Not when the whole table is level — that is the opening, not a deficit.
@@ -192,6 +202,12 @@ CRYPTO_SCAM_SCANDALS = 3
 RACKET_LEADER_BONUS = 5
 # The flat part of the racket demand, before 2$ per own Серый сектор object and the round drift.
 RACKET_BASE = 3
+# 1.20.0: the racket always takes influence — the flat part plus one per RACKET_INFLUENCE_ROUND_STEP
+# rounds, plus one per own administrative object. Money alone was the resource every seat already
+# had too much of by mid-game, so the role scored 7-11% in the nightly runs: the influence is what
+# actually slows a rival down.
+RACKET_INFLUENCE_BASE = 1
+RACKET_INFLUENCE_ROUND_STEP = 5
 # The sanction reads the target's own scandal counter: money at two, money and influence at three,
 # and the role itself at four.
 SANCTION_MONEY_TIER = 2
@@ -217,11 +233,6 @@ JOURNALIST_INFLATE_INFLUENCE = 1
 # already built, so the seat now brings something on the turn it is taken.
 MAFIA_CLAIM_ROOFS = 1
 # --- the marks three roles write on the shared board --------------------------------------------
-# «Договоримся»: the politician rents a district for the round the way «Зонирование» does. Priced
-# in the two things the role has to weigh rather than in an action, because the politician's turn
-# is already spoken for by projects. The Серый сектор is the gate — a clean politician cannot
-# strike the deal at all.
-POLITICIAN_DEAL_INFLUENCE = 3
 # A veto closes one project to everybody else for as long as it stays on the board. The project
 # rotates on the ordinary schedule and takes the veto with it, so this buys tempo on one card
 # rather than freezing the board.

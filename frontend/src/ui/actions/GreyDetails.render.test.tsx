@@ -48,6 +48,15 @@ describe("grey operations window", () => {
     expect(html).toContain("нужен объект района");
   });
 
+  it("lists every rival with money, influence, scandals, Protection and points", () => {
+    const html = render();
+    const room = scenarios["Слоты заняты"];
+    const rivals = (room.game as GameState).players.filter(player => player.id !== ME);
+    expect(html).toContain('data-ui="grey-targets"');
+    for (const rival of rivals) expect(html).toContain(rival.name);
+    expect(html).toContain("Деньги · влияние · скандалы · Защита");
+  });
+
   it("renders without engine tables at all", () => {
     expect(() => render({ grey_tables: undefined })).not.toThrow();
   });

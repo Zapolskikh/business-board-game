@@ -16,7 +16,7 @@
     "politician": {
       "title": "Politician",
       "passive": "Government Quarter businesses: +1$. Every residential business on the table, even other players': +1◆ per round.",
-      "power": "Settle a scandal: 1 action and 2◆ → −1 scandal. Make a deal (once per turn, no action, you need a Grey Sector business): 3◆ — any district counts as yours until the end of the round. Veto (once per turn, no action): only you can take a project on the board."
+      "power": "Settle a scandal: 1 action and 2◆ → −1 scandal. Veto (once per turn, no action): only you can take a project on the board."
     },
     "journalist": {
       "title": "Journalist",
@@ -128,7 +128,6 @@
     "tender": { "title": "City Tender", "text": "2$ for each of your businesses in your biggest district (it is picked for you). At most (10 + round number)$." },
     "campaign": { "title": "Media Campaign", "text": "Spend 2$ and get 4◆." },
     "upgrade_subsidy": { "title": "Patron of the Arts", "text": "Pay 12$ and get +4 points in the final score. No slot needed." },
-    "zoning": { "title": "Rezoning", "text": "Until the end of the round, the chosen district counts as if you had 1 more business there: for project conditions, shady deals, role powers and synergy. Role passives do not count it." },
     "temporary_mandate": { "title": "City Mosaic", "text": "+1 point for each district where you have 2 or more businesses." },
     "mobilization": {"title": "All Hands", "text": "Get +1 normal action right now."},
     "investor_call": { "title": "Named Fund", "text": "Pay 15$ and get +5 points in the final score. No slot needed." },

@@ -144,6 +144,14 @@ def room_view(
             for card in engine.catalog.action_cards.values()
             if card.kind == "district_cash"
         }
+        # The same for every card in hand whose payout reads the table («Аппаратный ресурс» pays per
+        # administrative object, a grant grows with the round): computed by the play code on a copy,
+        # so the hand can print «сейчас даст X» instead of leaving the number to the chronicle.
+        game["card_effects"] = {
+            held.card_id: preview
+            for held in viewer_for_role.hand
+            if (preview := engine.card_play_preview(room.game, viewer_for_role, held.card_id)) is not None
+        }
         # The Крыша price grows with the round and the Мафия pays one less. A client-side copy of
         # that formula drifts, comment and all, so the price ships from the engine instead.
         game["roof_price"] = engine.roof_price(room.game, viewer_for_role)
