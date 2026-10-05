@@ -21,7 +21,7 @@ SCHEMA_VERSION = 1
 # scandals are not cut by grey-scandal reductions; an arrest resets scandals to 0; the politician's
 # «Договоримся» and the card «Изменение зонирования» are gone; legendaries open in round 9 and come
 # out at most two a refill.
-RULES_VERSION = "city-1.20.0"
+RULES_VERSION = "city-1.21.0"
 
 # Bumped whenever the catalog changes, even if no rule moved: card texts are part of the agreement
 # too. 2026-09-30: removed the unsupported cash-exchange purchase payout. 2026-09-30b: «Судебный
@@ -129,10 +129,11 @@ MARKET_DISCARD_WEIGHTS = {"common": 1, "uncommon": 2, "rare": 6, "epic": 12, "le
 # Rarities that stop being dealt in deck order once every rarity is open: from then on they only
 # come out of the weighted draw, as filler.
 LATE_FILLER_RARITIES = frozenset({"common", "uncommon"})
-# At most this many legendaries per refill (1.20.0). They used to open as a wave: by round 8-9 the
-# market was full of them and by 10-11 they were all bought or sunk in the discard. Two a refill
-# from round 9: eight legendaries over seven refills still all reach the table, but spread out.
-LEGENDARIES_PER_REFILL = 2
+# At most this many legendaries on the market at once (1.21.0). They used to open as a wave: by
+# round 9-10 the market was full of them and by 11 they were all bought or sunk in the discard.
+# 1.20.0 capped them per refill, but a purchase refills its slot on its own, so every legendary
+# bought was replaced by the next one: the whole set of eight still came out in rounds 9-10.
+MAX_LEGENDARIES_ON_MARKET = 2
 
 # The catch-up: at the start of every round the trailing player (all of them, on a tie for last)
 # gets this much influence. Not when the whole table is level — that is the opening, not a deficit.

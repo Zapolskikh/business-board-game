@@ -554,6 +554,12 @@ export function describeEventSegments(event: DomainEvent, game: GameState, meta:
         segments.push(playerSeg(game, playerId), txt(" "), signed(paid(playerId), "$"));
         // Passive influence is reported too: a wallet-only line settles it invisibly.
         if (gained(playerId) !== 0) segments.push(txt(" "), signed(gained(playerId), "◆"));
+        // Since 1.21.0 the Защита refill and the scandal decay are settled here as well.
+        const passive = (data.passive_sources as Record<string, Record<string, unknown>> | undefined)?.[playerId];
+        const roofs = numberValue(passive?.roofs);
+        const scandals = numberValue(passive?.scandals);
+        if (roofs !== 0) segments.push(txt(" "), signed(roofs, "🛡"));
+        if (scandals !== 0) segments.push(txt(" "), signed(scandals, "⚠", false));
       });
       return segments;
     }

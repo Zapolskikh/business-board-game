@@ -48,6 +48,36 @@ describe("BoardView", () => {
     expect(() => render(name)).not.toThrow();
   });
 
+  it("проект, доступный только по Хартии, не горит как «можно взять» и помечен 📜", () => {
+    // Раньше поиск по project_id находил вариант use_waiver, и обычное «Взять» молча
+    // тратило Хартию — право на один проект за всю партию.
+    const legal = [
+      { type: "city_project", payload: { project_id: "metro", use_waiver: true } },
+      { type: "end_turn", payload: {} },
+    ];
+    const html = render("Богатый ход", { legal });
+    expect(html).toContain("📜");
+    expect(html).not.toMatch(/data-ui="project-card"[^>]*data-state="ready"/);
+  });
+
+  it("заряженная Хартия видна на карте объекта, потраченная — нет", () => {
+    const charged = render("Хартия заряжена");
+    expect(charged).toContain('data-ui="charter-charge"');
+    expect(charged).toContain('data-ui="project-charter-badge"');
+    const room = scenarios["Хартия заряжена"];
+    const game = room.game as GameState;
+    const spent = {
+      ...game,
+      players: game.players.map(player => (player.id === ME ? { ...player, project_waiver_ready: false } : player)),
+    };
+    const me = spent.players.find(player => player.id === ME) as PlayerState;
+    const html = text(renderToString(
+      <BoardView game={spent} meta={meta} context={{ game: spent, me, legal: [] }} onAction={() => {}}
+        busy={false} error="" onExit={() => {}} />,
+    ));
+    expect(html).not.toContain('data-ui="charter-charge"');
+  });
+
   it("печатает лимит скандалов из движка, а не «/5» для всех", () => {
     // Журналисту движок даёт шесть — зашивать это число в клиент нельзя.
     const html = render("Богатый ход");

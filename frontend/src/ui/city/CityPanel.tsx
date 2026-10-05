@@ -101,6 +101,7 @@ export function CityPanel({
                     owns={district ? districtCount(me, district.id, index.assets) : 0}
                     // Без доли от движка (галерея) — напечатанный доход.
                     income={me.asset_yields?.[owned.uid] ?? { money: asset.income, influence: 0 }}
+                    charterReady={Boolean(me.project_waiver_ready && asset.effects?.projectWaiver)}
                   />
                 </CardPopover>
               </motion.div>
@@ -185,6 +186,7 @@ const OwnedSlot = forwardRef(function OwnedSlot({
   lines,
   owns,
   income,
+  charterReady,
   ...rest
 }: {
   owned: OwnedAsset;
@@ -193,6 +195,8 @@ const OwnedSlot = forwardRef(function OwnedSlot({
   lines: ReturnType<typeof assetEffectLines>;
   owns: number;
   income: AssetYield;
+  /** Хартия в городе и её право на проект ещё не потрачено — заряд виден прямо на карте. */
+  charterReady?: boolean;
 }, ref: ForwardedRef<HTMLButtonElement>) {
   const value = assetPoints(asset);
   const portrait = useIsPortrait();
@@ -217,10 +221,24 @@ const OwnedSlot = forwardRef(function OwnedSlot({
       data-ui="asset-card"
       data-uid={owned.uid}
       style={assetFaceStyle(district?.color, asset.rarity, district?.id)}
-      className={portrait ? assetFaceGridPortrait : assetFaceGrid}
+      className={`relative ${portrait ? assetFaceGridPortrait : assetFaceGrid} ${
+        charterReady ? "ring-2 ring-[#e0b44a] shadow-[0_0_12px_rgb(240_200_90/0.75)]" : ""
+      }`}
       {...rest}
     >
       <AssetFace asset={asset} district={district} lines={lines} income={income} bullets={bullets} owned />
+      {charterReady && (
+        <span
+          data-ui="charter-charge"
+          title={t("ui.city.charterReady")}
+          className="absolute bottom-[26px] right-1.5 z-10 flex items-center gap-0.5 rounded-full border border-black/40
+            bg-[#c99a2e] px-1.5 text-[11px] font-bold leading-tight whitespace-nowrap text-[#2a1d05]
+            shadow-[0_0_8px_rgb(240_200_90/0.9)]"
+        >
+          <span className="text-[13px] leading-none">📜</span>
+          {!portrait && t("ui.city.charterShort")}
+        </span>
+      )}
     </button>
   );
 });

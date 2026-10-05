@@ -288,7 +288,7 @@ export function bookCs(ctx: RulesContext): RulesChapter[] {
         <li>${n.rotation} podniky, které jsou na trhu nejdéle (označené ⏳), odejdou ze stolu a jejich místa zaplní nové z balíčku. Staré podniky jdou do odhozu.</li>
         <li>Projekt úplně vlevo (označený ⏳) jde na spodek balíčku projektů. Ostatní projekty se posunou o místo doleva a jako poslední se přidá nový projekt z balíčku.</li>
       </ol>
-      <p><b>Balíček trhu.</b> Do ${lateRound}. kola vycházejí podniky z balíčku popořadě — od obyčejných k legendárním, jak se otevírá jejich vzácnost. Od ${lateRound}. kola, kdy jsou otevřené všechny vzácnosti, vycházejí vzácné, epické a legendární karty z balíčku pořád první a ostatní místa zaplní náhodná karta z balíčku a odhozu. Čím vzácnější karta, tím větší šance, že padne: obyčejné a neobvyklé podniky jsou na konci hry jen výplň. Při jednom rozdání vyjdou nejvýš dva legendární podniky.</p>
+      <p><b>Balíček trhu.</b> Do ${lateRound}. kola vycházejí podniky z balíčku popořadě — od obyčejných k legendárním, jak se otevírá jejich vzácnost. Od ${lateRound}. kola, kdy jsou otevřené všechny vzácnosti, vycházejí vzácné, epické a legendární karty z balíčku pořád první a ostatní místa zaplní náhodná karta z balíčku a odhozu. Čím vzácnější karta, tím větší šance, že padne: obyčejné a neobvyklé podniky jsou na konci hry jen výplň. Na trhu leží současně nejvýš dva legendární podniky: třetí vyjde, až když se jeden z nich koupí nebo odejde.</p>
       <div class="warn"><b>Po posledním kole se příjem nevyplácí.</b> Všechno, co byste vydělali na konci posledního kola, je nula, takže peníze a vliv utraťte během posledního kola.</div>
       `,
     },
@@ -337,7 +337,7 @@ export function bookCs(ctx: RulesContext): RulesChapter[] {
       <p>Při zatčení klesnou vaše skandály na 0 a přijdete o roli a o 1 Ochranu. V příštím tahu budete mít jen 1 akci. Pokud vás zatknou ve vašem tahu, tah hned skončí.</p>
       <h3>Jak se zbavit skandálů</h3>
       <p><b>Krizové PR</b> může použít každý: 1 akce a ${n.crisisPr}◆ smažou 1 skandál. Můžete ho opakovat, dokud máte akce a vliv. Další způsoby dávají role, karty akcí, podniky a projekty — je to na nich napsané. Ve hře najdete všechny své možnosti pod tlačítkem „Čištění“.</p>
-      <p>Pokud nemáte roli, na začátku každého vašeho tahu sám zmizí 1 skandál.</p>
+      <p>Pokud nemáte roli, na konci každého kola sám zmizí 1 skandál — spolu s příjmem. Na konci kola působí i „+1 Ochrana“ a „−1 skandál“ z podniků a projektů: ochrana je připravená na první útok nového kola, ať v pořadí tahů sedíte kdekoli.</p>
       `,
     },
     {

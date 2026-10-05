@@ -84,10 +84,14 @@ export function CardPopover({
           collisionPadding={10}
           aria-label={label}
           style={{ width: `min(94vw, ${width}px)` }}
-          className="ui-v2 z-50 max-h-[min(460px,80vh)] overflow-auto rounded-[10px]
-            border border-line-2 bg-panel font-sans text-ink"
+          /* Высота — сколько реально есть места от карточки до края экрана (Radix считает это
+           * сам), а не плоские 460px: окно игрока и длинный объект в них не влезали, и кнопка
+           * покупки уезжала под край. Прокручивается только содержимое — стрелка снаружи,
+           * иначе её 6px давали лишнюю полосу прокрутки почти каждому окну. */
+          className="ui-v2 z-50 flex max-h-[min(720px,var(--radix-popover-content-available-height,80vh))]
+            flex-col rounded-[10px] border border-line-2 bg-panel font-sans text-ink"
         >
-          {content}
+          <div className="min-h-0 overflow-auto rounded-[10px]">{content}</div>
           <Popover.Arrow className="fill-line-2" width={12} height={6} />
         </Popover.Content>
       </Popover.Portal>
@@ -112,6 +116,12 @@ export function PopoverBody({ children }: { children: ReactNode }) {
   return <div className="px-3 py-2.5 text-[11.5px] leading-[1.45] text-ink-muted">{children}</div>;
 }
 
+/* Подвал прилипает к низу прокрутки: в нём кнопка действия — купить, взять, продать, — и она
+ * должна быть видна сразу, а не после прокрутки длинного описания. */
 export function PopoverFooter({ children }: { children: ReactNode }) {
-  return <div className="grid gap-1.5 border-t border-line px-3 py-2.5">{children}</div>;
+  return (
+    <div className="sticky bottom-0 z-10 grid gap-1.5 border-t border-line bg-panel px-3 py-2.5">
+      {children}
+    </div>
+  );
 }

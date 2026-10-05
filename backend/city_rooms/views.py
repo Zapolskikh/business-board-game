@@ -109,6 +109,11 @@ def room_view(
         view = next(item for item in game["players"] if item["id"] == player_state.id)
         view["roof_limit"] = engine.roof_limit(player_state)
         view["scandal_limit"] = engine.scandal_limit(player_state)
+        # The charter's one waiver a game, still unspent: the owned card wears a 📜 while it is.
+        # Engine-derived like the limits, so the client never pairs the effect with the flag itself.
+        view["project_waiver_ready"] = (
+            not player_state.project_waiver_used and engine.effect_total(player_state, "projectWaiver") > 0
+        )
     # The viewer's own price for every market slot: discounts are per-player, so the client
     # must not recompute them — two implementations of one price formula drift, and the engine's
     # is the authoritative one.

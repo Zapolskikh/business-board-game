@@ -288,7 +288,7 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
         <li>The ${n.rotation} businesses that have been on the market the longest (marked ⏳) leave the table, and new ones from the deck take their place. The old businesses go to the discard.</li>
         <li>The leftmost project (marked ⏳) goes to the bottom of the project deck. The other projects move one place left, and a new project from the deck is added last.</li>
       </ol>
-      <p><b>The market deck.</b> Until round ${lateRound}, businesses come out of the deck in order — from common to legendary, as each rarity opens. From round ${lateRound}, when every rarity is open, the rare, epic and legendary cards of the deck still come first, and the other places are filled with a random card from the deck and the discard. The rarer the card, the better its chance: late in the game, common and uncommon businesses are only fillers. No more than two legendary businesses come out in one deal.</p>
+      <p><b>The market deck.</b> Until round ${lateRound}, businesses come out of the deck in order — from common to legendary, as each rarity opens. From round ${lateRound}, when every rarity is open, the rare, epic and legendary cards of the deck still come first, and the other places are filled with a random card from the deck and the discard. The rarer the card, the better its chance: late in the game, common and uncommon businesses are only fillers. There are never more than two legendary businesses on the market at once: a third comes out only after one of them is bought or leaves.</p>
       <div class="warn"><b>There is no income after the last round.</b> Everything you would earn at the end of the last round is zero, so spend your money and influence during the last round.</div>
       `,
     },
@@ -337,7 +337,7 @@ export function bookEn(ctx: RulesContext): RulesChapter[] {
       <p>When you are arrested, your scandals reset to 0, and you lose your role and 1 Protection. On your next turn you have only 1 action. If you are arrested on your own turn, the turn ends at once.</p>
       <h3>How to get rid of scandals</h3>
       <p><b>Crisis PR</b> is open to everyone: 1 action and ${n.crisisPr}◆ remove 1 scandal. You can repeat it while you have actions and influence. Roles, action cards, businesses and projects give other ways — it is written on them. In the game all your ways are under the “Clean up” button.</p>
-      <p>If you have no role, 1 scandal goes away by itself at the start of each of your turns.</p>
+      <p>If you have no role, 1 scandal goes away by itself at the end of every round, together with the income. The “+1 Protection” and “−1 scandal” of businesses and projects also work at the end of the round, so your defence is ready for the first hit of the new round wherever you sit in the turn order.</p>
       `,
     },
     {

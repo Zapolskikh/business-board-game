@@ -37,7 +37,7 @@ from city_engine.constants import (
     JOURNALIST_INFLATE_INFLUENCE,
     JOURNALIST_SCANDAL_LIMIT,
     LATE_FILLER_RARITIES,
-    LEGENDARIES_PER_REFILL,
+    MAX_LEGENDARIES_ON_MARKET,
     LOBBYING_INFLUENCE,
     LOBBYING_POINTS,
     MAFIA_CLAIM_ROOFS,
@@ -2445,13 +2445,9 @@ class CityEngine:
         jailed = player.jail_turns > 0
         player.jail_turns = max(0, player.jail_turns - 1)
         player.turns += 1
-        if player.role is None and player.scandals > 0:
-            player.scandals -= 1
-        player.scandals = max(0, player.scandals - self.effect_total(player, "scandalReduction"))
-        # At most one token a turn, however many sources say otherwise: stacked refills made a
-        # player permanently unattackable, which is the one thing no defence should buy.
-        if self.effect_total(player, "turnRoof"):
-            player.roofs = min(self.roof_limit(player), player.roofs + 1)
+        # The scandal decay and the Защита refill are settled with the income (``_settle_passives``),
+        # not here: paid at the player's own turn, they arrived after every rival who moved earlier
+        # had already hit the fresh income — and the leader moves last.
         base_actions = 1 if jailed else (4 if player.role == "fraudster" else 3)
         bonus = min(1, self.effect_total(player, "extraActions"))
         state.actions_left = base_actions + (0 if jailed else bonus)
@@ -2507,9 +2503,14 @@ class CityEngine:
         drawn: list[str] = []
         late = state.round_number >= max(self.catalog.rarity_min_round.values())
 
+        on_market = sum(1 for item in state.market if self.asset(item.card_id).rarity == "legendary")
+
         def legendary_room() -> bool:
-            # Legendaries come out a few a refill rather than as a wave (LEGENDARIES_PER_REFILL).
-            return sum(1 for card_id in drawn if self.asset(card_id).rarity == "legendary") < LEGENDARIES_PER_REFILL
+            # Counted against what already lies on the market, not against this refill alone: every
+            # caller removes the leaving slot first, so a bought legendary frees its place and a
+            # third one cannot come out next to two unsold ones (MAX_LEGENDARIES_ON_MARKET).
+            fresh = sum(1 for card_id in drawn if self.asset(card_id).rarity == "legendary")
+            return on_market + fresh < MAX_LEGENDARIES_ON_MARKET
 
         remaining: list[str] = []
         for card_id in state.market_deck:
@@ -2633,6 +2634,7 @@ class CityEngine:
             player.influence += sum(influence_sources[player.id].values())
             player.debt = 0
             player.scandal_gained_this_round = 0
+        passive_sources = self._settle_passives(state)
         state.append_event(
             "round_settled",
             round_number=state.round_number,
@@ -2640,7 +2642,42 @@ class CityEngine:
             income_sources=income_sources,
             influence_sources=influence_sources,
             object_income_sources=object_income_sources,
+            passive_sources=passive_sources,
         )
+
+    def _settle_passives(self, state: GameState) -> dict[str, dict[str, int]]:
+        """The scandal decay and the Защита refill, for everybody at once, with the income (1.21.0).
+
+        Paid at the start of the player's own turn they reached the leader last: the order runs from
+        the trailing player, so between two turns of the leader up to six rival turns spent the fresh
+        income and stripped a token that would only refill afterwards. Settled here, the defence is
+        up at the same moment the money arrives, whatever the seat. Still once a round, as before.
+
+        Nothing on the final round: its settlement pays nothing, and a scandal washed off there would
+        be free points on the final score.
+        """
+        passive = {player.id: self.passive_preview(state, player) for player in state.players}
+        for player in state.players:
+            player.roofs += passive[player.id]["roofs"]
+            player.scandals += passive[player.id]["scandals"]
+        return passive
+
+    def passive_preview(self, state: GameState, player: PlayerState) -> dict[str, int]:
+        """What settling the round right now changes on the counters: +Защита, −scandals.
+
+        The one definition ``_settle_passives`` applies and ``round_forecast`` displays, so the
+        header cannot promise a token the settlement will not hand out — a full stack shows +0.
+        """
+        if not self.round_pays_out(state):
+            return {"roofs": 0, "scandals": 0}
+        decay = (1 if player.role is None else 0) + self.effect_total(player, "scandalReduction")
+        scandals = -min(player.scandals, decay)
+        # At most one token a round, however many sources say otherwise: stacked refills made a
+        # player permanently unattackable, which is the one thing no defence should buy.
+        roofs = 0
+        if self.effect_total(player, "turnRoof") and player.roofs < self.roof_limit(player):
+            roofs = 1
+        return {"roofs": roofs, "scandals": scandals}
 
     def settlement_preview(
         self, state: GameState
@@ -2786,7 +2823,7 @@ class CityEngine:
         money["total"] = sum(money.values())
         influence = dict(influence_sources[player.id])
         influence["total"] = sum(influence.values())
-        return {"money": money, "influence": influence}
+        return {"money": money, "influence": influence, "passive": self.passive_preview(state, player)}
 
     def _income_breakdown(self, state: GameState, player: PlayerState) -> dict[str, int]:
         """Round money, itemised.

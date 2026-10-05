@@ -129,6 +129,8 @@ export interface PlayerState {
   // Engine-derived too: 5 for everybody, 6 for the Журналист. The role is stripped on reaching
   // it and the arrest follows one step later.
   scandal_limit: number;
+  /** От движка: у игрока есть Градостроительная хартия, и её право на проект ещё не потрачено. */
+  project_waiver_ready?: boolean;
   role: string | null;
   jail_turns: number;
   assets: OwnedAsset[];
@@ -168,6 +170,8 @@ export interface ScoreBreakdown {
 export interface RoundForecast {
   money: { objects: number; projects: number; residents_tax: number; journalist: number; debt: number; total: number };
   influence: { objects: number; administrative: number; projects: number; synergy: number; news: number; rating: number; total: number };
+  /** Что расчёт раунда сделает со счётчиками (1.21.0): +Защита и −скандалы (отрицательное число). */
+  passive?: { roofs: number; scandals: number };
 }
 
 export interface GameState {

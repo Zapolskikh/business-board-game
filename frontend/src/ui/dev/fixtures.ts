@@ -45,6 +45,7 @@ export const roles: RoleMeta[] = [
 
 export const assets: AssetMeta[] = [
   { id: "flex_offices", title: "Сеть гибких офисов", district: "business", rarity: "common", cost: 5, income: 2, influence: 1, points: 2, text: "Доступный доход и 1 влияние при покупке.", tags: ["finance"] },
+  { id: "planning_charter", title: "Градостроительная хартия", district: "government", rarity: "legendary", cost: 16, income: 1, influence: 2, points: 8, text: "Раз за партию: взять городской проект без выполнения условия. Цену и действие платите как обычно.", tags: ["government"], effects: { projectWaiver: 1, synergyInfluence: 1 } },
   { id: "insurance", title: "Страховое агентство", district: "business", rarity: "uncommon", cost: 7, income: 3, influence: 0, points: 3, text: "+1$ за каждый ваш объект Делового центра.", tags: ["finance"] },
   { id: "invest_fund", title: "Инвестиционный фонд", district: "business", rarity: "rare", cost: 8, income: 3, influence: 1, points: 4, text: "+1$ за каждый ваш объект Делового центра. Синергия 4+: +1◆ каждый раунд.", tags: ["finance"] },
   { id: "auto_warehouse", title: "Автоматизированный склад", district: "industrial", rarity: "uncommon", cost: 5, income: 2, influence: 0, points: 2, text: "Простой стабильный доход без условий.", tags: ["logistics"] },
@@ -278,6 +279,7 @@ export function makeGame(overrides: Partial<GameState> = {}): GameState {
     round_forecast: {
       money: { objects: 5, projects: 4, residents_tax: 1, journalist: 2, debt: 0, total: 12 },
       influence: { objects: 0, administrative: 0, projects: 1, synergy: 0, news: 1, rating: 0, total: 2 },
+      passive: { roofs: 1, scandals: -1 },
     },
     ...overrides,
   };
@@ -375,6 +377,23 @@ export const scenarios = {
     });
     return makeRoom({ game, legal_actions: [{ type: "end_turn", payload: {} }] });
   })(),
+
+  /* Хартия в городе и её заряд не потрачен: 📜 на карте объекта и на проекте, который можно
+   * взять только по ней. Обычное «Взять» у такого проекта погашено. */
+  "Хартия заряжена": makeRoom({
+    game: makeGame({
+      players: basePlayers.map(item =>
+        item.id === ME
+          ? { ...item, capacity: 4, project_waiver_ready: true, assets: [...item.assets, { uid: "o-charter", card_id: "planning_charter" }] }
+          : { ...item },
+      ),
+    }),
+    legal_actions: [
+      { type: "city_project", payload: { project_id: "dominant", use_waiver: true } },
+      { type: "city_project", payload: { project_id: "archive" } },
+      { type: "end_turn", payload: {} },
+    ],
+  }),
 
   "Есть свободный слот": makeRoom({
     game: makeGame({

@@ -5,7 +5,8 @@ import { projectPerkText, projectRequirementText, projectRerollMoney } from "../
 import type { CityMeta, GameState, LegalAction, ProjectMeta } from "../../online/types";
 import { CardPopover, PopoverBody, PopoverFooter, PopoverHeader } from "../primitives/CardPopover";
 import { KeyValue, Panel, sectionTitle, zoneRule } from "../primitives/atoms";
-import { resolve, usedThisTurn, type ActionContext } from "../lib/actions";
+import { matches, turnBlock, usedThisTurn, resolve, type ActionContext, type Availability } from "../lib/actions";
+import { tr } from "../../i18n";
 import type { Indexes } from "../lib/board";
 import { useIsPortrait } from "../lib/layout";
 import { projectArt, projectIcon, projectKind, statIcon } from "../assets/cards";
@@ -33,6 +34,7 @@ export function Projects({
   const reroll = resolve(context, "reroll_projects");
   const rerolled = usedThisTurn(game, "projects_rerolled");
   const [confirmReroll, setConfirmReroll] = useState(false);
+  const [charterFor, setCharterFor] = useState<{ action: LegalAction; project: ProjectMeta } | null>(null);
   const mine = context.me.projects
     .map(id => index.projects.get(id))
     .filter((project): project is ProjectMeta => Boolean(project));
@@ -97,6 +99,20 @@ export function Projects({
         >
           {t("ui.projects.rerollHint")}
         </ConfirmModal>
+        {/* Хартия — право на один проект за всю партию, и обратно его не вернуть. Поэтому
+          * отдельная кнопка и подтверждение, а не тихая подмена обычного «Взять». */}
+        <ConfirmModal
+          open={charterFor !== null}
+          onClose={() => setCharterFor(null)}
+          onConfirm={() => charterFor && onAction(charterFor.action)}
+          title={t("ui.projects.charterTitle")}
+          price={charterFor
+            ? t("ui.projects.charterPrice", { influence: charterFor.project.cost_influence, money: charterFor.project.cost_money })
+            : ""}
+          confirmLabel={t("ui.projects.charterConfirm")}
+        >
+          {t("ui.projects.charterHint")}
+        </ConfirmModal>
       </div>
 
       {/* 90% ширины: проектов всегда четыре, и на всю колонку карточки растягивались
@@ -107,7 +123,8 @@ export function Projects({
           {game.project_board.map((projectId, position) => {
             const project = index.projects.get(projectId);
             if (!project) return null;
-            const take = resolve(context, "city_project", { project_id: projectId });
+            const take = takeProject(context, projectId);
+            const charter = charterTake(context, projectId);
             const standing = game.project_progress?.[projectId];
             // Ровно один проект уходит за раунд, всегда самый давний. Это правило движка,
             // и его стоит в будущем присылать флагом рядом с проектом, как это уже
@@ -152,6 +169,8 @@ export function Projects({
                       leaving={leaving}
                       state={take}
                       onTake={() => take.kind === "ready" && onAction(take.action)}
+                      charter={charter}
+                      onCharter={action => setCharterFor({ action, project })}
                       veto={context.legal.find(
                         action =>
                           action.type === "use_role_power" &&
@@ -169,6 +188,7 @@ export function Projects({
                     standing={standing}
                     leaving={leaving}
                     ready={take.kind === "ready"}
+                    charter={Boolean(charter)}
                     pending={take.kind === "pending"}
                     shortInfluence={context.me.influence < project.cost_influence}
                     shortMoney={context.me.money < project.cost_money}
@@ -205,6 +225,8 @@ const ProjectCard = forwardRef<
     standing: Standing;
     leaving: boolean;
     ready: boolean;
+    /** Условие не выполнено, но движок предлагает взять проект по Хартии. */
+    charter: boolean;
     pending: boolean;
     shortInfluence: boolean;
     shortMoney: boolean;
@@ -212,7 +234,7 @@ const ProjectCard = forwardRef<
     veto?: "mine" | "theirs";
   }
 >(function ProjectCard(
-  { project, meta, standing, leaving, ready, pending, shortInfluence, shortMoney, veto, ...rest },
+  { project, meta, standing, leaving, ready, charter, pending, shortInfluence, shortMoney, veto, ...rest },
   ref,
 ) {
   const met = standing?.met ?? false;
@@ -249,6 +271,18 @@ const ProjectCard = forwardRef<
         >
           {project.title}
         </b>
+        {/* Та же плашка, что «уходит», но золотом: проект можно взять только по Хартии. */}
+        {charter && (
+          <span
+            data-ui="project-charter-badge"
+            className="flex items-center gap-0.5 rounded-full border border-black/40 bg-[#c99a2e] px-1.5 text-[11px]
+              font-bold leading-tight whitespace-nowrap text-[#2a1d05] shadow-[0_0_6px_rgb(240_200_90/0.8)]"
+            title={t("ui.projects.charterBadge")}
+          >
+            <span className="text-[13px] leading-none">📜</span>
+            {!portrait && t("ui.projects.charterShort")}
+          </span>
+        )}
         {veto && (
           <span
             className={`rounded px-1 text-3xs ${
@@ -367,6 +401,8 @@ function ProjectDetails({
   leaving,
   state,
   onTake,
+  charter,
+  onCharter,
   veto,
   onVeto,
   vetoBy,
@@ -375,8 +411,11 @@ function ProjectDetails({
   meta: CityMeta;
   standing: Standing;
   leaving: boolean;
-  state: ReturnType<typeof resolve>;
+  state: Availability;
   onTake: () => void;
+  /** Взятие по Хартии, если движок его предлагает: отдельная кнопка с подтверждением. */
+  charter?: LegalAction;
+  onCharter: (action: LegalAction) => void;
   /** Вето политика на этот проект, если движок его сейчас разрешает. */
   veto?: LegalAction;
   onVeto: (action: LegalAction) => void;
@@ -441,6 +480,17 @@ function ProjectDetails({
             {t("ui.projects.veto")}
           </button>
         )}
+        {charter && (
+          <button
+            type="button"
+            data-ui="project-charter"
+            onClick={() => onCharter(charter)}
+            className="mb-1 rounded-md border border-gold bg-[#2a2412] px-2 py-2 text-center text-xs
+              font-semibold text-gold hover:bg-[#3a3218]"
+          >
+            <ResourceText>{t("ui.projects.charter", { influence: project.cost_influence, money: project.cost_money })}</ResourceText>
+          </button>
+        )}
         <button
           type="button"
           disabled={state.kind !== "ready"}
@@ -457,4 +507,22 @@ function ProjectDetails({
       </PopoverFooter>
     </>
   );
+}
+
+/* Обычное «Взять» ищет только вариант без Хартии. Раньше поиск по одному project_id
+ * находил и вариант `use_waiver`, когда условие не выполнено, — и кнопка «Взять»
+ * молча тратила Хартию, право на один проект за всю партию. */
+function takeProject(context: ActionContext, projectId: string): Availability {
+  if (context.pending && matches(context.pending, "city_project", { project_id: projectId })) {
+    return { kind: "pending", action: context.pending };
+  }
+  const action = context.legal.find(
+    item => matches(item, "city_project", { project_id: projectId }) && item.payload.use_waiver !== true,
+  );
+  if (action) return { kind: "ready", action };
+  return { kind: "blocked", reason: turnBlock(context) ?? tr("game", "ui.block.unavailable") };
+}
+
+function charterTake(context: ActionContext, projectId: string): LegalAction | undefined {
+  return context.legal.find(item => matches(item, "city_project", { project_id: projectId, use_waiver: true }));
 }

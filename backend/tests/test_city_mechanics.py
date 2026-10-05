@@ -2687,6 +2687,36 @@ def test_legendaries_open_in_round_nine_at_most_two_a_refill() -> None:
     assert not any(item.card_id in legendaries for item in state.market)
 
 
+def test_a_purchase_refill_cannot_push_the_market_past_two_legendaries() -> None:
+    """1.21.0: the cap is on the market, not on one refill — a bought slot refills on its own.
+
+    Under the per-refill cap every purchase was a fresh refill of one, so all eight legendaries came
+    out in rounds 9-10 (a live game bought every one of them there).
+    """
+    engine = CityEngine()
+    catalog = load_catalog()
+    legendaries = [card_id for card_id, asset in catalog.assets.items() if asset.rarity == "legendary"]
+    state = make_state()
+    state.round_number = 9
+    state.market = []
+    state.market_deck = legendaries + [card_id for card_id in state.market_deck if card_id not in legendaries]
+    engine._refill_market(state, 6)
+    count = lambda: sum(1 for item in state.market if item.card_id in legendaries)  # noqa: E731
+    assert count() == 2
+
+    # An ordinary slot leaves: its replacement may not be a third legendary.
+    ordinary = next(item for item in state.market if item.card_id not in legendaries)
+    state.market = [item for item in state.market if item.uid != ordinary.uid]
+    engine._refill_market(state, 1)
+    assert count() == 2
+
+    # A legendary leaves: the next one may take its place.
+    sold = next(item for item in state.market if item.card_id in legendaries)
+    state.market = [item for item in state.market if item.uid != sold.uid]
+    engine._refill_market(state, 1)
+    assert count() == 2
+
+
 def test_card_play_preview_reads_the_table_without_touching_it() -> None:
     """«Сейчас даст X»: the play code itself, run on a copy, for cards whose payout reads the table."""
     engine = CityEngine()
@@ -2701,3 +2731,63 @@ def test_card_play_preview_reads_the_table_without_touching_it() -> None:
     # A card that prints its own number gets no preview.
     assert engine.card_play_preview(state, player, "upgrade_subsidy") is None
     assert (player.money, player.influence) == (money, influence)
+
+
+def _close_round(engine: CityEngine, state):
+    """End every remaining turn of the current round; returns the state the next round opens with."""
+    opening = state.round_number
+    while state.round_number == opening and state.status == "playing":
+        state = run(engine, state, "end_turn")
+    return state
+
+
+def test_defence_and_scandal_decay_are_settled_with_the_income() -> None:
+    """1.21.0: the Защита refill and the scandal decay land at the round settlement, for everybody.
+
+    Paid at the player's own turn they arrived after every rival who moved earlier had hit the fresh
+    income. Now the defence is up before the first turn of the new round, whatever the seat.
+    """
+    engine = CityEngine()
+    state = make_state()
+    defender = state.players[0]
+    clean = state.players[1]
+    give_asset(state, defender, "fortress_factory")  # +1 Защита limit, refills a token
+    give_asset(state, defender, "anticorruption")  # −1 scandal
+    defender.role = "capitalist"
+    defender.roofs, defender.scandals = 0, 3
+    clean.role, clean.scandals = None, 2  # no role: one scandal decays by itself
+    # The header reads the same numbers the settlement will apply.
+    assert engine.round_forecast(state, defender)["passive"] == {"roofs": 1, "scandals": -1}
+    assert engine.round_forecast(state, clean)["passive"] == {"roofs": 0, "scandals": -1}
+
+    state = _close_round(engine, state)
+    defender, clean = state.player_by_id(defender.id), state.player_by_id(clean.id)
+    # Settled before anybody acts in round 2 — the first player of the round sees it already.
+    assert state.round_number == 2 and state.turns_taken_in_round == 0
+    assert defender.roofs == 1 and defender.scandals == 2
+    assert clean.scandals == 1
+    settled = next(event for event in reversed(state.event_log) if event.type == "round_settled")
+    assert settled.data["passive_sources"][defender.id] == {"roofs": 1, "scandals": -1}
+    assert settled.data["passive_sources"][clean.id] == {"roofs": 0, "scandals": -1}
+
+    # The turn start no longer pays it a second time.
+    roofs, scandals = defender.roofs, defender.scandals
+    while state.current_player.id != defender.id:
+        state = run(engine, state, "end_turn")
+    defender = state.player_by_id(defender.id)
+    assert (defender.roofs, defender.scandals) == (roofs, scandals)
+
+
+def test_the_final_settlement_washes_off_no_scandal() -> None:
+    engine = CityEngine()
+    state = make_state()
+    state.round_number = state.max_rounds
+    player = state.players[0]
+    give_asset(state, player, "anticorruption")
+    player.role, player.scandals, player.roofs = None, 3, 0
+    give_asset(state, player, "fortress_factory")
+
+    state = _close_round(engine, state)
+    assert state.status == "finished"
+    player = state.player_by_id(player.id)
+    assert (player.scandals, player.roofs) == (3, 0)

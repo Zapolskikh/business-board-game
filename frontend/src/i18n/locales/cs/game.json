@@ -86,9 +86,9 @@
   "perk": {
     "passiveMoney": "+{{value}}$ každé kolo",
     "passiveInfluence": "+{{value}}◆ každé kolo",
-    "scandalReduction": "−{{value}} skandál na začátku tahu",
+    "scandalReduction": "−{{value}} skandál na konci každého kola",
     "greyScandalReduction": "−{{value}} skandál ze šedých kšeftů",
-    "turnRoof": "+1 Ochrana na začátku každého tahu",
+    "turnRoof": "+1 Ochrana na konci každého kola",
     "roofCapacity": "+{{value}} k limitu Ochrany",
     "extraInvestmentActions": "+1 akce na začátku tahu",
     "none": "bez trvalého bonusu"
@@ -273,12 +273,12 @@
     "extraActionsShort": "+1 akce/tah",
     "extraInvestment": "+1 akce na začátku tahu",
     "extraInvestmentShort": "+1 akce",
-    "turnRoof": "+1 Ochrana na začátku každého tahu",
-    "turnRoofShort": "+1 Ochrana/tah",
+    "turnRoof": "+1 Ochrana na konci každého kola",
+    "turnRoofShort": "+1 Ochrana/kolo",
     "roofCapacity": "+{{value}} k limitu Ochrany",
     "roofCapacityShort": "limit Ochrany +{{value}}",
-    "scandalReduction": "−{{value}} skandál na začátku tahu",
-    "scandalReductionShort": "−{{value}} skandál/tah",
+    "scandalReduction": "−{{value}} skandál na konci každého kola",
+    "scandalReductionShort": "−{{value}} skandál/kolo",
     "greyReduction": "−{{value}} skandál ze šedých kšeftů",
     "greyReductionShort": "−{{value}}⚠ ze šedých",
     "turnCard": "+1 karta akce na začátku tahu",
@@ -343,7 +343,7 @@
       "roofPrice": "Cena Ochrany", "roofStrong": "Ochrana",
       "roofText": " je jediná obrana ve hře. Úplně zastaví jakýkoli úder soupeře na vás: kartu, výpalné, sankce, hack, pokus vzít vám roli i jakékoli skandály. Pak se spotřebuje. Před vašimi vlastními rozhodnutími (třeba neúspěšným šedým kšeftem) nechrání.",
       "scandalsStrong": "Skandály:",
-      "scandalsText": " při {{limit}} přijdete o roli, při {{jail}} vás zatknou. Skandál můžete smazat krizovým PR. Když nemáte roli, jeden skandál sám zmizí na začátku tahu."
+      "scandalsText": " při {{limit}} přijdete o roli, při {{jail}} vás zatknou. Skandál můžete smazat krizovým PR. Když nemáte roli, jeden skandál sám zmizí na konci každého kola."
     },
     "actionsInfo": {
       "title": "⚡ Akce", "left": "zbývá {{count}}",
@@ -356,7 +356,7 @@
     "header": {
       "title": "Město vlivu", "round": "Kolo {{round}} / {{max}}", "points": "Body", "money": "Peníze",
       "influence": "Vliv", "roofs": "Ochrana", "scandals": "Skandály", "actions": "Akce", "yourRole": "Vaše role",
-      "noRole": "Bez role", "score": "Skóre", "resources": "Zdroje", "income": "Příjem za kolo", "city": "Město",
+      "noRole": "Bez role", "score": "Skóre", "resources": "Zdroje", "income": "Příjem za kolo", "roofsRound": "Ochrana za kolo", "scandalsRound": "Skandály za kolo", "city": "Město",
       "defence": "Obrana", "scoreButton": "Skóre a příjem", "chronicle": "Kronika", "rules": "Pravidla", "rooms": "Místnosti",
       "backToRooms": "Zpět do místností", "menu": "Nabídka", "busy": "Server provádí tah, boti přemýšlejí…",
       "finished": "🏁 Hra skončila", "jailed": "🚔 Zatčení: v příštím tahu jen 1 akce", "theme": "Barevné téma"
@@ -377,7 +377,13 @@
       "ofNeeded": "{{have}} z {{needed}}", "perk": "🎁 Trvalý bonus:",
       "leavingNote": "⏳ Odchází na konci kola — na spodek balíčku.",
       "veto": "⛔ Veto — zavřít projekt pro všechny ostatní (bez akce, jednou za tah)", "vetoInfoTitle": "🚫 Veto Politika", "vetoInfo": "{{name}} vetoval tento projekt: dokud je na desce, může ho vzít jen on. Veto končí, když projekt odejde z desky nebo Politik přijde o roli.", "vetoInfoMine": "Vaše veto: dokud je projekt na desce a vy jste Politik, můžete ho vzít jen vy. Veto máte jen jedno: nové ruší staré.",
-      "take": "Vzít · {{influence}}◆ + {{money}}$", "taking": "Bereme…"
+      "take": "Vzít · {{influence}}◆ + {{money}}$", "taking": "Bereme…",
+      "charter": "📜 Vzít s Listinou · {{influence}}◆ + {{money}}$",
+      "charterShort": "Listina", "charterBadge": "Podmínka není splněna, ale projekt můžete vzít s Územní listinou",
+      "charterTitle": "Vzít projekt s Listinou?",
+      "charterPrice": "Cena: {{influence}}◆, {{money}}$ a jedna akce. Podmínka projektu není potřeba.",
+      "charterHint": "Územní listina ruší podmínku projektu jen jednou za hru. Potom právo propadne, i když listinu prodáte.",
+      "charterConfirm": "Vzít s Listinou"
     },
     "asset": {
       "roof": "+{{count}} Ochrana", "card": "+karta",
@@ -398,7 +404,7 @@
       "openTitle": "Otevřít místo {{number}}?", "openHint": "Místo natrvalo rozšíří vaše město: můžete do něj postavit další podnik.",
       "openPrice": "Cena: {{money}}$ a jedna akce. Peníze se nevracejí.", "openPriceInfluence": "Cena: {{money}}$, {{influence}}◆ a jedna akce. Nic se nevrací.", "openConfirm": "Otevřít místo", "lockedSlot": "🔒 Místo {{number}}", "open": "Otevřít · ",
       "district": "čtvrť {{count}}/4", "districtTitle": "Vaše podniky v této čtvrti. Synergie začíná při 2 a při 4.",
-      "sellTitle": "Prodat za {{value}}$ — nestojí akci", "districtRow": "Čtvrť",
+      "sellTitle": "Prodat za {{value}}$ — nestojí akci", "charterShort": "nabitá", "charterReady": "Listina je nabitá: jednou za hru můžete vzít projekt bez podmínky. Hledejte 📜 na desce projektů", "districtRow": "Čtvrť",
       "districtValue": "{{icon}} {{title}} · máte {{count}} ze 4", "printedRow": "Příjem na kartě", "printedValue": "+{{money}}$ za kolo", "incomeRow": "Příjem teď",
       "incomeNow": "+{{money}}$ za kolo",
       "incomeNowInfluence": "+{{money}}$ a +{{influence}}◆ za kolo",
@@ -435,7 +441,7 @@
     },
     "powers": {
       "title": "⚡ Schopnosti role", "noRoleSubtitle": "bez role",
-      "noRoleStart": "Nemáte roli. Bez role jeden skandál sám zmizí na začátku tahu, ale bonusy a schopnosti role nemáte. Role stojí ",
+      "noRoleStart": "Nemáte roli. Bez role jeden skandál sám zmizí na konci každého kola, ale bonusy a schopnosti role nemáte. Role stojí ",
       "noRoleEnd": " — vzít ji můžete v seznamu rolí.",
       "subtitle": "schopnosti role", "allPerks": "Všechny bonusy fungují naplno.", "noPerks": "Tato role nemá trvalé bonusy.",
       "active": "Schopnosti", "action": "⚡ akce", "noAction": "bez akce", "price": "Cena: {{cost}}", "apply": "Použít",
@@ -461,7 +467,7 @@
       "roofNote": "Dokud má držitel Ochranu, jeho roli vzít nelze. Nejdřív mu Ochranu odeberte.", "protected": "Chráněno Ochranou",
       "mine": "Vaše role", "holder": "Má ji {{name}}", "freeState": "Volná", "already": "Už je vaše", "take": "Vzít roli",
       "pick": "Vybrat roli", "unavailable": "Teď ne", "passive": "Bonusy", "powers": "Schopnosti", "working": "Teď funguje · {{role}}",
-      "noRole": "Nemáte roli. Na začátku každého tahu jeden skandál sám zmizí, ale bonusy a schopnosti role nemáte."
+      "noRole": "Nemáte roli. Na konci každého kola jeden skandál sám zmizí, ale bonusy a schopnosti role nemáte."
     },
     "book": {
       "title": "Kniha města", "subtitle": "Pravidla hry Město vlivu", "search": "Hledat v pravidlech", "clear": "Smazat hledání",

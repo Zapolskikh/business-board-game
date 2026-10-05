@@ -58,7 +58,7 @@ const HudStat = forwardRef<HTMLButtonElement, ButtonProps>(function HudStat(
       className={`grid min-w-0 content-center gap-0.5 px-3 py-1.5 text-left hover:bg-panel-3 ${className}`}
       {...rest}
     >
-      <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-ink-dim">{label}</span>
+      <span className="whitespace-nowrap text-[9px] font-semibold uppercase tracking-[0.1em] text-ink-dim">{label}</span>
       <span className="flex items-center gap-2 whitespace-nowrap text-[14px] leading-none font-bold">{children}</span>
     </button>
   );
@@ -96,6 +96,9 @@ export function Header({
   const risky = atScandalRisk(me);
   const role = meta.roles.find(item => item.id === me.role);
   const income = game.round_forecast;
+  const passiveRoofs = income?.passive?.roofs ?? 0;
+  /* Движок присылает снижение отрицательным числом; в шапке — сколько скандалов уйдёт. */
+  const passiveScandals = -(income?.passive?.scandals ?? 0);
   /* Подпись у кнопки есть всегда — на узком экране она уезжает в aria-label, а не пропадает.
    * Кнопки те же самые: разница только в том, показывать ли слово рядом со значком. */
   const { t } = useTranslation("game");
@@ -140,7 +143,7 @@ export function Header({
         data-ui="player-hud"
         /* Пергамент с золотой каймой — «табличка» игрока, как карточки на столе. Токены
          * `.game-card` переводят текст и цвета смысла на тёмные, под бумагу. */
-        className="game-card hud-plate flex min-w-0 max-w-[780px] items-stretch self-stretch justify-self-center
+        className="game-card hud-plate flex min-w-0 max-w-[920px] items-stretch self-stretch justify-self-center
           overflow-hidden rounded-lg"
       >
         {dashboard()}
@@ -227,6 +230,24 @@ export function Header({
             </span>
             <span className="flex items-center gap-0.5 text-influence">
               +{income?.influence.total ?? 0}<Crown />
+            </span>
+          </HudStat>
+        </CardPopover>
+        <Sep />
+        {/* Пассивы раунда (1.21.0): что расчёт раунда сделает с Защитой и скандалами. Прогноз,
+          * а не ставка: при полном пределе Защиты здесь честный +0. */}
+        <CardPopover side="bottom" align="center" content={<DefenceDetails game={game} me={me} />}>
+          <HudStat label={t("ui.header.roofsRound")}>
+            <span className={`flex items-center gap-0.5 ${passiveRoofs > 0 ? "text-defence" : "text-ink-muted"}`}>
+              +{passiveRoofs}<Icon src={statIcon("roof")} />
+            </span>
+          </HudStat>
+        </CardPopover>
+        <Sep />
+        <CardPopover side="bottom" align="center" content={<DefenceDetails game={game} me={me} />}>
+          <HudStat label={t("ui.header.scandalsRound")}>
+            <span className={`flex items-center gap-0.5 ${passiveScandals > 0 ? "text-good" : "text-ink-muted"}`}>
+              {passiveScandals > 0 ? "−" : ""}{passiveScandals}<Icon src={statIcon("scandal")} />
             </span>
           </HudStat>
         </CardPopover>
