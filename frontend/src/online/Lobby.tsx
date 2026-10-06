@@ -299,10 +299,14 @@ const SEAT_COLORS = ["#b9a2d4", "#7fc8bd", "#8fb3dd", "#df9a7a"];
 // The engine still accepts the retired policies, but they play the old economy, so they are not
 // offered. Reborn went the same way: it was written for rules long gone and loses to a newcomer by
 // the fifth round. A seat that already holds it keeps playing — the server still knows the id.
-const BOT_POLICIES: { id: Difficulty; name: string; level: "easy" | "normal" | "hard" | "strategy" }[] = [
-  { id: "ledger", name: "Claude Ledger", level: "normal" },
-  { id: "oracle", name: "Claude Oracle", level: "hard" },
-  { id: "boris", name: "BorisTheTraxer", level: "strategy" },
+// Names come from the locale (`common:difficulty.*`) and carry no vendor prefix: players took a
+// «Claude …» seat for a live AI agent rather than a scripted bot.
+const BOT_POLICIES: { id: Difficulty; level: "easy" | "normal" | "hard" | "strategy" }[] = [
+  { id: "ledger", level: "normal" },
+  { id: "oracle", level: "hard" },
+  { id: "boris", level: "strategy" },
+  { id: "raider", level: "strategy" },
+  { id: "builder", level: "strategy" },
 ];
 // Only Reborn reads a favourite role; the other policies pick their seat from the position, so the
 // selector would promise them something they ignore.
@@ -323,7 +327,7 @@ function BotConfigurator({ seat, roles, disabled, onApply }: {
     <div className="bot-controls-v2">
       <label className="room-field">{t("seat.botModel")}
         <select value={policy} onChange={event => setPolicy(event.target.value as Difficulty)}>
-          {BOT_POLICIES.map(item => <option value={item.id} key={item.id}>{t(`seat.botLevel.${item.level}`)} · {item.name}</option>)}
+          {BOT_POLICIES.map(item => <option value={item.id} key={item.id}>{t(`seat.botLevel.${item.level}`)} · {t(`difficulty.${item.id}`, { ns: "common" })}</option>)}
         </select>
       </label>
       {USES_PREFERRED_ROLE.has(policy) && (

@@ -36,7 +36,9 @@
     "expert": "Reborn",
     "ledger": "Ledger",
     "oracle": "Oracle",
-    "boris": "BorisTheTraxer"
+    "boris": "Pokladník",
+    "raider": "Nájezdník",
+    "builder": "Stavitel"
   },
   "support": {
     "donate": "Podpořit na {{site}}",

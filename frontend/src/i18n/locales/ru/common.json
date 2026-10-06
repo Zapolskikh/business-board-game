@@ -36,7 +36,9 @@
     "expert": "Reborn",
     "ledger": "Ledger",
     "oracle": "Oracle",
-    "boris": "BorisTheTraxer"
+    "boris": "Казначей",
+    "raider": "Рейдер",
+    "builder": "Застройщик"
   },
   "support": {
     "donate": "Поддержать на {{site}}",

@@ -36,7 +36,9 @@
     "expert": "Reborn",
     "ledger": "Ledger",
     "oracle": "Oracle",
-    "boris": "BorisTheTraxer"
+    "boris": "Treasurer",
+    "raider": "Raider",
+    "builder": "Builder"
   },
   "support": {
     "donate": "Support us on {{site}}",

@@ -1,5 +1,5 @@
-// Only Claude Reborn is left; the server reads retired ids in saved games back as "expert".
-export type Difficulty = "expert" | "ledger" | "oracle" | "boris";
+// The bot policies a seat may carry; the server reads retired ids in saved games back as "expert".
+export type Difficulty = "expert" | "ledger" | "oracle" | "boris" | "raider" | "builder";
 export type RoomStatus = "waiting" | "playing" | "finished";
 
 export interface RoomSummary {
