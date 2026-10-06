@@ -267,7 +267,13 @@ function TurnStatus({ game, me }: { game: GameState; me: PlayerState }) {
   const mine = current?.id === me.id;
   const ahead = turnPosition(game, me.id) - (game.turns_taken_in_round ?? 0);
   return (
-    <div data-ui="turn-status" className="grid min-w-[170px] gap-1">
+    /* Своя еле заметная рамка и выравнивание по центру: без них раунд и ход висели в левом
+     * верхнем углу шапки, прижатые к краю. */
+    <div
+      data-ui="turn-status"
+      className="grid min-w-[190px] content-center justify-items-center gap-1 self-stretch rounded-lg
+        border border-line/50 bg-panel/30 px-3 py-1 text-center"
+    >
       <span className="text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-dim">
         {t("ui.header.round", { round: game.round_number, max: game.max_rounds })}
       </span>
@@ -278,7 +284,7 @@ function TurnStatus({ game, me }: { game: GameState; me: PlayerState }) {
           {t("ui.mobile.yourTurn")}
         </b>
       ) : (
-        <span className="flex min-w-0 items-baseline gap-1.5 whitespace-nowrap">
+        <span className="flex min-w-0 max-w-full items-baseline justify-center gap-1.5 whitespace-nowrap">
           <b className="card-serif overflow-hidden text-ellipsis text-[16px] leading-tight text-ink">
             {t("ui.mobile.turnOf", { name: current?.name ?? "" })}
           </b>
