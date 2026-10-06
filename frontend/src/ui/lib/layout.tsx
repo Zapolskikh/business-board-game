@@ -145,7 +145,15 @@ export function useMobileViewport(active: boolean): void {
       const scale = (screenSides()!.long / width + nudge).toFixed(4);
       return `width=${width}, initial-scale=${scale}, minimum-scale=${scale}, maximum-scale=${scale}, user-scalable=no, viewport-fit=cover`;
     };
+    /* Пока игрок печатает (чат), стол не трогаем: клавиатура сама сдвигает видимую область,
+     * чтобы показать поле ввода, а возврат «на место» и перезапись meta увели бы поле обратно
+     * под клавиатуру или сбросили фокус. Всё выровняется, когда клавиатура закроется. */
+    const typing = () => {
+      const focused = document.activeElement;
+      return focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement;
+    };
     const home = () => {
+      if (typing()) return;
       if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
     };
     /* Не чаще раза в 700 мс: переписанная meta сама вызывает resize видимой области, и без
@@ -155,6 +163,7 @@ export function useMobileViewport(active: boolean): void {
     let applied = 0;
     let retry = 0;
     const settle = () => {
+      if (typing()) return;
       const now = Date.now();
       if (now - last < 700) {
         if (!retry) {
@@ -177,7 +186,7 @@ export function useMobileViewport(active: boolean): void {
     };
     // Панели браузера появились или спрятались — видимая область другой формы, стол пересчитывается.
     const resync = () => {
-      if (Math.abs(logicalWidth() - applied) > 4) settle();
+      if (!typing() && Math.abs(logicalWidth() - applied) > 4) settle();
     };
     // Смещение видимой области (не прокрутка документа) — тоже сигнал вернуть стол на место.
     const drift = () => {
@@ -197,12 +206,16 @@ export function useMobileViewport(active: boolean): void {
     window.addEventListener("orientationchange", settle);
     document.addEventListener("fullscreenchange", settle);
     document.addEventListener("webkitfullscreenchange", settle);
+    // Клавиатура закрылась — фокус ушёл из поля: теперь можно вернуть стол на место.
+    const released = () => timers.push(window.setTimeout(drift, 350));
+    document.addEventListener("focusout", released);
     window.addEventListener("resize", resync);
     window.visualViewport?.addEventListener("resize", drift);
     window.visualViewport?.addEventListener("scroll", drift);
     return () => {
       timers.forEach(timer => window.clearTimeout(timer));
       window.clearTimeout(retry);
+      document.removeEventListener("focusout", released);
       window.removeEventListener("resize", resync);
       window.removeEventListener("orientationchange", settle);
       document.removeEventListener("fullscreenchange", settle);
@@ -215,4 +228,37 @@ export function useMobileViewport(active: boolean): void {
       meta.setAttribute("content", original);
     };
   }, [active]);
+}
+
+/* Видимая часть экрана: без того, что закрыла экранная клавиатура.
+ *
+ * `position: fixed` на телефоне считается от всей страницы, а не от того, что видно, поэтому окно
+ * «по центру экрана» при открытой клавиатуре оказывается под ней. Окно, в котором печатают, ставят
+ * по этим координатам: `top` — где видимая область начинается, `height` — сколько её осталось. */
+export function useVisibleArea(active: boolean): { top: number; height: number } {
+  const read = () => {
+    const view = typeof window === "undefined" ? undefined : window.visualViewport;
+    if (view) return { top: view.offsetTop, height: view.height };
+    return { top: 0, height: typeof window === "undefined" ? 600 : window.innerHeight };
+  };
+  const [area, setArea] = useState(read);
+  useEffect(() => {
+    if (!active || typeof window === "undefined") return;
+    const update = () =>
+      setArea(current => {
+        const next = read();
+        return Math.abs(next.top - current.top) < 0.5 && Math.abs(next.height - current.height) < 0.5 ? current : next;
+      });
+    update();
+    const view = window.visualViewport;
+    view?.addEventListener("resize", update);
+    view?.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
+    return () => {
+      view?.removeEventListener("resize", update);
+      view?.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, [active]);
+  return area;
 }

@@ -16,6 +16,7 @@ export function Modal({
   children,
   footer,
   headerAction,
+  area,
   nested = false,
 }: {
   open: boolean;
@@ -27,6 +28,9 @@ export function Modal({
   width?: number;
   children: ReactNode;
   footer?: ReactNode;
+  /** Окно, в котором печатают: встаёт в видимую часть экрана над клавиатурой (см. `useVisibleArea`)
+   * и занимает её по высоте, а не центруется по всей странице. */
+  area?: { top: number; height: number };
   /** Окно поверх другого окна: затемнение ложится и на нижнее окно, а не только на доску. */
   nested?: boolean;
 }) {
@@ -38,7 +42,10 @@ export function Modal({
         <Dialog.Overlay className={`fixed inset-0 bg-[#0009] ${nested ? "z-[55]" : "z-40"}`} />
         <Dialog.Content
           data-ui="modal"
-          style={{ width: `min(${Math.round(width * (zoom ?? 1))}px, 94vw)` }}
+          style={{
+            width: `min(${Math.round(width * (zoom ?? 1))}px, 94vw)`,
+            ...(area ? { top: area.top, height: area.height, maxHeight: "none", translate: "-50% 0" } : {}),
+          }}
           className={`ui-v2 fixed left-1/2 top-1/2 grid max-h-[88vh] -translate-x-1/2 -translate-y-1/2
             grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-[12px] border border-line-2
             bg-panel font-sans text-ink ${nested ? "z-[56]" : "z-50"}`}

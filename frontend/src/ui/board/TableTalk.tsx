@@ -4,6 +4,7 @@ import { chatText } from "../../online/botTalk";
 import { describeEventSegments } from "../../online/gameUi";
 import type { ChatMessage, CityMeta, GameState } from "../../online/types";
 import { playerColor } from "../lib/board";
+import { useVisibleArea } from "../lib/layout";
 import { Modal } from "../primitives/Modal";
 import { Panel } from "../primitives/atoms";
 import { LogSegments } from "./LogSegments";
@@ -243,9 +244,15 @@ export function ChatModal({
   onSend?: Send;
 }) {
   const { t } = useTranslation("game");
+  /* Окно стоит в видимой части экрана: без клавиатуры — по центру, с клавиатурой — над ней, и
+   * поле ввода остаётся на виду. Отступ сверху и снизу — чтобы рамка не липла к краям. */
+  const visible = useVisibleArea(open);
+  const gap = 8;
+  const height = Math.max(150, Math.min(visible.height - 2 * gap, 430));
+  const top = visible.top + Math.max(gap, (visible.height - height) / 2);
   return (
-    <Modal open={open} onClose={onClose} title={`💬 ${t("ui.chat.title")}`} width={560}>
-      <div className="grid h-[250px]">
+    <Modal open={open} onClose={onClose} title={`💬 ${t("ui.chat.title")}`} width={560} area={{ top, height }}>
+      <div className="grid h-full min-h-0">
         <Chat chat={chat} game={game} meId={meId} onSend={onSend} autoFocus />
       </div>
     </Modal>
