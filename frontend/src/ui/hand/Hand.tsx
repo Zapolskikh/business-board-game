@@ -7,8 +7,9 @@ import { tr } from "../../i18n";
 import { CardPopover, PopoverBody, PopoverFooter, PopoverHeader } from "../primitives/CardPopover";
 import { ResourceText } from "../primitives/ResourceIcon";
 import { ListItem, Panel, SectionHead } from "../primitives/atoms";
-import { findActions, resolve, usedThisTurn, type ActionContext } from "../lib/actions";
+import { findActions, resolve, turnBlock, usedThisTurn, type ActionContext } from "../lib/actions";
 import type { Indexes } from "../lib/board";
+import { useBlockedHint } from "../primitives/BlockedHint";
 
 const toneColor: Record<string, string> = {
   attack: "#d4939a",
@@ -26,12 +27,15 @@ export function Hand({
   index,
   context,
   onAction,
+  row = false,
 }: {
   game: GameState;
   meta: CityMeta;
   index: Indexes;
   context: ActionContext;
   onAction: (action: LegalAction) => void;
+  /** Одной строкой: на телефоне рука открывается панелью снизу во всю ширину экрана. */
+  row?: boolean;
 }) {
   const { t } = useTranslation("game");
   const me = context.me;
@@ -39,20 +43,29 @@ export function Hand({
   const draw = resolve(context, "buy_action_card");
   const played = usedThisTurn(game, "card_played");
   const converted = usedThisTurn(game, "card_converted");
+  const blocked = useBlockedHint();
 
   return (
     <Panel rows>
       <SectionHead title={t("ui.hand.title")} meta={t("ui.hand.meta", { count: hand.length, deck: game.action_deck_count })} />
-      <div className="grid min-h-0 grid-rows-[auto_repeat(3,minmax(0,1fr))] gap-1">
+      <div
+        className={`grid min-h-0 gap-1 ${
+          row ? "h-[104px] grid-cols-[minmax(0,0.8fr)_repeat(3,minmax(0,1fr))] gap-1.5" : "grid-rows-[auto_repeat(3,minmax(0,1fr))]"
+        }`}
+      >
         <button
           type="button"
           data-ui="draw-card-button"
           data-tutorial="draw-card"
-          disabled={draw.kind !== "ready"}
-          onClick={() => draw.kind === "ready" && onAction(draw.action)}
+          aria-disabled={draw.kind !== "ready" || undefined}
+          onClick={event =>
+            draw.kind === "ready"
+              ? onAction(draw.action)
+              : blocked.show(draw.kind === "blocked" ? draw.reason : undefined, event.currentTarget)
+          }
           title={draw.kind === "blocked" ? draw.reason : t("ui.hand.drawHint")}
           className="grid gap-1 rounded-md border border-good/60 bg-panel-2 px-2.5 py-2
-            enabled:hover:bg-panel-3 disabled:border-line disabled:opacity-45"
+            not-aria-disabled:hover:bg-panel-3 aria-disabled:border-line aria-disabled:opacity-45"
         >
           <b className="text-[15px] text-good">{t("ui.hand.draw")}</b>
           {/* Цена всегда на кнопке, а не вместо неё причина отказа: без цены нельзя
@@ -67,6 +80,7 @@ export function Hand({
             <b className={game.actions_left < 1 ? "font-bold text-bad" : "font-bold text-ink"}><ResourceText>1⚡</ResourceText></b>
           </span>
         </button>
+        {blocked.hint}
 
         <AnimatePresence mode="popLayout" initial={false}>
           {hand.map(held => {
@@ -183,6 +197,9 @@ function HandCardDetails({
     into: "influence",
   })[0];
   const discardValue = cardDiscardValue(meta);
+  const blocked = useBlockedHint();
+  /* Сброс — раз за ход; если он уже был, причина ровно эта, иначе — общая причина хода. */
+  const discardBlock = converted ? t("ui.hand.discardedReason") : turnBlock(context) ?? t("ui.actions.unavailable");
 
   return (
     <>
@@ -236,23 +253,24 @@ function HandCardDetails({
         <div className="grid grid-cols-2 gap-1.5">
           <button
             type="button"
-            disabled={!toMoney}
-            onClick={() => toMoney && onAction(toMoney)}
+            aria-disabled={!toMoney || undefined}
+            onClick={event => (toMoney ? onAction(toMoney) : blocked.show(discardBlock, event.currentTarget))}
             className="rounded-md border border-line bg-panel-2 px-2 py-2 text-center text-xs
-              enabled:hover:border-accent disabled:opacity-45"
+              not-aria-disabled:hover:border-accent aria-disabled:opacity-45"
           >
             {converted ? t("ui.hand.discarded") : t("ui.hand.discard", { value: discardValue.money })}
           </button>
           <button
             type="button"
-            disabled={!toInfluence}
-            onClick={() => toInfluence && onAction(toInfluence)}
+            aria-disabled={!toInfluence || undefined}
+            onClick={event => (toInfluence ? onAction(toInfluence) : blocked.show(discardBlock, event.currentTarget))}
             className="rounded-md border border-line bg-panel-2 px-2 py-2 text-center text-xs
-              enabled:hover:border-accent disabled:opacity-45"
+              not-aria-disabled:hover:border-accent aria-disabled:opacity-45"
           >
             {converted ? "—" : t("ui.hand.discardInfluence", { value: discardValue.influence })}
           </button>
         </div>
+        {blocked.hint}
       </PopoverFooter>
     </>
   );

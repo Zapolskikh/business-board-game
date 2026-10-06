@@ -1,6 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useThemeStyle } from "../lib/theme";
+import { useEffect, useMemo, useState } from "react";
 import { rankPlayers, scoreOf } from "../../online/gameUi";
 import type { CityMeta, GameState, LegalAction } from "../../online/types";
 import { ActionsPanel } from "../actions/ActionsPanel";
@@ -20,10 +19,10 @@ import { useTurnBriefing } from "./briefing";
 import { TurnBriefingModal } from "./TurnBriefing";
 import { GreyResult } from "./GreyResult";
 import { BoardScaler } from "./BoardScaler";
-import { MobileFrame } from "./MobileFrame";
+import { MobileShell, MobileTable, RotateNotice } from "./MobileBoard";
 import { Header, StatusBar } from "./Header";
 import { ScoreDetails } from "./headerPopovers";
-import { BoardLayoutProvider, usePortraitViewport, type BoardLayout } from "../lib/layout";
+import { BoardLayoutProvider, useDeviceLayout, useMobileViewport, type BoardLayout } from "../lib/layout";
 
 /* Сборка доски.
  *
@@ -49,7 +48,7 @@ export function BoardView({
   busy: boolean;
   error: string;
   onExit: () => void;
-  /** Раскладка принудительно — для галереи и тестов. Без неё решает ширина вьюпорта. */
+  /** Раскладка принудительно — для галереи и тестов. Без неё решает экран устройства. */
   layout?: BoardLayout;
   /** Подключённая партия разрешает сетевой экспорт хроники; /dev работает без сессии. */
   liveSession?: boolean;
@@ -79,17 +78,20 @@ export function BoardView({
     [game],
   );
 
-  /* Раскладка одна на всё дерево: её спрашивают рынок, город и проекты, чтобы построить
-   * сетку карточек 3×2 или 2×N. Ширину меряем здесь, а не в каждом из них. */
-  const narrow = usePortraitViewport();
-  const portrait = layout ? layout === "portrait" : narrow;
+  /* Раскладка одна на всё дерево: её спрашивают карточки, проекты и поповеры. Экран меряем
+   * здесь, а не в каждом из них. Телефон в альбоме получает мобильный стол в логическом размере
+   * (см. useMobileViewport), телефон вертикально — просьбу повернуть его. */
+  const device = useDeviceLayout();
+  const mobile = layout ? layout === "mobile" : device.mobile;
+  const rotate = !layout && device.mobile && device.portrait;
+  useMobileViewport(!layout && device.mobile && !device.portrait);
 
-  /* Три колонки собираются одинаково для обеих раскладок и различаются только тем, куда их
-   * ставят: рядом или в шторки. Иначе это были бы две копии доски, расходящиеся при первой же
-   * правке — ровно то, чем закончилась предыдущая попытка сделать мобильную версию. */
+  /* Панели собираются одинаково для обеих раскладок и различаются только тем, куда их ставят.
+   * Иначе это были бы две копии доски, расходящиеся при первой же правке. */
+  const rail = <PlayersRail game={game} meta={meta} index={index} context={context} onAction={onAction} />;
   const players = (
     <div className="grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_auto] gap-1.5">
-      <PlayersRail game={game} meta={meta} index={index} context={context} onAction={onAction} />
+      {rail}
       <ChronicleRail game={game} meta={meta} unseen={unseen} onOpen={() => setChronicle(true)} />
     </div>
   );
@@ -102,25 +104,29 @@ export function BoardView({
     * Вертикально — то же самое, и это осознанно: прокрутка центра означала бы, что рынок и
     * свой город нельзя увидеть одновременно, а решение всегда принимается по ним обоим.
     * Помещается всё за счёт краткой карточки, а не за счёт лишней высоты. */
+  const projectsPanel = <Projects game={game} meta={meta} index={index} context={context} onAction={onAction} />;
+  const marketPanel = (
+    <MarketGrid
+      game={game}
+      me={context.me}
+      meta={meta}
+      legal={context.legal}
+      pending={context.pending}
+      onBuy={onAction}
+    />
+  );
+  const cityPanel = <CityPanel meta={meta} index={index} context={context} onAction={onAction} />;
   const city = (
-    <div
-      className={`grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_minmax(0,1fr)] ${
-        portrait ? "gap-1" : "gap-1.5"
-      }`}
-    >
-      <Projects game={game} meta={meta} index={index} context={context} onAction={onAction} />
-      <MarketGrid
-        game={game}
-        me={context.me}
-        meta={meta}
-        legal={context.legal}
-        pending={context.pending}
-        onBuy={onAction}
-      />
-      <CityPanel meta={meta} index={index} context={context} onAction={onAction} />
+    <div className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_minmax(0,1fr)] gap-1.5">
+      {projectsPanel}
+      {marketPanel}
+      {cityPanel}
     </div>
   );
 
+  const hand = (row: boolean) => (
+    <Hand game={game} meta={meta} index={index} context={context} onAction={onAction} row={row} />
+  );
   const actions = (
     <ActionsPanel
       game={game}
@@ -128,28 +134,25 @@ export function BoardView({
       index={index}
       context={context}
       onAction={onAction}
-      beforeEndTurn={
-        <Hand game={game} meta={meta} index={index} context={context} onAction={onAction} />
-      }
+      beforeEndTurn={mobile ? undefined : hand(false)}
+      endTurnButton={!mobile}
     />
   );
 
-  const Frame = portrait ? MobileShell : BoardScaler;
+  if (rotate) return <RotateNotice onExit={onExit} />;
+
+  const Frame = mobile ? MobileShell : BoardScaler;
   const currentPlayer = game.players[game.current_player_index];
   const showStatus = Boolean(
     error || busy || game.status === "finished" || (currentPlayer?.id === context.me.id && context.me.jail_turns > 0),
   );
 
   return (
-    <BoardLayoutProvider layout={portrait ? "portrait" : "wide"}>
+    <BoardLayoutProvider layout={mobile ? "mobile" : "wide"}>
     <Frame>
-      {/* Поля и зазоры на телефоне вдвое меньше: каждые четыре точки по краю — это две точки
-        * ширины карточки, а их всего около полутора сотен. */}
       <div
-        className={`grid h-full w-full font-sans text-ink ${
+        className={`grid h-full w-full gap-1.5 p-2 font-sans text-ink ${
           showStatus ? "grid-rows-[auto_auto_minmax(0,1fr)]" : "grid-rows-[auto_minmax(0,1fr)]"
-        } ${
-          portrait ? "gap-1 p-1" : "gap-1.5 p-2"
         }`}
       >
       <Header
@@ -157,7 +160,7 @@ export function BoardView({
         me={context.me}
         meta={meta}
         unseenEvents={unseen}
-        compact={portrait}
+        mobile={mobile}
         onChronicle={() => setChronicle(true)}
         onScore={() => setScore(true)}
         onRules={() => setRules(true)}
@@ -165,8 +168,20 @@ export function BoardView({
       />
       {showStatus && <StatusBar game={game} me={context.me} busy={busy} error={error} />}
 
-      {portrait ? (
-        <MobileFrame center={city} left={players} right={actions} />
+      {mobile ? (
+        <MobileTable
+          game={game}
+          context={context}
+          onAction={onAction}
+          players={rail}
+          actions={actions}
+          projects={projectsPanel}
+          market={marketPanel}
+          city={cityPanel}
+          hand={hand(true)}
+          unseen={unseen}
+          onChronicle={() => setChronicle(true)}
+        />
       ) : (
         <div className="grid min-h-0 grid-cols-[238px_minmax(0,1fr)_274px] gap-1.5">
           {players}
@@ -228,14 +243,6 @@ export function BoardView({
     </Frame>
     </BoardLayoutProvider>
   );
-}
-
-/* Обёртка вертикальной раскладки. Того же назначения, что BoardScaler, но без множителя:
- * на телефоне стол не сжимают, а перестраивают, поэтому размеры здесь настоящие — 12px
- * подписи остаются 12px. Класс `ui-v2` обязателен: на нём висит весь ресет темы. */
-function MobileShell({ children }: { children: ReactNode }) {
-  const theme = useThemeStyle();
-  return <div style={theme} className="ui-v2 h-dvh w-dvw overflow-hidden bg-surface">{children}</div>;
 }
 
 /** Подключённая версия: всё то же самое, но из живой партии. */

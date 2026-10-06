@@ -91,7 +91,8 @@ try {
     width,
     height,
     deviceScaleFactor: 1,
-    mobile: width < 700,
+    // Телефон и в альбомной ориентации: без мобильной эмуляции браузер не применяет meta viewport.
+    mobile: width < 700 || height <= 640,
     screenWidth: width,
     screenHeight: height,
   });

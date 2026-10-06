@@ -363,7 +363,7 @@
     },
     "themes": { "blue": "Dusty blue", "green": "Green", "limestone": "Limestone", "plum": "Plum", "dark": "Dark" },
     "projects": {
-      "titleShort": "Projects", "title": "City projects", "mine": "yours: {{count}} · {{points}} pts",
+      "title": "City projects", "mine": "yours: {{count}} · {{points}} pts",
       "none": "you have no projects yet", "rerolled": "The board was already re-dealt this turn",
       "rerollHint": "All four projects go back to the deck, and four new ones come out. The board is shared — it changes for everyone.",
       "reroll": "Re-deal · ",
@@ -396,8 +396,7 @@
       "noUnique": "No special bonus", "pointsTitle": "Points in the final score", "points": "points"
     },
     "city": {
-      "title": "My city", "metaShort": "{{used}}/{{capacity}} · {{total}} total",
-      "meta": "{{used}} / {{capacity}} used · {{total}} slots total · selling costs no action, you get half the price",
+      "title": "My city", "meta": "{{used}} / {{capacity}} used · {{total}} slots total · selling costs no action, you get half the price",
       "details": "{{title}} — details", "slot": "Slot {{number}}", "free": "Free", "openSlot": "Open the slot",
       "openPrevious": "First open the previous slot",
       "openTitle": "Open slot {{number}}?", "openHint": "The slot expands your city for good: you can place one more business in it.",
@@ -457,7 +456,7 @@
       "freeStart": "Playing and discarding cards is free — no action and ", "freeStrong": "as many times per turn as you like",
       "freeEnd": ". Only buying is limited: one card purchase per turn.", "pick": "Pick an option", "play": "Play",
       "played": "You already played a card this turn.", "cantPlay": "You can't play it right now.",
-      "discarded": "Already discarded", "discard": "Discard for {{value}}$", "discardInfluence": "Discard for {{value}}◆"
+      "discarded": "Already discarded", "discardedReason": "You have already discarded a card this turn: one discard per turn.", "discard": "Discard for {{value}}$", "discardInfluence": "Discard for {{value}}◆"
     },
     "finish": { "scoreModal": "Score and income", "title": "🏁 The game is over", "rounds": "{{count}} rounds", "back": "← Back to the rooms", "noRole": "no role" },
     "roles": {
@@ -473,7 +472,24 @@
       "found_one": "Found: {{total}} in {{count}} chapter", "found_other": "Found: {{total}} in {{count}} chapters",
       "nothing": "Nothing found", "chapter": "Chapter {{number}}", "close": "Close the book"
     },
-    "mobile": { "left": "Players and log", "right": "Actions and hand", "closePanel": "Close the panel", "close": "Close", "hideLeft": "‹ Hide", "hideRight": "Hide ›" },
+    "mobile": {
+      "board": "Game board",
+      "projects": "Projects",
+      "market": "Market",
+      "city": "My city",
+      "chronicle": "Log",
+      "hand": "Hand",
+      "closeHand": "Close the hand",
+      "endTurnTitle": "End your turn?",
+      "endTurnText": "Unspent actions are lost — they do not carry over to your next turn.",
+      "endTurnLeft": "Actions left: {{count}}",
+      "rotateTitle": "Rotate your device",
+      "rotateText": "The game is made for landscape: that way the players, the board and the actions all fit on screen.",
+      "fullscreen": "Full screen",
+      "exitFullscreen": "Exit full screen",
+      "addToHomeTitle": "Play without Safari bars",
+      "addToHome": "Tap Share → Add to Home Screen and launch the game from its icon: the address bar will no longer take up space."
+    },
     "greyResult": {
       "title": "Shady deal: {{operation}}", "target": "target — {{name}}", "roll": "rolled {{roll}}", "face": "result",
       "sources": "Modifier: {{sources}}", "sourceCard": "card", "scale": "1–2 — failure · 3–4 — weak effect · 5–6 — full effect", "ok": "OK"

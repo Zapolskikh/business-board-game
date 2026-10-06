@@ -363,7 +363,7 @@
     },
     "themes": { "blue": "Prašná modrá", "green": "Zelená", "limestone": "Vápenec", "plum": "Švestková", "dark": "Tmavá" },
     "projects": {
-      "titleShort": "Projekty", "title": "Městské projekty", "mine": "vaše: {{count}} · {{points}} b.",
+      "title": "Městské projekty", "mine": "vaše: {{count}} · {{points}} b.",
       "none": "zatím nemáte žádný projekt", "rerolled": "Deska už byla v tomto tahu znovu rozdána",
       "rerollHint": "Všechny čtyři projekty jdou zpět do balíčku a vyjdou čtyři nové. Deska je společná — mění se všem.",
       "reroll": "Znovu rozdat · ",
@@ -397,8 +397,7 @@
       "noUnique": "Bez zvláštního bonusu", "pointsTitle": "Body do konečného skóre", "points": "bodů"
     },
     "city": {
-      "title": "Moje město", "metaShort": "{{used}}/{{capacity}} · celkem {{total}}",
-      "meta": "{{used}} / {{capacity}} obsazeno · celkem {{total}} míst · prodej nestojí akci, dostanete polovinu ceny",
+      "title": "Moje město", "meta": "{{used}} / {{capacity}} obsazeno · celkem {{total}} míst · prodej nestojí akci, dostanete polovinu ceny",
       "details": "{{title}} — podrobnosti", "slot": "Místo {{number}}", "free": "Volné", "openSlot": "Otevřít místo",
       "openPrevious": "Nejdřív otevřete předchozí místo",
       "openTitle": "Otevřít místo {{number}}?", "openHint": "Místo natrvalo rozšíří vaše město: můžete do něj postavit další podnik.",
@@ -458,7 +457,7 @@
       "freeStart": "Hrát a zahazovat karty je zdarma — bez akce a ", "freeStrong": "kolikrát chcete za tah",
       "freeEnd": ". Omezený je jen nákup: jeden nákup karet za tah.", "pick": "Vyberte možnost", "play": "Zahrát",
       "played": "V tomto tahu už jste kartu zahráli.", "cantPlay": "Teď ji zahrát nejde.",
-      "discarded": "Už zahozeno", "discard": "Zahodit za {{value}}$", "discardInfluence": "Zahodit za {{value}}◆"
+      "discarded": "Už zahozeno", "discardedReason": "Tento tah už jste kartu zahodili: zahodit lze jednou za tah.", "discard": "Zahodit za {{value}}$", "discardInfluence": "Zahodit za {{value}}◆"
     },
     "finish": { "scoreModal": "Skóre a příjem", "title": "🏁 Hra skončila", "rounds": "{{count}} kol", "back": "← Zpět do místností", "noRole": "bez role" },
     "roles": {
@@ -475,7 +474,24 @@
       "found_many": "Nalezeno: {{total}} v {{count}} kapitolách", "found_other": "Nalezeno: {{total}} v {{count}} kapitolách",
       "nothing": "Nic nenalezeno", "chapter": "Kapitola {{number}}", "close": "Zavřít knihu"
     },
-    "mobile": { "left": "Hráči a kronika", "right": "Akce a ruka", "closePanel": "Zavřít panel", "close": "Zavřít", "hideLeft": "‹ Skrýt", "hideRight": "Skrýt ›" },
+    "mobile": {
+      "board": "Herní plán",
+      "projects": "Projekty",
+      "market": "Trh",
+      "city": "Moje město",
+      "chronicle": "Kronika",
+      "hand": "Ruka",
+      "closeHand": "Zavřít ruku",
+      "endTurnTitle": "Ukončit tah?",
+      "endTurnText": "Nevyužité akce propadnou — do dalšího tahu se nepřenášejí.",
+      "endTurnLeft": "Zbývá akcí: {{count}}",
+      "rotateTitle": "Otočte zařízení",
+      "rotateText": "Hra je určena na šířku: tak se na obrazovku vejdou hráči, stůl i akce.",
+      "fullscreen": "Celá obrazovka",
+      "exitFullscreen": "Ukončit celou obrazovku",
+      "addToHomeTitle": "Hrát bez lišt Safari",
+      "addToHome": "Klepněte na Sdílet → Přidat na plochu a spouštějte hru z ikony: adresní řádek pak nebude zabírat místo."
+    },
     "greyResult": {
       "title": "Šedý kšeft: {{operation}}", "target": "cíl — {{name}}", "roll": "padlo {{roll}}", "face": "výsledek",
       "sources": "Modifikátor: {{sources}}", "sourceCard": "karta", "scale": "1–2 — neúspěch · 3–4 — slabý účinek · 5–6 — plný účinek", "ok": "OK"

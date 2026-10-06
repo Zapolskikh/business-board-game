@@ -4,6 +4,7 @@ import type { CityMeta, GameState, LegalAction } from "../../online/types";
 import { findAction, turnBlock, type ActionContext } from "../lib/actions";
 import type { Indexes } from "../lib/board";
 import { ResourceText } from "../primitives/ResourceIcon";
+import { useBlockedHint } from "../primitives/BlockedHint";
 
 /* Роли — это справочник правил, а не ещё один плотный список кнопок.
  * Поэтому описание каждой роли всегда остаётся читаемым, даже когда сам захват недоступен:
@@ -27,6 +28,7 @@ export function RolesDetails({
   const perks = rolePerkRows(game, meta);
   const free = meta.roles.filter(role => !game.players.some(player => player.role === role.id)).length;
   const turnBlocked = turnBlock(context);
+  const blocked = useBlockedHint();
 
   return (
     <div data-ui="roles-modal-content">
@@ -76,15 +78,17 @@ export function RolesDetails({
                 type="button"
                 data-ui="role-card"
                 data-state={state}
-                disabled={!claim}
-                onClick={() => claim && onAction(claim)}
+                aria-disabled={!claim || undefined}
+                onClick={event =>
+                  claim ? onAction(claim) : blocked.show(mine ? undefined : actionHint, event.currentTarget)
+                }
                 title={!claim && !mine ? actionHint : undefined}
                 style={{ borderLeftColor: role.color }}
                 className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] content-start gap-x-3 gap-y-2 rounded-lg
                   border border-l-[3px] border-line bg-panel-2 p-3 text-left
                   data-[state=mine]:border-y-good data-[state=mine]:border-r-good data-[state=mine]:bg-[#101a15]
-                  enabled:cursor-pointer enabled:hover:border-y-line-2 enabled:hover:border-r-line-2 enabled:hover:bg-panel-3
-                  disabled:cursor-default"
+                  not-aria-disabled:cursor-pointer not-aria-disabled:hover:border-y-line-2 not-aria-disabled:hover:border-r-line-2
+                  not-aria-disabled:hover:bg-panel-3 aria-disabled:cursor-default"
               >
                 <span
                   className="grid size-9 place-items-center rounded-full border text-[17px]"
@@ -151,6 +155,7 @@ export function RolesDetails({
           </p>
         )}
       </div>
+      {blocked.hint}
     </div>
   );
 }

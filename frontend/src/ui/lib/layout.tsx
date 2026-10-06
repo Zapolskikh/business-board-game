@@ -2,20 +2,16 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 
 /* Какой раскладкой сейчас рисуется доска.
  *
- * Раскладок ровно две, и это принципиально. `wide` — стол фиксированного размера, вписанный
- * в экран множителем: три колонки, шесть карточек рынка в два ряда, ничего не переносится.
- * `portrait` — телефон вертикально: колонка одна, боковые панели выезжают шторками, а сетки
- * карточек становятся 2×N.
+ * Раскладок ровно две. `wide` — стол фиксированного размера, вписанный в экран множителем:
+ * три колонки, проекты, рынок и город друг под другом. `mobile` — телефон в альбомной
+ * ориентации: те же колонки игроков и действий по бокам, а проекты, рынок и город — вкладками
+ * в центре, по одной за раз.
  *
- * Раскладка приходит контекстом, а не пропом через семь уровней: её спрашивают три компонента
- * (рынок, город, проекты) в разных ветках дерева, и пробрасывать флаг до каждого — значит
- * менять сигнатуры всем, кто просто стоит по дороге.
- *
- * Промежуточных состояний нет намеренно. Резиновая раскладка между этими двумя — это ровно та
- * задача, из-за которой стол и сделали фиксированным: колонки сжимаются, подписи налезают,
- * и каждая правка требует проверки в четырёх ширинах.
+ * Раскладка приходит контекстом, а не пропом через семь уровней: её спрашивают несколько
+ * компонентов в разных ветках дерева, и пробрасывать флаг до каждого — значит менять
+ * сигнатуры всем, кто просто стоит по дороге.
  */
-export type BoardLayout = "wide" | "portrait";
+export type BoardLayout = "wide" | "mobile";
 
 const LayoutContext = createContext<BoardLayout>("wide");
 
@@ -27,30 +23,102 @@ export function useBoardLayout(): BoardLayout {
   return useContext(LayoutContext);
 }
 
-/** Короткая форма для сеток: `cols(portrait, "grid-cols-2", "grid-cols-3")`. */
-export function useIsPortrait(): boolean {
-  return useBoardLayout() === "portrait";
+export function useIsMobile(): boolean {
+  return useBoardLayout() === "mobile";
 }
 
-/* Порог, ниже которого стол шириной 1520 точек перестаёт иметь смысл: множитель уходит за 0.6,
- * и текст в 9px превращается в серую рябь. Меряется ширина вьюпорта, а не «телефон ли это»:
- * узкое окно на ноутбуке — та же задача, а планшет в альбоме прекрасно играет широкой доской.
+/* Телефон узнаём по размеру экрана, а не окна.
+ *
+ * Окно на телефоне мы сами подменяем логической шириной (см. useMobileViewport), и после этого
+ * `innerWidth` говорит 1300 — по нему раскладка тут же переключилась бы обратно на широкую.
+ * Размер экрана от meta viewport не зависит. Короткая сторона до 640 — это телефоны и
+ * маленькие планшеты в альбоме (1024×600); iPad и ноутбуки играют широкой доской.
  */
-const PORTRAIT_QUERY = "(max-width: 900px)";
+const PHONE_SHORT_SIDE = 640;
 
-/** Следит за шириной вьюпорта. Вне браузера (SSR, тесты) всегда `wide`. */
-export function usePortraitViewport(): boolean {
-  const supported = typeof window !== "undefined" && typeof window.matchMedia === "function";
-  const [portrait, setPortrait] = useState(() => (supported ? window.matchMedia(PORTRAIT_QUERY).matches : false));
+function screenSides(): { long: number; short: number } | null {
+  if (typeof window === "undefined" || !window.screen) return null;
+  const { width, height } = window.screen;
+  if (!width || !height) return null;
+  return { long: Math.max(width, height), short: Math.min(width, height) };
+}
+
+export function isPhoneScreen(): boolean {
+  const sides = screenSides();
+  return Boolean(sides && sides.short <= PHONE_SHORT_SIDE);
+}
+
+function isPortrait(): boolean {
+  if (typeof window === "undefined") return false;
+  if (typeof window.matchMedia === "function") return window.matchMedia("(orientation: portrait)").matches;
+  return window.innerHeight > window.innerWidth;
+}
+
+/** Телефон ли это и как его держат. Вне браузера (SSR, тесты) — широкий стол. */
+export function useDeviceLayout(): { mobile: boolean; portrait: boolean } {
+  const read = () => ({ mobile: isPhoneScreen(), portrait: isPortrait() });
+  const [state, setState] = useState(read);
 
   useEffect(() => {
-    if (!supported) return;
-    const query = window.matchMedia(PORTRAIT_QUERY);
-    const update = () => setPortrait(query.matches);
+    if (typeof window === "undefined") return;
+    const update = () =>
+      setState(current => {
+        const next = read();
+        return next.mobile === current.mobile && next.portrait === current.portrait ? current : next;
+      });
     update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, [supported]);
+    const query = typeof window.matchMedia === "function" ? window.matchMedia("(orientation: portrait)") : null;
+    query?.addEventListener("change", update);
+    window.addEventListener("resize", update);
+    window.addEventListener("orientationchange", update);
+    return () => {
+      query?.removeEventListener("change", update);
+      window.removeEventListener("resize", update);
+      window.removeEventListener("orientationchange", update);
+    };
+  }, []);
 
-  return portrait;
+  return state;
+}
+
+/* Логический размер мобильного стола.
+ *
+ * Стол рисуется в постоянной высоте и вписывается в экран целиком, как картинка: на любом
+ * телефоне видно одно и то же, меняется только множитель. Ширина — по пропорциям экрана, чтобы
+ * стол занимал его без полос: на вытянутом телефоне центральное поле чуть шире.
+ *
+ * MOBILE_HEIGHT — главная ручка плотности: больше — всё мельче и просторнее, меньше — крупнее.
+ * Ширина не опускается ниже MOBILE_MIN_WIDTH: на планшете 16:10 три колонки иначе сжались бы,
+ * и тогда стол становится выше, а не уже.
+ */
+export const MOBILE_HEIGHT = 600;
+export const MOBILE_MIN_WIDTH = 1200;
+
+/* Масштаб — через meta viewport, а не через `zoom` на контейнере, как у широкого стола.
+ *
+ * Окна, поповеры и подсказки Radix рендерятся порталом в body, вне контейнера доски. С `zoom`
+ * они остались бы в натуральную величину: окно ролей шириной 1040 точек на экране в 844 — и
+ * каждое пришлось бы подгонять отдельно. Логическая ширина вьюпорта масштабирует страницу
+ * целиком: браузер сам считает, что экран шириной 1300 точек, и всё — доска, окна, поповеры —
+ * рисуется в одних и тех же единицах. Шрифты при этом растеризуются в итоговом размере и
+ * остаются чёткими.
+ *
+ * Включается только на время партии в альбомной ориентации: лобби и вертикальный экран
+ * «поверните устройство» живут в обычной ширине устройства.
+ */
+export function useMobileViewport(active: boolean): void {
+  useEffect(() => {
+    if (!active || typeof document === "undefined") return;
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+    const sides = screenSides();
+    if (!meta || !sides) return;
+    const original = meta.getAttribute("content") ?? "width=device-width, initial-scale=1.0";
+    const width = Math.max(MOBILE_MIN_WIDTH, Math.round((MOBILE_HEIGHT * sides.long) / sides.short));
+    const scale = (sides.long / width).toFixed(4);
+    meta.setAttribute(
+      "content",
+      `width=${width}, initial-scale=${scale}, minimum-scale=${scale}, maximum-scale=${scale}, user-scalable=no, viewport-fit=cover`,
+    );
+    return () => meta.setAttribute("content", original);
+  }, [active]);
 }

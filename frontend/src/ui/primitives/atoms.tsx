@@ -2,6 +2,7 @@ import { tr } from "../../i18n";
 import { forwardRef, type CSSProperties, type ReactNode } from "react";
 import type { Availability } from "../lib/actions";
 import { ResourceText } from "./ResourceIcon";
+import { useBlockedHint } from "./BlockedHint";
 
 /* Общие атомы доски. Держим их в одном файле, чтобы плотная сетка была
  * единообразной: одинаковые отступы, одинаковые размеры подписей.
@@ -101,17 +102,20 @@ export function ActionButton({
 }) {
   const ready = state.kind === "ready";
   const status = spent ? "spent" : state.kind;
+  const blocked = useBlockedHint();
   return (
+    <>
     <button
       type="button"
       data-ui="action-button"
       data-state={status}
       data-tutorial={tutorial}
-      disabled={!ready}
-      onClick={onClick}
+      /* Не `disabled`: недоступная кнопка нажимается и показывает причину — см. BlockedHint. */
+      aria-disabled={!ready || undefined}
+      onClick={event => (ready ? onClick() : blocked.show(state.kind === "blocked" ? state.reason : undefined, event.currentTarget))}
       title={[hint, state.kind === "blocked" ? state.reason : undefined].filter(Boolean).join("\n\n") || undefined}
       className={`grid min-w-0 gap-0.5 rounded-md border border-line bg-panel-2 px-2 py-1.5
-        data-[state=ready]:border-line-2 enabled:hover:border-accent enabled:hover:bg-panel-3
+        data-[state=ready]:border-line-2 not-aria-disabled:hover:border-accent not-aria-disabled:hover:bg-panel-3
         data-[state=blocked]:opacity-35
         data-[state=pending]:animate-pulse
         data-[state=spent]:border-bad/40 data-[state=spent]:opacity-65
@@ -129,10 +133,12 @@ export function ActionButton({
           * кнопка, а не по «Сейчас недоступно»: половина панели недоступна почти всегда,
           * и справка пропадала именно тогда, когда она нужна. Недоступность видна по
           * затемнению, нехватка ресурса — по красному числу в самой цене, точная причина —
-          * в подсказке при наведении. */}
+          * в подсказке при наведении и по нажатию. */}
         {spent ? tr("game", "ui.common.spent") : cost}
       </small>
     </button>
+    {blocked.hint}
+    </>
   );
 }
 

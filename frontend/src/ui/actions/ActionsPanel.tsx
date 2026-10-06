@@ -22,6 +22,7 @@ import { PowerResultTable, PowerTrigger } from "./PowerTargets";
 import { RolesDetails } from "./RolesDetails";
 import { RolePowersDetails } from "./RolePowersDetails";
 import { GreyDetails } from "./GreyDetails";
+import { useBlockedHint } from "../primitives/BlockedHint";
 
 /* Правая панель. Шесть базовых действий видны всегда, справочники — в больших окнах.
  * Способности роли НЕ в ящике: это активные кнопки хода, а не справка.
@@ -54,6 +55,7 @@ export function ActionsPanel({
   context,
   onAction,
   beforeEndTurn,
+  endTurnButton = true,
 }: {
   game: GameState;
   meta: CityMeta;
@@ -64,6 +66,8 @@ export function ActionsPanel({
    * в свой ход, и её место — рядом с остальными действиями, а не внизу доски рядом с городом.
    * Пропом, а не импортом — чтобы панель действий не знала про руку. */
   beforeEndTurn?: ReactNode;
+  /** На телефоне «Завершить ход» стоит в нижней панели, под рукой большого пальца. */
+  endTurnButton?: boolean;
 }) {
   const { t } = useTranslation("game");
   const me = context.me;
@@ -73,6 +77,7 @@ export function ActionsPanel({
   /* Какой справочник открыт. Одно поле вместо трёх флагов: окно всё равно может
    * быть только одно, и состояние «открыты два» просто не выразимо. */
   const [drawer, setDrawer] = useState<"roles" | "powers" | "grey" | null>(null);
+  const blocked = useBlockedHint();
 
   const work = resolve(context, "basic_action", { kind: "work" });
   const patronAction = resolve(context, "basic_action", { kind: "patronage" });
@@ -300,17 +305,22 @@ export function ActionsPanel({
 
       {beforeEndTurn}
 
-      <button
+      {endTurnButton && <button
         type="button"
-        disabled={endTurn.kind !== "ready"}
+        aria-disabled={endTurn.kind !== "ready" || undefined}
         data-tutorial="end-turn"
-        onClick={() => act(endTurn)}
+        onClick={event =>
+          endTurn.kind === "ready"
+            ? act(endTurn)
+            : blocked.show(endTurn.kind === "blocked" ? endTurn.reason : undefined, event.currentTarget)
+        }
         /* Главная кнопка темы — единственная залитая акцентом на всей доске. */
         className="primary-button card-serif rounded-[7px] px-2 py-2.5 text-center text-[16px]
-          disabled:opacity-50"
+          aria-disabled:opacity-50"
       >
         {endTurn.kind === "pending" ? t("ui.actions.ending") : t("ui.actions.endTurn")}
-      </button>
+      </button>}
+      {blocked.hint}
     </div>
   );
 

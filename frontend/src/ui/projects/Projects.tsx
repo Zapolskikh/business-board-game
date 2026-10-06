@@ -8,10 +8,11 @@ import { KeyValue, Panel, sectionTitle, zoneRule } from "../primitives/atoms";
 import { matches, turnBlock, usedThisTurn, resolve, type ActionContext, type Availability } from "../lib/actions";
 import { tr } from "../../i18n";
 import type { Indexes } from "../lib/board";
-import { useIsPortrait } from "../lib/layout";
+import { useIsMobile } from "../lib/layout";
 import { projectArt, projectIcon, projectKind, statIcon } from "../assets/cards";
 import { ResourceText, resourceTooltip } from "../primitives/ResourceIcon";
 import { ConfirmModal } from "../primitives/Modal";
+import { useBlockedHint } from "../primitives/BlockedHint";
 
 /* Доска проектов. Общая для всех: кто взял — тот и забрал, остальным проект недоступен.
  * Поэтому карточка на доске показывает только цену и прогресс, а «почему» — в поповере.
@@ -30,10 +31,11 @@ export function Projects({
   onAction: (action: LegalAction) => void;
 }) {
   const { t } = useTranslation("game");
-  const portrait = useIsPortrait();
+  const mobile = useIsMobile();
   const reroll = resolve(context, "reroll_projects");
   const rerolled = usedThisTurn(game, "projects_rerolled");
   const [confirmReroll, setConfirmReroll] = useState(false);
+  const blocked = useBlockedHint();
   const [charterFor, setCharterFor] = useState<{ action: LegalAction; project: ProjectMeta } | null>(null);
   const mine = context.me.projects
     .map(id => index.projects.get(id))
@@ -57,12 +59,14 @@ export function Projects({
   }
 
   return (
-    <Panel zone="projects">
+    /* На телефоне проекты — отдельная вкладка на всю высоту центра, поэтому панель растягивается,
+     * а карточки встают два на два и делят её поровну. */
+    <Panel zone="projects" rows={mobile}>
       {/* В строке остаются счётчик своих проектов и действие. Размер колоды — справочная
         * информация, она живёт в книге правил, а не на игровом столе. */}
       <div className={`flex items-baseline gap-2 overflow-hidden px-0.5 pb-[2px] ${zoneRule}`}>
         <h2 className={sectionTitle}>
-          {portrait ? t("ui.projects.titleShort") : t("ui.projects.title")}
+          {t("ui.projects.title")}
         </h2>
         <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[10.5px] text-ink-dim">
           {mine.length ? t("ui.projects.mine", { count: mine.length, points: minePoints }) : t("ui.projects.none")}
@@ -71,8 +75,15 @@ export function Projects({
           * Нажатие только открывает подтверждение: доска общая и меняется у всех сразу. */}
         <button
           type="button"
-          disabled={reroll.kind !== "ready"}
-          onClick={() => reroll.kind === "ready" && setConfirmReroll(true)}
+          aria-disabled={reroll.kind !== "ready" || undefined}
+          onClick={event =>
+            reroll.kind === "ready"
+              ? setConfirmReroll(true)
+              : blocked.show(
+                  rerolled ? t("ui.projects.rerolled") : reroll.kind === "blocked" ? reroll.reason : undefined,
+                  event.currentTarget,
+                )
+          }
           title={
             rerolled
               ? t("ui.projects.rerolled")
@@ -81,14 +92,15 @@ export function Projects({
                 : t("ui.projects.rerollHint")
           }
           className="ml-auto flex shrink-0 items-center gap-1 self-center rounded-md border border-line-2 bg-panel-2
-            px-2.5 py-1 text-[12.5px] font-semibold whitespace-nowrap text-ink enabled:hover:border-accent
-            enabled:hover:bg-panel-3 disabled:opacity-45"
+            px-2.5 py-1 text-[12.5px] font-semibold whitespace-nowrap text-ink not-aria-disabled:hover:border-accent
+            not-aria-disabled:hover:bg-panel-3 aria-disabled:opacity-45"
         >
           <span aria-hidden="true">🔄</span>
-          {portrait ? "" : t("ui.projects.reroll")}
+          {t("ui.projects.reroll")}
           <span className="text-money"><ResourceText>{`${projectRerollMoney(meta)}$`}</ResourceText></span>
           <span className="text-ink-muted">+ <ResourceText>⚡</ResourceText></span>
         </button>
+        {blocked.hint}
         <ConfirmModal
           open={confirmReroll}
           onClose={() => setConfirmReroll(false)}
@@ -115,10 +127,9 @@ export function Projects({
         </ConfirmModal>
       </div>
 
-      {/* 90% ширины: проектов всегда четыре, и на всю колонку карточки растягивались
-        * шире, чем требует их содержимое. Вертикально — два на два: вчетверо уже экрана
-        * телефона от карточки остаётся одна цена. */}
-      <div className={`grid gap-[5px] ${portrait ? "grid-cols-2" : "grid-cols-4"}`}>
+      {/* Широкий стол — четыре в ряд. На телефоне вчетверо уже от карточки осталась бы одна
+        * цена, поэтому два на два: вкладка проектов всё равно занимает весь центр. */}
+      <div className={`grid gap-[5px] ${mobile ? "min-h-0 grid-cols-2 grid-rows-2 gap-1.5" : "grid-cols-4"}`}>
         <AnimatePresence mode="popLayout" initial={false}>
           {game.project_board.map((projectId, position) => {
             const project = index.projects.get(projectId);
@@ -156,7 +167,7 @@ export function Projects({
                   transition: { duration: 0.78, times: [0, 0.1, 0.64, 1], ease: "easeIn" },
                 }}
                 transition={{ duration: 0.28, ease: "easeOut" }}
-                className="min-w-0"
+                className="min-h-0 min-w-0"
               >
                 <CardPopover
                   side="bottom"
@@ -243,10 +254,9 @@ const ProjectCard = forwardRef<
   const art = projectArt(kind);
   const icon = projectIcon(kind);
   const star = statIcon("score");
-  /* Вертикально на карточке остаются только те две строки, по которым выбирают: название с
-   * очками и цена с прогрессом. Текст условия и постоянный бонус уезжают в поповер — иначе
-   * четыре проекта съедают треть экрана, которой не хватает рынку. */
-  const portrait = useIsPortrait();
+  /* На телефоне карточка вчетверо больше по площади, чем полоска на широком столе, — тот же
+   * состав строк, но крупнее и с воздухом между ними. */
+  const mobile = useIsMobile();
   const { t } = useTranslation("game");
 
   /* Слои по комплекту из presets: фон категории с рамкой, отдельная иконка награды, текст
@@ -260,13 +270,13 @@ const ProjectCard = forwardRef<
       data-state={pending ? "pending" : ready ? "ready" : met ? "met" : "locked"}
       style={art ? ({ "--project-art": `url(${art})` } as CSSProperties) : undefined}
       className={`game-card project-card grid w-full min-w-0 overflow-hidden text-left
-        data-[state=pending]:animate-pulse ${portrait ? "gap-[2px] px-2 py-1.5" : "gap-[3px] px-3 py-[7px]"}`}
+        data-[state=pending]:animate-pulse ${mobile ? "h-full content-evenly gap-2 px-4 py-3" : "gap-[3px] px-3 py-[7px]"}`}
       {...rest}
     >
       <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
         <b
           className={`project-card-title min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap ${
-            portrait ? "text-[11.5px]" : "text-[14px]"
+            mobile ? "text-[19px]" : "text-[14px]"
           }`}
         >
           {project.title}
@@ -280,7 +290,7 @@ const ProjectCard = forwardRef<
             title={t("ui.projects.charterBadge")}
           >
             <span className="text-[13px] leading-none">📜</span>
-            {!portrait && t("ui.projects.charterShort")}
+            {t("ui.projects.charterShort")}
           </span>
         )}
         {veto && (
@@ -305,44 +315,43 @@ const ProjectCard = forwardRef<
             title={t("ui.projects.leaving")}
           >
             <span className="text-[13px] leading-none">⏳</span>
-            {!portrait && t("ui.market.leaving")}
+            {t("ui.market.leaving")}
           </span>
         )}
         <span className="flex shrink-0 items-center gap-0.5 whitespace-nowrap" title={t("ui.projects.points", { count: project.points })}>
-          {star && <img src={star} alt="" className="size-[15px]" />}
-          <b className="project-card-title text-[15px] leading-none">{project.points}</b>
-          {!portrait && <small className="text-3xs text-ink-dim">{t("ui.projects.ptsShort")}</small>}
+          {star && <img src={star} alt="" className={mobile ? "size-[20px]" : "size-[15px]"} />}
+          <b className={`project-card-title leading-none ${mobile ? "text-[20px]" : "text-[15px]"}`}>{project.points}</b>
+          <small className={mobile ? "text-[12px] text-ink-dim" : "text-3xs text-ink-dim"}>{t("ui.projects.ptsShort")}</small>
         </span>
       </span>
 
       {/* Постоянный бонус — ради него половину проектов и берут, поэтому он крупно и с
         * иконкой категории. Единица начисления — ровно та, что в правилах. */}
-      {!portrait && (
-        <span className="project-card-plate flex min-w-0 items-center gap-1.5 overflow-hidden" title={perk ? resourceTooltip(perk) : undefined}>
-          {icon && <img src={icon} alt="" className="size-[20px] shrink-0 object-contain" />}
-          <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[11.5px] font-semibold
-            text-[var(--project-ink)]">
-            <ResourceText>{kind === "points" ? t("ui.projects.onlyPoints") : perk}</ResourceText>
-          </span>
+      <span className="project-card-plate flex min-w-0 items-center gap-1.5 overflow-hidden" title={perk ? resourceTooltip(perk) : undefined}>
+        {icon && <img src={icon} alt="" className={`shrink-0 object-contain ${mobile ? "size-[26px]" : "size-[20px]"}`} />}
+        <span className={`font-semibold text-[var(--project-ink)] ${
+          mobile ? "line-clamp-2 text-[14px] leading-snug" : "overflow-hidden text-ellipsis whitespace-nowrap text-[11.5px]"
+        }`}>
+          <ResourceText>{kind === "points" ? t("ui.projects.onlyPoints") : perk}</ResourceText>
         </span>
-      )}
+      </span>
 
-      {!portrait && (
-        <span
-          className={`project-card-plate overflow-hidden text-ellipsis whitespace-nowrap !pl-1 text-2xs leading-tight ${
-            met ? "font-semibold text-good" : "text-ink-muted"
-          }`}
-        >
-          {met ? "✓ " : t("ui.projects.condition")}
-          <ResourceText>{projectRequirementText(project, meta)}</ResourceText>
-        </span>
-      )}
+      <span
+        className={`project-card-plate !pl-1 leading-tight ${
+          mobile ? "line-clamp-2 text-[13px]" : "overflow-hidden text-ellipsis whitespace-nowrap text-2xs"
+        } ${met ? "font-semibold text-good" : "text-ink-muted"}`}
+      >
+        {met ? "✓ " : t("ui.projects.condition")}
+        <ResourceText>{projectRequirementText(project, meta)}</ResourceText>
+      </span>
 
       {/* Цена справа, прогресс слева. Красным горит именно та цифра, которой не хватает, —
         * «✓» у прогресса значит «условие выполнено», а не «можно купить». */}
       <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
-        {standing && <ProjectProgress standing={standing} compact={portrait} />}
-        <span className="project-card-price ml-auto shrink-0 whitespace-nowrap !pl-1.5 text-[11.5px] font-bold"
+        {standing && <ProjectProgress standing={standing} />}
+        <span className={`project-card-price ml-auto shrink-0 whitespace-nowrap !pl-1.5 font-bold ${
+          mobile ? "text-[15px]" : "text-[11.5px]"
+        }`}
           title={t("ui.projects.price")}>
           <span className={shortInfluence ? "text-bad" : "text-influence"}><ResourceText>{`${project.cost_influence}◆`}</ResourceText></span>
           {" + "}
@@ -355,7 +364,7 @@ const ProjectCard = forwardRef<
 
 /* Сегменты по одному на единицу условия; при больших требованиях — сплошная шкала,
  * иначе десяток сегментов превращается в пунктир. Бинарное условие — один сегмент. */
-function ProjectProgress({ standing, compact }: { standing: NonNullable<Standing>; compact: boolean }) {
+function ProjectProgress({ standing }: { standing: NonNullable<Standing> }) {
   const total = standing.binary ? 1 : Math.max(1, standing.needed);
   const done = standing.binary ? (standing.met ? 1 : 0) : Math.min(standing.have, total);
   const { t } = useTranslation("game");
@@ -380,7 +389,7 @@ function ProjectProgress({ standing, compact }: { standing: NonNullable<Standing
             <span
               key={position}
               data-filled={position < done || undefined}
-              className={`project-segment ${compact ? "w-2.5" : total > 4 ? "w-3" : "w-[18px]"}`}
+              className={`project-segment ${total > 4 ? "w-3" : "w-[18px]"}`}
             />
           ))}
         </span>

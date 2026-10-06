@@ -3,14 +3,14 @@ import { forwardRef, useState, type ForwardedRef } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { assetEffectLines, assetPoints, districtCount, districtSynergyValue, slotPrice } from "../../online/gameUi";
 import type { AssetMeta, AssetYield, CityMeta, DistrictMeta, LegalAction, OwnedAsset } from "../../online/types";
-import { AssetFace, assetFaceGrid, assetFaceGridPortrait, assetFaceStyle, type AssetBullet } from "../primitives/AssetFace";
+import { AssetFace, assetFaceGrid, assetFaceStyle, type AssetBullet } from "../primitives/AssetFace";
 import { CardPopover, PopoverBody, PopoverFooter, PopoverHeader } from "../primitives/CardPopover";
-import { useIsPortrait } from "../lib/layout";
 import { EffectList, KeyValue, Panel, SectionHead } from "../primitives/atoms";
 import { resolve, type ActionContext } from "../lib/actions";
 import { maxCapacity, type Indexes } from "../lib/board";
 import { ResourceText } from "../primitives/ResourceIcon";
 import { ConfirmModal } from "../primitives/Modal";
+import { useBlockedHint } from "../primitives/BlockedHint";
 
 /* Мой город: занятые слоты, свободные и закрытые.
  *
@@ -36,7 +36,7 @@ export function CityPanel({
   /* Слот стоит дорого, а замок легко задеть мимоходом, поэтому покупка идёт через окно. */
   const [confirmSlot, setConfirmSlot] = useState(false);
   const nextSlot = slotPrice(meta, me.capacity);
-  const portrait = useIsPortrait();
+  const blocked = useBlockedHint();
   const { t } = useTranslation("game");
 
   return (
@@ -46,11 +46,7 @@ export function CityPanel({
         /* «Продажа бесплатна» читалось как «отдаёте объект даром»: два игрока подряд решили,
          * что возврата нет вовсе. Бесплатным было действие, а не сделка — теперь так и написано,
          * и цена возврата стоит рядом, потому что это половина, а не полная цена. */
-        meta={
-          portrait
-            ? t("ui.city.metaShort", { used: me.assets.length, capacity: me.capacity, total })
-            : t("ui.city.meta", { used: me.assets.length, capacity: me.capacity, total })
-        }
+        meta={t("ui.city.meta", { used: me.assets.length, capacity: me.capacity, total })}
       />
       {/* Панель сразу в полный рост: все шесть слотов занимают своё место с первого раунда,
         * хотя три из них ещё закрыты. Иначе покупка объекта или слота двигала бы всю доску.
@@ -134,8 +130,15 @@ export function CityPanel({
             <button
               key={`locked-${position}`}
               type="button"
-              disabled={!ready}
-              onClick={() => capacity.kind === "ready" && setConfirmSlot(true)}
+              aria-disabled={!ready || undefined}
+              onClick={event =>
+                ready
+                  ? setConfirmSlot(true)
+                  : blocked.show(
+                      next ? (capacity.kind === "blocked" ? capacity.reason : undefined) : t("ui.city.openPrevious"),
+                      event.currentTarget,
+                    )
+              }
               title={
                 next && capacity.kind === "blocked"
                   ? capacity.reason
@@ -144,7 +147,7 @@ export function CityPanel({
                     : t("ui.city.openPrevious")
               }
               className="empty-slot grid place-content-center justify-items-center gap-[3px] rounded-card
-                px-[7px] py-1.5 enabled:hover:bg-panel-3 disabled:opacity-60"
+                px-[7px] py-1.5 not-aria-disabled:hover:bg-panel-3 aria-disabled:opacity-60"
             >
               <b className="card-serif text-[13px]">{t("ui.city.lockedSlot", { number: slot + 1 })}</b>
               <span className="rounded border border-line bg-panel-2 px-2 py-0.5 text-2xs text-ink">
@@ -154,6 +157,7 @@ export function CityPanel({
           );
         })}
       </div>
+      {blocked.hint}
       <ConfirmModal
         open={confirmSlot}
         onClose={() => setConfirmSlot(false)}
@@ -199,7 +203,6 @@ const OwnedSlot = forwardRef(function OwnedSlot({
   charterReady?: boolean;
 }, ref: ForwardedRef<HTMLButtonElement>) {
   const value = assetPoints(asset);
-  const portrait = useIsPortrait();
   const { t } = useTranslation("game");
   const districtSynergy = districtSynergyValue(owns);
   const bullets: AssetBullet[] = [
@@ -221,7 +224,7 @@ const OwnedSlot = forwardRef(function OwnedSlot({
       data-ui="asset-card"
       data-uid={owned.uid}
       style={assetFaceStyle(district?.color, asset.rarity, district?.id)}
-      className={`relative ${portrait ? assetFaceGridPortrait : assetFaceGrid} ${
+      className={`relative ${assetFaceGrid} ${
         charterReady ? "ring-2 ring-[#e0b44a] shadow-[0_0_12px_rgb(240_200_90/0.75)]" : ""
       }`}
       {...rest}
@@ -236,7 +239,7 @@ const OwnedSlot = forwardRef(function OwnedSlot({
             shadow-[0_0_8px_rgb(240_200_90/0.9)]"
         >
           <span className="text-[13px] leading-none">📜</span>
-          {!portrait && t("ui.city.charterShort")}
+          {t("ui.city.charterShort")}
         </span>
       )}
     </button>

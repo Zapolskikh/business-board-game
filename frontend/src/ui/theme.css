@@ -179,7 +179,9 @@
     text-align: left;
   }
 
-  .ui-v2 button:disabled {
+  /* `aria-disabled` — недоступная кнопка, которая по нажатию объясняет причину (BlockedHint). */
+  .ui-v2 button:disabled,
+  .ui-v2 button[aria-disabled="true"] {
     cursor: not-allowed;
   }
 
@@ -263,8 +265,37 @@
     color: var(--color-primary-ink);
     box-shadow: 0 2px 5px rgb(0 0 0 / 0.35), inset 0 1px 0 rgb(255 255 255 / 0.35);
   }
-  .ui-v2 .primary-button:enabled:hover {
+  .ui-v2 .primary-button:enabled:not([aria-disabled="true"]):hover {
     background: color-mix(in srgb, var(--color-primary) 80%, white);
+  }
+
+  /* Вкладки центра на телефоне. Активная — золотом, как главная кнопка: на ней сейчас стол. */
+  .ui-v2 .mobile-tab {
+    border-color: var(--color-line);
+    background: var(--color-panel);
+    color: var(--color-ink-muted);
+    touch-action: manipulation;
+  }
+  .ui-v2 .mobile-tab[data-active] {
+    border-color: transparent;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 88%, white) 0%, var(--color-primary) 100%);
+    color: var(--color-primary-ink);
+    box-shadow: 0 2px 5px rgb(0 0 0 / 0.35), inset 0 1px 0 rgb(255 255 255 / 0.35);
+  }
+  .ui-v2.mobile-shell button,
+  .ui-v2.mobile-sheet button {
+    touch-action: manipulation;
+  }
+
+  .ui-v2 .rotate-hint {
+    animation: rotate-hint 2.4s ease-in-out infinite;
+  }
+  @keyframes rotate-hint {
+    0%, 30% { transform: rotate(0deg); }
+    60%, 100% { transform: rotate(-90deg); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ui-v2 .rotate-hint { animation: none; transform: rotate(-90deg); }
   }
 
   /* ── Проекты ─────────────────────────────────────────────────────────────── */
@@ -369,6 +400,14 @@
   }
   .ui-v2 .asset-field:nth-child(-n + 2) {
     border-bottom: 1px solid rgb(120 101 72 / 0.22);
+  }
+  /* Мобильная карточка: те же поля столбиком — разделители только между строками. */
+  .ui-v2 .asset-fields[data-stack] .asset-field {
+    border-right: 0;
+    border-bottom: 1px solid rgb(120 101 72 / 0.22);
+  }
+  .ui-v2 .asset-fields[data-stack] .asset-field:last-child {
+    border-bottom: 0;
   }
 
   .ui-v2 .asset-footer {

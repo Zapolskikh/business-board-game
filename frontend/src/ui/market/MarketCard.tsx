@@ -12,8 +12,7 @@ import type {
 } from "../../online/types";
 import { playerColor } from "../lib/board";
 import { tr } from "../../i18n";
-import { AssetFace, assetFaceGrid, assetFaceGridPortrait, assetFaceStyle, type AssetBullet } from "../primitives/AssetFace";
-import { useIsPortrait } from "../lib/layout";
+import { AssetFace, assetFaceGrid, assetFaceStyle, type AssetBullet } from "../primitives/AssetFace";
 import { CardPopover } from "../primitives/CardPopover";
 import { MarketCardDetails } from "./MarketCardDetails";
 import type { MarketCardState } from "./marketCardState";
@@ -57,7 +56,6 @@ export function MarketCard({
   /** Пересдача слота «Маркет-мейкером» — тоже только когда движок её предлагает. */
   refresh?: LegalAction;
 }) {
-  const portrait = useIsPortrait();
   const { t } = useTranslation("game");
 
   /* Сноска «ещё N условий» — про город после покупки: условие «при наличии объекта своего же
@@ -110,7 +108,7 @@ export function MarketCard({
         animate={{ opacity: state.kind === "buying" ? 0.55 : 1 }}
         whileHover={state.kind === "buyable" ? { y: -2 } : undefined}
         transition={{ duration: 0.18 }}
-        className={`${portrait ? assetFaceGridPortrait : assetFaceGrid} relative data-[state=buying]:animate-pulse`}
+        className={`${assetFaceGrid} relative data-[state=buying]:animate-pulse`}
       >
         {owner && (
           <span

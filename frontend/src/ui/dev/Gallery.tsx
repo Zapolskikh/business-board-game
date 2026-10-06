@@ -77,6 +77,9 @@ export function Gallery() {
         busy={busy}
         error={error}
         onExit={() => window.alert("Выход в комнаты")}
+        /* `?layout=mobile` — мобильный стол в окне браузера, без эмуляции телефона. Настоящий
+         * масштаб и экран «поверните устройство» видны только в режиме устройства DevTools. */
+        layout={query.get("layout") === "mobile" ? "mobile" : undefined}
       />
 
       {/* Пульт галереи. Поверх доски, чтобы не искажать её раскладку. */}

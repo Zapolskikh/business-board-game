@@ -236,39 +236,39 @@ describe("BoardView", () => {
     ).not.toThrow();
   });
 
-  /* Вертикальная раскладка — вторая полноценная доска, а не «то же самое поуже»: три колонки
-   * превращаются в одну и две шторки. Проверяем то, что отличает её от широкой, и то, ради
-   * чего она вообще нужна: центр на экране, бока по кнопке, карточки в два столбца. */
-  it.each(names)("рендерится вертикально: %s", name => {
-    expect(() => render(name, {}, "portrait")).not.toThrow();
+  /* Мобильная раскладка — тот же стол, но центр вкладками: игроки и действия на виду, а из
+   * проектов, рынка и города виден один. Проверяем то, что отличает её от широкой. */
+  it.each(names)("рендерится на телефоне: %s", name => {
+    expect(() => render(name, {}, "mobile")).not.toThrow();
   });
 
-  it("вертикально: центр на месте, бока за язычками", () => {
-    const html = render("Богатый ход", {}, "portrait");
+  it("на телефоне: игроки и действия на месте, центр вкладками, конец хода внизу", () => {
+    const html = render("Богатый ход", {}, "mobile");
 
-    expect(html).toContain("Рынок");
-    expect(html).toContain("Мой город");
-    expect(html).toContain("aria-label=\"Игроки и хроника\"");
-    expect(html).toContain("aria-label=\"Действия и рука\"");
-    // Трёхколоночная сетка стола не должна остаться ни в каком виде.
-    expect(html).not.toContain("238px");
-    // Шторки закрыты, поэтому панели игроков и действий в разметке ещё нет.
-    expect(html).not.toContain("Способности ·");
+    expect(html).toContain('data-ui="mobile-tab-projects"');
+    expect(html).toContain('data-ui="mobile-tab-market"');
+    expect(html).toContain('data-ui="mobile-tab-city"');
+    expect(html).toContain('data-ui="player-card"');
+    expect(html).toContain('data-ui="mobile-end-turn"');
+    expect(html).toContain('data-ui="mobile-hand"');
+    // По умолчанию открыт рынок, город и проекты ждут во вкладках.
+    expect(html).toContain('data-ui="asset-card"');
+    expect(html).not.toContain('data-ui="project-card"');
+    // Кнопка конца хода одна — внизу, а не ещё и в колонке действий.
+    expect(html.split('data-tutorial="end-turn"').length).toBe(1);
+    // Шапка без ряда кнопок: всё в меню.
+    expect(html).toContain('data-ui="mobile-menu"');
   });
 
-  it("вертикально: карточка краткая, а сетка та же", () => {
-    const portrait = render("Богатый ход", {}, "portrait");
+  it("на телефоне карточка полная, а поля столбиком", () => {
+    const mobile = render("Богатый ход", {}, "mobile");
     const wide = render("Богатый ход", {}, "wide");
 
-    // Шесть слотов рынка и шесть слотов города видны сразу в обеих раскладках.
-    expect(portrait).toContain("grid-cols-3");
-    // Проекты вчетвером в ряд помещаются только на широком столе.
-    expect(portrait).toContain("grid-cols-2");
-    expect(wide).toContain("grid-cols-4");
-    // Редкость словом, теги и таблица свойств — только на широкой карточке; вертикально
-    // они уезжают в поповер, иначе шесть карточек в высоту экрана не встают.
-    expect(wide).toContain("Обычный");
-    expect(portrait).not.toContain("Обычный");
+    // Редкость, теги и все четыре поля остаются на лице и на телефоне.
+    expect(mobile).toContain("asset-ribbon");
+    expect(mobile).toContain("asset-tag");
+    expect(mobile).toContain("grid-cols-1 grid-rows-4");
+    expect(wide).not.toContain("grid-cols-1 grid-rows-4");
   });
 
   it("переживает объект, которого нет в каталоге", () => {

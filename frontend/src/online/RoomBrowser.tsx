@@ -9,6 +9,7 @@ import { AboutDialog } from "./AboutDialog";
 import { SupportLinks } from "./SupportLinks";
 import { StudioLogo } from "./StudioMark";
 import { ResourceText } from "../ui/primitives/ResourceIcon";
+import { isPhoneScreen } from "../ui/lib/layout";
 
 interface Props {
   meta: CityMeta;
@@ -226,12 +227,16 @@ export function RoomBrowser({ meta, onOpen, onFeedback, onTutorial }: Props) {
           <p className="hero-slogan">{t("hero.titleLine1")}<br /><em>{t("hero.titleLine2")}</em></p>
           <p className="hero-lead">{t("hero.lead")}</p>
           <p className="hero-hook">{t("hero.hook")}</p>
-          {/* Обучение — отдельной крупной кнопкой рядом с основными: новичку стоит начать с него. */}
+          {/* Обучение — отдельной крупной кнопкой рядом с основными: новичку стоит начать с него.
+            * На телефоне его нет: подсказки обучения указывают на места широкого стола, а у
+            * мобильного своя раскладка — для него обучение будет отдельным. */}
           <div className="hero-row">
-          <button type="button" className="hero-tutorial" onClick={onTutorial} title={t("menu.hint", { ns: "tutorial" })}>
-            <small>{t("menu.recommended", { ns: "tutorial" })}</small>
-            <b>{t("menu.cta", { ns: "tutorial" })}</b>
-          </button>
+          {!isPhoneScreen() && (
+            <button type="button" className="hero-tutorial" onClick={onTutorial} title={t("menu.hint", { ns: "tutorial" })}>
+              <small>{t("menu.recommended", { ns: "tutorial" })}</small>
+              <b>{t("menu.cta", { ns: "tutorial" })}</b>
+            </button>
+          )}
           <div className="hero-row-main">
           <div className="hero-actions">
             <button type="button" className="rooms-button primary hero-cta" onClick={startGame}>{t("hero.ctaPlay")}</button>

@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { tr } from "../../i18n";
 import type { CSSProperties, ReactNode } from "react";
 import { rarityLabels, tagLabel, type AssetEffectLine } from "../../online/gameUi";
-import { useIsPortrait } from "../lib/layout";
+import { useIsMobile } from "../lib/layout";
 import type { AssetMeta, AssetYield, DistrictMeta } from "../../online/types";
 import {
   districtArt,
@@ -92,12 +92,6 @@ export interface AssetBullet {
   tone?: "warn" | "good" | "bad" | "dim";
 }
 
-const bulletTone: Record<NonNullable<AssetBullet["tone"]>, string> = {
-  warn: "text-warning",
-  good: "text-good",
-  bad: "text-bad",
-  dim: "text-ink-dim",
-};
 
 
 const signed = (value: number, unit: string): string => `${value >= 0 ? "+" : "−"}${Math.abs(value)}${unit}`;
@@ -122,54 +116,13 @@ export function AssetFace({
   /** Объект уже куплен: разовая награда получена и показывается приглушённо. */
   owned?: boolean;
 }) {
-  const portrait = useIsPortrait();
+  const mobile = useIsMobile();
   const { t } = useTranslation("game");
   const summary = assetFaceSummary(asset, lines);
   const otherOneTime = summary.oneTime.filter(item => !item.endsWith("◆"));
   const points = asset.points ?? 0;
   const star = statIcon("score");
   const icon = districtIcon(district?.id);
-
-  /* Вертикально карточка краткая: цена, название, очки и доход. Всё остальное — по нажатию.
-   * Мобильная раскладка будет пересобрана отдельно, здесь она только не должна ломаться. */
-  if (portrait) {
-    return (
-      <>
-        <span className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1">
-          {price ? (
-            <b className={`text-3xs font-bold ${price.short ? "text-bad" : "text-gold"}`}><ResourceText>{`${price.value}$`}</ResourceText></b>
-          ) : (
-            <span />
-          )}
-          {icon ? <img src={icon} alt={district?.title} className="mx-auto size-3.5" /> : <span />}
-          <span className="flex items-center gap-0.5 text-3xs font-bold text-points">
-            {star && <img src={star} alt="" className="size-2.5" />}
-            {points}
-          </span>
-        </span>
-        <h3 className="overflow-hidden text-[11px] leading-[1.15] font-semibold text-ink">{asset.title}</h3>
-        <span className="flex items-center gap-1.5 overflow-hidden text-3xs whitespace-nowrap">
-          <b className={income.money ? "font-bold text-money" : "text-ink-dim"}><ResourceText>{signed(income.money, "$")}</ResourceText></b>
-          {income.influence !== 0 && <b className="font-bold text-influence"><ResourceText>{signed(income.influence, "◆")}</ResourceText></b>}
-          {summary.unique.length > 0 && <span className="text-ink-dim">✦</span>}
-        </span>
-        <span className="flex items-center gap-1 overflow-hidden text-3xs whitespace-nowrap text-ink-dim">
-          {bullets.map(bullet => (
-            bullet.key === "leaving" ? (
-              <span key={bullet.key} title={bullet.title} aria-label={bullet.title} className="text-2xl font-black leading-none text-warning drop-shadow-[0_0_4px_rgba(221,163,109,0.8)]">
-                {bullet.icon}
-              </span>
-            ) : (
-              <span key={bullet.key} title={bullet.title} className={bullet.tone ? bulletTone[bullet.tone] : ""}>
-                <ResourceText>{bullet.icon}</ResourceText>
-                <ResourceText>{bullet.text}</ResourceText>
-              </span>
-            )
-          ))}
-        </span>
-      </>
-    );
-  }
 
   const leaving = bullets.find(bullet => bullet.key === "leaving");
   const ribbon = rarityRibbon(asset.rarity);
@@ -229,7 +182,14 @@ export function AssetFace({
       {/* Четыре поля на своих местах: деньги и влияние за раунд слева, разовое и особое справа.
         * Пустое поле приглушено, а не убрано — шесть карт сравниваются одним взглядом. */}
       <span className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-1.5">
-        <span className="asset-fields grid min-h-0 min-w-0 grid-cols-2 grid-rows-2 overflow-hidden rounded-md">
+        {/* На телефоне карточка выше и уже: поля встают в столбик, и каждое получает всю ширину —
+          * особому свойству так помещается вдвое больше текста. */}
+        <span
+          data-stack={mobile || undefined}
+          className={`asset-fields grid min-h-0 min-w-0 overflow-hidden rounded-md ${
+            mobile ? "grid-cols-1 grid-rows-4" : "grid-cols-2 grid-rows-2"
+          }`}
+        >
           <Field icon={statIcon("money")} empty={income.money === 0} title={t("ui.asset.moneyTitle")} label={t("ui.asset.moneyEmpty")}>
             <b className="text-[14px] text-money">{signed(income.money, "")}</b>
             <small>{t("ui.asset.perRound")}</small>
@@ -350,9 +310,3 @@ export const assetFaceGrid = `game-card asset-card grid h-full w-full min-h-0 mi
   grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-1
   rounded-card border border-[var(--rc)]
   px-2.5 pt-1.5 pb-1 text-left`;
-
-/** Та же карточка вертикально: четыре зоны, поля вдвое уже. */
-export const assetFaceGridPortrait = `game-card asset-card grid h-full w-full min-h-0 min-w-0
-  grid-rows-[auto_minmax(0,1fr)_auto_auto] gap-0.5
-  rounded-card border border-[var(--rc)]
-  px-1 py-1 text-left`;
