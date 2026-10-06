@@ -111,8 +111,8 @@ export function CityPanel({
             className="empty-slot grid place-content-center justify-items-center gap-1 rounded-card
               px-[7px] py-1.5 text-ink-dim"
           >
-            <b className="card-serif text-[13px]">{t("ui.city.slot", { number: me.assets.length + position + 1 })}</b>
-            <span className="text-3xs">{t("ui.city.free")}</span>
+            <b className="card-serif text-[16px]">{t("ui.city.slot", { number: me.assets.length + position + 1 })}</b>
+            <span className="text-[12.5px]">{t("ui.city.free")}</span>
           </div>
         ))}
 
@@ -149,8 +149,8 @@ export function CityPanel({
               className="empty-slot grid place-content-center justify-items-center gap-[3px] rounded-card
                 px-[7px] py-1.5 not-aria-disabled:hover:bg-panel-3 aria-disabled:opacity-60"
             >
-              <b className="card-serif text-[13px]">{t("ui.city.lockedSlot", { number: slot + 1 })}</b>
-              <span className="rounded border border-line bg-panel-2 px-2 py-0.5 text-2xs text-ink">
+              <b className="card-serif text-[16px]">{t("ui.city.lockedSlot", { number: slot + 1 })}</b>
+              <span className="rounded border border-line bg-panel-2 px-2 py-0.5 text-[13.5px] text-ink">
                 {t("ui.city.open")}<b className={short ? "font-bold text-bad" : ""}><ResourceText>{`${price ?? "?"}$${influence ? ` + ${influence}◆` : ""}`}</ResourceText></b>
               </span>
             </button>

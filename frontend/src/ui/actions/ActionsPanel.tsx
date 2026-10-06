@@ -136,6 +136,7 @@ export function ActionsPanel({
      * каскадом доходит до всех, и правая колонка остаётся одной зоной, даже если панелей
      * в ней станет больше. */
     <div
+      data-ui="actions-column"
       style={zoneStyle("actions")}
       className={`grid min-h-0 min-w-0 gap-1.5 ${
         mobile ? "content-start" : "grid-rows-[auto_auto_auto_minmax(0,1fr)_auto_auto]"

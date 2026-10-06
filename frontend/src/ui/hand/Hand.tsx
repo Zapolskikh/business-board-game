@@ -148,7 +148,7 @@ export function Hand({
         {Array.from({ length: Math.max(0, 3 - hand.length) }).map((_, position) => (
           <div
             key={`empty-${position}`}
-            className="empty-slot grid place-content-center rounded-md text-[12px] text-ink-dim"
+            className="empty-slot grid place-content-center rounded-md text-[14px] text-ink-dim"
           >
             {t("ui.hand.empty")}
           </div>

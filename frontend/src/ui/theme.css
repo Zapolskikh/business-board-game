@@ -121,7 +121,8 @@
    * подмена токенов позволяет существующим классам текста и фона автоматически
    * перейти на тёмный текст, не меняя семантику денег, очков и состояний. */
   .ui-v2 .game-card,
-  .ui-v2.mobile-shell :is([data-ui="action-button"], [data-ui="power-trigger"], [data-ui="drawer-row"]) {
+  .ui-v2 [data-ui="actions-column"] :is([data-ui="action-button"], [data-ui="power-trigger"], [data-ui="drawer-row"]),
+  .ui-v2 :is([data-ui="draw-card-button"], [data-ui="hand-card"]) {
     --color-panel: #d4c4a7;
     --color-panel-2: #e7dcc6;
     --color-panel-3: #ddcfb4;
@@ -1114,36 +1115,64 @@
   }
 }
 
-/* Боковые колонки мобильного стола — на шаг крупнее, чем на широком.
+/* Размеры подписей на столе и бумага правой колонки.
  *
- * Стол на телефоне вписан в экран множителем ~0.65, и подписи кнопок в 11.5px становились
- * мельче всего остального. Правила лежат в слое утилит и выигрывают у `text-[…]` только за счёт
- * специфичности, поэтому действуют лишь внутри `.mobile-shell` — широкий стол их не видит. */
+ * Правила лежат в слое утилит и выигрывают у `text-[…]` только за счёт специфичности. Сначала —
+ * общий шаг для обоих столов: мелкие подписи (9–11.5px) читались с трудом и на большом экране.
+ * Затем мобильный стол: он вписан в экран множителем ~0.65, поэтому там всё ещё на шаг крупнее. */
 @layer utilities {
-  .ui-v2.mobile-shell :is([data-ui="action-button"], [data-ui="power-trigger"]) > b,
-  .ui-v2.mobile-shell [data-ui="drawer-row"] b {
-    font-size: 15.5px;
-  }
-  .ui-v2.mobile-shell :is([data-ui="action-button"], [data-ui="power-trigger"]) > small,
-  .ui-v2.mobile-shell [data-ui="drawer-row"] small {
-    font-size: 13.5px;
-  }
-  /* Кнопки правой колонки — той же бумагой, что карточки игроков слева: светлый текст на тёмной
-   * кнопке на телефоне не читался, а рядом с карточками рынка тёмные плашки выглядели чужими.
-   * Цвета текста переключает общий набор токенов бумаги (см. `.game-card`). */
-  .ui-v2.mobile-shell :is([data-ui="action-button"], [data-ui="power-trigger"], [data-ui="drawer-row"]) {
-    border: 1px solid #c9a55a;
+  /* Кнопки правой колонки, карты руки и «Вытянуть 2 карты» — той же бумагой, что карточки
+   * игроков слева: светлый текст на тёмной кнопке читался плохо, а рядом с карточками рынка тёмные
+   * плашки выглядели чужими. Цвета текста переключает общий набор токенов бумаги (см. `.game-card`). */
+  .ui-v2 [data-ui="actions-column"] :is([data-ui="action-button"], [data-ui="power-trigger"], [data-ui="drawer-row"]),
+  .ui-v2 :is([data-ui="draw-card-button"], [data-ui="hand-card"]) {
+    border-color: #c9a55a;
     background: linear-gradient(180deg, #f7efdc 0%, #ecdfc3 100%);
     box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.5), 0 1px 3px rgb(0 0 0 / 0.3);
   }
-  .ui-v2.mobile-shell :is([data-ui="action-button"], [data-ui="power-trigger"])[data-state="blocked"] {
+  .ui-v2 [data-ui="hand-card"] { border-left-color: var(--tone); }
+  .ui-v2 [data-ui="actions-column"] :is([data-ui="action-button"], [data-ui="power-trigger"])[data-state="blocked"],
+  .ui-v2 [data-ui="draw-card-button"][aria-disabled="true"] {
     opacity: 0.7;
   }
 
-  /* Карточки игроков: роль, статус хода и строка ресурсов крупнее — за счёт убранного заголовка. */
-  .ui-v2.mobile-shell [data-ui="player-card"] .text-\[16px\] { font-size: 17.5px; }
+  /* Общий шаг: правая колонка. */
+  .ui-v2 :is([data-ui="action-button"], [data-ui="power-trigger"]) > b,
+  .ui-v2 :is([data-ui="drawer-row"], [data-ui="hand-card"]) b { font-size: 15px; }
+  .ui-v2 :is([data-ui="action-button"], [data-ui="power-trigger"]) > small,
+  .ui-v2 :is([data-ui="drawer-row"], [data-ui="hand-card"]) small { font-size: 13px; }
+
+  /* Общий шаг: карточки игроков. */
+  .ui-v2 [data-ui="player-card"] .text-\[16px\] { font-size: 17.5px; }
+  .ui-v2 [data-ui="player-card"] .text-\[12px\] { font-size: 14.5px; }
+  .ui-v2 [data-ui="player-card"] .text-\[12px\] img { width: 17px; height: 17px; }
+  .ui-v2 [data-ui="player-card"] .text-2xs { font-size: 13px; }
+  .ui-v2 [data-ui="player-card"] .text-3xs { font-size: 11.5px; }
+
+  /* Общий шаг: шапка. */
+  .ui-v2 [data-ui="player-hud"] { max-width: 1080px; }
+  .ui-v2 [data-ui="player-hud"] .text-\[9px\] { font-size: 10.5px; letter-spacing: 0.07em; }
+  .ui-v2 [data-ui="player-hud"] .text-\[14px\] { font-size: 16.5px; }
+  .ui-v2 [data-ui="player-hud"] .text-\[13px\] { font-size: 15px; }
+  .ui-v2 [data-ui="player-hud"] button img.size-4 { width: 18px; height: 18px; }
+  .ui-v2 [data-ui="player-hud"] button img.size-3 { width: 14px; height: 14px; }
+
+  /* Общий шаг: карточка объекта — признаки и поля. */
+  .ui-v2 .asset-tag { padding: 1px 9px; font-size: 12.5px; }
+  .ui-v2 .asset-field b { font-size: 15px; }
+  .ui-v2 .asset-field:last-child b { font-size: 12px; }
+  .ui-v2 .asset-field small { font-size: 12.5px; }
+
+  /* ── Мобильный стол: ещё на шаг крупнее ─────────────────────────────────────────────────── */
+  .ui-v2.mobile-shell :is([data-ui="action-button"], [data-ui="power-trigger"]) > b,
+  .ui-v2.mobile-shell [data-ui="drawer-row"] b,
+  .ui-v2.mobile-sheet [data-ui="hand-card"] b { font-size: 15.5px; }
+  .ui-v2.mobile-shell :is([data-ui="action-button"], [data-ui="power-trigger"]) > small,
+  .ui-v2.mobile-shell [data-ui="drawer-row"] small,
+  .ui-v2.mobile-sheet [data-ui="hand-card"] small { font-size: 13.5px; }
+
+  /* Карточки игроков: роль, статус хода и строка ресурсов — за счёт убранного заголовка. */
   .ui-v2.mobile-shell [data-ui="player-card"] .text-\[12px\] { font-size: 15px; }
-  .ui-v2.mobile-shell [data-ui="player-card"] .text-\[12px\] img { width: 17px; height: 17px; }
   .ui-v2.mobile-shell [data-ui="player-card"] .text-2xs { font-size: 13.5px; }
   .ui-v2.mobile-shell [data-ui="player-card"] .text-3xs { font-size: 12px; }
 
@@ -1156,7 +1185,7 @@
   .ui-v2.mobile-shell [data-ui="player-hud"] button img.size-4 { width: 20px; height: 20px; }
   .ui-v2.mobile-shell [data-ui="player-hud"] button img.size-3 { width: 16px; height: 16px; }
 
-  /* Карточка объекта: признаки и поля крупнее; плашка полей доходит почти до черты над очками. */
+  /* Карточка объекта: плашка полей доходит почти до черты над очками. */
   .ui-v2.mobile-shell .asset-card { row-gap: 3px; padding-bottom: 3px; }
   .ui-v2.mobile-shell .asset-tag { padding: 1px 10px; font-size: 13px; }
   .ui-v2.mobile-shell .asset-field b { font-size: 16px; }
