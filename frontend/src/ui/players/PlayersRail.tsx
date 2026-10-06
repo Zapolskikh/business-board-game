@@ -8,6 +8,7 @@ import { Panel, SectionHead } from "../primitives/atoms";
 import { ResourceText } from "../primitives/ResourceIcon";
 import type { ActionContext } from "../lib/actions";
 import { atScandalRisk, playerColor, scandalLimit, turnPosition, type Indexes } from "../lib/board";
+import { useIsMobile } from "../lib/layout";
 import { PlayerDetails } from "./PlayerDetails";
 import { playerFrame, roleIcon, statIcon } from "../assets/cards";
 
@@ -31,9 +32,14 @@ export function PlayersRail({
   onAction: (action: LegalAction) => void;
 }) {
   const { t } = useTranslation("game");
+  /* На телефоне заголовка нет: четыре карточки сами говорят, что это игроки, а его строка нужнее
+   * карточкам — и колонка встаёт вровень с правой, у которой заголовка тоже нет. */
+  const mobile = useIsMobile();
   return (
-    <Panel rows zone="players">
-      <SectionHead title={t("ui.players.title")} meta={t("ui.players.count", { count: game.players.length })} />
+    <Panel rows={!mobile} zone="players" className={mobile ? "grid min-h-0 grid-rows-[minmax(0,1fr)]" : ""}>
+      {!mobile && (
+        <SectionHead title={t("ui.players.title")} meta={t("ui.players.count", { count: game.players.length })} />
+      )}
       <div className="grid min-h-0 grid-rows-4 gap-1 p-px">
         {game.players.map(player => (
           <CardPopover

@@ -356,7 +356,7 @@
     "header": {
       "title": "Město vlivu", "round": "Kolo {{round}} / {{max}}", "points": "Body", "money": "Peníze",
       "influence": "Vliv", "roofs": "Ochrana", "scandals": "Skandály", "actions": "Akce", "yourRole": "Vaše role",
-      "noRole": "Bez role", "score": "Skóre", "resources": "Zdroje", "income": "Příjem za kolo", "roofsRound": "Ochrana za kolo", "scandalsRound": "Skandály za kolo", "city": "Město",
+      "noRole": "Bez role", "score": "Skóre", "resources": "Zdroje", "income": "Příjem za kolo", "roofsRound": "Ochrana/kolo", "scandalsRound": "Skandály/kolo", "city": "Město",
       "defence": "Obrana", "scoreButton": "Skóre a příjem", "chronicle": "Kronika", "rules": "Pravidla", "rooms": "Místnosti",
       "backToRooms": "Zpět do místností", "menu": "Nabídka", "busy": "Server provádí tah, boti přemýšlejí…",
       "finished": "🏁 Hra skončila", "jailed": "🚔 Zatčení: v příštím tahu jen 1 akce", "theme": "Barevné téma"

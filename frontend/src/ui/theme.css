@@ -120,7 +120,8 @@
   /* Объекты и проекты — физический слой игры поверх почти чёрного стола. Локальная
    * подмена токенов позволяет существующим классам текста и фона автоматически
    * перейти на тёмный текст, не меняя семантику денег, очков и состояний. */
-  .ui-v2 .game-card {
+  .ui-v2 .game-card,
+  .ui-v2.mobile-shell :is([data-ui="action-button"], [data-ui="power-trigger"], [data-ui="drawer-row"]) {
     --color-panel: #d4c4a7;
     --color-panel-2: #e7dcc6;
     --color-panel-3: #ddcfb4;
@@ -1125,10 +1126,42 @@
   }
   .ui-v2.mobile-shell :is([data-ui="action-button"], [data-ui="power-trigger"]) > small,
   .ui-v2.mobile-shell [data-ui="drawer-row"] small {
-    font-size: 12.5px;
+    font-size: 13.5px;
   }
+  /* Кнопки правой колонки — той же бумагой, что карточки игроков слева: светлый текст на тёмной
+   * кнопке на телефоне не читался, а рядом с карточками рынка тёмные плашки выглядели чужими.
+   * Цвета текста переключает общий набор токенов бумаги (см. `.game-card`). */
+  .ui-v2.mobile-shell :is([data-ui="action-button"], [data-ui="power-trigger"], [data-ui="drawer-row"]) {
+    border: 1px solid #c9a55a;
+    background: linear-gradient(180deg, #f7efdc 0%, #ecdfc3 100%);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.5), 0 1px 3px rgb(0 0 0 / 0.3);
+  }
+  .ui-v2.mobile-shell :is([data-ui="action-button"], [data-ui="power-trigger"])[data-state="blocked"] {
+    opacity: 0.7;
+  }
+
+  /* Карточки игроков: роль, статус хода и строка ресурсов крупнее — за счёт убранного заголовка. */
   .ui-v2.mobile-shell [data-ui="player-card"] .text-\[16px\] { font-size: 17.5px; }
-  .ui-v2.mobile-shell [data-ui="player-card"] .text-\[12px\] { font-size: 13.5px; }
-  .ui-v2.mobile-shell [data-ui="player-card"] .text-2xs { font-size: 11.5px; }
-  .ui-v2.mobile-shell [data-ui="player-card"] .text-3xs { font-size: 9.75px; }
+  .ui-v2.mobile-shell [data-ui="player-card"] .text-\[12px\] { font-size: 15px; }
+  .ui-v2.mobile-shell [data-ui="player-card"] .text-\[12px\] img { width: 17px; height: 17px; }
+  .ui-v2.mobile-shell [data-ui="player-card"] .text-2xs { font-size: 13.5px; }
+  .ui-v2.mobile-shell [data-ui="player-card"] .text-3xs { font-size: 12px; }
+
+  /* Шапка: табличка игрока занимает всё место между статусом хода и меню, цифры крупнее. */
+  .ui-v2.mobile-shell [data-ui="player-hud"] { max-width: none; justify-self: stretch; }
+  .ui-v2.mobile-shell [data-ui="player-hud"] > :is(button, div) { flex: 1 1 auto; }
+  .ui-v2.mobile-shell [data-ui="player-hud"] .text-\[9px\] { font-size: 11.5px; letter-spacing: 0.06em; }
+  .ui-v2.mobile-shell [data-ui="player-hud"] .text-\[14px\] { font-size: 19px; }
+  .ui-v2.mobile-shell [data-ui="player-hud"] .text-\[13px\] { font-size: 17px; }
+  .ui-v2.mobile-shell [data-ui="player-hud"] button img.size-4 { width: 20px; height: 20px; }
+  .ui-v2.mobile-shell [data-ui="player-hud"] button img.size-3 { width: 16px; height: 16px; }
+
+  /* Карточка объекта: признаки и поля крупнее; плашка полей доходит почти до черты над очками. */
+  .ui-v2.mobile-shell .asset-card { row-gap: 3px; padding-bottom: 3px; }
+  .ui-v2.mobile-shell .asset-tag { padding: 1px 10px; font-size: 13px; }
+  .ui-v2.mobile-shell .asset-field b { font-size: 16px; }
+  .ui-v2.mobile-shell .asset-field:last-child b { font-size: 12.5px; }
+  .ui-v2.mobile-shell .asset-field small { font-size: 13px; }
+  .ui-v2.mobile-shell .asset-field img { width: 20px; height: 20px; }
+  .ui-v2.mobile-shell .asset-footer { padding-top: 2px; }
 }

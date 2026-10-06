@@ -356,7 +356,7 @@
     "header": {
       "title": "City of Influence", "round": "Round {{round}} / {{max}}", "points": "Points", "money": "Money",
       "influence": "Influence", "roofs": "Protection", "scandals": "Scandals", "actions": "Actions", "yourRole": "Your role",
-      "noRole": "No role", "score": "Score", "resources": "Resources", "income": "Round income", "roofsRound": "Protection per round", "scandalsRound": "Scandals per round", "city": "City",
+      "noRole": "No role", "score": "Score", "resources": "Resources", "income": "Round income", "roofsRound": "Protection/round", "scandalsRound": "Scandals/round", "city": "City",
       "defence": "Defence", "scoreButton": "Score and income", "chronicle": "Log", "rules": "Rules", "rooms": "Rooms",
       "backToRooms": "Back to the rooms", "menu": "Menu", "busy": "The server is making the move, bots are thinking…",
       "finished": "🏁 The game is over", "jailed": "🚔 Arrested: only 1 action next turn", "theme": "Colour theme"
