@@ -9,9 +9,14 @@ import "./i18n";
 // на остальных адресах, решает App.tsx: в production старый, в dev — v2.
 const isGallery = location.pathname.startsWith("/dev") || new URLSearchParams(location.search).has("dev");
 
+// Книга правил и диалоги обучения одним листом, для печати в PDF: /?print (язык — &lang=…).
+const isPrint = new URLSearchParams(location.search).has("print");
+
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
-if (isGallery) {
+if (isPrint) {
+  void import("./ui/dev/PrintBook").then(({ PrintBook }) => root.render(<PrintBook />));
+} else if (isGallery) {
   void import("./ui/dev/Gallery").then(({ Gallery }) =>
     root.render(
       <React.StrictMode>

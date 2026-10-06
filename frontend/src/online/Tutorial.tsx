@@ -73,6 +73,9 @@ const STEPS: Step[] = [
   { id: "finale", look: "none", anchors: [] },
 ];
 
+/** Сценарий целиком — для листа печати (`ui/dev/PrintBook`): те же шаги, что проходит игрок. */
+export const TUTORIAL_STEPS: readonly Step[] = STEPS;
+
 const NOTHING = () => false;
 
 export function TutorialScreen({ meta, onExit }: { meta: CityMeta; onExit: () => void }) {
