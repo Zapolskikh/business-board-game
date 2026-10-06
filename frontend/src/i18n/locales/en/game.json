@@ -460,6 +460,9 @@
     },
     "finish": { "scoreModal": "Score and income", "title": "🏁 The game is over", "rounds": "{{count}} rounds", "back": "← Back to the rooms", "noRole": "no role" },
     "roles": {
+      "showAll": "All role descriptions",
+      "back": "‹ Short view",
+      "claimFor": "Take the role for {{price}}◆",
       "title": "City roles", "free": "{{free}} of {{total}} free", "priceStart": "A free role costs ",
       "priceMiddle": ", taking a role from someone costs ", "priceEnd": ". Taking a role costs one action.",
       "roofNote": "While the holder has Protection, their role cannot be taken. Remove the Protection first.", "protected": "Protected",
@@ -473,6 +476,12 @@
       "nothing": "Nothing found", "chapter": "Chapter {{number}}", "close": "Close the book"
     },
     "mobile": {
+      "yourTurn": "Your turn",
+      "turnOf": "{{name}} is playing",
+      "turnsAhead_one": "you in {{count}} turn",
+      "turnsAhead_other": "you in {{count}} turns",
+      "turnDone": "you have played",
+      "finished": "Game over",
       "board": "Game board",
       "projects": "Projects",
       "market": "Market",

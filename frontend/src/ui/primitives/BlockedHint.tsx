@@ -1,6 +1,7 @@
 import * as Popover from "@radix-ui/react-popover";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ResourceText } from "./ResourceIcon";
+import { useIsMobile } from "../lib/layout";
 
 /* Плашка «почему нельзя» у недоступной кнопки.
  *
@@ -29,6 +30,7 @@ export function useBlockedHint(): {
   /* Счётчик, а не флаг: второе нажатие по той же кнопке перезапускает таймер, и плашка не
    * исчезает через полсекунды после него только потому, что первая успела отсчитать своё. */
   const [shown, setShown] = useState(0);
+  const mobile = useIsMobile();
 
   const show = useCallback((reason: string | undefined, target: HTMLElement) => {
     if (!reason) return;
@@ -57,8 +59,8 @@ export function useBlockedHint(): {
           onOpenAutoFocus={event => event.preventDefault()}
           onCloseAutoFocus={event => event.preventDefault()}
           /* Выше окон карточек (z-61) и панели руки: недоступная кнопка бывает и внутри них. */
-          className="ui-v2 z-[70] max-w-[280px] rounded-md border border-bad/50 bg-panel px-2.5 py-1.5 font-sans
-            text-[12.5px] leading-snug text-ink shadow-[0_4px_14px_rgb(0_0_0/0.45)]"
+          className={`ui-v2 z-[70] rounded-md border border-bad/50 bg-panel px-2.5 py-1.5 font-sans leading-snug
+            text-ink shadow-[0_4px_14px_rgb(0_0_0/0.45)] ${mobile ? "max-w-[340px] text-[15px]" : "max-w-[280px] text-[12.5px]"}`}
         >
           <span aria-hidden="true" className="mr-1">⛔</span>
           <ResourceText>{message ?? ""}</ResourceText>

@@ -5,7 +5,7 @@ import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import type { CityMeta, GameState, PlayerState } from "../../online/types";
 import { CardPopover } from "../primitives/CardPopover";
 import { ActionsDetails, DefenceDetails, ScoreDetails } from "./headerPopovers";
-import { atScandalRisk, scandalLimit } from "../lib/board";
+import { atScandalRisk, scandalLimit, turnPosition } from "../lib/board";
 import { roleIcon, statIcon } from "../assets/cards";
 import { setTheme, useTheme } from "../lib/theme";
 import { themes, type ThemeId } from "../themes";
@@ -88,12 +88,16 @@ export function Header({
      * функциональных зон, и на общем `bg-panel` она читалась как ещё одна панель. */
     <header className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-panel
       bg-topbar px-3 py-1.5">
-      <div className="flex items-baseline gap-2.5">
-        <b className="card-serif text-[19px]">{t("ui.header.title")}</b>
-        <span className="text-[11px] text-ink-muted">
-          {t("ui.header.round", { round: game.round_number, max: game.max_rounds })}
-        </span>
-      </div>
+      {mobile ? (
+        <TurnStatus game={game} me={me} />
+      ) : (
+        <div className="flex items-baseline gap-2.5">
+          <b className="card-serif text-[19px]">{t("ui.header.title")}</b>
+          <span className="text-[11px] text-ink-muted">
+            {t("ui.header.round", { round: game.round_number, max: game.max_rounds })}
+          </span>
+        </div>
+      )}
 
       <div
         data-ui="player-hud"
@@ -252,6 +256,39 @@ export function Header({
       </>
     );
   }
+}
+
+/* На телефоне вместо названия игры — то, ради чего смотрят в угол экрана: какой раунд и чей ход.
+ * Название игрок и так знает, а ход ботов на телефоне проходит без карточки «Ходит» перед глазами:
+ * она в колонке игроков, и её легко не заметить. Когда ход чужой — сколько ходов до вашего. */
+function TurnStatus({ game, me }: { game: GameState; me: PlayerState }) {
+  const { t } = useTranslation("game");
+  const current = game.players[game.current_player_index];
+  const mine = current?.id === me.id;
+  const ahead = turnPosition(game, me.id) - (game.turns_taken_in_round ?? 0);
+  return (
+    <div data-ui="turn-status" className="grid min-w-[170px] gap-1">
+      <span className="text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-dim">
+        {t("ui.header.round", { round: game.round_number, max: game.max_rounds })}
+      </span>
+      {game.status !== "playing" ? (
+        <b className="card-serif text-[17px] leading-none text-gold">{t("ui.mobile.finished")}</b>
+      ) : mine ? (
+        <b className="card-serif w-fit rounded-full bg-gold px-2.5 py-0.5 text-[16px] leading-tight text-[#2a1d05]">
+          {t("ui.mobile.yourTurn")}
+        </b>
+      ) : (
+        <span className="flex min-w-0 items-baseline gap-1.5 whitespace-nowrap">
+          <b className="card-serif overflow-hidden text-ellipsis text-[16px] leading-tight text-ink">
+            {t("ui.mobile.turnOf", { name: current?.name ?? "" })}
+          </b>
+          <small className="text-[12px] text-ink-muted">
+            {ahead > 0 ? t("ui.mobile.turnsAhead", { count: ahead }) : t("ui.mobile.turnDone")}
+          </small>
+        </span>
+      )}
+    </div>
+  );
 }
 
 function ActionCharges({ left }: { left: number }) {

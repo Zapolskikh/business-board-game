@@ -1,6 +1,7 @@
 import { tr } from "../../i18n";
 import * as Dialog from "@radix-ui/react-dialog";
 import type { ReactNode } from "react";
+import { MOBILE_DIALOG_ZOOM, useIsMobile } from "../lib/layout";
 import { ResourceText } from "./ResourceIcon";
 
 /* Модалка — для того, чему поповера мало: хроника, правила, финальный счёт.
@@ -14,6 +15,7 @@ export function Modal({
   width = 620,
   children,
   footer,
+  nested = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -22,27 +24,31 @@ export function Modal({
   width?: number;
   children: ReactNode;
   footer?: ReactNode;
+  /** Окно поверх другого окна: затемнение ложится и на нижнее окно, а не только на доску. */
+  nested?: boolean;
 }) {
+  // Контекст раскладки доходит и сквозь портал: окно рисуется внутри дерева доски.
+  const zoom = useIsMobile() ? MOBILE_DIALOG_ZOOM : undefined;
   return (
     <Dialog.Root open={open} onOpenChange={next => !next && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-[#0009]" />
+        <Dialog.Overlay className={`fixed inset-0 bg-[#0009] ${nested ? "z-[55]" : "z-40"}`} />
         <Dialog.Content
           data-ui="modal"
-          style={{ width: `min(${width}px, 94vw)` }}
-          className="ui-v2 fixed left-1/2 top-1/2 z-50 grid max-h-[88vh] -translate-x-1/2 -translate-y-1/2
+          style={{ width: `min(${Math.round(width * (zoom ?? 1))}px, 94vw)` }}
+          className={`ui-v2 fixed left-1/2 top-1/2 grid max-h-[88vh] -translate-x-1/2 -translate-y-1/2
             grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-[12px] border border-line-2
-            bg-panel font-sans text-ink"
+            bg-panel font-sans text-ink ${nested ? "z-[56]" : "z-50"}`}
         >
-          <div className="flex min-w-0 items-baseline gap-2 border-b border-line px-3.5 py-2.5">
+          <div style={{ zoom }} className="flex min-w-0 items-baseline gap-2 border-b border-line px-3.5 py-2.5">
             <Dialog.Title className="min-w-0 flex-1 truncate text-sm font-bold">{title}</Dialog.Title>
             {subtitle && <span className="shrink-0 text-2xs text-ink-dim">{subtitle}</span>}
             <Dialog.Close className="px-1 text-base text-ink-dim hover:text-ink" aria-label={tr("game", "ui.common.close")}>
               ✕
             </Dialog.Close>
           </div>
-          <div className="overflow-auto px-3.5 py-3 text-xs leading-relaxed text-ink-muted">{children}</div>
-          {footer && <div className="border-t border-line px-3.5 py-2.5">{footer}</div>}
+          <div style={{ zoom }} className="overflow-auto px-3.5 py-3 text-xs leading-relaxed text-ink-muted">{children}</div>
+          {footer && <div style={{ zoom }} className="border-t border-line px-3.5 py-2.5">{footer}</div>}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
@@ -126,16 +132,17 @@ export function DetailsModal({
   width?: number;
   children: ReactNode;
 }) {
+  const zoom = useIsMobile() ? MOBILE_DIALOG_ZOOM : undefined;
   return (
     <Dialog.Root open={open} onOpenChange={next => !next && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-[#0009]" />
         <Dialog.Content
           data-ui="details-modal"
-          style={{ width: `min(${width}px, 94vw)` }}
+          style={{ width: `min(${Math.round(width * (zoom ?? 1))}px, 94vw)` }}
           className="ui-v2 fixed left-1/2 top-1/2 z-50 grid max-h-[88vh] -translate-x-1/2 -translate-y-1/2
             grid-rows-[minmax(0,1fr)] overflow-auto rounded-[12px] border border-line-2 bg-panel
-            font-sans text-xs leading-relaxed text-ink-muted [&>div:first-of-type]:pr-10"
+            font-sans text-xs leading-relaxed text-ink-muted [&>div>div:first-of-type]:pr-10"
         >
           <Dialog.Title className="sr-only">{label}</Dialog.Title>
           <Dialog.Close
@@ -144,7 +151,7 @@ export function DetailsModal({
           >
             ✕
           </Dialog.Close>
-          {children}
+          <div style={{ zoom }} className="min-w-0">{children}</div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

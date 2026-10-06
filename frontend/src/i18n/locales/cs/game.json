@@ -461,6 +461,9 @@
     },
     "finish": { "scoreModal": "Skóre a příjem", "title": "🏁 Hra skončila", "rounds": "{{count}} kol", "back": "← Zpět do místností", "noRole": "bez role" },
     "roles": {
+      "showAll": "Popis všech rolí",
+      "back": "‹ Stručně",
+      "claimFor": "Vzít roli za {{price}}◆",
       "title": "Role ve městě", "free": "Volných {{free}} z {{total}}", "priceStart": "Volná role stojí ",
       "priceMiddle": ", vzít roli jinému hráči stojí ", "priceEnd": ". Vzít roli stojí jednu akci.",
       "roofNote": "Dokud má držitel Ochranu, jeho roli vzít nelze. Nejdřív mu Ochranu odeberte.", "protected": "Chráněno Ochranou",
@@ -475,6 +478,14 @@
       "nothing": "Nic nenalezeno", "chapter": "Kapitola {{number}}", "close": "Zavřít knihu"
     },
     "mobile": {
+      "yourTurn": "Jste na tahu",
+      "turnOf": "Hraje {{name}}",
+      "turnsAhead_one": "vy za {{count}} tah",
+      "turnsAhead_few": "vy za {{count}} tahy",
+      "turnsAhead_many": "vy za {{count}} tahu",
+      "turnsAhead_other": "vy za {{count}} tahů",
+      "turnDone": "už jste táhli",
+      "finished": "Konec hry",
       "board": "Herní plán",
       "projects": "Projekty",
       "market": "Trh",

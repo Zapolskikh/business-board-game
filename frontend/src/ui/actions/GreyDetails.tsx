@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { useState } from "react";
 import {
   greyEffectText,
   greyOperationDistricts,
@@ -11,6 +12,7 @@ import { ResourceText } from "../primitives/ResourceIcon";
 import { findActions, usedThisTurn, type ActionContext } from "../lib/actions";
 import { scoreOf, targetStats } from "../lib/powerPreview";
 import type { Indexes } from "../lib/board";
+import { useIsMobile } from "../lib/layout";
 
 /* Серые операции — бросок кубика. Таблица граней приходит от движка уже посчитанной под игрока
  * (game.grey_tables): модификаторы роли и карт, треть партии — клиент ничего не пересчитывает,
@@ -70,6 +72,73 @@ export function GreyDetails({
   const tables = game.grey_tables ?? [];
   const byId = new Map(tables.map(table => [table.asset_id, table]));
   const first = tables[0];
+  const mobile = useIsMobile();
+  const cap = meta.scoring?.grey_roll_cap ?? 3;
+  const present = ORDER.filter(operationId => byId.has(operationId));
+  /* Открытой встаёт первая операция, которую можно запустить прямо сейчас, иначе — первая
+   * открытая районом: игрок открывает окно, чтобы что-то сделать, а не листать запертые. */
+  const preferred =
+    present.find(operationId => findActions(context, "grey_operation", { asset_id: operationId }).length > 0) ??
+    present.find(operationId => byId.get(operationId)?.unlocked) ??
+    present[0];
+  const [tab, setTab] = useState<string | undefined>(preferred);
+  const shown = tab && byId.has(tab) ? tab : preferred;
+
+  /* Телефон: пять операций подряд — несколько экранов прокрутки. Там каждая операция — вкладка с
+   * полной карточкой, а модификатор броска поднят в шапку окна: он общий для всех пяти. */
+  if (mobile) {
+    return (
+      <div>
+        <div className="border-b border-line px-3 py-2.5">
+          <div className="flex min-w-0 items-baseline gap-2">
+            <b className="min-w-0 flex-1 text-[15px] font-bold">{t("ui.grey.title")}</b>
+            <span className="shrink-0 text-2xs text-ink-dim">{spent ? t("ui.grey.spent") : t("ui.grey.once")}</span>
+          </div>
+          {first && <ModifierLine table={first} cap={cap} headline />}
+        </div>
+        <PopoverBody>
+          <p className="mb-1.5 text-[13px] text-ink-muted">{t("ui.grey.intro")}</p>
+          <p className="mb-3 text-[13px] text-ink-muted">
+            <ResourceText>{t("ui.grey.defence")}</ResourceText>
+          </p>
+          <div role="tablist" aria-label={t("ui.grey.title")} className="mb-2.5 flex flex-wrap gap-1.5">
+            {present.map(operationId => {
+              const table = byId.get(operationId)!;
+              const ready = findActions(context, "grey_operation", { asset_id: operationId }).length > 0;
+              return (
+                <button
+                  key={operationId}
+                  type="button"
+                  role="tab"
+                  data-ui={`grey-tab-${operationId}`}
+                  aria-selected={operationId === shown}
+                  data-active={operationId === shown || undefined}
+                  onClick={() => setTab(operationId)}
+                  className="mobile-tab flex min-h-10 items-center gap-1.5 rounded-md border px-3 text-[13.5px] font-semibold"
+                >
+                  {!table.unlocked && <span aria-hidden="true">🔒</span>}
+                  {greyOperationLabels[operationId] ?? operationId}
+                  {ready && !spent && <span aria-hidden="true" className="size-2 rounded-full bg-good" />}
+                </button>
+              );
+            })}
+          </div>
+          {shown && (
+            <OperationBlock
+              key={shown}
+              operationId={shown}
+              table={byId.get(shown)!}
+              game={game}
+              index={index}
+              context={context}
+              spent={spent}
+              onAction={onAction}
+            />
+          )}
+        </PopoverBody>
+      </div>
+    );
+  }
 
   // One block, not a fragment: the modal is a grid whose first row shrinks to fit, and a header
   // standing on its own collapsed under a tall body.
@@ -81,7 +150,7 @@ export function GreyDetails({
         <p className="mb-3 text-[13px] text-ink-muted">
           <ResourceText>{t("ui.grey.defence")}</ResourceText>
         </p>
-        {first && <ModifierLine table={first} cap={meta.scoring?.grey_roll_cap ?? 3} />}
+        {first && <ModifierLine table={first} cap={cap} />}
 
         <div className="grid gap-3">
           {ORDER.map(operationId => {
@@ -106,16 +175,24 @@ export function GreyDetails({
   );
 }
 
-function ModifierLine({ table, cap }: { table: GreyTable; cap: number }) {
+/** Модификатор броска. `headline` — в шапке окна на телефоне: крупно, зелёным и жирным. */
+function ModifierLine({ table, cap, headline = false }: { table: GreyTable; cap: number; headline?: boolean }) {
   const { t } = useTranslation("game");
   if (!table.modifier) {
-    return <p className="mb-3 text-[13px] text-ink-dim">{t("ui.grey.modifierNone")}</p>;
+    return (
+      <p className={headline ? "mt-1 text-[14px] font-semibold text-ink-muted" : "mb-3 text-[13px] text-ink-dim"}>
+        {t("ui.grey.modifierNone")}
+      </p>
+    );
   }
   const parts = table.sources.map(item => t(`ui.grey.source.${item.source}`, { value: item.value, defaultValue: item.source }));
   const capped = table.sources.reduce((sum, item) => sum + item.value, 0) > table.modifier;
   return (
-    <p className="mb-3 text-[13px] text-ink">
-      {t("ui.grey.modifier", { value: table.modifier })} <span className="text-ink-muted">({parts.join(", ")})</span>
+    <p data-ui="grey-modifier" className={headline ? "mt-1 text-[13px] text-ink" : "mb-3 text-[13px] text-ink"}>
+      <b className={headline ? "text-[16px] font-extrabold text-good" : undefined}>
+        {t("ui.grey.modifier", { value: table.modifier })}
+      </b>{" "}
+      <span className="text-ink-muted">({parts.join(", ")})</span>
       {capped && <span className="text-warning"> · {t("ui.grey.modifierCap", { cap })}</span>}
       <span className="text-ink-dim"> · {t("ui.grey.modifierShift")}</span>
     </p>

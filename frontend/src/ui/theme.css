@@ -1112,3 +1112,23 @@
     .ui-v2 .rules-book-text table { display: block; overflow-x: auto; }
   }
 }
+
+/* Боковые колонки мобильного стола — на шаг крупнее, чем на широком.
+ *
+ * Стол на телефоне вписан в экран множителем ~0.65, и подписи кнопок в 11.5px становились
+ * мельче всего остального. Правила лежат в слое утилит и выигрывают у `text-[…]` только за счёт
+ * специфичности, поэтому действуют лишь внутри `.mobile-shell` — широкий стол их не видит. */
+@layer utilities {
+  .ui-v2.mobile-shell :is([data-ui="action-button"], [data-ui="power-trigger"]) > b,
+  .ui-v2.mobile-shell [data-ui="drawer-row"] b {
+    font-size: 15.5px;
+  }
+  .ui-v2.mobile-shell :is([data-ui="action-button"], [data-ui="power-trigger"]) > small,
+  .ui-v2.mobile-shell [data-ui="drawer-row"] small {
+    font-size: 12.5px;
+  }
+  .ui-v2.mobile-shell [data-ui="player-card"] .text-\[16px\] { font-size: 17.5px; }
+  .ui-v2.mobile-shell [data-ui="player-card"] .text-\[12px\] { font-size: 13.5px; }
+  .ui-v2.mobile-shell [data-ui="player-card"] .text-2xs { font-size: 11.5px; }
+  .ui-v2.mobile-shell [data-ui="player-card"] .text-3xs { font-size: 9.75px; }
+}

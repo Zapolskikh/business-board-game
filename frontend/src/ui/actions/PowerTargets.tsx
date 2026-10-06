@@ -17,6 +17,7 @@ export const PowerTrigger = forwardRef<
     <button
       ref={ref}
       type="button"
+      data-ui="power-trigger"
       {...rest}
       className={`grid min-w-0 gap-0.5 rounded-md border bg-panel-2 px-2 py-1.5 hover:bg-panel-3
         ${danger ? "border-bad/50 hover:border-bad" : "border-line hover:border-line-2"} ${className ?? ""}`}

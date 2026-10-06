@@ -94,6 +94,12 @@ export function useDeviceLayout(): { mobile: boolean; portrait: boolean } {
 export const MOBILE_HEIGHT = 600;
 export const MOBILE_MIN_WIDTH = 1200;
 
+/* Окна и подсказки на телефоне — крупнее стола. Стол плотный, потому что на нём видно всё сразу;
+ * окно открыто одно, места вокруг него много, и его текст читают, а не окидывают взглядом.
+ * Множитель применяется к содержимому окна (`zoom`), а не к самому окну: центрирование и рамка
+ * остаются как есть, а текст, отступы и кнопки растут вместе — шрифт 11.5px становится ~14px. */
+export const MOBILE_DIALOG_ZOOM = 1.2;
+
 /* Масштаб — через meta viewport, а не через `zoom` на контейнере, как у широкого стола.
  *
  * Окна, поповеры и подсказки Radix рендерятся порталом в body, вне контейнера доски. С `zoom`
@@ -105,20 +111,76 @@ export const MOBILE_MIN_WIDTH = 1200;
  *
  * Включается только на время партии в альбомной ориентации: лобби и вертикальный экран
  * «поверните устройство» живут в обычной ширине устройства.
+ *
+ * iOS Safari после поворота и после входа в полноэкранный режим оставляет старое смещение
+ * видимой области: слева чёрная полоса, стол уехал вправо и обрезан, и на место он вставал только
+ * после движения пальцем. Поэтому при каждом таком событии meta переписывается дважды — сначала с
+ * чуть другим масштабом, кадром позже с точным (одинаковое значение Safari пропускает и не
+ * пересчитывает), — и страница несколько раз за полсекунды возвращается в левый верхний угол:
+ * Safari досчитывает поворот с задержкой, и одного сброса сразу после события не хватает.
+ * Прокрутка документа на время партии выключена: стол занимает ровно экран, листать нечего.
  */
 export function useMobileViewport(active: boolean): void {
   useEffect(() => {
     if (!active || typeof document === "undefined") return;
     const meta = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
-    const sides = screenSides();
-    if (!meta || !sides) return;
+    if (!meta || !screenSides()) return;
     const original = meta.getAttribute("content") ?? "width=device-width, initial-scale=1.0";
-    const width = Math.max(MOBILE_MIN_WIDTH, Math.round((MOBILE_HEIGHT * sides.long) / sides.short));
-    const scale = (sides.long / width).toFixed(4);
-    meta.setAttribute(
-      "content",
-      `width=${width}, initial-scale=${scale}, minimum-scale=${scale}, maximum-scale=${scale}, user-scalable=no, viewport-fit=cover`,
-    );
-    return () => meta.setAttribute("content", original);
+    const timers: number[] = [];
+
+    const content = (nudge: number) => {
+      const sides = screenSides()!;
+      const width = Math.max(MOBILE_MIN_WIDTH, Math.round((MOBILE_HEIGHT * sides.long) / sides.short));
+      const scale = (sides.long / width + nudge).toFixed(4);
+      return `width=${width}, initial-scale=${scale}, minimum-scale=${scale}, maximum-scale=${scale}, user-scalable=no, viewport-fit=cover`;
+    };
+    const home = () => {
+      if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
+    };
+    /* Не чаще раза в 700 мс: переписанная meta сама вызывает resize видимой области, и без
+     * паузы застрявшее смещение (например, от открытой клавиатуры) крутило бы сброс по кругу. */
+    let last = 0;
+    const settle = () => {
+      const now = Date.now();
+      if (now - last < 700) return;
+      last = now;
+      meta.setAttribute("content", content(0.0001));
+      requestAnimationFrame(() => {
+        meta.setAttribute("content", content(0));
+        home();
+      });
+      for (const delay of [60, 250, 600]) timers.push(window.setTimeout(home, delay));
+    };
+    // Смещение видимой области (не прокрутка документа) — тоже сигнал вернуть стол на место.
+    const drift = () => {
+      home();
+      const view = window.visualViewport;
+      if (view && (view.offsetLeft > 0.5 || view.offsetTop > 0.5)) settle();
+    };
+
+    const root = document.documentElement;
+    const previous = { html: root.style.overflow, body: document.body.style.overflow, behavior: root.style.overscrollBehavior };
+    root.style.overflow = "hidden";
+    root.style.overscrollBehavior = "none";
+    document.body.style.overflow = "hidden";
+
+    settle();
+    window.addEventListener("orientationchange", settle);
+    document.addEventListener("fullscreenchange", settle);
+    document.addEventListener("webkitfullscreenchange", settle);
+    window.visualViewport?.addEventListener("resize", drift);
+    window.visualViewport?.addEventListener("scroll", drift);
+    return () => {
+      timers.forEach(timer => window.clearTimeout(timer));
+      window.removeEventListener("orientationchange", settle);
+      document.removeEventListener("fullscreenchange", settle);
+      document.removeEventListener("webkitfullscreenchange", settle);
+      window.visualViewport?.removeEventListener("resize", drift);
+      window.visualViewport?.removeEventListener("scroll", drift);
+      root.style.overflow = previous.html;
+      root.style.overscrollBehavior = previous.behavior;
+      document.body.style.overflow = previous.body;
+      meta.setAttribute("content", original);
+    };
   }, [active]);
 }

@@ -22,6 +22,7 @@ import { PowerResultTable, PowerTrigger } from "./PowerTargets";
 import { RolesDetails } from "./RolesDetails";
 import { RolePowersDetails } from "./RolePowersDetails";
 import { GreyDetails } from "./GreyDetails";
+import { useIsMobile } from "../lib/layout";
 import { useBlockedHint } from "../primitives/BlockedHint";
 
 /* Правая панель. Шесть базовых действий видны всегда, справочники — в больших окнах.
@@ -113,6 +114,22 @@ export function ActionsPanel({
   const greyAvailable = findActions(context, "grey_operation").length;
   const greySpent = usedThisTurn(game, "grey_operation_used");
   const freeRoles = meta.roles.filter(item => !game.players.some(player => player.role === item.id)).length;
+  /* На телефоне колонка не должна прокручиваться: заголовок «Действия» с молниями повторял шапку,
+   * подпись «Базовые» — очевидное, а отдельная панель способностей съедала строку, и справочники
+   * снизу уезжали из вида. Способности встают в ту же сетку сразу за базовыми: у базовых семь
+   * кнопок, и первая способность занимает пустое восьмое место. */
+  const mobile = useIsMobile();
+  const powerCells = powers.map(power => (
+    <div key={power} data-tutorial={`power-${power}`} className="grid min-w-0">
+      <PowerButton
+        power={power}
+        game={game}
+        districts={meta.districts}
+        context={context}
+        onAction={onAction}
+      />
+    </div>
+  ));
 
   return (
     /* Зона задаётся на обёртке, а не на каждой из четырёх панелей внутри: --zone-bg
@@ -120,9 +137,11 @@ export function ActionsPanel({
      * в ней станет больше. */
     <div
       style={zoneStyle("actions")}
-      className="grid min-h-0 min-w-0 grid-rows-[auto_auto_auto_minmax(0,1fr)_auto_auto] gap-1.5"
+      className={`grid min-h-0 min-w-0 gap-1.5 ${
+        mobile ? "content-start" : "grid-rows-[auto_auto_auto_minmax(0,1fr)_auto_auto]"
+      }`}
     >
-      <Panel className="pb-2">
+      {!mobile && <Panel className="pb-2">
         <div className={`flex items-center gap-2 px-0.5 pt-px pb-[2px] ${zoneRule}`}>
           <h2 className={sectionTitle}>{t("ui.actions.title")}</h2>
           <span className="ml-auto flex gap-1">
@@ -136,11 +155,13 @@ export function ActionsPanel({
             ))}
           </span>
         </div>
-      </Panel>
+      </Panel>}
 
       <Panel>
-        <div className="px-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-dim">{t("ui.actions.basic")}</div>
-        <div className="mt-2 grid grid-cols-2 gap-1.5">
+        {!mobile && (
+          <div className="px-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-dim">{t("ui.actions.basic")}</div>
+        )}
+        <div className={`grid grid-cols-2 gap-1.5 ${mobile ? "" : "mt-2"}`}>
           <ActionButton
             label={t("ui.actions.work")}
             cost={<><span className="font-semibold text-money"><ResourceText>+2$</ResourceText></span>{t("ui.actions.workCost")}</>}
@@ -229,27 +250,16 @@ export function ActionsPanel({
             tutorial="roof"
             onClick={() => act(roof)}
           />
+          {mobile && role && powerCells}
         </div>
       </Panel>
 
-      {role && powers.length > 0 && (
+      {!mobile && role && powers.length > 0 && (
         <Panel>
           <div className="px-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-dim">
             {t("ui.actions.powers", { icon: role.icon, role: role.title })}
           </div>
-          <div className="mt-2 grid grid-cols-2 gap-1.5">
-            {powers.map(power => (
-              <div key={power} data-tutorial={`power-${power}`} className="grid min-w-0">
-                <PowerButton
-                  power={power}
-                  game={game}
-                  districts={meta.districts}
-                  context={context}
-                  onAction={onAction}
-                />
-              </div>
-            ))}
-          </div>
+          <div className="mt-2 grid grid-cols-2 gap-1.5">{powerCells}</div>
         </Panel>
       )}
 

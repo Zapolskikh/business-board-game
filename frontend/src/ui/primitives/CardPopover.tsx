@@ -2,7 +2,7 @@ import { tr } from "../../i18n";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Popover from "@radix-ui/react-popover";
 import { useState, type ReactNode } from "react";
-import { useIsMobile } from "../lib/layout";
+import { MOBILE_DIALOG_ZOOM, useIsMobile } from "../lib/layout";
 import { ResourceText } from "./ResourceIcon";
 
 /* Обёртка поповера — единственное место, знающее про Radix.
@@ -49,16 +49,19 @@ export function CardPopover({
           <Dialog.Content
             data-ui="card-details"
             aria-describedby={undefined}
-            style={{ width: `min(94vw, ${Math.max(width, 360)}px)` }}
+            style={{ width: `min(94vw, ${Math.round(Math.max(width, 360) * MOBILE_DIALOG_ZOOM)}px)` }}
             className="ui-v2 fixed left-1/2 top-1/2 z-[61] grid max-h-[85dvh]
               -translate-x-1/2 -translate-y-1/2 grid-rows-[minmax(0,1fr)_auto] overflow-hidden
               rounded-[12px] border border-line-2 bg-panel font-sans text-ink"
           >
             <Dialog.Title className="sr-only">{label ?? tr("game", "ui.common.details")}</Dialog.Title>
-            <div className="overflow-auto">{content}</div>
+            <div className="overflow-auto" style={{ zoom: MOBILE_DIALOG_ZOOM }}>{content}</div>
             {/* Отдельная кнопка, а не только тап мимо окна: мимо окна на телефоне
               * промахиваются в соседнюю карточку, и вместо закрытия открывается она. */}
-            <Dialog.Close className="border-t border-line px-3 py-2.5 text-center text-xs text-ink-muted">
+            <Dialog.Close
+              style={{ zoom: MOBILE_DIALOG_ZOOM }}
+              className="border-t border-line px-3 py-2.5 text-center text-xs text-ink-muted"
+            >
               {tr("game", "ui.common.close")}
             </Dialog.Close>
           </Dialog.Content>

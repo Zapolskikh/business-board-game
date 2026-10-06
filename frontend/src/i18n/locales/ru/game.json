@@ -784,6 +784,9 @@
       "noRole": "без роли"
     },
     "roles": {
+      "showAll": "Описание всех ролей",
+      "back": "‹ Коротко",
+      "claimFor": "Взять роль за {{price}}◆",
       "title": "Роли города",
       "free": "Свободно {{free}} из {{total}}",
       "priceStart": "Свободная роль стоит ",
@@ -817,6 +820,14 @@
       "close": "Закрыть книгу"
     },
     "mobile": {
+      "yourTurn": "Ваш ход",
+      "turnOf": "Ходит {{name}}",
+      "turnsAhead_one": "вы через {{count}} ход",
+      "turnsAhead_few": "вы через {{count}} хода",
+      "turnsAhead_many": "вы через {{count}} ходов",
+      "turnsAhead_other": "вы через {{count}} хода",
+      "turnDone": "вы уже сходили",
+      "finished": "Партия окончена",
       "board": "Игровое поле",
       "projects": "Проекты",
       "market": "Рынок",
