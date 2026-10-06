@@ -296,10 +296,10 @@ function SeatCard({
 
 const SEAT_COLORS = ["#b9a2d4", "#7fc8bd", "#8fb3dd", "#df9a7a"];
 
-// The engine still accepts the retired policies, but they play the old economy, so only the two
-// current ones are offered.
+// The engine still accepts the retired policies, but they play the old economy, so they are not
+// offered. Reborn went the same way: it was written for rules long gone and loses to a newcomer by
+// the fifth round. A seat that already holds it keeps playing — the server still knows the id.
 const BOT_POLICIES: { id: Difficulty; name: string; level: "easy" | "normal" | "hard" | "strategy" }[] = [
-  { id: "expert", name: "Claude Reborn", level: "easy" },
   { id: "ledger", name: "Claude Ledger", level: "normal" },
   { id: "oracle", name: "Claude Oracle", level: "hard" },
   { id: "boris", name: "BorisTheTraxer", level: "strategy" },
@@ -316,7 +316,7 @@ function BotConfigurator({ seat, roles, disabled, onApply }: {
 }) {
   const { t } = useTranslation("home");
   const [role, setRole] = useState(seat.preferred_role ?? "");
-  const [policy, setPolicy] = useState<Difficulty>(seat.kind === "bot" ? seat.difficulty : "expert");
+  const [policy, setPolicy] = useState<Difficulty>(seat.kind === "bot" && BOT_POLICIES.some(item => item.id === seat.difficulty) ? seat.difficulty : "ledger");
   useEffect(() => { setRole(seat.preferred_role ?? ""); }, [seat.preferred_role]);
   useEffect(() => { if (seat.kind === "bot") setPolicy(seat.difficulty); }, [seat.kind, seat.difficulty]);
   return (
