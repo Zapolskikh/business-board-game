@@ -13,8 +13,10 @@ from typing import Any
 
 from city_bots.atlas import ATLAS_ID, choose_atlas_command
 from city_bots.boris import BORIS_ID, choose_boris_command
+from city_bots.builder import BUILDER_ID, choose_builder_command
 from city_bots.ledger import LEDGER_ID, choose_ledger_command
 from city_bots.oracle import ORACLE_ID, choose_oracle_command
+from city_bots.raider import RAIDER_ID, choose_raider_command
 from city_engine.commands import Command
 from city_engine.constants import (
     CAPACITY_COSTS,
@@ -105,6 +107,8 @@ BOT_POLICY_NAMES = {
     ORACLE_ID: "Claude Oracle",
     BORIS_ID: "BorisTheTraxer",
     ATLAS_ID: "Claude Atlas",
+    RAIDER_ID: "Claude Raider",
+    BUILDER_ID: "Claude Builder",
 }
 
 # The policies that live in their own module; each returns (action, value, alternatives).
@@ -113,6 +117,8 @@ POLICY_MODULES = {
     ORACLE_ID: choose_oracle_command,
     BORIS_ID: choose_boris_command,
     ATLAS_ID: choose_atlas_command,
+    RAIDER_ID: choose_raider_command,
+    BUILDER_ID: choose_builder_command,
 }
 
 BOT_POLICY_ALIASES = {
@@ -135,6 +141,14 @@ BOT_POLICY_ALIASES = {
     "claude-atlas": ATLAS_ID,
     "claude atlas": ATLAS_ID,
     "клод-атлас": ATLAS_ID,
+    RAIDER_ID: RAIDER_ID,
+    "claude-raider": RAIDER_ID,
+    "claude raider": RAIDER_ID,
+    "клод-рейдер": RAIDER_ID,
+    BUILDER_ID: BUILDER_ID,
+    "claude-builder": BUILDER_ID,
+    "claude builder": BUILDER_ID,
+    "клод-застройщик": BUILDER_ID,
     "борис": BORIS_ID,
 }
 
@@ -146,7 +160,7 @@ def normalize_bot_policy(value: str) -> str:
     try:
         return BOT_POLICY_ALIASES[key]
     except KeyError as exc:
-        allowed = "expert/reborn, ledger, oracle, boris, atlas"
+        allowed = "expert/reborn, ledger, oracle, boris, atlas, raider, builder"
         raise ValueError(f"unknown bot policy {value!r}; expected {allowed}") from exc
 
 

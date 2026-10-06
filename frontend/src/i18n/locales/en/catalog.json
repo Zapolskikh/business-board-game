@@ -20,8 +20,8 @@
     },
     "journalist": {
       "title": "Journalist",
-      "passive": "At the end of the round: 1$ for each scandal of other players (2$ if you have a Business District business) and +1◆ for each of your own scandals if you have a Residential Area business. You lose the role at 6 scandals, not 5.",
-      "power": "Blow up a story (once per turn, no action, 1◆): 1 scandal to you and to the target. Publish (once per turn): 1 action and 3◆ → 2 scandals to the target. The target's Protection stops both."
+      "passive": "At the end of the round: 1$ for each scandal of other players if you have a Business District business, and +1◆ for each of your own scandals if you have a Residential Area business. You lose the role at 6 scandals, not 5.",
+      "power": "Blow up a story (once per turn, no action): 1 scandal to you and to the target. Publish (once per turn): 1 action and 3◆ → 2 scandals to the target. The target's Protection stops both."
     },
     "fraudster": {
       "title": "Hustler",

@@ -2742,9 +2742,14 @@ class CityEngine:
         return incomes, income_sources, influence_sources
 
     def _journalist_income(self, state: GameState, player: PlayerState) -> tuple[int, int]:
-        """The journalist's round: money off the rivals' scandals and a rating off their own."""
+        """The journalist's round: money off the rivals' scandals and a rating off their own.
+
+        Each half hangs off a quarter (1.22.0): the money needs an object of the Деловой центр, the
+        rating one of the Спальный район. The money used to pay 1$ a scandal with no object at all
+        and 2$ with one, which made the seat an income from the first round it was taken.
+        """
         rating = player.scandals if self.built_district_count(player, "residential") > 0 else 0
-        rate = 2 if self.built_district_count(player, "business") > 0 else 1
+        rate = 1 if self.built_district_count(player, "business") > 0 else 0
         cash = rate * sum(other.scandals for other in state.players if other.id != player.id)
         return cash, rating
 
@@ -3195,8 +3200,8 @@ class CityEngine:
             rows.append(
                 {
                     "key": "journalist_money",
-                    "value": (2 if has_business else 1) * rivals,
-                    "potential": 2 * rivals,
+                    "value": rivals if has_business else 0,
+                    "potential": rivals,
                     "needs": None if has_business else "business",
                 }
             )

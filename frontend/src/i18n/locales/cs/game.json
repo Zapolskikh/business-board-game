@@ -25,7 +25,7 @@
     "journalist_inflate": {
       "label": "Nafouknout aféru",
       "what": "Jeden skandál soupeři a jeden vám: ušpiníte se taky. Pokud má cíl Ochranu, zastaví úder — a pak nedostanete skandál ani vy.",
-      "cost": "1◆, bez akce, jednou za tah"
+      "cost": "bez akce, jednou za tah"
     },
     "journalist_publish": { "label": "Zveřejnit článek", "what": "Dva skandály soupeři, vám nic. Ochrana cíle zastaví celý článek.", "cost": "akce + 3◆, jednou za tah" },
     "fraudster_cleanup": { "label": "Zamést stopy", "what": "Zdarma smaže jeden váš skandál.", "cost": "akce" },
@@ -236,7 +236,7 @@
     "capitalist_objects": { "label": "Příjem z každého podniku", "unit": "$/kolo", "hint": "+1$ za každý váš podnik" },
     "capitalist_industrial_influence": { "label": "Vliv z Průmyslové zóny", "unit": "◆/kolo", "hint": "+1◆ za každý váš podnik v Průmyslové zóně — kupte si takový podnik, aby to fungovalo" },
     "politician_residents": { "label": "Vliv od obyvatel", "unit": "◆/kolo", "hint": "+1◆ za každý podnik na Sídlišti na stole, i cizí" },
-    "journalist_money": { "label": "Peníze za cizí skandály", "unit": "$/kolo", "hint": "1$ za každý cizí skandál, 2$ pokud máte podnik v Obchodní čtvrti" },
+    "journalist_money": { "label": "Peníze za cizí skandály", "unit": "$/kolo", "hint": "1$ za každý cizí skandál — potřebujete aspoň jeden podnik v Obchodní čtvrti" },
     "journalist_rating": { "label": "Vliv za vlastní skandály", "unit": "◆/kolo", "hint": "+1◆ za každý váš skandál — potřebujete aspoň jeden podnik na Sídlišti" },
     "fraudster_actions": { "label": "Čtyři akce za tah", "unit": "", "hint": "Víc než kterákoli jiná role" },
     "fraudster_grey_roll": {"label": "Bonus k hodu šedých operací", "unit": "", "hint": "+1 ke každému hodu"},

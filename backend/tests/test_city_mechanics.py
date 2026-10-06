@@ -367,8 +367,9 @@ def settled_sources(state) -> dict:
     return settled.data["income_sources"]
 
 
-def test_journalist_money_doubles_with_a_business_object() -> None:
-    """The journalist owns no district, so its money line hangs off somebody else's quarter."""
+def test_journalist_money_needs_a_business_object() -> None:
+    """The journalist owns no district: its money line hangs off the Деловой центр, like the rating
+    hangs off the Спальный район (1.22.0). Without the object rival scandals pay nothing."""
     engine = CityEngine()
     state = make_state()
     journalist = state.current_player
@@ -379,14 +380,14 @@ def test_journalist_money_doubles_with_a_business_object() -> None:
 
     state = run(engine, state, "end_turn")
     state = run(engine, state, "end_turn")
-    assert settled_sources(state)[journalist.id]["journalist"] == 3  # 1$ a scandal, bare
+    assert settled_sources(state)[journalist.id]["journalist"] == 0  # no Деловой центр, no money
 
     give_asset(state, state.player_by_id(journalist.id), "insurance_agency")  # Деловой центр
     for _ in state.players:
         state = run(engine, state, "end_turn")
     # settled_sources reads the first settlement, so take the last one explicitly.
     last = [event for event in state.event_log if event.type == "round_settled"][-1]
-    assert last.data["income_sources"][journalist.id]["journalist"] == 6
+    assert last.data["income_sources"][journalist.id]["journalist"] == 3  # 1$ a scandal
 
 
 def test_the_final_round_pays_no_income_and_no_influence() -> None:
@@ -590,7 +591,7 @@ def test_journalist_powers_use_scandal_rules() -> None:
     )
     assert state.current_player.scandals == 1
     assert state.player_by_id(target.id).scandals == 1
-    assert state.current_player.influence == 10 - JOURNALIST_INFLATE_INFLUENCE  # 1.19.0: the story costs 1◆
+    assert state.current_player.influence == 10 - JOURNALIST_INFLATE_INFLUENCE  # 1.22.0: the story is free again
     # The publication costs an action now, and lands twice as hard for it.
     actions_before = state.actions_left
     state = run(

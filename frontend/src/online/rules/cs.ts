@@ -62,14 +62,14 @@ const roles: Record<string, RoleGuide> = {
   journalist: {
     style: "Role skandálů: cizí skandály přinášejí peníze, vlastní vliv. <b>Synergie čtvrtí:</b> Obchodní čtvrť, Sídliště.",
     perks: [
-      "Na konci kola dostanete 1$ za každý skandál soupeřů, nebo 2$, pokud máte aspoň jeden podnik v Obchodní čtvrti.",
+      "Na konci kola dostanete 1$ za každý skandál soupeřů, pokud máte aspoň jeden podnik v Obchodní čtvrti.",
       "Na konci kola dostanete 1◆ za každý svůj skandál, pokud máte aspoň jeden podnik na Sídlišti.",
       "Váš limit skandálů je o 1 vyšší: roli ztratíte při 6 skandálech a zatčení přijde při 7.",
     ],
     powers: [
       {
         name: "Nafouknout aféru",
-        cost: "1◆, bez akce",
+        cost: "bez akce",
         limit: "jednou za tah",
         effect: "Vy i vybraný soupeř dostanete po 1 skandálu. Pokud úder zastaví Ochrana soupeře, nedostanete svůj skandál ani vy.",
       },

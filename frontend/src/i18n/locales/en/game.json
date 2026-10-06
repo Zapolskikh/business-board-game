@@ -25,7 +25,7 @@
     "journalist_inflate": {
       "label": "Blow up a story",
       "what": "One scandal for a rival and one for you: you get dirty too. If the target has Protection, it stops the hit — and then you get no scandal either.",
-      "cost": "1◆, no action, once per turn"
+      "cost": "no action, once per turn"
     },
     "journalist_publish": { "label": "Publish an exposé", "what": "Two scandals for a rival, nothing for you. The target's Protection stops the whole thing.", "cost": "action + 3◆, once per turn" },
     "fraudster_cleanup": { "label": "Cover your tracks", "what": "Removes one of your scandals for free.", "cost": "action" },
@@ -236,7 +236,7 @@
     "capitalist_objects": { "label": "Income from each business", "unit": "$/round", "hint": "+1$ for each of your businesses" },
     "capitalist_industrial_influence": { "label": "Influence from the Industrial Zone", "unit": "◆/round", "hint": "+1◆ for each of your Industrial Zone businesses — buy one to turn this on" },
     "politician_residents": { "label": "Influence from residents", "unit": "◆/round", "hint": "+1◆ for each residential business on the table, even other players'" },
-    "journalist_money": { "label": "Money for other players' scandals", "unit": "$/round", "hint": "1$ for each scandal of other players, 2$ if you have a Business District business" },
+    "journalist_money": { "label": "Money for other players' scandals", "unit": "$/round", "hint": "1$ for each scandal of other players — you need at least one Business District business" },
     "journalist_rating": { "label": "Influence for your own scandals", "unit": "◆/round", "hint": "+1◆ for each of your scandals — you need at least one Residential Area business" },
     "fraudster_actions": { "label": "Four actions per turn", "unit": "", "hint": "More than any other role" },
     "fraudster_grey_roll": {"label": "Shady deal roll bonus", "unit": "", "hint": "+1 to every roll"},

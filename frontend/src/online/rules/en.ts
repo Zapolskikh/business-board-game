@@ -62,14 +62,14 @@ const roles: Record<string, RoleGuide> = {
   journalist: {
     style: "The scandal role: other players' scandals bring money, your own bring influence. <b>District synergy:</b> Business District, Residential Area.",
     perks: [
-      "At the end of the round you get 1$ for each rival scandal, or 2$ if you have at least one Business District business.",
+      "At the end of the round you get 1$ for each rival scandal if you have at least one Business District business.",
       "At the end of the round you get 1◆ for each of your scandals if you have at least one Residential Area business.",
       "Your scandal limit is 1 higher: you lose the role at 6 scandals and are arrested at 7.",
     ],
     powers: [
       {
         name: "Blow up a story",
-        cost: "1◆, no action",
+        cost: "no action",
         limit: "once per turn",
         effect: "You and the rival you pick each get 1 scandal. If the rival's Protection stops the hit, you do not get your scandal either.",
       },

@@ -173,7 +173,7 @@ def render(tally: Tally, config: TournamentConfig) -> str:
     lines += _cards(engine, tally, names, bots, bot_names)
     lines += _grey(tally, names, bots, bot_names)
     lines += _roles(tally, names, bots, bot_names)
-    lines += _interaction(tally, bots, bot_names)
+    lines += _interaction(tally, names, bots, bot_names)
     lines += _basic(tally, names, bots, bot_names)
     lines += _decisions(tally, names, bots, bot_names)
     lines += _thirds(tally, names)
@@ -670,10 +670,28 @@ def _roles(tally: Tally, names: Names, bots: list[str], bot_names: dict[str, str
         for cause, count in causes[:5]:
             reason, _, command = cause.partition("|")
             lines.append(f"| {names.role(role)} | {reason} | {names.decision(command) if command else '—'} | {count} |")
+    rounds = sum(value for (_bot, kind), value in tally.journalist_income.items() if kind == "rounds")
+    if rounds:
+        lines += [
+            "",
+            "Доход Журналиста по источникам, за оплаченный раунд с ролью: деньги — за чужие скандалы (нужен объект "
+            "Делового центра), рейтинг — влияние за свои (нужен объект Спального района).",
+            "",
+            "| Бот | Раундов с ролью | $ за раунд | ◆ за раунд |",
+            "|---|---:|---:|---:|",
+        ]
+        for bot in [*bots, None]:
+            have = total(tally.journalist_income, bot, "rounds")
+            if have:
+                lines.append(
+                    f"| {bot_names[bot] if bot else '**Все**'} | {int(have)} | "
+                    f"{ratio(total(tally.journalist_income, bot, 'money'), have, 2)} | "
+                    f"{ratio(total(tally.journalist_income, bot, 'rating'), have, 2)} |"
+                )
     return [*lines, ""]
 
 
-def _interaction(tally: Tally, bots: list[str], bot_names: dict[str, str]) -> list[str]:
+def _interaction(tally: Tally, names: Names, bots: list[str], bot_names: dict[str, str]) -> list[str]:
     lines = [
         "## Взаимодействие и защита",
         "",
@@ -700,6 +718,19 @@ def _interaction(tally: Tally, bots: list[str], bot_names: dict[str, str]) -> li
             f"| {bot_names[bot]} | {ratio(tally.roofs_gained[bot], seats, 2)} | {ratio(tally.roofs_blocked[bot], seats, 2)} | "
             f"{ratio(tally.roofs_blocked[bot], tally.roofs_gained[bot], 2)} | {ratio(tally.roofs_end[bot], seats, 2)} |"
         )
+    lost = sum(tally.roofs_lost.values())
+    if lost:
+        lines += [
+            "",
+            "Чем сняты Защиты соперников: решение, после которого жетон пропал (погашенный удар, отъём или пробой).",
+            "",
+            "| Решение | Снято Защит | Доля | За партию |",
+            "|---|---:|---:|---:|",
+        ]
+        for command, count in sorted(tally.roofs_lost.items(), key=lambda item: (-item[1], item[0]))[:12]:
+            lines.append(
+                f"| {names.decision(command)} | {int(count)} | {pct(count, lost)} | {ratio(count, tally.games, 2)} |"
+            )
     return [*lines, ""]
 
 

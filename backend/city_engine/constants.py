@@ -20,8 +20,9 @@ SCHEMA_VERSION = 1
 # takes influence (1 + round/5, plus one per own administrative object); the crypto scam's three
 # scandals are not cut by grey-scandal reductions; an arrest resets scandals to 0; the politician's
 # «Договоримся» and the card «Изменение зонирования» are gone; legendaries open in round 9 and come
-# out at most two a refill.
-RULES_VERSION = "city-1.21.0"
+# out at most two a refill. 1.22.0: «Раздуть историю» is free again; the journalist's money needs
+# an object of the Деловой центр and pays 1$ a rival scandal.
+RULES_VERSION = "city-1.22.0"
 
 # Bumped whenever the catalog changes, even if no rule moved: card texts are part of the agreement
 # too. 2026-09-30: removed the unsupported cash-exchange purchase payout. 2026-09-30b: «Судебный
@@ -37,7 +38,8 @@ RULES_VERSION = "city-1.21.0"
 # «Автономная офшорная юрисдикция» 15 → 12$.
 # 2026-10-05: the racket takes influence always; «Изменение зонирования» removed; legendaries open in
 # round 9.
-CONTENT_VERSION = "city-content-2026-10-05"
+# 2026-10-06: the journalist's texts — the story is free, the money needs a Деловой центр object.
+CONTENT_VERSION = "city-content-2026-10-06"
 
 DISTRICT_IDS = (
     "residential",
@@ -56,10 +58,10 @@ ROLE_IDS = (
     "military",
 )
 # Bot policies, by the id stored on a seat: Claude Reborn (easy), Ledger (normal), Oracle (hard),
-# and BorisTheTraxer, the tester's rule-book strategy. The older
+# BorisTheTraxer, the tester's rule-book strategy, Raider, the aggressive seat, and Builder, the project seat. The older
 # easy/medium/hard profiles played rules that no longer exist and were removed. A saved room or
 # game that still names one of them is read back as Reborn — see ``normalize_bot_difficulty``.
-BOT_DIFFICULTIES = ("expert", "ledger", "oracle", "boris", "atlas")
+BOT_DIFFICULTIES = ("expert", "ledger", "oracle", "boris", "atlas", "raider", "builder")
 DEFAULT_BOT_DIFFICULTY = "expert"
 LEGACY_BOT_DIFFICULTIES = frozenset({"easy", "medium", "hard"})
 # The policies that read a seat's favourite role. The others choose their seat from the position.
@@ -226,9 +228,12 @@ BASE_SCANDAL_LIMIT = 5
 # gated on BASE_SCANDAL_LIMIT for everybody, so the extra headroom can never be laundered into
 # another seat.
 JOURNALIST_SCANDAL_LIMIT = 6
-# «Раздуть историю» was free and the most used power in the game (6795 presses over 768 games), and
-# the main way the capitalist and the politician lost their seats. 1.19.0: it costs influence.
-JOURNALIST_INFLATE_INFLUENCE = 1
+# «Раздуть историю» is free again (1.22.0). 1.19.0 priced it at 1◆ because it was the most used
+# power in the game and the main way the capitalist and the politician lost their seats; the price
+# did not change that, and by design the role's cheap story is the table's one steady source of
+# scandals — without it five scandals on a guarded rival are out of reach. The seat was cut on its
+# money instead: see ``CityEngine._journalist_income``.
+JOURNALIST_INFLATE_INFLUENCE = 0
 # What the mafia takes with the seat (1.19.0): a Защита, within the role's own limit of two. Claiming
 # the role lost 5.7 points against the table over 2648 forks — it paid off only on a Серый сектор
 # already built, so the seat now brings something on the turn it is taken.

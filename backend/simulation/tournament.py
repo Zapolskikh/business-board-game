@@ -189,6 +189,11 @@ class Tally:
     roofs_gained: Counter = field(default_factory=Counter)
     roofs_blocked: Counter = field(default_factory=Counter)
     roofs_end: Counter = field(default_factory=Counter)
+    # Чем сняты Защиты соперников: ключ — решение, после которого жетон пропал. По разнице состояний,
+    # а не по событиям: рэкет, «Отобрать Защиту» и «Пробить защиту» снимают жетон без события о гашении.
+    roofs_lost: Counter = field(default_factory=Counter)
+    # Доход Журналиста по источникам, за оплаченные раунды с ролью: ключ (бот, "rounds"|"money"|"rating").
+    journalist_income: Counter = field(default_factory=Counter)
     # --- итоги ---------------------------------------------------------------------------------
     seats: Counter = field(default_factory=Counter)
     wins: Counter = field(default_factory=Counter)
@@ -273,6 +278,7 @@ class _Game:
     block: int = 0
     rotation: int = 0
     forks: int = 0
+    fork_keys: Counter = field(default_factory=Counter)  # прицельные развилки этой партии, по решению
 
 
 def play_game(engine: CityEngine, config: TournamentConfig, index: int) -> Tally:
@@ -324,7 +330,9 @@ def play_game(engine: CityEngine, config: TournamentConfig, index: int) -> Tally
         chance = fork_chance
         if focus:
             available = {action_key(state, actor, action) for action, _ in transitions}
-            chance = FOCUS_FORK_CHANCE if available & focus else 0.0
+            # Решение, уже набравшее свои развилки в этой партии, больше не повод для новой.
+            wanted = {key for key in available & focus if game.fork_keys[key] < FOCUS_FORKS_PER_KEY}
+            chance = FOCUS_FORK_CHANCE if wanted else 0.0
         if chance and fork_rng.random() < chance:
             began = time.perf_counter()
             _fork(engine, tally, game, state, actor, transitions, command, bucket, fork_rng, focus)
@@ -464,6 +472,10 @@ def _absorb_events(
         for card in player.hand:
             if card.uid not in old:
                 tally.card_drawn[(policy_of[player.id], card.card_id)] += 1
+    for player in after.players:
+        lost = before.player_by_id(player.id).roofs - player.roofs
+        if player.id != current and lost > 0:
+            tally.roofs_lost[command_key] += lost
     for event in events:
         data = event.data
         actor = str(event.actor_id) if event.actor_id else None
@@ -560,6 +572,13 @@ def _close_object(tally: Tally, item: dict[str, Any], *, points: int, refund: in
 
 def _credit_settlement(engine: CityEngine, tally: Tally, game: _Game, before: GameState, data: dict[str, Any]) -> None:
     tally.settlements += 1
+    if engine.round_pays_out(before):
+        for player in before.players:
+            if player.role == "journalist":
+                policy = game.policy_of[player.id]
+                tally.journalist_income[(policy, "rounds")] += 1
+                tally.journalist_income[(policy, "money")] += int(data["income_sources"][player.id].get("journalist", 0))
+                tally.journalist_income[(policy, "rating")] += int(data["influence_sources"][player.id].get("rating", 0))
     sources = data.get("object_income_sources", {})
     for player_id, rows in sources.items():
         player = before.player_by_id(player_id)
@@ -726,6 +745,10 @@ FORK_KINDS = (
 SEARCHING = frozenset({"ledger", "oracle", "atlas"})
 # Шанс развилки в прицельном режиме, когда подозрительное решение доступно в позиции.
 FOCUS_FORK_CHANCE = 0.5
+# Сколько прицельных развилок одно решение получает за партию. Без потолка частые решения забирали
+# почти всё: в прогоне 2026-10-03 вышло ≈94 развилки на партию вместо восьми, 70% из них — в «Памп и
+# дамп» и «Взять роль: Мафиози», а редкие («Агломерация» — 12 на 96 партий) оставались без выборки.
+FOCUS_FORKS_PER_KEY = 2
 CONTINUATION_BUDGET = 0.03
 CONTINUATION_WIDTHS = (3, 2)
 
@@ -755,13 +778,16 @@ def _fork(
         if action["type"] not in FORK_KINDS:
             continue
         key = action_key(state, actor, action)
-        if focus and key not in focus:
+        if focus and (key not in focus or game.fork_keys[key] >= FOCUS_FORKS_PER_KEY):
             continue
         if key != chosen_key:
             classes.setdefault(key, []).append(action)
     if not classes:
         return
-    key = rng.choice(sorted(classes))
+    # В прицельном режиме — решение, у которого в этой партии развилок меньше всего.
+    fewest = min(game.fork_keys[key] for key in classes)
+    key = rng.choice(sorted(key for key in classes if game.fork_keys[key] == fewest))
+    game.fork_keys[key] += 1
     alternative = rng.choice(classes[key])
     game.forks += 1
     tag = f"{state.game_id}:fork{game.forks}"

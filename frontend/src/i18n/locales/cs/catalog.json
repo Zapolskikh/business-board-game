@@ -20,8 +20,8 @@
     },
     "journalist": {
       "title": "Novinář",
-      "passive": "Na konci kola: 1$ za každý cizí skandál (2$, pokud máte podnik v Obchodní čtvrti) a +1◆ za každý svůj skandál, pokud máte podnik na Sídlišti. Roli ztrácíte až při 6 skandálech, ne při 5.",
-      "power": "Nafouknout aféru (jednou za tah, bez akce, 1◆): vám i cíli po 1 skandálu. Článek (jednou za tah): 1 akce a 3◆ → cíl dostane 2 skandály. Ochrana cíle zastaví obojí."
+      "passive": "Na konci kola: 1$ za každý cizí skandál, pokud máte podnik v Obchodní čtvrti, a +1◆ za každý svůj skandál, pokud máte podnik na Sídlišti. Roli ztrácíte až při 6 skandálech, ne při 5.",
+      "power": "Nafouknout aféru (jednou za tah, bez akce): vám i cíli po 1 skandálu. Článek (jednou za tah): 1 akce a 3◆ → cíl dostane 2 skandály. Ochrana cíle zastaví obojí."
     },
     "fraudster": {
       "title": "Podvodník",

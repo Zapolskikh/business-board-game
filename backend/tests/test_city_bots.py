@@ -479,3 +479,180 @@ def test_atlas_does_not_sell_with_no_action_left_to_replace_it() -> None:
     assert not _allows(state, {"type": "sell_asset", "payload": {"asset_uid": "x"}})
     state.actions_left = 1
     assert _allows(state, {"type": "sell_asset", "payload": {"asset_uid": "x"}})
+
+
+def test_raider_finishes_a_game_without_touching_the_state() -> None:
+    """The grey operations are priced on clones: neither the state nor its dice move while it thinks."""
+    engine = CityEngine()
+    state = ledger_game("raider", "boris", "raider")
+    for _ in range(2_000):
+        if state.status == "finished":
+            break
+        before = state_hash(state)
+        decision = choose_bot_command(engine, state, state.current_player.id)
+        assert state_hash(state) == before
+        state = engine.apply(state, decision.command).state
+    assert state.status == "finished"
+
+
+def raider_turn(engine: CityEngine, state):
+    """Play the current seat's turn out and return the state the next seat receives."""
+    serial = state.turn_serial
+    while state.status == "playing" and state.turn_serial == serial:
+        state = engine.apply(state, choose_bot_command(engine, state, state.current_player.id).command).state
+    return state
+
+
+def test_raider_opens_with_the_journalist_and_falls_back_to_the_military() -> None:
+    engine = CityEngine()
+    state = ledger_game("raider", "expert", "expert")
+    state.current_player.difficulty = "raider"  # the opening seat is drawn, the policy is not
+    raider = state.current_player.id
+    state.current_player.influence = state.role_price
+    assert raider_turn(engine, state.clone()).player_by_id(raider).role == "journalist"
+
+    next(player for player in state.players if player.id != raider).role = "journalist"
+    assert raider_turn(engine, state.clone()).player_by_id(raider).role == "military"
+
+
+def test_raider_saves_influence_for_the_seat_it_wants() -> None:
+    """One point short of the seat: nothing that spends influence is on the table, the campaign is."""
+    from city_bots.raider import choose_raider_command
+
+    engine = CityEngine()
+    state = ledger_game("raider", "expert", "expert")
+    player = state.current_player
+    player.difficulty = "raider"
+    player.influence = state.role_price - 1
+    player.money = 12
+    action, _value, _reasons = choose_raider_command(engine, state, player.id)
+    after = engine.apply(state.clone(), choose_bot_command(engine, state, player.id).command).state
+    assert after.player_by_id(player.id).influence >= player.influence, action
+
+
+def test_raider_leaves_the_roofed_table_for_the_mafia() -> None:
+    """Every rival behind a Защита: the journalist and the military have nobody to hit."""
+    engine = CityEngine()
+    state = ledger_game("raider", "expert", "expert")
+    state.current_player.difficulty = "raider"  # the opening seat is drawn, the policy is not
+    raider = state.current_player.id
+    state.current_player.influence = state.role_price
+    for rival in state.players:
+        rival.roofs = int(rival.id != raider)
+    assert raider_turn(engine, state.clone()).player_by_id(raider).role == "mafia"
+
+
+def test_raider_keeps_its_seat_once_the_plan_turns_to_points() -> None:
+    from city_bots.raider import TUNING, choose_raider_command
+
+    engine = CityEngine()
+    state = ledger_game("raider", "expert", "expert")
+    state.max_rounds = 15
+    state.round_number = TUNING.points_round
+    player = state.current_player
+    player.difficulty = "raider"
+    player.role = "journalist"
+    player.influence = 20
+    for rival in state.players:
+        rival.roofs = int(rival.id != player.id)  # early, this table would send the raider to another seat
+    action, _value, _reasons = choose_raider_command(engine, state, player.id)
+    assert action["type"] != "claim_role"
+
+
+def test_raider_cashes_a_deep_wallet_into_patronage() -> None:
+    from city_bots.raider import choose_raider_command
+
+    engine = CityEngine()
+    state = ledger_game("raider", "expert")
+    player = state.current_player
+    player.capacity = 6
+    player.assets = [OwnedAsset(uid=f"owned:{index}", card_id="cowork") for index in range(6)]
+    player.money = 200
+    player.influence = 0
+    player.roofs = 1
+    state.market = []
+    action, _value, _reasons = choose_raider_command(engine, state, player.id)
+    assert action == {"type": "basic_action", "payload": {"kind": "patronage"}}
+
+
+def test_raider_turns_to_points_early_at_a_roofed_and_clean_table() -> None:
+    """Seat lost, every rival behind a Защита, nobody dirty: no attacking seat is worth the influence."""
+    from city_bots.raider import TUNING, _View
+
+    engine = CityEngine()
+    state = ledger_game("raider", "expert", "expert")
+    state.max_rounds = 15
+    state.round_number = TUNING.quiet_round
+    player = state.current_player
+    for rival in state.players:
+        rival.roofs = int(rival.id != player.id)
+    assert _View(engine, state, player, TUNING).late
+    next(rival for rival in state.players if rival.id != player.id).scandals = TUNING.quiet_scandals + 1
+    assert not _View(engine, state, player, TUNING).late
+
+
+def test_builder_finishes_a_game_and_never_attacks() -> None:
+    """The project seat: nothing aimed at a rival, no grey operation, and the state untouched."""
+    engine = CityEngine()
+    state = ledger_game("builder", "raider", "builder")
+    builders = {player.id for player in state.players if player.difficulty == "builder"}
+    for _ in range(2_000):
+        if state.status == "finished":
+            break
+        actor = state.current_player.id
+        before = state_hash(state)
+        command = choose_bot_command(engine, state, actor).command
+        assert state_hash(state) == before
+        if actor in builders:
+            assert command.type != "grey_operation"
+            target = command.payload.get("target_id")
+            assert target is None or target == actor, command
+        state = engine.apply(state, command).state
+    assert state.status == "finished"
+
+
+def test_builder_takes_a_ready_project_before_anything_else() -> None:
+    from city_bots.builder import choose_builder_command
+
+    engine = CityEngine()
+    state = ledger_game("builder", "expert")
+    player = state.current_player
+    player.money = 40
+    player.influence = 12
+    state.project_board = ["charity_fund", *[item for item in state.project_board if item != "charity_fund"][:3]]
+    state.project_deck = [item for item in state.project_deck if item != "charity_fund"]
+    action, _value, _reasons = choose_builder_command(engine, state, player.id)
+    assert action["type"] == "city_project"
+
+
+def test_builder_keeps_a_veto_standing_as_the_politician() -> None:
+    """The veto is free: with the seat, the Builder's turn never ends without one on the board."""
+    engine = CityEngine()
+    state = ledger_game("builder", "expert", "expert")
+    player = state.current_player
+    player.difficulty = "builder"
+    player.role = "politician"
+    after = raider_turn(engine, state.clone())
+    assert player.id in after.project_veto.values()
+
+
+def test_builder_moves_into_the_politician_seat_when_it_comes_free() -> None:
+    from city_bots.builder import choose_builder_command
+
+    engine = CityEngine()
+    state = ledger_game("builder", "expert", "expert")
+    player = state.current_player
+    player.role = "fraudster"
+    player.roofs = 1
+    player.influence = 2
+    player.money = 0
+    state.round_number = 2
+    state.actions_left = 1
+    action, _value, _reasons = choose_builder_command(engine, state, player.id)
+    assert action["type"] != "claim_role"
+    player.influence = 12
+    action, _value, _reasons = choose_builder_command(engine, state, player.id)
+    assert action in (
+        {"type": "claim_role", "payload": {"role_id": "politician"}},
+        *[{"type": "city_project", "payload": {"project_id": item}} for item in state.project_board],
+    )
