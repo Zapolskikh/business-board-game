@@ -128,34 +128,63 @@ export function useMobileViewport(active: boolean): void {
     const original = meta.getAttribute("content") ?? "width=device-width, initial-scale=1.0";
     const timers: number[] = [];
 
-    const content = (nudge: number) => {
+    /* Пропорции берём у видимой области, а не у экрана: в браузере панели (шапка Safari в
+     * альбоме) съедают часть высоты, и стол, посчитанный по экрану, в остаток не помещался —
+     * сплющивался, тексты наезжали друг на друга. Отношение сторон окна от масштаба не зависит,
+     * поэтому его можно мерить и после подмены meta. Уже экрана видимая область не бывает;
+     * сверху — потолок, чтобы случайно схлопнувшееся окно не превратило стол в ленту. */
+    const logicalWidth = () => {
       const sides = screenSides()!;
-      const width = Math.max(MOBILE_MIN_WIDTH, Math.round((MOBILE_HEIGHT * sides.long) / sides.short));
-      const scale = (sides.long / width + nudge).toFixed(4);
+      const screenRatio = sides.long / sides.short;
+      const { innerWidth, innerHeight } = window;
+      const visible = innerWidth > innerHeight && innerHeight > 0 ? innerWidth / innerHeight : screenRatio;
+      const ratio = Math.min(Math.max(visible, screenRatio), screenRatio * 1.5);
+      return Math.max(MOBILE_MIN_WIDTH, Math.round(MOBILE_HEIGHT * ratio));
+    };
+    const content = (width: number, nudge: number) => {
+      const scale = (screenSides()!.long / width + nudge).toFixed(4);
       return `width=${width}, initial-scale=${scale}, minimum-scale=${scale}, maximum-scale=${scale}, user-scalable=no, viewport-fit=cover`;
     };
     const home = () => {
       if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
     };
     /* Не чаще раза в 700 мс: переписанная meta сама вызывает resize видимой области, и без
-     * паузы застрявшее смещение (например, от открытой клавиатуры) крутило бы сброс по кругу. */
+     * паузы застрявшее смещение (например, от открытой клавиатуры) крутило бы сброс по кругу.
+     * Пропущенный вызов не теряется: после паузы пропорции сверяются ещё раз. */
     let last = 0;
+    let applied = 0;
+    let retry = 0;
     const settle = () => {
       const now = Date.now();
-      if (now - last < 700) return;
+      if (now - last < 700) {
+        if (!retry) {
+          retry = window.setTimeout(() => {
+            retry = 0;
+            resync();
+          }, 700 - (now - last));
+        }
+        return;
+      }
       last = now;
-      meta.setAttribute("content", content(0.0001));
+      const width = logicalWidth();
+      applied = width;
+      meta.setAttribute("content", content(width, 0.0001));
       requestAnimationFrame(() => {
-        meta.setAttribute("content", content(0));
+        meta.setAttribute("content", content(width, 0));
         home();
       });
       for (const delay of [60, 250, 600]) timers.push(window.setTimeout(home, delay));
+    };
+    // Панели браузера появились или спрятались — видимая область другой формы, стол пересчитывается.
+    const resync = () => {
+      if (Math.abs(logicalWidth() - applied) > 4) settle();
     };
     // Смещение видимой области (не прокрутка документа) — тоже сигнал вернуть стол на место.
     const drift = () => {
       home();
       const view = window.visualViewport;
       if (view && (view.offsetLeft > 0.5 || view.offsetTop > 0.5)) settle();
+      else resync();
     };
 
     const root = document.documentElement;
@@ -168,10 +197,13 @@ export function useMobileViewport(active: boolean): void {
     window.addEventListener("orientationchange", settle);
     document.addEventListener("fullscreenchange", settle);
     document.addEventListener("webkitfullscreenchange", settle);
+    window.addEventListener("resize", resync);
     window.visualViewport?.addEventListener("resize", drift);
     window.visualViewport?.addEventListener("scroll", drift);
     return () => {
       timers.forEach(timer => window.clearTimeout(timer));
+      window.clearTimeout(retry);
+      window.removeEventListener("resize", resync);
       window.removeEventListener("orientationchange", settle);
       document.removeEventListener("fullscreenchange", settle);
       document.removeEventListener("webkitfullscreenchange", settle);

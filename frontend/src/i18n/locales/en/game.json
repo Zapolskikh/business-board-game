@@ -497,7 +497,8 @@
       "fullscreen": "Full screen",
       "exitFullscreen": "Exit full screen",
       "addToHomeTitle": "Play without Safari bars",
-      "addToHome": "Tap Share → Add to Home Screen and launch the game from its icon: the address bar will no longer take up space."
+      "addToHome": "Tap Share → Add to Home Screen and launch the game from its icon: the address bar will no longer take up space.",
+      "addToHomeSeat": "Best done before a game: your seat at the table does not carry over to the app."
     },
     "greyResult": {
       "title": "Shady deal: {{operation}}", "target": "target — {{name}}", "roll": "rolled {{roll}}", "face": "result",

@@ -51,6 +51,32 @@ export async function toggleFullscreen(): Promise<void> {
   }
 }
 
+/* Кнопка «назад» браузера во время партии.
+ *
+ * На телефоне стрелка Safari стоит прямо над столом, и по привычке ею закрывают открытое окно —
+ * а браузер уводит на предыдущий сайт, и партия потеряна. Поэтому в историю кладётся запись-
+ * заглушка: «назад» съедает её, страница остаётся на месте, а открытое окно закрывается так же,
+ * как по Escape. Заглушка тут же кладётся заново. После выхода из партии одна запись остаётся
+ * лишней — первое «назад» на главной ничего не делает; это дешевле, чем снимать её и ловить
+ * асинхронный popstate.
+ */
+export function useBackGuard(active: boolean): void {
+  useEffect(() => {
+    if (!active || typeof window === "undefined") return;
+    const arm = () => {
+      const state = history.state as { cityBackGuard?: boolean } | null;
+      if (!state?.cityBackGuard) history.pushState({ cityBackGuard: true }, "");
+    };
+    const onPop = () => {
+      arm();
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    };
+    arm();
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [active]);
+}
+
 export function useIsFullscreen(): boolean {
   const [active, setActive] = useState(() => typeof document !== "undefined" && Boolean(fullscreenElement()));
   useEffect(() => {

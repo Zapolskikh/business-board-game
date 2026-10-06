@@ -23,6 +23,7 @@ import { MobileShell, MobileTable, RotateNotice } from "./MobileBoard";
 import { Header, StatusBar } from "./Header";
 import { ScoreDetails } from "./headerPopovers";
 import { BoardLayoutProvider, useDeviceLayout, useMobileViewport, type BoardLayout } from "../lib/layout";
+import { useBackGuard } from "../lib/fullscreen";
 
 /* Сборка доски.
  *
@@ -85,6 +86,7 @@ export function BoardView({
   const mobile = layout ? layout === "mobile" : device.mobile;
   const rotate = !layout && device.mobile && device.portrait;
   useMobileViewport(!layout && device.mobile && !device.portrait);
+  useBackGuard(!layout && device.mobile);
 
   /* Панели собираются одинаково для обеих раскладок и различаются только тем, куда их ставят.
    * Иначе это были бы две копии доски, расходящиеся при первой же правке. */

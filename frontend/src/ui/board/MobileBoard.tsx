@@ -3,6 +3,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { useState, type CSSProperties, type ReactNode } from "react";
 import type { GameState, LegalAction } from "../../online/types";
 import { resolve, type ActionContext } from "../lib/actions";
+import { fullscreenSupport, toggleFullscreen } from "../lib/fullscreen";
 import { useThemeStyle } from "../lib/theme";
 import { ConfirmModal } from "../primitives/Modal";
 import { useBlockedHint } from "../primitives/BlockedHint";
@@ -260,6 +261,7 @@ export function MobileShell({ children }: { children: ReactNode }) {
 export function RotateNotice({ onExit }: { onExit: () => void }) {
   const theme = useThemeStyle();
   const { t } = useTranslation("game");
+  const support = fullscreenSupport();
   return (
     <div
       style={theme}
@@ -270,6 +272,28 @@ export function RotateNotice({ onExit }: { onExit: () => void }) {
       <span aria-hidden="true" className="rotate-hint text-[64px] leading-none">📱</span>
       <b className="card-serif text-[22px]">{t("ui.mobile.rotateTitle")}</b>
       <p className="max-w-[320px] text-[15px] leading-snug text-ink-muted">{t("ui.mobile.rotateText")}</p>
+      {/* Нажатие — тот самый жест, без которого браузер не пустит в полный экран; заодно он
+          закрепляет альбомную ориентацию, и поворачивать телефон руками уже не нужно. */}
+      {support === "api" && (
+        <button
+          type="button"
+          data-ui="fullscreen"
+          onClick={() => void toggleFullscreen()}
+          className="min-h-11 rounded-md border border-line-2 bg-panel-3 px-4 text-[15px] hover:bg-panel-2"
+        >
+          ⛶ {t("ui.mobile.fullscreen")}
+        </button>
+      )}
+      {support === "ios-home" && (
+        <p
+          data-ui="add-to-home"
+          className="max-w-[320px] rounded-md border border-line bg-panel-2 px-3 py-2 text-left text-[13px] leading-snug
+            text-ink-muted"
+        >
+          <b className="mb-0.5 block text-ink">⛶ {t("ui.mobile.addToHomeTitle")}</b>
+          {t("ui.mobile.addToHome")} {t("ui.mobile.addToHomeSeat")}
+        </p>
+      )}
       <button
         type="button"
         onClick={onExit}

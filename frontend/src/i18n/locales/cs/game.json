@@ -501,7 +501,8 @@
       "fullscreen": "Celá obrazovka",
       "exitFullscreen": "Ukončit celou obrazovku",
       "addToHomeTitle": "Hrát bez lišt Safari",
-      "addToHome": "Klepněte na Sdílet → Přidat na plochu a spouštějte hru z ikony: adresní řádek pak nebude zabírat místo."
+      "addToHome": "Klepněte na Sdílet → Přidat na plochu a spouštějte hru z ikony: adresní řádek pak nebude zabírat místo.",
+      "addToHomeSeat": "Nejlépe před hrou: místo u stolu se do aplikace nepřenáší."
     },
     "greyResult": {
       "title": "Šedý kšeft: {{operation}}", "target": "cíl — {{name}}", "roll": "padlo {{roll}}", "face": "výsledek",
