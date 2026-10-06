@@ -475,7 +475,9 @@
       "found_one": "Found: {{total}} in {{count}} chapter", "found_other": "Found: {{total}} in {{count}} chapters",
       "nothing": "Nothing found", "chapter": "Chapter {{number}}", "close": "Close the book"
     },
+    "chat": {"tab": "Chat", "logTab": "Log", "tabs": "Chat and log", "title": "Table chat", "placeholder": "Say something to the table…", "send": "Send", "empty": "Quiet so far. Be the first to write."},
     "mobile": {
+      "chat": "Chat",
       "yourTurn": "Your turn",
       "turnOf": "{{name}} is playing",
       "turnsAhead_one": "you in {{count}} turn",
@@ -522,6 +524,7 @@
       "noSlot": "No free slot — sell a business or open a new slot", "noMoney": "You need {{missing}}$ more", "unavailable": "Not available now"
     },
     "briefing": {
+      "openLog": "Open the full log",
       "title": "🔔 Your turn — what changed", "round": "round {{round}}", "rounds": "rounds {{from}}–{{to}}", "go": "Got it, let's play →",
       "important": "Important", "stats": "Before {{arrow}} now", "done": "What others did to you ({{count}})",
       "nothing": "Nobody did anything to you.",

@@ -819,7 +819,9 @@
       "chapter": "Глава {{number}}",
       "close": "Закрыть книгу"
     },
+    "chat": {"tab": "Чат", "logTab": "Лог", "tabs": "Чат и лог", "title": "Чат стола", "placeholder": "Написать за стол…", "send": "Отправить", "empty": "Здесь пока тихо. Напишите первым."},
     "mobile": {
+      "chat": "Чат",
       "yourTurn": "Ваш ход",
       "turnOf": "Ходит {{name}}",
       "turnsAhead_one": "вы через {{count}} ход",
@@ -900,6 +902,7 @@
       "unavailable": "Сейчас недоступно"
     },
     "briefing": {
+      "openLog": "Открыть полный лог",
       "title": "🔔 Ваш ход — что изменилось",
       "round": "раунд {{round}}",
       "rounds": "раунды {{from}}–{{to}}",

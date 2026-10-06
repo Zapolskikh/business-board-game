@@ -59,6 +59,8 @@ export const cityApi = {
     request<unknown>(`/api/city/rooms/${id}/journal?${new URLSearchParams({ viewer_id: viewerId })}`, {
       headers: { "X-Room-Password": password },
     }),
+  chat: (id: string, password: string, playerId: string, text: string) =>
+    request<RoomView>(`/api/city/rooms/${id}/chat`, json({ password, player_id: playerId, text })),
   command: (id: string, password: string, actorId: string, gameRevision: number, action: LegalAction) =>
     request<RoomView>(`/api/city/rooms/${id}/commands`, json({
       password,

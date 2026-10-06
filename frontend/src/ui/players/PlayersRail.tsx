@@ -1,8 +1,9 @@
 import { useTranslation } from "react-i18next";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { forwardRef, type CSSProperties, type ReactNode } from "react";
 import { difficultyLabels } from "../../online/gameUi";
-import type { CityMeta, GameState, LegalAction, PlayerState } from "../../online/types";
+import type { ChatMessage, CityMeta, GameState, LegalAction, PlayerState } from "../../online/types";
+import { ChatBubble } from "../board/TableTalk";
 import { CardPopover } from "../primitives/CardPopover";
 import { Panel, SectionHead } from "../primitives/atoms";
 import { ResourceText } from "../primitives/ResourceIcon";
@@ -24,12 +25,15 @@ export function PlayersRail({
   index,
   context,
   onAction,
+  bubbles = {},
 }: {
   game: GameState;
   meta: CityMeta;
   index: Indexes;
   context: ActionContext;
   onAction: (action: LegalAction) => void;
+  /** Свежие реплики чата по игрокам: всплывают облачком над карточкой автора. */
+  bubbles?: Record<string, ChatMessage>;
 }) {
   const { t } = useTranslation("game");
   /* На телефоне заголовка нет: четыре карточки сами говорят, что это игроки, а его строка нужнее
@@ -42,8 +46,9 @@ export function PlayersRail({
       )}
       <div className="grid min-h-0 grid-rows-4 gap-1 p-px">
         {game.players.map(player => (
+          /* Обёртка ради облачка: сама карточка обрезает всё, что выходит за её рамку. */
+          <div key={player.id} className="relative grid min-h-0 min-w-0">
           <CardPopover
-            key={player.id}
             label={t("ui.players.details", { name: player.name })}
             width={520}
             content={
@@ -65,6 +70,21 @@ export function PlayersRail({
               data-tutorial={`player-${player.id}`}
             />
           </CardPopover>
+          <AnimatePresence>
+            {bubbles[player.id] && (
+              <motion.span
+                key={bubbles[player.id].seq}
+                className="contents"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ChatBubble message={bubbles[player.id]} />
+              </motion.span>
+            )}
+          </AnimatePresence>
+          </div>
         ))}
       </div>
     </Panel>

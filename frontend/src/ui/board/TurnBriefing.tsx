@@ -53,7 +53,16 @@ function Segments({ segments }: { segments: LogSegment[] }) {
   );
 }
 
-export function TurnBriefingModal({ briefing, onClose }: { briefing: Briefing | null; onClose: () => void }) {
+export function TurnBriefingModal({
+  briefing,
+  onClose,
+  onOpenLog,
+}: {
+  briefing: Briefing | null;
+  onClose: () => void;
+  /** Сводка показывает только то, что задело игрока; всё остальное — в полной хронике. */
+  onOpenLog: () => void;
+}) {
   // The hook before the early return: the briefing appears after the first render, and a hook that
   // only runs once it does changes the hook order between renders.
   const { t } = useTranslation("game");
@@ -72,6 +81,19 @@ export function TurnBriefingModal({ briefing, onClose }: { briefing: Briefing | 
           : t("ui.briefing.rounds", { from: briefing.fromRound, to: briefing.round })
       }
       width={860}
+      headerAction={
+        <button
+          type="button"
+          data-ui="briefing-open-log"
+          onClick={() => {
+            onClose();
+            onOpenLog();
+          }}
+          className="primary-button shrink-0 rounded-md px-3 py-1.5 text-[13px] font-bold"
+        >
+          📜 {t("ui.briefing.openLog")}
+        </button>
+      }
       footer={
         <button
           type="button"

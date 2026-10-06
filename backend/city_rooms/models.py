@@ -30,6 +30,12 @@ class ClientInfo:
     user_agent: str = ""
 
 
+# The table chat. Kept on the room, not in the game: a message is not a move, so it is in neither
+# the event log nor the replayable journal — the seed and the commands still rebuild the match
+# exactly. The cap bounds the room record; the length bounds one bubble over a player's card.
+CHAT_HISTORY = 200
+CHAT_MESSAGE_LENGTH = 240
+
 # Distinct addresses kept per seat: enough to see a player move between networks, small enough that a
 # long game does not grow the room record.
 SEAT_CLIENT_IPS = 5
@@ -106,6 +112,23 @@ class RoomState:
     # A tutorial table (city_rooms.tutorial): never listed, its bots are extras that only pass, and
     # its grey operation lands on a prepared face.
     tutorial: bool = False
+    # Table chat, oldest first: {seq, player_id, name, text, at, round, after_event}. ``after_event``
+    # is the last event seq the author had seen happen, so a readable log can put the line in place.
+    chat: list[dict[str, Any]] = field(default_factory=list)
+
+    def add_chat(self, player_id: str, name: str, text: str) -> dict[str, Any]:
+        game = self.game
+        message = {
+            "seq": (self.chat[-1]["seq"] + 1) if self.chat else 1,
+            "player_id": player_id,
+            "name": name,
+            "text": text,
+            "at": utc_now(),
+            "round": game.round_number if game else None,
+            "after_event": game.event_log[-1].seq if game and game.event_log else 0,
+        }
+        self.chat = [*self.chat, message][-CHAT_HISTORY:]
+        return message
 
     def record_client(self, player_id: str, client: ClientInfo | None, *, joined: bool = False) -> None:
         if client is None:
@@ -163,6 +186,7 @@ class RoomState:
             "seat_token_hashes": dict(self.seat_token_hashes),
             "seat_clients": {key: dict(value) for key, value in self.seat_clients.items()},
             "tutorial": self.tutorial,
+            "chat": [dict(message) for message in self.chat],
         }
 
     @classmethod
@@ -184,6 +208,7 @@ class RoomState:
             seat_token_hashes={str(key): str(value) for key, value in (data.get("seat_token_hashes") or {}).items()},
             seat_clients={str(key): dict(value) for key, value in (data.get("seat_clients") or {}).items()},
             tutorial=bool(data.get("tutorial", False)),
+            chat=[dict(message) for message in (data.get("chat") or [])],
         )
         state.validate()
         return state

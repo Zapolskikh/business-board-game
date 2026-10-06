@@ -228,8 +228,21 @@ export interface GameState {
 
 export interface LegalAction { type: string; payload: Record<string, unknown> }
 
+/** Реплика за столом. Живёт в комнате, а не в партии: в журнал .json не попадает. */
+export interface ChatMessage {
+  seq: number;
+  player_id: string;
+  name: string;
+  text: string;
+  at: string;
+  round: number | null;
+  /** Номер последнего события, которое автор видел: по нему реплика встаёт на место в журнале .md. */
+  after_event: number;
+}
+
 export interface RoomView extends RoomSummary {
   seats: RoomSeat[];
+  chat?: ChatMessage[];
   max_rounds?: number;
   role_price?: number;
   created_at?: string;

@@ -15,12 +15,15 @@ export function Modal({
   width = 620,
   children,
   footer,
+  headerAction,
   nested = false,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   subtitle?: ReactNode;
+  /** Кнопка в шапке окна, между заголовком и крестиком. */
+  headerAction?: ReactNode;
   width?: number;
   children: ReactNode;
   footer?: ReactNode;
@@ -40,8 +43,9 @@ export function Modal({
             grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-[12px] border border-line-2
             bg-panel font-sans text-ink ${nested ? "z-[56]" : "z-50"}`}
         >
-          <div style={{ zoom }} className="flex min-w-0 items-baseline gap-2 border-b border-line px-3.5 py-2.5">
+          <div style={{ zoom }} className="flex min-w-0 items-center gap-2 border-b border-line px-3.5 py-2.5">
             <Dialog.Title className="min-w-0 flex-1 truncate text-sm font-bold">{title}</Dialog.Title>
+            {headerAction}
             {subtitle && <span className="shrink-0 text-2xs text-ink-dim">{subtitle}</span>}
             <Dialog.Close className="px-1 text-base text-ink-dim hover:text-ink" aria-label={tr("game", "ui.common.close")}>
               ✕

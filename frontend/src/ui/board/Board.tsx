@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useMemo, useState } from "react";
 import { rankPlayers, scoreOf } from "../../online/gameUi";
-import type { CityMeta, GameState, LegalAction } from "../../online/types";
+import type { ChatMessage, CityMeta, GameState, LegalAction } from "../../online/types";
 import { ActionsPanel } from "../actions/ActionsPanel";
 import { CityPanel } from "../city/CityPanel";
 import { Hand } from "../hand/Hand";
@@ -11,10 +11,10 @@ import { Projects } from "../projects/Projects";
 import { Modal, DetailsModal } from "../primitives/Modal";
 import type { ActionContext } from "../lib/actions";
 import { indexMaps } from "../lib/board";
-import { useCommand, useGame, useLegalActions, useMe, useMeta, useRoom } from "../lib/session";
+import { useChat, useCommand, useGame, useLegalActions, useMe, useMeta, useRoom } from "../lib/session";
 import { Chronicle } from "./Chronicle";
 import { RulesBook } from "./RulesBook";
-import { ChronicleRail } from "./ChronicleRail";
+import { ChatModal, TableTalk, chatTop, chatUnread, useChatBubbles } from "./TableTalk";
 import { useTurnBriefing } from "./briefing";
 import { TurnBriefingModal } from "./TurnBriefing";
 import { GreyResult } from "./GreyResult";
@@ -24,6 +24,8 @@ import { Header, StatusBar } from "./Header";
 import { ScoreDetails } from "./headerPopovers";
 import { BoardLayoutProvider, useDeviceLayout, useMobileViewport, type BoardLayout } from "../lib/layout";
 import { useBackGuard } from "../lib/fullscreen";
+
+const NO_CHAT: ChatMessage[] = [];
 
 /* Сборка доски.
  *
@@ -41,6 +43,8 @@ export function BoardView({
   onExit,
   layout,
   liveSession = false,
+  chat = NO_CHAT,
+  onChat,
 }: {
   game: GameState;
   meta: CityMeta;
@@ -53,6 +57,9 @@ export function BoardView({
   layout?: BoardLayout;
   /** Подключённая партия разрешает сетевой экспорт хроники; /dev работает без сессии. */
   liveSession?: boolean;
+  /** Чат стола: реплики комнаты и отправка. Без `onChat` чат только читается. */
+  chat?: ChatMessage[];
+  onChat?: (text: string) => void;
 }) {
   // Хук перевода на корне доски: смена языка перерисовывает всё дерево, и подписи из
   // gameUi (они берут язык в момент вызова) обновляются вместе с компонентами.
@@ -63,6 +70,15 @@ export function BoardView({
   const [rules, setRules] = useState(false);
   const [seen, setSeen] = useState<number | null>(null);
   const [finishOpen, setFinishOpen] = useState(true);
+  /* Чат на телефоне — отдельным окном; на широком столе он всегда на виду в левом углу, и
+   * непрочитанное там считает сама панель. */
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatSeen, setChatSeen] = useState(() => chatTop(chat));
+  const top = chatTop(chat);
+  useEffect(() => {
+    if (chatOpen) setChatSeen(top);
+  }, [chatOpen, top]);
+  const bubbles = useChatBubbles(chat);
 
   const logCount = game.event_log.length;
   useEffect(() => {
@@ -90,11 +106,21 @@ export function BoardView({
 
   /* Панели собираются одинаково для обеих раскладок и различаются только тем, куда их ставят.
    * Иначе это были бы две копии доски, расходящиеся при первой же правке. */
-  const rail = <PlayersRail game={game} meta={meta} index={index} context={context} onAction={onAction} />;
+  const rail = (
+    <PlayersRail game={game} meta={meta} index={index} context={context} onAction={onAction} bubbles={bubbles} />
+  );
   const players = (
     <div className="grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_auto] gap-1.5">
       {rail}
-      <ChronicleRail game={game} meta={meta} unseen={unseen} onOpen={() => setChronicle(true)} />
+      <TableTalk
+        game={game}
+        meta={meta}
+        meId={context.me.id}
+        chat={chat}
+        onSend={onChat}
+        unseenEvents={unseen}
+        onOpenLog={() => setChronicle(true)}
+      />
     </div>
   );
 
@@ -183,6 +209,8 @@ export function BoardView({
           hand={hand(true)}
           unseen={unseen}
           onChronicle={() => setChronicle(true)}
+          chatUnread={chatUnread(chat, chatSeen, context.me.id)}
+          onChat={() => setChatOpen(true)}
         />
       ) : (
         <div className="grid min-h-0 grid-cols-[238px_minmax(0,1fr)_274px] gap-1.5">
@@ -200,7 +228,16 @@ export function BoardView({
         exportEnabled={liveSession}
       />
 
-      <TurnBriefingModal briefing={briefing} onClose={closeBriefing} />
+      <ChatModal
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+        game={game}
+        meId={context.me.id}
+        chat={chat}
+        onSend={onChat}
+      />
+
+      <TurnBriefingModal briefing={briefing} onClose={closeBriefing} onOpenLog={() => setChronicle(true)} />
       <GreyResult game={game} meta={meta} meId={context.me.id} />
 
       <DetailsModal open={score} onClose={() => setScore(false)} label={t("ui.finish.scoreModal")}>
@@ -255,6 +292,7 @@ export function Board({ onExit }: { onExit: () => void }) {
   const meta = useMeta();
   const legal = useLegalActions();
   const { send, pending, isPending, error } = useCommand();
+  const talk = useChat();
 
   const context: ActionContext = { game, me, legal, pending };
 
@@ -268,6 +306,8 @@ export function Board({ onExit }: { onExit: () => void }) {
       error={error || (room.error instanceof Error ? room.error.message : "")}
       onExit={onExit}
       liveSession
+      chat={talk.chat}
+      onChat={talk.send}
     />
   );
 }

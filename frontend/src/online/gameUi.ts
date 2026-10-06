@@ -907,7 +907,17 @@ export function buildGameLogMarkdown(room: RoomView, meta: CityMeta, version: st
   lines.push(tg("log.chronicle"), "");
   // Oldest first: the chronicle on screen is newest-first for reading, but a log to analyse has to
   // run in the direction the game actually went.
-  game.event_log.forEach(event => lines.push(`${event.seq}. ${describeEvent(event, game, meta)}`));
+  /* Реплики чата — на своих местах между событиями: `after_event` — последнее событие, которое
+   * автор видел. Это читаемый журнал; в воспроизводимый .json чат не входит — реплика не ход. */
+  const chat = room.chat ?? [];
+  const said = (after: number) =>
+    chat.filter(message => message.after_event === after).forEach(message => lines.push(`> 💬 **${message.name}:** ${message.text}`));
+  const known = new Set(game.event_log.map(event => event.seq));
+  chat.filter(message => !known.has(message.after_event)).forEach(message => lines.push(`> 💬 **${message.name}:** ${message.text}`));
+  game.event_log.forEach(event => {
+    lines.push(`${event.seq}. ${describeEvent(event, game, meta)}`);
+    said(event.seq);
+  });
   return lines.join("\n");
 }
 

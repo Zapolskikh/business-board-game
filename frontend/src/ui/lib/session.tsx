@@ -8,7 +8,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { ApiError, cityApi } from "../../online/api";
-import type { CityMeta, GameState, LegalAction, PlayerState, RoomView } from "../../online/types";
+import type { ChatMessage, CityMeta, GameState, LegalAction, PlayerState, RoomView } from "../../online/types";
 
 /* Слой раздачи состояния.
  *
@@ -146,4 +146,23 @@ export function useCommand(): CommandHandle {
     // Сервер отвечает фразой для разработчика; игроку — понятный текст на его языке.
     error: mutation.error ? errorText(mutation.error) : "",
   };
+}
+
+const NO_CHAT: ChatMessage[] = [];
+
+/** Чат стола: реплики приходят вместе с состоянием комнаты, отправка — отдельным запросом. */
+export function useChat(): { chat: ChatMessage[]; send: ((text: string) => void) | undefined } {
+  const { roomId, password, playerId, adminToken } = useSession();
+  const client = useQueryClient();
+  const key = roomKey(roomId, playerId);
+  const chat = useRoom().data?.chat ?? NO_CHAT;
+
+  const mutation = useMutation({
+    mutationFn: (text: string) => cityApi.chat(roomId, password, playerId, text),
+    // Ответ — полное состояние комнаты, как и на команду: реплика видна сразу, без ожидания опроса.
+    onSuccess: room => client.setQueryData(key, room),
+    onError: () => void client.invalidateQueries({ queryKey: key }),
+  });
+  // Наблюдатель-админ смотрит чужими глазами и за игрока не говорит.
+  return { chat, send: adminToken ? undefined : mutation.mutate };
 }

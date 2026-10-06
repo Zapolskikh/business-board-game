@@ -34,6 +34,8 @@ export function MobileTable({
   hand,
   unseen,
   onChronicle,
+  chatUnread,
+  onChat,
 }: {
   game: GameState;
   context: ActionContext;
@@ -46,6 +48,9 @@ export function MobileTable({
   hand: ReactNode;
   unseen: number;
   onChronicle: () => void;
+  /** Есть реплики, пришедшие с последнего открытия чата. */
+  chatUnread: boolean;
+  onChat: () => void;
 }) {
   const { t } = useTranslation("game");
   const [view, setView] = useState<MobileView>("market");
@@ -118,8 +123,12 @@ export function MobileTable({
 
       {actions}
 
-      <BarButton icon="📜" label={t("ui.mobile.chronicle")} meta={t("ui.chronicle.events", { count: game.event_log.length })}
-        dot={unseen > 0} onClick={onChronicle} ui="mobile-chronicle" />
+      {/* Хроника и чат делят левый нижний угол пополам: подписи короткие, счётчик событий уступил
+        * место второй кнопке — он и так стоит в заголовке самой хроники. */}
+      <div className="grid min-w-0 grid-cols-2 gap-1.5">
+        <BarButton icon="📜" label={t("ui.mobile.chronicle")} meta="" dot={unseen > 0} onClick={onChronicle} ui="mobile-chronicle" />
+        <BarButton icon="💬" label={t("ui.mobile.chat")} meta="" dot={chatUnread} onClick={onChat} ui="mobile-chat" />
+      </div>
 
       <BarButton icon="🃏" label={t("ui.mobile.hand")} meta={`${handCount}/3`} dot={handDot}
         onClick={() => setHandOpen(true)} ui="mobile-hand" />
@@ -172,12 +181,16 @@ function BarButton({
       type="button"
       data-ui={ui}
       onClick={onClick}
-      className="relative flex h-12 min-w-0 items-center gap-2.5 rounded-panel border border-line bg-panel px-3.5 text-left
-        hover:bg-panel-2 active:bg-panel-3"
+      className={`relative flex h-12 min-w-0 items-center rounded-panel border border-line bg-panel text-left
+        hover:bg-panel-2 active:bg-panel-3 ${meta ? "gap-2.5 px-3.5" : "justify-center gap-1 px-1"}`}
     >
-      <span aria-hidden="true" className="text-[20px]">{icon}</span>
-      <b className="card-serif text-[17px]">{label}</b>
-      <span className="ml-auto overflow-hidden text-ellipsis whitespace-nowrap pr-2 text-[13px] text-ink-dim">{meta}</span>
+      <span aria-hidden="true" className={meta ? "text-[20px]" : "text-[17px]"}>{icon}</span>
+      <b className={`card-serif overflow-hidden text-ellipsis whitespace-nowrap ${meta ? "text-[17px]" : "text-[15px]"}`}>
+        {label}
+      </b>
+      {meta && (
+        <span className="ml-auto overflow-hidden text-ellipsis whitespace-nowrap pr-2 text-[13px] text-ink-dim">{meta}</span>
+      )}
       {dot && <span aria-hidden="true" className="absolute right-1.5 top-1.5 size-2.5 rounded-full bg-gold" />}
     </button>
   );

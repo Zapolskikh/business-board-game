@@ -477,7 +477,9 @@
       "found_many": "Nalezeno: {{total}} v {{count}} kapitolách", "found_other": "Nalezeno: {{total}} v {{count}} kapitolách",
       "nothing": "Nic nenalezeno", "chapter": "Kapitola {{number}}", "close": "Zavřít knihu"
     },
+    "chat": {"tab": "Chat", "logTab": "Log", "tabs": "Chat a log", "title": "Chat u stolu", "placeholder": "Napište ke stolu…", "send": "Odeslat", "empty": "Zatím je tu ticho. Napište první."},
     "mobile": {
+      "chat": "Chat",
       "yourTurn": "Jste na tahu",
       "turnOf": "Hraje {{name}}",
       "turnsAhead_one": "vy za {{count}} tah",
@@ -526,6 +528,7 @@
       "noSlot": "Žádné volné místo — prodejte podnik nebo otevřete nové místo", "noMoney": "Chybí vám {{missing}}$", "unavailable": "Teď nedostupné"
     },
     "briefing": {
+      "openLog": "Otevřít celý log",
       "title": "🔔 Jste na tahu — co se změnilo", "round": "kolo {{round}}", "rounds": "kola {{from}}–{{to}}", "go": "Jasně, hrajeme →",
       "important": "Důležité", "stats": "Předtím {{arrow}} teď", "done": "Co vám ostatní udělali ({{count}})",
       "nothing": "Nikdo vám nic neudělal.",

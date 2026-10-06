@@ -1194,3 +1194,64 @@
   .ui-v2.mobile-shell .asset-field img { width: 20px; height: 20px; }
   .ui-v2.mobile-shell .asset-footer { padding-top: 2px; }
 }
+
+/* Разговор за столом: чат и лента событий одними «репликами», облачко над карточкой игрока. */
+@layer utilities {
+  .ui-v2 .talk-tab {
+    border-color: var(--color-line);
+    background: var(--color-panel-2);
+    color: var(--color-ink-muted);
+  }
+  .ui-v2 .talk-tab[data-active] {
+    border-color: transparent;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 88%, white) 0%, var(--color-primary) 100%);
+    color: var(--color-primary-ink);
+  }
+
+  /* Реплика: чужая — слева с «хвостиком» внизу слева, своя — справа и золотом, событие стола —
+   * тем же пузырём, но приглушённым: говорит не игрок. */
+  .ui-v2 .talk-line {
+    max-width: 94%;
+    border: 1px solid var(--color-line);
+    border-radius: 11px 11px 11px 3px;
+    background: var(--color-panel-2);
+    padding: 4px 9px;
+    font-size: 13px;
+    line-height: 1.3;
+    color: var(--color-ink);
+    overflow-wrap: anywhere;
+  }
+  .ui-v2 .talk-line[data-mine] {
+    border-color: transparent;
+    border-radius: 11px 11px 3px 11px;
+    background: color-mix(in srgb, var(--color-primary) 82%, white);
+    color: var(--color-primary-ink);
+  }
+  .ui-v2 .talk-line[data-system] {
+    font-size: 12px;
+    color: var(--color-ink-muted);
+  }
+
+  .ui-v2 .talk-input {
+    border-color: var(--color-line-2);
+    background: var(--color-panel-2);
+    color: var(--color-ink);
+  }
+  .ui-v2 .talk-input::placeholder { color: var(--color-ink-dim); }
+  .ui-v2 .talk-input:focus { border-color: var(--color-accent); }
+
+  .ui-v2 .chat-bubble {
+    border: 1.5px solid #4a3b22;
+    border-radius: 13px 13px 3px 13px;
+    background: #fffdf6;
+    padding: 4px 9px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.25;
+    color: #201b15;
+    box-shadow: 0 3px 8px rgb(0 0 0 / 0.45);
+  }
+  .ui-v2.mobile-shell .chat-bubble { font-size: 14.5px; }
+  .ui-v2.mobile-shell .talk-line,
+  .ui-v2 [data-ui="modal"] .talk-line { font-size: 14px; }
+}

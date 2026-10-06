@@ -74,6 +74,9 @@ def room_view(
         "seats": [seat.to_dict() for seat in room.seats],
         "game": None,
         "legal_actions": legal_actions or [],
+        # The table chat rides with the state: the same poll that brings a rival's move brings their
+        # line. It is on the room, not in the game — see ``RoomState.chat``.
+        "chat": [dict(message) for message in room.chat],
     }
     if room.game is None:
         return result

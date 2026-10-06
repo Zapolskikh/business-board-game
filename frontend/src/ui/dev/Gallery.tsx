@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { GameState, LegalAction, MarketAsset } from "../../online/types";
+import type { ChatMessage, GameState, LegalAction, MarketAsset } from "../../online/types";
 import { BoardView } from "../board/Board";
 import type { ActionContext } from "../lib/actions";
 import { ME, meta as fixtureMeta, scenarios, type ScenarioName } from "./fixtures";
@@ -36,6 +36,21 @@ export function Gallery() {
   const [error, setError] = useState(query.has("error") ? "Команда не выполнена: ревизия устарела" : "");
   const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight });
   const [panel, setPanel] = useState(query.get("panel") !== "0");
+  /* Чат в галерее живёт в памяти страницы. `?chat=1` — сразу с парой реплик и облачком: первая
+   * реплика приходит с загрузкой и молчит, вторая появляется следом, как только что сказанная. */
+  const [chat, setChat] = useState<ChatMessage[]>(() =>
+    query.has("chat") ? [{ seq: 1, player_id: "p-bot2", name: "Bot 2", text: "Кто взял мой проект?", at: "", round: 6, after_event: 0 }] : [],
+  );
+  const say = (player_id: string, name: string, text: string) =>
+    setChat(current => [...current, { seq: current.length + 1, player_id, name, text, at: "", round: 6, after_event: 0 }]);
+  useEffect(() => {
+    if (!query.has("chat")) return;
+    const timer = window.setTimeout(() => {
+      say(ME, "Вы", "Я. И рынок сейчас тоже заберу.");
+      say("p-bot3", "Bot 3", "Посмотрим, хватит ли влияния 🙂");
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const onResize = () => setSize({ w: window.innerWidth, h: window.innerHeight });
@@ -77,6 +92,8 @@ export function Gallery() {
         busy={busy}
         error={error}
         onExit={() => window.alert("Выход в комнаты")}
+        chat={chat}
+        onChat={text => say(ME, "Вы", text)}
         /* `?layout=mobile` — мобильный стол в окне браузера, без эмуляции телефона; `?layout=wide` —
          * широкий стол, даже если экран по размеру похож на телефон (безголовый браузер). Настоящий
          * масштаб и экран «поверните устройство» видны только в режиме устройства DevTools. */

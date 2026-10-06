@@ -15,7 +15,7 @@ from city_engine.engine import CityEngine
 from city_engine.errors import CityEngineError, StaleRevisionError
 from city_engine.factory import GameSettings, PlayerSetup, create_game_from_catalog
 from city_rooms.errors import RoomAccessError, RoomConflictError, RoomNameTakenError, RoomValidationError
-from city_rooms.models import ClientInfo, RoomSeat, RoomState
+from city_rooms.models import CHAT_MESSAGE_LENGTH, ClientInfo, RoomSeat, RoomState
 from city_rooms.repository import RoomRepository
 from city_rooms.security import hash_password, verify_password
 from city_rooms.tutorial import PLAYER_ID as TUTORIAL_PLAYER_ID
@@ -291,6 +291,36 @@ class CityRoomService:
         room.touch()
         self.repository.save(room, expected)
         return room
+
+    def post_chat(
+        self, room_id: str, *, password: str, player_id: str, text: str, client: ClientInfo | None = None
+    ) -> RoomState:
+        """Say something at the table. Any seated human may, in the lobby and after the final too.
+
+        A message races the game itself — bots move, another player presses a button — and losing
+        that race must not lose the line: the room is re-read and the message appended again.
+        """
+        body = " ".join(text.split())[:CHAT_MESSAGE_LENGTH]
+        if not body:
+            raise RoomValidationError("a chat message cannot be empty")
+        for attempt in range(4):
+            room = self.repository.get(room_id)
+            expected = room.revision
+            self._authorize(room, password)
+            seat = next((seat for seat in room.seats if seat.player_id == player_id), None)
+            if seat is None or seat.kind != "human":
+                raise RoomAccessError("chat requires an occupied human seat")
+            room.add_chat(player_id, str(seat.name), body)
+            room.record_client(player_id, client)
+            room.touch()
+            try:
+                self.repository.save(room, expected)
+            except RoomConflictError:
+                if attempt == 3:
+                    raise
+                continue
+            return room
+        raise RoomConflictError("room changed; reload and retry")
 
     def _advance_bots(self, room: RoomState) -> None:
         if room.game is None:

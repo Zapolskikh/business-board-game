@@ -384,3 +384,55 @@ def test_admin_endpoints_stay_closed_with_a_short_key(monkeypatch) -> None:  # t
     monkeypatch.setenv("ADMIN_TOKEN", "short")
     client = TestClient(app)
     assert client.get("/api/city/admin/rooms", headers={"X-Admin-Token": "short"}).status_code == 404
+
+
+def test_chat_rides_with_the_state_and_stays_out_of_the_journal() -> None:
+    """A line said at the table reaches every viewer with the next poll, survives the bots' moves,
+    and is not part of the replayable journal: a message is not a move."""
+    service = CityRoomService(InMemoryRoomRepository())
+    app.dependency_overrides[get_room_service] = lambda: service
+    client = TestClient(app)
+    try:
+        room_id = client.post("/api/city/rooms", json={"name": "Chat", "password": "secret", "capacity": 2}).json()["id"]
+        client.post(f"/api/city/rooms/{room_id}/join", json={"password": "secret", "seat_index": 0, "player_name": "Oleg"})
+        client.post(f"/api/city/rooms/{room_id}/seats", json={"password": "secret", "seat_index": 1, "kind": "bot"})
+
+        # The lobby already has a chat, and the room revision moves so that a poll picks the line up.
+        before = client.get(f"/api/city/rooms/{room_id}").json()["revision"]
+        said = client.post(
+            f"/api/city/rooms/{room_id}/chat", json={"password": "secret", "player_id": "seat-1", "text": "  привет,\n стол  "}
+        )
+        assert said.status_code == 200
+        assert said.json()["revision"] == before + 1
+        assert [(m["seq"], m["name"], m["text"], m["round"]) for m in said.json()["chat"]] == [(1, "Oleg", "привет, стол", None)]
+
+        # Only a seated human speaks, and only with the room password.
+        assert client.post(
+            f"/api/city/rooms/{room_id}/chat", json={"password": "secret", "player_id": "seat-2", "text": "бот"}
+        ).status_code == 403
+        assert client.post(
+            f"/api/city/rooms/{room_id}/chat", json={"password": "nope", "player_id": "seat-1", "text": "x"}
+        ).status_code == 403
+        assert client.post(
+            f"/api/city/rooms/{room_id}/chat", json={"password": "secret", "player_id": "seat-1", "text": "   "}
+        ).status_code == 422
+
+        client.post(f"/api/city/rooms/{room_id}/start", json={"password": "secret", "seed": 3})
+        long_line = "я" * 500
+        client.post(f"/api/city/rooms/{room_id}/chat", json={"password": "secret", "player_id": "seat-1", "text": long_line})
+        state = client.get(
+            f"/api/city/rooms/{room_id}/state", params={"viewer_id": "seat-1"}, headers={"X-Room-Password": "secret"}
+        ).json()
+        assert [m["seq"] for m in state["chat"]] == [1, 2]
+        assert len(state["chat"][1]["text"]) == 240
+        assert state["chat"][1]["round"] == 1 and state["chat"][1]["after_event"] >= 1
+        assert "chat" not in state["game"]
+
+        room = service.get_room(room_id)
+        room.game.status = "finished"
+        room.status = "finished"
+        from city_rooms.views import room_journal
+
+        assert "chat" not in room_journal(room) and "chat" not in room_journal(room)["game"]
+    finally:
+        app.dependency_overrides.clear()

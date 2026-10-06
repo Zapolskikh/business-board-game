@@ -77,6 +77,14 @@ class CommandRequest(BaseModel):
     expected_revision: int | None = Field(default=None, ge=0)
 
 
+class ChatRequest(BaseModel):
+    password: str = Field(default="", max_length=128)
+    player_id: str = Field(min_length=1, max_length=64)
+    # Longer than the stored line on purpose: the service trims, a hard 422 on the 241st character
+    # would lose what the player typed.
+    text: str = Field(min_length=1, max_length=1000)
+
+
 @lru_cache(maxsize=1)
 def get_room_service() -> CityRoomService:
     store = os.getenv("ROOM_STORE", "auto").lower()
@@ -322,6 +330,20 @@ def get_room_journal(
         return room_journal(room)
     except ValueError as exc:
         raise RoomValidationError(str(exc)) from exc
+
+
+@router.post("/rooms/{room_id}/chat")
+def post_chat(
+    room_id: str,
+    request: ChatRequest,
+    http: Request,
+    service: CityRoomService = Depends(get_room_service),
+) -> dict[str, Any]:
+    room = service.post_chat(
+        room_id, password=request.password, player_id=request.player_id, text=request.text, client=_client(http)
+    )
+    legal_actions = service.engine.legal_actions(room.game, request.player_id) if room.game is not None else []
+    return room_view(room, request.player_id, legal_actions, _market_prices(service, room, request.player_id))
 
 
 @router.post("/rooms/{room_id}/commands")
