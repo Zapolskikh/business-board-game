@@ -310,3 +310,51 @@ def test_only_reborn_keeps_a_favourite_role() -> None:
     seats = service.get_room(room.id).seats
     assert seats[1].preferred_role == "mafia"
     assert seats[2].preferred_role is None
+
+
+def test_a_bot_speaks_rarely_and_only_about_what_happened_to_it(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """One line for a command, one line a round for a bot, nothing at a tutorial table — and the
+    server sends a trigger, not words: the clients pick the phrase in the reader's language."""
+    from random import Random
+
+    from city_engine.models import DomainEvent
+    from city_rooms import banter
+
+    service = CityRoomService(InMemoryRoomRepository())
+    room = service.create_room(name="Talk", password="secret", capacity=2)
+    service.join(room.id, password="secret", seat_index=0, player_name="Oleg")
+    service.set_bot(room.id, password="secret", seat_index=1, difficulty="raider")
+    room = service.start(room.id, password="secret", seed=5)
+    bot = next(player.id for player in room.game.players if player.is_bot)
+    human = next(player.id for player in room.game.players if not player.is_bot)
+    monkeypatch.setattr(banter, "TRIGGERS", {name: 1.0 for name in banter.TRIGGERS})
+    rng = Random(1)
+
+    def event(kind: str, actor: str, **data):  # type: ignore[no-untyped-def]
+        return DomainEvent(seq=999, type=kind, actor_id=actor, data=data)
+
+    # A story the Защита swallowed is «blocked», not «smeared».
+    hit = [
+        event("role_power_used", human, power="journalist_publish", target_id=bot),
+        event("targeted_effect_blocked", bot, power="journalist_publish", by="roof"),
+    ]
+    said = banter.bot_remark(service.engine, room, hit, rng)
+    assert said is not None and said["player_id"] == bot and said["text"] == ""
+    assert said["line"]["trigger"] == "blocked" and 0 <= said["line"]["n"] < 1000
+    assert room.chat[-1] is said
+
+    # The same bot stays quiet for the rest of the round, whatever happens next.
+    assert banter.bot_remark(service.engine, room, [event("scandal_limit_reached", bot, jailed=True)], rng) is None
+    room.game.round_number += 1
+    again = banter.bot_remark(service.engine, room, [event("scandal_limit_reached", bot, jailed=True)], rng)
+    assert again is not None and again["line"]["trigger"] == "jailed"
+
+    # A human's own misfortune is theirs to comment on.
+    assert banter.bot_remark(service.engine, room, [event("scandal_limit_reached", human, jailed=True)], rng) is None
+    # The final is always worth a word, cooldown or not.
+    final = banter.bot_remark(service.engine, room, [event("game_finished", None, winner_id=human)], rng)
+    assert final is not None and final["line"]["trigger"] == "lost"
+
+    room.tutorial = True
+    room.game.round_number += 1
+    assert banter.bot_remark(service.engine, room, [event("scandal_limit_reached", bot, jailed=True)], rng) is None

@@ -80,7 +80,7 @@ export function PlayersRail({
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
               >
-                <ChatBubble message={bubbles[player.id]} />
+                <ChatBubble message={bubbles[player.id]} game={game} />
               </motion.span>
             )}
           </AnimatePresence>

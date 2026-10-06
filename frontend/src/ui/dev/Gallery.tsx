@@ -48,6 +48,10 @@ export function Gallery() {
     const timer = window.setTimeout(() => {
       say(ME, "Вы", "Я. И рынок сейчас тоже заберу.");
       say("p-bot3", "Bot 3", "Посмотрим, хватит ли влияния 🙂");
+      setChat(current => [
+        ...current,
+        { seq: current.length + 1, player_id: "p-bot4", name: "Bot 4", text: "", at: "", round: 6, after_event: 0, line: { trigger: "blocked", n: 1 } },
+      ]);
     }, 300);
     return () => window.clearTimeout(timer);
   }, []);

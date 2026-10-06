@@ -11,6 +11,7 @@ import type {
   RoleMeta,
   RoomView,
 } from "./types";
+import { chatText } from "./botTalk";
 import { tr } from "../i18n";
 
 /* Все подписи — из locales/<язык>/game.json. Таблицы ниже — объекты с геттерами: их можно
@@ -911,9 +912,9 @@ export function buildGameLogMarkdown(room: RoomView, meta: CityMeta, version: st
    * автор видел. Это читаемый журнал; в воспроизводимый .json чат не входит — реплика не ход. */
   const chat = room.chat ?? [];
   const said = (after: number) =>
-    chat.filter(message => message.after_event === after).forEach(message => lines.push(`> 💬 **${message.name}:** ${message.text}`));
+    chat.filter(message => message.after_event === after).forEach(message => lines.push(`> 💬 **${message.name}:** ${chatText(message, game)}`));
   const known = new Set(game.event_log.map(event => event.seq));
-  chat.filter(message => !known.has(message.after_event)).forEach(message => lines.push(`> 💬 **${message.name}:** ${message.text}`));
+  chat.filter(message => !known.has(message.after_event)).forEach(message => lines.push(`> 💬 **${message.name}:** ${chatText(message, game)}`));
   game.event_log.forEach(event => {
     lines.push(`${event.seq}. ${describeEvent(event, game, meta)}`);
     said(event.seq);

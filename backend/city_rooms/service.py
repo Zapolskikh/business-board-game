@@ -7,6 +7,7 @@ import hmac
 import re
 import secrets
 from copy import deepcopy
+from random import Random
 
 from city_bots import choose_bot_command
 from city_engine.commands import Command
@@ -14,6 +15,7 @@ from city_engine.constants import PREFERRED_ROLE_POLICIES, normalize_bot_difficu
 from city_engine.engine import CityEngine
 from city_engine.errors import CityEngineError, StaleRevisionError
 from city_engine.factory import GameSettings, PlayerSetup, create_game_from_catalog
+from city_rooms.banter import bot_remark
 from city_rooms.errors import RoomAccessError, RoomConflictError, RoomNameTakenError, RoomValidationError
 from city_rooms.models import CHAT_MESSAGE_LENGTH, ClientInfo, RoomSeat, RoomState
 from city_rooms.repository import RoomRepository
@@ -37,6 +39,8 @@ class CityRoomService:
     def __init__(self, repository: RoomRepository, engine: CityEngine | None = None) -> None:
         self.repository = repository
         self.engine = engine or CityEngine()
+        # The bots' table talk rolls its own dice: the game's generator is part of the replayable match.
+        self.banter = Random()
 
     def create_room(
         self,
@@ -277,6 +281,7 @@ class CityRoomService:
         if room.tutorial and command.type == "grey_operation":
             # The lesson's operation is a full success: the die is loaded before the command reads it.
             load_the_die(room.game)
+        heard = len(room.game.event_log)
         try:
             transition = self.engine.apply(room.game, command)
         except StaleRevisionError as exc:
@@ -286,6 +291,7 @@ class CityRoomService:
         room.game = transition.state
         room.record_client(command.actor_id, client)
         self._advance_bots(room)
+        bot_remark(self.engine, room, room.game.event_log[heard:], self.banter)
         if room.game.status == "finished":
             room.status = "finished"
         room.touch()

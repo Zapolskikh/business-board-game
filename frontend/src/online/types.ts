@@ -238,6 +238,8 @@ export interface ChatMessage {
   round: number | null;
   /** Номер последнего события, которое автор видел: по нему реплика встаёт на место в журнале .md. */
   after_event: number;
+  /** Реплика бота: сервер присылает повод и число, а слова выбирает клиент на языке читателя. */
+  line?: { trigger: string; n: number };
 }
 
 export interface RoomView extends RoomSummary {

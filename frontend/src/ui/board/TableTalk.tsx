@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { chatText } from "../../online/botTalk";
 import { describeEventSegments } from "../../online/gameUi";
 import type { ChatMessage, CityMeta, GameState } from "../../online/types";
 import { playerColor } from "../lib/board";
@@ -80,7 +81,7 @@ function ChatList({ chat, game, meId }: { chat: ChatMessage[]; game: GameState; 
                 {message.name}
               </b>
             )}
-            <span className="break-words">{message.text}</span>
+            <span className="break-words">{chatText(message, game)}</span>
           </div>
         );
       })}
@@ -252,10 +253,10 @@ export function ChatModal({
 }
 
 /** Облачко с репликой над карточкой игрока. */
-export function ChatBubble({ message }: { message: ChatMessage }) {
+export function ChatBubble({ message, game }: { message: ChatMessage; game: GameState }) {
   return (
     <span data-ui="chat-bubble" className="chat-bubble pointer-events-none absolute right-1.5 top-1 z-20 max-w-[88%]">
-      <span className="line-clamp-3 break-words">{message.text}</span>
+      <span className="line-clamp-3 break-words">{chatText(message, game)}</span>
     </span>
   );
 }
