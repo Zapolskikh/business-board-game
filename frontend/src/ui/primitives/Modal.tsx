@@ -157,6 +157,7 @@ export function DetailsModal({
         >
           <Dialog.Title className="sr-only">{label}</Dialog.Title>
           <Dialog.Close
+            data-ui="details-close"
             className="absolute right-2.5 top-2 z-10 px-1 text-base text-ink-dim hover:text-ink"
             aria-label={tr("game", "ui.common.close")}
           >

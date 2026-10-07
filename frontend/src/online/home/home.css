@@ -150,8 +150,13 @@
 .hm-mobile .hm-form .room-field { font-size: 14px; }
 .hm-mobile .hm-form .form-hint { font-size: 13px; }
 .hm-mobile .hm-form .open-toggle small { font-size: 12.5px; }
-/* Телефон в альбоме: текст слева, кнопки справа — главное действие видно без прокрутки. */
+/* Телефон в альбоме: текст слева, кнопки справа — главное действие видно без прокрутки. Высоты
+ * там меньше 400 точек, и весь экран рисуется на 15% мельче (`zoom`): главная, форма создания и
+ * окна над ними помещаются в экран, а не в полтора. */
 @media (orientation: landscape) and (max-height: 560px) {
+  .rooms-app.hm-mobile { zoom: .85; min-height: calc(100dvh / .85); }
+  .hm-actions .hm-tutorial small, .hm-facts { display: none; }
+  .hm-actions .hm-tutorial { padding: 10px 14px; }
   .hm-home { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: center; gap: 0 8px; }
   .hm-hero { padding: 22px 18px 18px; gap: 8px; }
   .hm-hero h1 { font-size: clamp(24px, 4.2vw, 32px); }

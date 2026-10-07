@@ -540,8 +540,6 @@
       "title": "🌒 Shady deals",
       "spent": "already done",
       "once": "one per turn",
-      "intro": "Any business of the right district opens a deal — no role needed. One deal per turn: roll the die and read the table. Faces 1–2 fail, 3–4 give the weak effect, 5–6 the full one. Your scandals depend on the face too; Protection never cancels your own scandals. Deals score no points: everything they give is in the effect.",
-      "defence": "The target's Protection blocks any shady deal in full and is not used up. Only «Break Protection» removes it — make sure the target is open before you strike.",
       "spentHint": "a deal has already been done this turn",
       "needHint": "needs a business in: {{districts}}",
       "noRoofs": "no rival holds Protection",

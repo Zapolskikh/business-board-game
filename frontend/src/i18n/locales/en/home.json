@@ -11,7 +11,8 @@
     "home": "← Home",
     "menu": "Menu",
     "closeMenu": "Close menu",
-    "language": "Language"
+    "language": "Language",
+    "support": "Support"
   },
   "presence": {
     "rooms_one": "{{count}} room online",
@@ -25,8 +26,6 @@
     "lead": "Grow your districts, pick roles with special powers and grab city projects before your rivals do.",
     "ctaPlay": "Create a room",
     "ctaRules": "How to play",
-    "factPlayers": "players",
-    "factRounds": "rounds",
     "pillarsLabel": "What the game is made of",
     "districtsTitle": "{{count}} districts",
     "districtsText": "Buy buildings, strengthen your district and unlock unique bonuses that help you grow faster than everyone else.",
@@ -36,8 +35,6 @@
     "projectsText": "Take part in city projects to earn more victory points and bonuses that keep working for you until the end of the game.",
     "greyTitle": "The shady side",
     "greyText": "Take risks, get resources and get in your rivals' way. Failed deals can bring you scandals.",
-    "factDistricts": "districts",
-    "factRoles": "roles",
     "factsLine": "{{districts}} districts · {{roles}} roles · {{rounds}} rounds by default"
   },
   "rooms": {
@@ -175,10 +172,7 @@
     "title": "About the project",
     "p1": "Hi! City of Influence is my own board game. I make it in my free time, and my dream is to see it one day as a real box on the table.",
     "p2Strong": "The game is completely free",
-    "p2": " and it will stay free: no ads and no paid advantages. Everyone plays on equal terms.",
-    "p3Start": "If you like the game and want to help, you can support the project with any amount. All the money will go to ",
-    "p3Strong": "printing the first batch of the board game",
-    "p3End": ": the cards, the board and the box.",
+    "p2": ": no ads and no paid advantages. Everyone plays on equal terms. If you like the project and want to support it, you can do it on Patreon or Boosty.",
     "p4": "Found a bug, something is unclear, or you have an idea? Write to me on the feedback page — I read every message.",
     "thanks": "Thank you for playing!",
     "write": "Send feedback",
@@ -291,5 +285,11 @@
     "cancel": "Cancel",
     "nameRequired": "Enter your name.",
     "passwordRequired": "Enter the room password."
+  },
+  "supportDialog": {
+    "title": "Support the project",
+    "lead": "Thank you for wanting to help",
+    "p1": "City of Influence is free and will stay free: no ads and no paid advantages. If you like the game and want to help, support the project on Patreon or Boosty — any amount.",
+    "p2": "All the money will go to printing the first batch of the board game: the cards, the board and the box."
   }
 }

@@ -101,6 +101,7 @@ export function MobileTable({
               type="button"
               role="tab"
               data-ui={`mobile-tab-${tab.id}`}
+              data-tutorial={`tab-${tab.id}`}
               aria-selected={view === tab.id}
               data-active={view === tab.id || undefined}
               onClick={() => setView(tab.id)}
@@ -131,11 +132,12 @@ export function MobileTable({
       </div>
 
       <BarButton icon="🃏" label={t("ui.mobile.hand")} meta={`${handCount}/3`} dot={handDot}
-        onClick={() => setHandOpen(true)} ui="mobile-hand" />
+        onClick={() => setHandOpen(true)} ui="mobile-hand" tutorial="hand-button" />
 
       <button
         type="button"
         data-ui="mobile-end-turn"
+        data-tutorial="end-turn"
         aria-disabled={endTurn.kind !== "ready" || undefined}
         onClick={event => finish(event.currentTarget)}
         className="primary-button card-serif h-12 rounded-[9px] px-3 text-center text-[19px] font-bold aria-disabled:opacity-50"
@@ -168,6 +170,7 @@ function BarButton({
   dot,
   onClick,
   ui,
+  tutorial,
 }: {
   icon: string;
   label: string;
@@ -175,11 +178,14 @@ function BarButton({
   dot: boolean;
   onClick: () => void;
   ui: string;
+  /** Метка для подсветки в обучении (online/Tutorial.tsx). */
+  tutorial?: string;
 }) {
   return (
     <button
       type="button"
       data-ui={ui}
+      data-tutorial={tutorial}
       onClick={onClick}
       className={`relative flex h-12 min-w-0 items-center rounded-panel border border-line bg-panel text-left
         hover:bg-panel-2 active:bg-panel-3 ${meta ? "gap-2.5 px-3.5" : "justify-center gap-1 px-1"}`}
@@ -228,6 +234,7 @@ function HandSheet({ open, onClose, children }: { open: boolean; onClose: () => 
           </div>
           <Dialog.Title className="sr-only">{t("ui.mobile.hand")}</Dialog.Title>
           <Dialog.Close
+            data-ui="hand-close"
             aria-label={t("ui.mobile.closeHand")}
             className="absolute right-3 top-2 z-10 grid size-11 place-items-center rounded-md border border-line
               bg-panel-2 text-[18px] text-ink-muted hover:bg-panel-3"

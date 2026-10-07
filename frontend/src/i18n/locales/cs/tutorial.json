@@ -19,30 +19,36 @@
     "error": "Výuku se nepodařilo spustit",
     "retry": "Zkusit znovu",
     "doThis": "Proveďte zvýrazněnou akci na desce",
-    "step": "Krok {{current}} z {{total}}"
+    "step": "Krok {{current}} z {{total}}",
+    "collapse": "Skrýt nápovědu"
   },
   "steps": {
     "intro": "Posaďte se. Ukážu vám základní tahy a pak si to zkusíte sami.\n\nUž jsem tu pracoval, vyjednával i kazil plány ostatním. Když mi něco pomůže vyhrát, využiju to.\n\nVaším cílem je získat za 15 kol nejvíc bodů. Přinášejí je podniky, projekty, role (+3, dokud ji držíte) a bonusové body — třeba za lobbing. Peníze a vliv vám k nim pomohou. Začneme.",
     "work": "Začneme něčím jednoduchým. Stiskněte vpravo „Zakázka“ a vyděláte 2$. Není to moc, ale někdy vám chybí právě tolik.",
     "workDone": "První peníze jsou doma. Jen si pamatujte: obvykle máte tři akce za tah. Zakázka pomůže, když vám trochu chybí na nákup, ale celou hru na ní nepostavíte.",
-    "campaign": "Teď potřebujeme kontakty. Stiskněte „Výměna“ a dejte 5$ za 3◆. Budou se hodit, až samotné peníze nebudou stačit.",
-    "buyObject": "Kupte na trhu „Lékárny za rohem“. Každé kolo vám přinesou příjem. Na konci hry podnik přidá i body: polovinu své ceny, zaokrouhlenou dolů.\n\nLidem léky, nám příjem. Takový obchod mi vyhovuje.",
+    "campaign": "Teď vám ukážu, jak získat první vliv. Stiskněte „Výměna“ a dejte 5$ za 3◆. Bude se hodit, až samotné peníze nebudou stačit.",
+    "buyObject": "Kupte na trhu „Lékárny za rohem“. Každé kolo vám přinesou příjem. Na konci hry podnik přidá i body: polovinu své ceny, zaokrouhlenou dolů.\n\nLidem léky, nám příjem.",
     "role": "Teď si vezmeme roli. Každá tu má svoje možnosti.\n\nOtevřete vpravo „Role“ a vezměte si Novináře. Jeho bonus i zvláštní schopnost platí, dokud roli držíte. Zkusíme nafouknout jednu aféru.",
     "power": "Viktor nám překáží. Už má čtyři skandály. Přidáme pátý a přijde o roli Kapitalisty.\n\nStiskněte „Nafouknout aféru“ a vyberte Viktora. Nejdřív bych mu nabídl dohodu, ale tohle vyjde levněji.",
-    "scandals": "Viktor přišel o roli. Jenže ta aféra přidala skandál i vám. O špinavých rukou jsem vás varoval.\n\n• Každý zbývající skandál vám na konci hry odečte 1 bod.\n• O roli se obvykle přichází při pěti skandálech. Váš Novinář má hranici šest.\n• Při překročení hranice vás zatknou: pokud jste na tahu, hned skončí, v příštím tahu vám zůstane jen jedna akce, skandály klesnou na nulu a přijdete o roli i o jednu Ochranu.\n• Skandály sníží krizové PR a některé schopnosti rolí.\n• Bez role vám na konci každého kola jeden skandál sám zmizí.\n\nJakmile o Novináře přijdete, zase platí běžná hranice. Hlídejte si počítadlo.",
+    "scandals": "Viktor přišel o roli. Jenže ta aféra přidala skandál i vám.\n\n• Každý zbývající skandál vám na konci hry odečte 1 bod.\n• O roli se obvykle přichází při pěti skandálech. Váš Novinář má hranici šest.\n• Při překročení hranice vás zatknou: pokud jste na tahu, hned skončí, v příštím tahu vám zůstane jen jedna akce, skandály klesnou na nulu a přijdete o roli i o jednu Ochranu.\n• Skandály sníží krizové PR a některé schopnosti rolí.\n• Bez role vám na konci každého kola jeden skandál sám zmizí.\n\nJakmile o Novináře přijdete, zase platí běžná hranice. Hlídejte si počítadlo.",
     "cards": "Ještě mám něco v záloze. Soupeři nemusí vědět všechno, co chystáme.\n\nStiskněte „+ Líznout 2 karty“ nad ukončením tahu. Dvě akční karty stojí jednu akci, 4$ a 1◆.",
     "playCard": "To se bude hodit. Zahrajte z ruky „Všechny ruce na palubu“ a získáte jednu akci navíc. Samotné zahrání karty akci nespotřebuje.",
-    "charity": "Najde se čas i na dobrý skutek. Vezměte „Charitativní fond“: nemá zvláštní podmínky, stačí zaplatit jeho cenu.\n\nMěsto dostane pomoc, vy body. To mi vyhovuje.",
+    "charity": "Najde se čas i na dobrý skutek. Vezměte „Charitativní fond“: nemá zvláštní podmínky, stačí zaplatit jeho cenu.\n\nMěsto dostane pomoc, vy body.",
     "terminal": "Teď chci „Říční přístav“, ale potřebujeme k němu podnik s logistikou. Poslouží „Pašerácký terminál“. Kupte ho na trhu.\n\nAno, pašerácký. Výhodný nákup si kvůli názvu ujít nenechám.",
     "port": "A přístav je dostupný. Vezměte projekt „Říční přístav“, než ho získá někdo jiný. Původ našeho terminálu můžeme ve slavnostním projevu vynechat.",
     "grey": "Terminál patří do Šedé zóny a zpřístupňuje šedé kšefty. Najděte je vpravo a spusťte „Pomluvy“ proti soupeřům.\n\nVýsledek závisí na kostce. Pro výuku jsem nám zařídil příznivý hod. U běžného stolu budete muset riskovat.",
     "greyDone": "Vyšlo to. Při špatném hodu by skandály mohly připadnout vám.\n\nJe tu i další překážka: Ochrana blokuje „Pomluvy“ a další šedé útoky na majitele, aniž by se spotřebovala. Na ni máme zvláštní tah — „Prolomit Ochranu“.",
     "roof": "Viktor to nejspíš nenechá bez odpovědi. Kupte Ochranu: teď stojí 3$ a jednu akci. V dalších kolech zdraží. Na ochrance bych nešetřil.",
     "roofInfo": "Ochranu máte. Teď si zapamatujte, na co se můžete spolehnout.\n\n• Blokuje šedé útoky na vás a zůstává na místě. Výjimkou je „Prolomit Ochranu“.\n• Zachytí jednu nepřátelskou kartu nebo schopnost role a spotřebuje se. Zvláštní tahy na odstranění Ochrany toto pravidlo obcházejí.\n• Chráněnou roli nelze překoupit.\n• Obvykle můžete mít jednu Ochranu, Mafián dvě.\n• Odstranit ji mohou také „Obejít ochranku“, „Přetáhnout ochranku“ a Bezpečákova schopnost „Sebrat Ochranu“.\n\nA ještě něco: před skandály za vaše vlastní činy vás ochranka nezachrání.",
-    "lobbying": "Zpátky k vyjednávání. Kontakty máte, teď z nich něco vytěžíme.\n\nStiskněte „Lobbing“: zaplatíte 10◆ a získáte 6 bodů. Vliv, který vám zůstane na konci hry, žádné body nepřinese.",
+    "lobbying": "Zpátky k vyjednávání. Vliv máte, teď z něj něco vytěžíme.\n\nStiskněte „Lobbing“: zaplatíte 10◆ a získáte 6 bodů. Vliv, který vám zůstane na konci hry, žádné body nepřinese.",
     "endTurn": "Prozatím máme hotovo. Obvykle máte tři akce za tah; na výuku jsem vám dal víc. Teď došly.\n\nUkončete tah. Podíváme se, co udělali ostatní.",
     "roundEnd": "Začalo nové kolo. Okno „Jste na tahu — co se změnilo“ shrnuje události od vašeho posledního tahu.\n\nPodniky přinesly příjem. Tři nejstarší karty trhu nahradily nové a jeden projekt odešel dospod balíčku. Proto s důležitým nákupem dlouho neotálejte.\n\nPrvní hraje hráč s nejnižším skóre. Všichni, kteří se dělí o poslední místo, dostanou po 1◆. Teď nahlédneme do kroniky.",
     "revenge": "Podle očekávání: Viktor na vás zahrál „Kompromat“. Najděte záznam v kronice — Ochrana zachytila ránu a spotřebovala se.\n\nPo „Pomluvách“ by vám zůstala, ale karta je něco jiného. Před dalším sporem si budete muset ochranku znovu najmout.",
-    "finale": "Základy už znáte. Teď si to zkuste sami. Jestli se potkáme u stejného stolu, i já budu hrát na vítězství.\n\nNa závěr:\n• Berte vhodné projekty, dokud jsou dostupné.\n• Do konce hry proměňte peníze a vliv v body.\n• Hlídejte skandály a hranici své role.\n\nNedržte se jediného postupu. Podívejte se, co se právě vyplatí."
+    "finale": "Základy už znáte. Teď si to zkuste sami. Jestli se potkáme u stejného stolu, i já budu hrát na vítězství.\n\nNa závěr:\n• Berte vhodné projekty, dokud jsou dostupné.\n• Do konce hry proměňte peníze a vliv v body.\n• Hlídejte skandály a hranici své role.\n\nNedržte se jediného postupu. Podívejte se, co se právě vyplatí.",
+    "cardsMobile": "Ještě mám něco v záloze. Soupeři nemusí vědět všechno, co chystáme.\n\nOtevřete dole „Ruku“ a stiskněte „+ Líznout 2 karty“. Dvě akční karty stojí jednu akci, 4$ a 1◆.",
+    "playCardMobile": "To se bude hodit. Zahrajte z „Ruky“ „Všechny ruce na palubu“ a získáte jednu akci navíc. Samotné zahrání karty akci nespotřebuje.",
+    "city": "Koupený podnik je teď ve vašem městě. Otevřete nahoře záložku „Moje město“ — uvidíte tam všechny své podniky, jejich příjem a volná místa.",
+    "cityDone": "Tady jsou vaše „Lékárny za rohem“. Mezi záložkami „Projekty“, „Trh“ a „Moje město“ můžete přepínat kdykoli — vždy jednu, aby se karty dobře četly.",
+    "terminalMobile": "Teď chci „Říční přístav“, ale potřebujeme k němu podnik s logistikou. Přejděte na záložku „Trh“ a kupte podnik se štítkem „Logistika“ — poslouží „Pašerácký terminál“.\n\nAno, pašerácký. Výhodný nákup si kvůli názvu ujít nenechám."
   }
 }

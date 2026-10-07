@@ -11,7 +11,8 @@
     "home": "← Domů",
     "menu": "Menu",
     "closeMenu": "Zavřít menu",
-    "language": "Jazyk"
+    "language": "Jazyk",
+    "support": "Podpořit"
   },
   "presence": {
     "rooms_one": "{{count}} místnost online",
@@ -27,8 +28,6 @@
     "lead": "Rozvíjejte čtvrti, vybírejte role se zvláštními schopnostmi a získejte městské projekty dřív než soupeři.",
     "ctaPlay": "Vytvořit místnost",
     "ctaRules": "Jak hrát",
-    "factPlayers": "hráči",
-    "factRounds": "kol",
     "pillarsLabel": "Z čeho se hra skládá",
     "districtsTitle": "{{count}} čtvrtí",
     "districtsText": "Kupujte budovy, posilujte svou čtvrť a získávejte jedinečné bonusy, které vám pomohou růst rychleji než ostatní.",
@@ -38,8 +37,6 @@
     "projectsText": "Zapojte se do městských projektů a získejte víc vítězných bodů i bonusy, které pro vás pracují až do konce hry.",
     "greyTitle": "Šedá strana",
     "greyText": "Riskujte, získávejte zdroje a škoďte soupeřům. Nepovedené kšefty vám mohou přinést skandály.",
-    "factDistricts": "čtvrtí",
-    "factRoles": "rolí",
     "factsLine": "{{districts}} čtvrtí · {{roles}} rolí · {{rounds}} kol ve výchozím nastavení"
   },
   "rooms": {
@@ -181,10 +178,7 @@
     "title": "O projektu",
     "p1": "Ahoj! Město vlivu je moje vlastní desková hra. Dělám ji ve volném čase a moc bych ji jednou chtěl vidět jako skutečnou krabici na stole.",
     "p2Strong": "Hra je úplně zdarma",
-    "p2": " a zdarma i zůstane: bez reklam a bez placených výhod. Všichni hrají za stejných podmínek.",
-    "p3Start": "Pokud se vám hra líbí a chcete pomoct, můžete projekt podpořit jakoukoli částkou. Všechny peníze půjdou na ",
-    "p3Strong": "tisk první série deskové verze",
-    "p3End": ": karty, herní plán a krabici.",
+    "p2": ": bez reklam a bez placených výhod. Všichni hrají za stejných podmínek. Pokud se vám projekt líbí a chcete ho podpořit, můžete to udělat přes Patreon nebo Boosty.",
     "p4": "Našli jste chybu, něco je nejasné, nebo máte nápad? Napište mi přes zpětnou vazbu — čtu každou zprávu.",
     "thanks": "Díky, že hrajete!",
     "write": "Napsat zpětnou vazbu",
@@ -297,5 +291,11 @@
     "cancel": "Zrušit",
     "nameRequired": "Zadejte jméno.",
     "passwordRequired": "Zadejte heslo místnosti."
+  },
+  "supportDialog": {
+    "title": "Podpořit projekt",
+    "lead": "Díky, že chcete pomoct",
+    "p1": "Město vlivu je zdarma a zdarma i zůstane: bez reklam a bez placených výhod. Pokud se vám hra líbí a chcete pomoct, podpořte projekt na Patreonu nebo Boosty — jakoukoli částkou.",
+    "p2": "Všechny peníze půjdou na tisk první série deskové verze: karty, herní plán a krabici."
   }
 }

@@ -255,7 +255,9 @@ describe("BoardView", () => {
     expect(html).toContain('data-ui="asset-card"');
     expect(html).not.toContain('data-ui="project-card"');
     // Кнопка конца хода одна — внизу, а не ещё и в колонке действий.
-    expect(html.split('data-tutorial="end-turn"').length).toBe(1);
+    // Метка обучения стоит ровно на одной кнопке — нижней, мобильной.
+    expect(html.split('data-tutorial="end-turn"').length).toBe(2);
+    expect(html).toMatch(/data-ui="mobile-end-turn"\s+data-tutorial="end-turn"/);
     // Шапка без ряда кнопок: всё в меню.
     expect(html).toContain('data-ui="mobile-menu"');
   });

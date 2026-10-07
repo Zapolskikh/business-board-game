@@ -26,6 +26,8 @@ interface Props {
 const WIDE_QUERY = "(min-width: 900px), (orientation: landscape) and (min-width: 600px)";
 /** Низкий экран (телефон в альбоме, маленький ноутбук с панелями): лобби ровно в экран, без прокрутки страницы. */
 const SHORT_QUERY = "(max-height: 560px)";
+/** Масштаб лобби на телефоне в альбоме — тот же, что у главной в home.css. */
+const LANDSCAPE_ZOOM = 0.85;
 
 function useMedia(query: string): boolean {
   const read = () => typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia(query).matches;
@@ -238,7 +240,13 @@ export function Lobby({ roomId, initialPassword = "", autoJoinName = null, playe
 
   // Телефон: лобби занимает ровно видимую часть экрана — над клавиатурой, когда она открыта.
   const area = useVisibleArea(fitted);
-  const shellStyle: CSSProperties | undefined = fitted ? { top: area.top, height: area.height } : undefined;
+  /* Телефон в альбоме (две колонки на низком экране) — на 15% мельче: в высоту там меньше 400
+   * точек, и четыре места с шапкой и запуском иначе не помещались. Под `zoom` размеры в точках
+   * умножаются на него, поэтому высота видимой области делится обратно. */
+  const scale = wide && short ? LANDSCAPE_ZOOM : 1;
+  const shellStyle: CSSProperties | undefined = fitted
+    ? { top: area.top / scale, height: area.height / scale, ...(scale !== 1 ? { zoom: scale } : {}) }
+    : undefined;
 
   if (!room) {
     return (

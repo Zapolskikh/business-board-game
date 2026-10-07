@@ -84,7 +84,10 @@ export function GreyDetails({
   const [tab, setTab] = useState<string | undefined>(preferred);
   const shown = tab && byId.has(tab) ? tab : preferred;
 
-  /* Телефон: пять операций подряд — несколько экранов прокрутки. Там каждая операция — вкладка с
+  /* Вводных абзацев над операциями нет: правила открытия, кубика и Защиты — в книге правил, а здесь
+   * окно должно показывать операцию целиком, с кнопкой «Запустить», без прокрутки.
+   *
+   * Телефон: пять операций подряд — несколько экранов прокрутки. Там каждая операция — вкладка с
    * полной карточкой, а модификатор броска поднят в шапку окна: он общий для всех пяти. */
   if (mobile) {
     return (
@@ -97,10 +100,6 @@ export function GreyDetails({
           {first && <ModifierLine table={first} cap={cap} headline />}
         </div>
         <PopoverBody>
-          <p className="mb-1.5 text-[13px] text-ink-muted">{t("ui.grey.intro")}</p>
-          <p className="mb-3 text-[13px] text-ink-muted">
-            <ResourceText>{t("ui.grey.defence")}</ResourceText>
-          </p>
           <div role="tablist" aria-label={t("ui.grey.title")} className="mb-2.5 flex flex-wrap gap-1.5">
             {present.map(operationId => {
               const table = byId.get(operationId)!;
@@ -146,10 +145,6 @@ export function GreyDetails({
     <div>
       <PopoverHeader title={t("ui.grey.title")} subtitle={spent ? t("ui.grey.spent") : t("ui.grey.once")} />
       <PopoverBody>
-        <p className="mb-2 text-[13px] text-ink-muted">{t("ui.grey.intro")}</p>
-        <p className="mb-3 text-[13px] text-ink-muted">
-          <ResourceText>{t("ui.grey.defence")}</ResourceText>
-        </p>
         {first && <ModifierLine table={first} cap={cap} />}
 
         <div className="grid gap-3">
@@ -296,6 +291,22 @@ function OperationBlock({
         <p className="mt-1 text-[11px] text-ink-dim">{t("ui.grey.capNote", { third: t(`ui.grey.third.${table.third as 0 | 1 | 2}`) })}</p>
       )}
 
+      {/* Запуск — сразу под таблицей эффектов, до списка соперников: иначе у массовой операции
+        * кнопка уходила под список и окно приходилось прокручивать. У адресной кнопки — в строках целей. */}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {!available && <span className="text-[12px] text-ink-dim">{reason}</span>}
+        {!table.targeted &&
+          options.map((action, position) => (
+            <button
+              key={`${operationId}-${position}`}
+              type="button"
+              onClick={() => onAction(action)}
+              className="primary-button rounded-[7px] px-4 py-2 text-[14px] font-semibold"
+            >
+              {t("ui.grey.run")}
+            </button>
+          ))}
+      </div>
       {/* Цели — таблицей с деньгами, влиянием, скандалами, Защитой и очками, как у Рэкета:
         * без неё состояние соперников приходилось держать в голове или закрывать окно. Эффект по
         * граням — в таблице выше; что выпадет, решает кубик. */}
@@ -306,20 +317,6 @@ function OperationBlock({
         options={options}
         onAction={onAction}
       />
-      <div className="mt-2 flex flex-wrap gap-2">
-        {!available && <span className="text-[12px] text-ink-dim">{reason}</span>}
-        {!table.targeted &&
-          options.map((action, position) => (
-            <button
-              key={`${operationId}-${position}`}
-              type="button"
-              onClick={() => onAction(action)}
-              className="rounded-[7px] border border-primary px-3 py-1.5 text-[13px] text-ink hover:bg-panel-3"
-            >
-              {t("ui.grey.run")}
-            </button>
-          ))}
-      </div>
     </section>
   );
 }

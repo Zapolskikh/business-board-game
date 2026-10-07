@@ -544,8 +544,6 @@
       "title": "🌒 Šedé operace",
       "spent": "už proběhla",
       "once": "jedna za tah",
-      "intro": "Operaci odemyká jakýkoli váš podnik příslušné čtvrti — role není potřeba. Jedna operace za tah: hoďte kostkou a podívejte se do tabulky. Stěny 1–2 jsou neúspěch, 3–4 slabý účinek, 5–6 plný. Skandály pro vás závisí také na stěně; Ochrana vaše vlastní skandály neruší. Operace nedávají body: vše, co přinesou, je v účinku.",
-      "defence": "Ochrana cíle zablokuje jakoukoli šedou operaci celou a nespotřebuje se. Ochranu sundá jen «Prolomit Ochranu» — před útokem se ujistěte, že je cíl otevřený.",
       "spentHint": "v tomto tahu už operace proběhla",
       "needHint": "potřebuje podnik ve čtvrti: {{districts}}",
       "noRoofs": "žádný soupeř nemá Ochranu",

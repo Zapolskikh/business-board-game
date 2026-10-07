@@ -24,27 +24,28 @@ function BrandMark({ id }: { id: "boosty" | "patreon" }) {
   );
 }
 
-/** Иконки Boosty и Patreon. Пока у площадки нет адреса, её не видно вовсе: неработающая ссылка
- * в меню — обещание, которого нет (страницы на Boosty и Patreon ещё не созданы). */
-export function SupportLinks({ labels = false }: { labels?: boolean }) {
+/** Есть ли хоть одна площадка с адресом — иначе звать поддержать некуда. */
+export const canSupport = supportLinks.some(link => link.url);
+
+/* Кнопки Boosty и Patreon: знак площадки и название. Площадка без адреса — неактивная кнопка с
+ * пометкой «скоро»: видно, что поддержка будет, но нажать пока нечего. Адреса — в support.ts. */
+export function SupportLinks() {
   const { t } = useTranslation();
-  const live = supportLinks.filter(link => link.url);
-  if (!live.length) return null;
   return (
     <span className="support-links">
-      {live.map(link => (
-        <a
-          key={link.id}
-          className="support-link"
-          href={link.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          title={t("support.donate", { site: link.title })}
-        >
-          <BrandMark id={link.id} />
-          {labels && <span>{link.title}</span>}
-        </a>
-      ))}
+      {supportLinks.map(link =>
+        link.url ? (
+          <a key={link.id} className="support-link" href={link.url} target="_blank" rel="noopener noreferrer" title={t("support.donate", { site: link.title })}>
+            <BrandMark id={link.id} />
+            <span>{link.title}</span>
+          </a>
+        ) : (
+          <span key={link.id} className="support-link is-soon" role="link" aria-disabled="true" title={t("support.soonTitle", { site: link.title })}>
+            <BrandMark id={link.id} />
+            <span>{link.title} <small>{t("support.soon")}</small></span>
+          </span>
+        ),
+      )}
     </span>
   );
 }

@@ -5,10 +5,9 @@ import { LanguagePicker } from "../i18n/LanguagePicker";
 import { ApiError, cityApi } from "./api";
 import { newSecret, saveOwnerToken } from "./roomSecrets";
 import type { CityMeta, RoomSummary } from "./types";
-import { AboutDialog } from "./AboutDialog";
+import { AboutDialog, SupportDialog } from "./AboutDialog";
 import { StudioLogo } from "./StudioMark";
 import { ResourceText } from "../ui/primitives/ResourceIcon";
-import { isPhoneScreen } from "../ui/lib/layout";
 import { CodeEntry } from "./home/CodeEntry";
 import { CreateRoomForm, EMPTY_DRAFT, nameKey, type CreateDraft } from "./home/CreateRoomForm";
 import { EnterDialog } from "./home/EnterDialog";
@@ -57,6 +56,7 @@ export function RoomBrowser({ meta, onOpen, onFeedback, onTutorial }: Props) {
   const wide = useMedia(WIDE_QUERY);
   const narrowLanguage = useMedia("(max-width: 420px)");
   const [about, setAbout] = useState(false);
+  const [support, setSupport] = useState(false);
   const [rules, setRules] = useState(false);
   const [menu, setMenu] = useState(false);
 
@@ -193,8 +193,8 @@ export function RoomBrowser({ meta, onOpen, onFeedback, onTutorial }: Props) {
       <span aria-hidden="true">→</span>
     </button>
   );
-  // Обучение показывает места широкого стола; на телефоне у стола своя раскладка, и обучения для неё пока нет.
-  const tutorialCard = !isPhoneScreen() && (
+  // Обучение — и на ПК, и на телефоне: у мобильного стола свои подсказки (online/Tutorial.tsx, `mobile`).
+  const tutorialCard = (
     <div className="hm-tutorial">
       <span><b>{t("home:tutorialCard.title")}</b><small>{t("home:tutorialCard.text")}</small></span>
       <button type="button" className="hm-link" onClick={onTutorial}>{t("home:tutorialCard.cta")}</button>
@@ -230,6 +230,7 @@ export function RoomBrowser({ meta, onOpen, onFeedback, onTutorial }: Props) {
         </Suspense>
       )}
       {about && <AboutDialog onClose={() => setAbout(false)} onFeedback={() => { setAbout(false); onFeedback(); }} />}
+      {support && <SupportDialog onClose={() => setSupport(false)} />}
       {entering && (
         <EnterDialog room={entering.room} playerName={playerName} returning={entering.returning} onSubmit={confirmEnter} onClose={() => setEntering(null)} />
       )}
@@ -284,6 +285,7 @@ export function RoomBrowser({ meta, onOpen, onFeedback, onTutorial }: Props) {
               <button type="button" onClick={() => setRules(true)}>{t("nav.rules")}</button>
               <button type="button" onClick={() => setAbout(true)}>{t("nav.about")}</button>
               <button type="button" onClick={onFeedback}>{t("nav.feedback")}</button>
+              <button type="button" onClick={() => setSupport(true)}>{t("nav.support")}</button>
             </footer>
           </>
         )}
@@ -313,6 +315,7 @@ export function RoomBrowser({ meta, onOpen, onFeedback, onTutorial }: Props) {
             <button type="button" onClick={() => { setMenu(false); setRules(true); }}>{t("nav.rules")}</button>
             <button type="button" onClick={() => { setMenu(false); setAbout(true); }}>{t("nav.about")}</button>
             <button type="button" onClick={() => { setMenu(false); onFeedback(); }}>{t("nav.feedback")}</button>
+            <button type="button" onClick={() => { setMenu(false); setSupport(true); }}>{t("nav.support")}</button>
             <div className="hm-menu-language"><span>{t("home:nav.language")}</span><LanguagePicker /></div>
           </MenuSheet>
         )}
@@ -338,6 +341,7 @@ export function RoomBrowser({ meta, onOpen, onFeedback, onTutorial }: Props) {
             <button type="button" className="rooms-button subtle" onClick={() => setRules(true)}>{t("nav.rules")}</button>
             <button type="button" className="rooms-button subtle" onClick={() => setAbout(true)}>{t("nav.about")}</button>
             <button type="button" className="rooms-button subtle" onClick={onFeedback}>{t("nav.feedback")}</button>
+            <button type="button" className="rooms-button subtle" onClick={() => setSupport(true)}>{t("nav.support")}</button>
             <LanguagePicker className="rooms-language" compact={narrowLanguage} />
           </nav>
         </div>
@@ -357,12 +361,6 @@ export function RoomBrowser({ meta, onOpen, onFeedback, onTutorial }: Props) {
               <button type="button" className="rooms-button hero-cta ghost" onClick={() => setRules(true)}>{t("hero.ctaRules")}</button>
             </div>
             {tutorialCard}
-            <ul className="hero-facts">
-              <li><b>2–4</b><span>{t("hero.factPlayers")}</span></li>
-              <li><b>5–30</b><span>{t("hero.factRounds")}</span></li>
-              <li><b>{meta.districts.length}</b><span>{t("hero.factDistricts")}</span></li>
-              <li><b>{meta.roles.length}</b><span>{t("hero.factRoles")}</span></li>
-            </ul>
           </div>
         </section>
 

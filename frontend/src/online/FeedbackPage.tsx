@@ -2,9 +2,8 @@ import { useTranslation } from "react-i18next";
 import { LanguagePicker } from "../i18n/LanguagePicker";
 import { useState } from "react";
 import { ApiError, cityApi } from "./api";
-import { SupportLinks } from "./SupportLinks";
+import { SupportLinks, canSupport } from "./SupportLinks";
 import { StudioFooter } from "./StudioMark";
-import { supportLinks } from "./support";
 
 type Kind = "bug" | "idea" | "other";
 
@@ -69,10 +68,10 @@ export function FeedbackPage({ onBack }: { onBack: () => void }) {
           <h1>{t("feedback.title")}</h1>
           <p>{t("feedback.lead")}</p>
           {/* Про поддержку — только когда есть куда: без адресов Boosty и Patreon это обещание без кнопки. */}
-          {supportLinks.some(link => link.url) && (
+          {canSupport && (
             <>
               <p className="feedback-support">{t("feedback.support")}</p>
-              <SupportLinks labels />
+              <SupportLinks />
             </>
           )}
         </div>
