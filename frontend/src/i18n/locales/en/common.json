@@ -30,7 +30,7 @@
     "nameTaken": "A room with this name already exists — pick another one.",
     "playerNameTaken": "Someone at this table already has this name — pick another one.",
     "seatTaken": "This seat is taken by another player.",
-    "hostOnly": "Only the lobby creator can do this.",
+    "hostOnly": "Only the room host can do this.",
     "seatKey": "This seat was taken in another browser — you cannot write as it.",
     "seatChanged": "The seat has already changed — the list is updated."
   },

@@ -4,14 +4,11 @@ import { useState } from "react";
 import { ApiError, cityApi } from "./api";
 import { SupportLinks } from "./SupportLinks";
 import { StudioFooter } from "./StudioMark";
+import { supportLinks } from "./support";
 
 type Kind = "bug" | "idea" | "other";
 
-const kinds: { id: Kind; icon: string }[] = [
-  { id: "bug", icon: "🐞" },
-  { id: "idea", icon: "💡" },
-  { id: "other", icon: "💬" },
-];
+const kinds: Kind[] = ["bug", "idea", "other"];
 
 /* Отдельная страница, а не окно: сообщение о баге пишут долго, и случайный клик мимо окна
  * не должен стирать написанное. */
@@ -71,14 +68,18 @@ export function FeedbackPage({ onBack }: { onBack: () => void }) {
           <span className="eyebrow">{t("feedback.eyebrow")}</span>
           <h1>{t("feedback.title")}</h1>
           <p>{t("feedback.lead")}</p>
-          <p className="feedback-support">{t("feedback.support")}</p>
-          <SupportLinks labels />
+          {/* Про поддержку — только когда есть куда: без адресов Boosty и Patreon это обещание без кнопки. */}
+          {supportLinks.some(link => link.url) && (
+            <>
+              <p className="feedback-support">{t("feedback.support")}</p>
+              <SupportLinks labels />
+            </>
+          )}
         </div>
 
         <section className="rooms-panel feedback-card">
           {state === "sent" ? (
             <div className="feedback-done" role="status">
-              <span className="feedback-done-icon">🙌</span>
               <h2>{t("feedback.doneTitle")}</h2>
               <p>{t("feedback.doneText")}</p>
               <div className="dialog-actions">
@@ -106,20 +107,11 @@ export function FeedbackPage({ onBack }: { onBack: () => void }) {
             >
               <fieldset className="feedback-kinds">
                 <legend>{t("feedback.kindLegend")}</legend>
-                {kinds.map(item => (
-                  <label key={item.id} className={item.id === kind ? "is-active" : ""}>
-                    <input
-                      type="radio"
-                      name="kind"
-                      value={item.id}
-                      checked={item.id === kind}
-                      onChange={() => setKind(item.id)}
-                    />
-                    <span className="feedback-kind-icon" aria-hidden="true">
-                      {item.icon}
-                    </span>
-                    <b>{t(`feedback.kinds.${item.id}.title`)}</b>
-                    <small>{t(`feedback.kinds.${item.id}.hint`)}</small>
+                {kinds.map(id => (
+                  <label key={id} className={id === kind ? "is-active" : ""}>
+                    <input type="radio" name="kind" value={id} checked={id === kind} onChange={() => setKind(id)} />
+                    <b>{t(`feedback.kinds.${id}.title`)}</b>
+                    <small>{t(`feedback.kinds.${id}.hint`)}</small>
                   </label>
                 ))}
               </fieldset>
@@ -140,6 +132,7 @@ export function FeedbackPage({ onBack }: { onBack: () => void }) {
                 <input
                   value={contact}
                   maxLength={200}
+                  autoComplete="email"
                   placeholder={t("feedback.contactPlaceholder")}
                   onChange={event => setContact(event.target.value)}
                 />

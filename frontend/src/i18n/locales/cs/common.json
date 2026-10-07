@@ -30,7 +30,7 @@
     "nameTaken": "Místnost s tímto názvem už existuje — vymyslete jiný.",
     "playerNameTaken": "U tohoto stolu už někdo má toto jméno — zvolte jiné.",
     "seatTaken": "Toto místo už obsadil jiný hráč.",
-    "hostOnly": "To může udělat jen zakladatel lobby.",
+    "hostOnly": "To může udělat jen pořadatel místnosti.",
     "seatKey": "Toto místo je obsazené v jiném prohlížeči — nelze za něj psát.",
     "seatChanged": "Místo se mezitím změnilo — seznam je aktualizovaný."
   },

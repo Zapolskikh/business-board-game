@@ -172,52 +172,53 @@
     "move": "Move here"
   },
   "about": {
-    "eyebrow": "About",
-    "title": "A board game I am making myself",
-    "p1": "Hi! City of Influence is my own board game. I make it in my free time, just because I love it. My dream is to see it one day as a real box on the table.",
+    "title": "About the project",
+    "p1": "Hi! City of Influence is my own board game. I make it in my free time, and my dream is to see it one day as a real box on the table.",
     "p2Strong": "The game is completely free",
     "p2": " and it will stay free: no ads and no paid advantages. Everyone plays on equal terms.",
     "p3Start": "If you like the game and want to help, you can support the project with any amount. All the money will go to ",
     "p3Strong": "printing the first batch of the board game",
     "p3End": ": the cards, the board and the box.",
-    "p4": "Your opinion means a lot to me. Found a bug, something is unclear, or you have an idea? Please write to me on the feedback page — I read every message.",
+    "p4": "Found a bug, something is unclear, or you have an idea? Write to me on the feedback page — I read every message.",
     "thanks": "Thank you for playing!",
-    "write": "✉ Send feedback",
-    "close": "Close"
+    "write": "Send feedback",
+    "close": "Close",
+    "lead": "A board game I am making myself",
+    "version": "Version {{version}}"
   },
   "feedback": {
     "eyebrow": "Feedback",
-    "title": "Tell me what you think",
+    "title": "Share what you think of the game",
     "lead": "Here you can report a bug, share an idea or just tell me how you like the game. I read every message. Leave a contact and I will try to reply.",
     "support": "Like the project? You can support it — the money goes to printing the board game.",
     "kindLegend": "What is it about",
     "kinds": {
       "bug": {
-        "title": "I found a bug",
+        "title": "Report a bug",
         "hint": "Something is broken or works wrong",
-        "placeholder": "What happened, and what did you do just before? If you remember the round, the role or the card — even better."
+        "placeholder": "What happened, and what did you do just before? If you remember, name the round, the role or the card."
       },
       "idea": {
-        "title": "I have an idea",
+        "title": "Suggest an idea",
         "hint": "Something to add or change",
         "placeholder": "What would you add to the game or do differently?"
       },
       "other": {
-        "title": "Just saying hi",
+        "title": "Other",
         "hint": "Thoughts, questions, anything",
         "placeholder": "Write it just as it is — I really want to know."
       }
     },
     "message": "Message",
-    "contact": "How can I reach you — if you want a reply",
-    "contactPlaceholder": "Email or @telegram, optional",
+    "contact": "Contact for a reply",
+    "contactPlaceholder": "Email or Telegram @username — optional",
     "trap": "Website",
-    "send": "Send",
+    "send": "Send message",
     "sending": "Sending…",
     "note": "We also send the game version and your browser type — it helps to find bugs.",
     "errorTooMany": "Too many messages in a row. Please wait a minute and try again.",
     "errorFailed": "Could not send. Check your internet and try again — your text is still here.",
-    "doneTitle": "Thank you! Your message arrived",
+    "doneTitle": "Thank you! Your message was sent.",
     "doneText": "It really helps to make the game better.",
     "writeMore": "Write another",
     "toHome": "Home"
