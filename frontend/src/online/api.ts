@@ -36,12 +36,17 @@ export const cityApi = {
     request<RoomView>("/api/city/rooms", json(body)),
   join: (id: string, body: { password: string; seat_index: number; player_name: string; release_seat_index?: number | null; seat_token?: string }) =>
     request<RoomView>(`/api/city/rooms/${id}/join`, json(body)),
-  seat: (id: string, body: { password: string; seat_index: number; kind: "bot" | "empty"; difficulty?: Difficulty; preferred_role?: string | null; owner_token?: string }) =>
+  // `expected_kind` — what the client believes sits there: «undo» clears a seat only while its bot is still on it.
+  seat: (id: string, body: { password: string; seat_index: number; kind: "bot" | "empty"; difficulty?: Difficulty; preferred_role?: string | null; owner_token?: string; expected_kind?: "bot" | "human" | "empty" }) =>
     request<RoomView>(`/api/city/rooms/${id}/seats`, json(body)),
+  // Уйти из комнаты до начала игры: место освобождается по своему ключу места.
+  leave: (id: string, body: { password: string; seat_index: number; seat_token: string }) =>
+    request<RoomView>(`/api/city/rooms/${id}/leave`, json(body)),
   start: (id: string, password: string, ownerToken?: string) =>
     request<RoomView>(`/api/city/rooms/${id}/start`, json({ password, owner_token: ownerToken })),
+  // Without a viewer — the lobby of someone not yet seated: seats and chat, no private game view.
   state: (id: string, password: string, viewerId: string, afterRevision?: number, adminToken?: string) => {
-    const params = new URLSearchParams({ viewer_id: viewerId });
+    const params = new URLSearchParams(viewerId ? { viewer_id: viewerId } : {});
     if (afterRevision !== undefined) params.set("after_revision", String(afterRevision));
     const headers: Record<string, string> = { "X-Room-Password": password };
     if (adminToken) headers["X-Admin-Token"] = adminToken;
@@ -59,8 +64,10 @@ export const cityApi = {
     request<unknown>(`/api/city/rooms/${id}/journal?${new URLSearchParams({ viewer_id: viewerId })}`, {
       headers: { "X-Room-Password": password },
     }),
-  chat: (id: string, password: string, playerId: string, text: string) =>
-    request<RoomView>(`/api/city/rooms/${id}/chat`, json({ password, player_id: playerId, text })),
+  // The seat key proves who speaks (the password is shared by the table); the client id makes a retry
+  // after a lost response one line, not two.
+  chat: (id: string, password: string, playerId: string, text: string, seatToken = "", clientId = "") =>
+    request<RoomView>(`/api/city/rooms/${id}/chat`, json({ password, player_id: playerId, text, seat_token: seatToken, client_id: clientId })),
   command: (id: string, password: string, actorId: string, gameRevision: number, action: LegalAction) =>
     request<RoomView>(`/api/city/rooms/${id}/commands`, json({
       password,

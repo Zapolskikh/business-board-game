@@ -7,6 +7,7 @@ import hmac
 import re
 import secrets
 from copy import deepcopy
+from datetime import UTC, datetime
 from random import Random
 
 from city_bots import choose_bot_command
@@ -16,8 +17,14 @@ from city_engine.engine import CityEngine
 from city_engine.errors import CityEngineError, StaleRevisionError
 from city_engine.factory import GameSettings, PlayerSetup, create_game_from_catalog
 from city_rooms.banter import bot_remark
-from city_rooms.errors import RoomAccessError, RoomConflictError, RoomNameTakenError, RoomValidationError
-from city_rooms.models import CHAT_MESSAGE_LENGTH, ClientInfo, RoomSeat, RoomState
+from city_rooms.errors import (
+    RoomAccessError,
+    RoomConflictError,
+    RoomNameTakenError,
+    RoomRateLimitError,
+    RoomValidationError,
+)
+from city_rooms.models import CHAT_BURST, CHAT_MESSAGE_LENGTH, CHAT_WINDOW, ClientInfo, RoomSeat, RoomState
 from city_rooms.repository import RoomRepository
 from city_rooms.security import hash_password, verify_password
 from city_rooms.tutorial import PLAYER_ID as TUTORIAL_PLAYER_ID
@@ -219,7 +226,15 @@ class CityRoomService:
         self.repository.save(room, expected)
         return room
 
-    def clear_seat(self, room_id: str, *, password: str, seat_index: int, owner_token: str = "") -> RoomState:
+    def clear_seat(
+        self,
+        room_id: str,
+        *,
+        password: str,
+        seat_index: int,
+        owner_token: str = "",
+        expected_kind: str | None = None,
+    ) -> RoomState:
         room = self.repository.get(room_id)
         expected = room.revision
         self._authorize(room, password)
@@ -227,6 +242,29 @@ class CityRoomService:
         seat = self._seat(room, seat_index)
         # Clearing a seat — a bot or another player — is the host's call alone.
         self._authorize_owner(room, owner_token)
+        if expected_kind is not None and seat.kind != expected_kind:
+            raise RoomConflictError("the seat changed; reload the room")
+        room.seat_token_hashes.pop(seat.player_id or "", None)
+        room.seats[seat_index] = RoomSeat(index=seat_index)
+        room.touch()
+        self.repository.save(room, expected)
+        return room
+
+    def leave(self, room_id: str, *, password: str, seat_index: int, seat_token: str) -> RoomState:
+        """A player leaves a room that has not started: their own seat, proven by its key, frees up.
+
+        Without it a guest who looked into a lobby and went back to the list kept the seat until the
+        host cleared it by hand. After the start a seat is a hand in play and stays taken.
+        """
+        room = self.repository.get(room_id)
+        expected = room.revision
+        self._authorize(room, password)
+        self._waiting(room)
+        seat = self._seat(room, seat_index)
+        if seat.kind != "human":
+            raise RoomConflictError("the seat changed; reload the room")
+        if not _token_matches(seat_token, room.seat_token_hashes.get(seat.player_id or "", "")):
+            raise RoomAccessError("only the seat's own key can leave it")
         room.seat_token_hashes.pop(seat.player_id or "", None)
         room.seats[seat_index] = RoomSeat(index=seat_index)
         room.touch()
@@ -299,12 +337,23 @@ class CityRoomService:
         return room
 
     def post_chat(
-        self, room_id: str, *, password: str, player_id: str, text: str, client: ClientInfo | None = None
+        self,
+        room_id: str,
+        *,
+        password: str,
+        player_id: str,
+        text: str,
+        seat_token: str = "",
+        client_id: str = "",
+        client: ClientInfo | None = None,
     ) -> RoomState:
         """Say something at the table. Any seated human may, in the lobby and after the final too.
 
-        A message races the game itself — bots move, another player presses a button — and losing
-        that race must not lose the line: the room is re-read and the message appended again.
+        The author is the seat proven by its key, not the id in the request: everyone at the table
+        knows the room password. A line with a ``client_id`` the room already holds is a retry and is
+        not said again. A message races the game itself — bots move, another player presses a
+        button — and losing that race must not lose the line: the room is re-read and the message
+        appended again.
         """
         body = " ".join(text.split())[:CHAT_MESSAGE_LENGTH]
         if not body:
@@ -316,7 +365,23 @@ class CityRoomService:
             seat = next((seat for seat in room.seats if seat.player_id == player_id), None)
             if seat is None or seat.kind != "human":
                 raise RoomAccessError("chat requires an occupied human seat")
-            room.add_chat(player_id, str(seat.name), body)
+            key = room.seat_token_hashes.get(player_id, "")
+            if key and not _token_matches(seat_token, key):
+                raise RoomAccessError("chat requires this seat's key")
+            if client_id and any(
+                line.get("cid") == client_id and line.get("player_id") == player_id for line in room.chat
+            ):
+                return room
+            now = datetime.now(UTC)
+            recent = [
+                line
+                for line in room.chat
+                if line.get("player_id") == player_id
+                and (now - datetime.fromisoformat(str(line["at"]))).total_seconds() < CHAT_WINDOW
+            ]
+            if len(recent) >= CHAT_BURST:
+                raise RoomRateLimitError("too many chat messages; wait a few seconds")
+            room.add_chat(player_id, str(seat.name), body, client_id)
             room.record_client(player_id, client)
             room.touch()
             try:

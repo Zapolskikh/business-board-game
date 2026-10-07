@@ -23,3 +23,7 @@ class RoomAccessError(RoomError):
 
 class RoomValidationError(RoomError):
     """The requested room transition is not legal."""
+
+
+class RoomRateLimitError(RoomError):
+    """Too many requests of one kind from one seat in a short time — a chat flood."""

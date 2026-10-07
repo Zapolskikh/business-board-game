@@ -24,40 +24,27 @@ function BrandMark({ id }: { id: "boosty" | "patreon" }) {
   );
 }
 
-/** Иконки Boosty и Patreon. Пока адреса нет, иконка видна, но неактивна и подписана «скоро». */
+/** Иконки Boosty и Patreon. Пока у площадки нет адреса, её не видно вовсе: неработающая ссылка
+ * в меню — обещание, которого нет (страницы на Boosty и Patreon ещё не созданы). */
 export function SupportLinks({ labels = false }: { labels?: boolean }) {
   const { t } = useTranslation();
+  const live = supportLinks.filter(link => link.url);
+  if (!live.length) return null;
   return (
     <span className="support-links">
-      {supportLinks.map(link =>
-        link.url ? (
-          <a
-            key={link.id}
-            className="support-link"
-            href={link.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={t("support.donate", { site: link.title })}
-          >
-            <BrandMark id={link.id} />
-            {labels && <span>{link.title}</span>}
-          </a>
-        ) : (
-          <span
-            key={link.id}
-            className="support-link is-soon"
-            title={t("support.soonTitle", { site: link.title })}
-            aria-label={t("support.soonTitle", { site: link.title })}
-          >
-            <BrandMark id={link.id} />
-            {labels && (
-              <span>
-                {link.title} <small>{t("support.soon")}</small>
-              </span>
-            )}
-          </span>
-        ),
-      )}
+      {live.map(link => (
+        <a
+          key={link.id}
+          className="support-link"
+          href={link.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={t("support.donate", { site: link.title })}
+        >
+          <BrandMark id={link.id} />
+          {labels && <span>{link.title}</span>}
+        </a>
+      ))}
     </span>
   );
 }

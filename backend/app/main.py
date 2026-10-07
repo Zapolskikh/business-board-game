@@ -15,6 +15,7 @@ from city_rooms.errors import (
     RoomAccessError,
     RoomConflictError,
     RoomNotFoundError,
+    RoomRateLimitError,
     RoomValidationError,
 )
 
@@ -51,6 +52,11 @@ async def room_access_denied(_request: object, exc: RoomAccessError) -> JSONResp
 @app.exception_handler(RoomConflictError)
 async def room_conflict(_request: object, exc: RoomConflictError) -> JSONResponse:
     return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+
+@app.exception_handler(RoomRateLimitError)
+async def room_rate_limited(_request: object, exc: RoomRateLimitError) -> JSONResponse:
+    return JSONResponse(status_code=429, content={"detail": str(exc)})
 
 
 @app.exception_handler(RoomValidationError)

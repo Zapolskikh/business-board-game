@@ -19,13 +19,19 @@ interface Session { password: string; playerId: string }
 const onFeedbackPage = () =>
   location.pathname.startsWith("/feedback") || new URLSearchParams(location.search).get("page") === "feedback";
 
+/* Ссылка-приглашение `/?room=<id>` открывает лобби этой комнаты. Читается один раз при загрузке —
+ * не в инициализаторе состояния: StrictMode вызывает его дважды, и второй вызов уже не нашёл бы
+ * параметр. Из адреса он убирается, чтобы «назад к комнатам» и перезагрузка вели на главную. */
+const invitedRoom = new URLSearchParams(location.search).get("room");
+
 export default function App() {
   const { t } = useTranslation();
   const [serverMeta, setMeta] = useState<CityMeta | null>(null);
   // Каталог на языке игрока: всё ниже читает названия карт и ролей отсюда.
   const meta = useLocalizedMeta(serverMeta);
   const [fatal, setFatal] = useState("");
-  const [roomId, setRoomId] = useState<string | null>(null);
+  const [roomId, setRoomId] = useState<string | null>(invitedRoom);
+  useEffect(() => { if (invitedRoom) history.replaceState(null, "", "/"); }, []);
   const [initialPassword, setInitialPassword] = useState("");
   // Имя, под которым игрок сразу садится за стол: после создания комнаты или «случайной игры».
   const [autoJoinName, setAutoJoinName] = useState<string | null>(null);

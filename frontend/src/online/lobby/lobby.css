@@ -1,0 +1,255 @@
+/* Лобби: игроки, чат, запуск.
+ *
+ * Спокойные непрозрачные панели поверх вечернего города: картинка видна по краям на широком экране
+ * и сверху на телефоне, но не под текстом, списками и чатом. Золото — заголовки и выбранная вкладка,
+ * зелёный — одно главное действие экрана («Начать игру» или «Занять место»). Шрифт форм, кнопок и
+ * чата — без засечек; засечки — только название комнаты и заголовки панелей.
+ *
+ * Две раскладки по ширине (Lobby.tsx, WIDE_QUERY): от 900px — две колонки, уже — вкладки
+ * «Игроки / Чат» и зона запуска внизу экрана. Узкое лобби стоит `position: fixed` по видимой части
+ * экрана (top/height приходят из useVisibleArea): поле чата остаётся над клавиатурой.
+ */
+.lb {
+  --lb-bg: #101419;
+  --lb-panel: #181e24;
+  --lb-panel-2: #1f262d;
+  --lb-line: #343c42;
+  --lb-line-2: #4a535a;
+  --lb-text: #f1ebdf;
+  --lb-muted: #b0b7bc;
+  --lb-dim: #8d959b;
+  --lb-gold: #d9bd7b;
+  --lb-primary: #a1cbb5;
+  --lb-primary-ink: #13201a;
+  --lb-danger: #e79a8f;
+  position: relative;
+  isolation: isolate;
+  box-sizing: border-box;
+  color: var(--lb-text);
+  background: var(--lb-bg);
+  font-family: Inter, "Segoe UI", Roboto, system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+  line-height: 1.4;
+}
+.lb *, .lb *::before, .lb *::after { box-sizing: border-box; }
+:where(.lb) :is(h1, h2, h3, p) { margin: 0; }
+/* Без веса селектора: классы кнопок ниже должны перекрывать эту основу, а не наоборот. */
+:where(.lb) button { font: inherit; color: inherit; cursor: pointer; }
+:where(.lb) button:disabled { cursor: default; }
+.lb :focus-visible { outline: 2px solid var(--lb-gold); outline-offset: 2px; }
+.lb-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Фон: город по краям широкого экрана, на телефоне — полоса сверху, уходящая в тёмное. */
+.lb-art { position: fixed; z-index: -1; inset: 0; pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(16,20,25,.55), var(--lb-bg) 22%, var(--lb-bg) 78%, rgba(16,20,25,.55)),
+    url("../../ui/assets/home/lobby.jpg") center / cover no-repeat;
+}
+.lb.is-narrow .lb-art { position: absolute; inset: 0 0 auto; height: 190px;
+  background: linear-gradient(180deg, rgba(16,20,25,.35), var(--lb-bg)), url("../../ui/assets/home/lobby.jpg") center 30% / cover no-repeat; }
+
+/* ── Кнопки ── */
+.lb-primary { display: inline-flex; min-height: 48px; padding: 10px 22px; align-items: center; justify-content: center; gap: 10px;
+  color: var(--lb-primary-ink); background: var(--lb-primary); border: 0; border-radius: 10px; font-weight: 700; font-size: 16px; }
+.lb-primary:hover:not(:disabled) { background: #b4d8c4; }
+.lb-primary:disabled { color: var(--lb-dim); background: var(--lb-panel-2); }
+.lb-secondary { display: inline-flex; min-height: 44px; padding: 8px 16px; align-items: center; gap: 8px;
+  color: var(--lb-text); background: transparent; border: 1px solid var(--lb-line-2); border-radius: 10px; font-weight: 600; }
+.lb-secondary:hover { border-color: var(--lb-gold); }
+.lb-back { min-height: 44px; padding: 8px 4px; color: var(--lb-gold); background: none; border: 0; font-weight: 600; }
+.lb-link { padding: 0; color: var(--lb-gold); background: none; border: 0; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.lb-icon-button { display: inline-grid; width: 44px; height: 44px; flex: none; place-items: center; padding: 0;
+  color: var(--lb-muted); background: transparent; border: 1px solid var(--lb-line); border-radius: 10px; }
+.lb-icon-button:hover:not(:disabled) { color: var(--lb-text); border-color: var(--lb-line-2); }
+.lb-chip { min-height: 40px; padding: 6px 14px; color: var(--lb-text); background: var(--lb-panel-2); border: 1px solid var(--lb-line-2);
+  border-radius: 10px; font-weight: 600; font-size: 14px; white-space: nowrap; }
+.lb-chip:hover:not(:disabled) { border-color: var(--lb-gold); }
+.lb-chip.is-accent { color: var(--lb-primary-ink); background: var(--lb-primary); border-color: var(--lb-primary); }
+.lb-chip.is-danger { color: #2a1210; background: var(--lb-danger); border-color: var(--lb-danger); }
+.lb-chip:disabled, .lb-icon-button:disabled { opacity: .55; }
+
+/* ── Шапка ── */
+.lb-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 8px 20px; }
+.lb-title { display: grid; min-width: 0; gap: 4px; }
+.lb-title h1 { overflow: hidden; color: var(--lb-text); font-family: Georgia, "Times New Roman", serif; font-size: 28px; font-weight: 400;
+  text-overflow: ellipsis; white-space: nowrap; }
+.lb-status { justify-self: start; padding: 3px 10px; color: var(--lb-primary); background: rgba(161,203,181,.12); border-radius: 999px; font-size: 12.5px; font-weight: 600; }
+.lb-status.status-playing { color: var(--lb-gold); background: rgba(217,189,123,.12); }
+.lb-status.status-finished { color: var(--lb-muted); background: var(--lb-panel-2); }
+.lb-lead { color: var(--lb-muted); font-size: 14px; }
+.lb-invite { display: grid; justify-items: end; gap: 4px; }
+.lb-code { max-width: 260px; color: var(--lb-dim); font-size: 12.5px; text-align: right; overflow-wrap: anywhere; }
+
+.lb-alert { padding: 10px 14px; color: #f3d2cc; background: #2a1a1a; border: 1px solid #5b3530; border-radius: 10px; font-size: 14px; }
+
+/* ── Игроки ── */
+.lb-players, .lb-chat-column { display: flex; min-width: 0; flex-direction: column; gap: 12px; padding: 18px; background: var(--lb-panel); border: 1px solid var(--lb-line); border-radius: 14px; }
+.lb-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.lb-section-head h2, .lb-chat-title { color: var(--lb-gold); font-family: Georgia, "Times New Roman", serif; font-size: 21px; font-weight: 400; }
+.lb-section-head span { color: var(--lb-muted); font-size: 14px; }
+.lb-seats { display: grid; margin: 0; padding: 0; gap: 8px; list-style: none; }
+.lb-seat { display: grid; min-height: 64px; padding: 10px 12px; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 12px;
+  background: var(--lb-panel-2); border: 1px solid var(--lb-line); border-radius: 12px; }
+.lb-seat.seat-empty { background: transparent; border-style: dashed; }
+.lb-seat.is-mine { border-color: rgba(161,203,181,.55); }
+.lb-avatar { display: grid; width: 40px; height: 40px; place-items: center; color: var(--lb-muted); background: var(--lb-bg); border: 1px solid var(--lb-line); border-radius: 50%; }
+.lb-avatar b { color: var(--lb-text); font-size: 16px; font-weight: 700; }
+.lb-seat.is-mine .lb-avatar { color: var(--lb-primary); border-color: rgba(161,203,181,.55); }
+.lb-seat.seat-bot .lb-avatar { color: var(--lb-gold); }
+.lb-seat-text { display: grid; min-width: 0; gap: 1px; }
+.lb-seat-text strong { overflow: hidden; font-size: 15.5px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.lb-seat-text small { overflow: hidden; color: var(--lb-muted); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.lb-seat-actions { display: flex; align-items: center; gap: 6px; }
+.lb-settings { padding-top: 10px; color: var(--lb-muted); border-top: 1px solid var(--lb-line); font-size: 13.5px; }
+.lb-spinner { width: 18px; height: 18px; border: 2px solid var(--lb-line-2); border-top-color: var(--lb-gold); border-radius: 50%; animation: lb-spin .8s linear infinite; }
+@keyframes lb-spin { to { transform: rotate(360deg); } }
+
+/* Вход за стол. */
+.lb-entry { display: grid; gap: 10px; padding: 14px; background: var(--lb-panel-2); border: 1px solid var(--lb-line-2); border-radius: 12px; }
+.lb-entry h3 { font-size: 15.5px; font-weight: 700; }
+.lb-entry-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.lb-entry-note { color: var(--lb-muted); font-size: 14px; }
+.lb-field { display: grid; gap: 5px; color: var(--lb-muted); font-size: 13px; font-weight: 600; }
+.lb-field input, .lb-chat-form input { width: 100%; min-width: 0; height: 46px; padding: 8px 12px; color: var(--lb-text); background: var(--lb-bg);
+  border: 1px solid var(--lb-line-2); border-radius: 10px; font: inherit; font-size: 16px; font-weight: 400; }
+.lb-field input:focus-visible, .lb-chat-form input:focus-visible { outline: 0; border-color: var(--lb-gold); box-shadow: 0 0 0 3px rgba(217,189,123,.18); }
+.lb-input-action { display: flex; gap: 6px; }
+
+/* ── Чат ── */
+.lb-chat { display: flex; min-height: 0; flex: 1 1 auto; flex-direction: column; gap: 8px; }
+.lb-chat-scroll { position: relative; display: flex; min-height: 0; flex: 1 1 auto; }
+.lb-chat-list { display: flex; min-height: 0; flex: 1 1 auto; flex-direction: column; gap: 8px; margin: 0; padding: 2px 2px 8px; overflow-y: auto; list-style: none; overscroll-behavior: contain; }
+.lb-chat-empty, .lb-chat-locked { margin: auto 0; padding: 12px; color: var(--lb-muted); font-size: 14px; text-align: center; }
+.lb-message { display: grid; max-width: 88%; gap: 2px; padding: 8px 12px; background: var(--lb-panel-2); border-radius: 12px 12px 12px 4px; }
+.lb-message.is-mine { align-self: flex-end; background: #22312a; border-radius: 12px 12px 4px 12px; }
+.lb-message.is-pending { opacity: .7; }
+.lb-message.is-failed { opacity: 1; box-shadow: inset 0 0 0 1px var(--lb-danger); }
+.lb-message-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; color: var(--lb-muted); font-size: 12.5px; }
+.lb-message-meta b { color: var(--lb-gold); font-weight: 600; }
+.lb-message.is-mine .lb-message-meta b { color: var(--lb-primary); }
+.lb-message-text { font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.lb-chat-new { position: absolute; bottom: 12px; left: 50%; padding: 6px 14px; color: var(--lb-primary-ink); background: var(--lb-primary); border: 0; border-radius: 999px;
+  font-size: 13px; font-weight: 700; transform: translateX(-50%); box-shadow: 0 6px 18px rgba(0,0,0,.45); }
+.lb-chat-notice { color: var(--lb-danger); font-size: 13px; }
+.lb-chat-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.lb-chat-form .lb-send { height: 46px; width: 46px; color: var(--lb-primary-ink); background: var(--lb-primary); border-color: var(--lb-primary); }
+.lb-chat-form .lb-send:disabled { color: var(--lb-dim); background: transparent; border-color: var(--lb-line); opacity: 1; }
+.lb-chat-left { grid-column: 1 / -1; color: var(--lb-dim); font-size: 12px; }
+
+/* ── Запуск ── */
+.lb-launch { display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; }
+.lb-launch-note { color: var(--lb-muted); font-size: 14.5px; }
+.lb-launch-note.is-ready { color: var(--lb-primary); }
+
+/* Плашка «Бот добавлен · Отменить». */
+.lb-toast { position: fixed; z-index: 40; bottom: calc(96px + env(safe-area-inset-bottom)); left: 50%; display: flex; width: max-content; max-width: calc(100% - 24px); padding: 10px 16px;
+  align-items: center; gap: 16px; color: var(--lb-text); background: #262e35; border: 1px solid var(--lb-line-2); border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(0,0,0,.5); transform: translateX(-50%); font-size: 14.5px; }
+
+/* ── Выбор бота ── */
+.lb-sheet { width: min(440px, calc(100% - 24px)); max-height: min(640px, 90dvh); padding: 0; color: var(--lb-text); background: var(--lb-panel);
+  border: 1px solid var(--lb-line-2); border-radius: 16px; font-family: Inter, "Segoe UI", Roboto, system-ui, sans-serif; }
+.lb-sheet::backdrop { background: rgba(0,0,0,.6); }
+.lb-sheet-body { display: grid; gap: 10px; padding: 16px 18px 20px; }
+.lb-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.lb-sheet-head h2 { color: var(--lb-gold); font-family: Georgia, "Times New Roman", serif; font-size: 20px; font-weight: 400; }
+.lb-sheet-group { margin: 6px 0 0; color: var(--lb-muted); font-size: 12.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.lb-bot-list { display: grid; margin: 0; padding: 0; gap: 8px; list-style: none; }
+.lb-bot-choice { display: grid; width: 100%; min-height: 56px; padding: 10px 14px; gap: 2px; text-align: left; color: var(--lb-text);
+  background: var(--lb-panel-2); border: 1px solid var(--lb-line); border-radius: 12px; }
+.lb-bot-choice:hover { border-color: var(--lb-gold); }
+.lb-bot-choice[aria-current] { border-color: var(--lb-primary); }
+.lb-bot-choice-title { display: flex; align-items: baseline; gap: 8px; font-weight: 700; font-size: 15.5px; }
+.lb-bot-choice-title small { color: var(--lb-primary); font-size: 12px; font-weight: 600; }
+.lb-bot-choice-about { color: var(--lb-muted); font-size: 13.5px; }
+
+/* ── Широкая раскладка ── */
+.lb.is-wide { display: grid; min-height: 100dvh; padding: 24px clamp(20px, 4vw, 40px) 28px; align-content: start; justify-content: center;
+  grid-template-columns: minmax(0, 1200px); gap: 18px; }
+.lb.is-wide .lb-head { padding-bottom: 6px; }
+.lb-columns { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); align-items: start; gap: 18px; }
+.lb.is-wide .lb-chat-column { height: clamp(420px, calc(100dvh - 300px), 640px); }
+.lb.is-wide .lb-launch { padding: 16px 0 0; border-top: 1px solid var(--lb-line); }
+
+/* ── Вписанное в экран лобби (телефон; низкий экран в две колонки) ──
+ * Стоит `position: fixed` по видимой части экрана: top/height приходят из useVisibleArea, поэтому
+ * поле чата остаётся над клавиатурой. Прокручиваются только списки внутри, страница — нет. */
+.lb.is-fitted { position: fixed; right: 0; left: 0; display: flex; flex-direction: column; overflow: hidden;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
+
+/* ── Узкая раскладка (телефон вертикально, узкое окно) ── */
+/* Шапка в две строки: «← Комнаты» и «Пригласить» — сверху, название со статусом — под ними. */
+.lb.is-narrow .lb-head { padding: 4px 14px 8px; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "back invite" "title title"; align-items: center; gap: 2px 12px; }
+.lb.is-narrow .lb-back { grid-area: back; justify-self: start; min-height: 40px; }
+.lb.is-narrow .lb-invite { grid-area: invite; }
+.lb.is-narrow .lb-title { grid-area: title; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; }
+.lb.is-narrow .lb-title h1 { flex: 0 1 auto; min-width: 0; font-size: 22px; }
+.lb.is-narrow .lb-status { order: 2; }
+.lb.is-narrow .lb-lead { order: 3; flex-basis: 100%; font-size: 13.5px; }
+.lb.is-narrow .lb-code { display: none; }
+.lb.is-narrow .lb-secondary { min-height: 40px; padding: 6px 12px; }
+.lb.is-narrow .lb-alert { margin: 0 14px 8px; }
+.lb-tabs { display: grid; grid-template-columns: 1fr 1fr; padding: 0 14px; border-bottom: 1px solid var(--lb-line); }
+.lb-tab { display: flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px; color: var(--lb-muted); background: none;
+  border: 0; border-bottom: 2px solid transparent; font-weight: 600; font-size: 15px; }
+.lb-tab[aria-selected="true"] { color: var(--lb-gold); border-bottom-color: var(--lb-gold); }
+.lb-badge { display: inline-grid; min-width: 22px; height: 22px; padding: 0 6px; place-items: center; color: var(--lb-primary-ink); background: var(--lb-primary);
+  border-radius: 999px; font-size: 12.5px; font-weight: 800; }
+.lb-panel { min-height: 0; flex: 1 1 auto; overflow-y: auto; padding: 10px 14px; overscroll-behavior: contain; }
+.lb-panel[hidden] { display: none; }
+.lb-panel-chat { display: flex; flex-direction: column; overflow: hidden; padding-bottom: 10px; }
+.lb.is-narrow .lb-players { gap: 8px; padding: 0; background: none; border: 0; }
+.lb.is-narrow .lb-players .lb-section-head { display: none; }
+.lb.is-narrow .lb-seats { gap: 6px; }
+.lb.is-narrow .lb-seat { min-height: 56px; padding: 7px 10px; }
+.lb.is-narrow .lb-entry { gap: 8px; padding: 10px 12px; }
+.lb.is-narrow .lb-settings { padding-top: 8px; }
+.lb.is-narrow .lb-launch { padding: 8px 14px calc(8px + env(safe-area-inset-bottom)); flex-direction: column; align-items: stretch; gap: 4px;
+  background: var(--lb-panel); border-top: 1px solid var(--lb-line); }
+.lb.is-narrow .lb-launch .lb-primary { order: -1; width: 100%; }
+.lb.is-narrow .lb-launch-note { text-align: center; font-size: 13.5px; }
+/* Пока печатают в чате, большая кнопка запуска не делит экран с клавиатурой. */
+.lb.is-fitted .lb-launch.is-collapsed { display: none; }
+/* Невысокий телефон: пояснение под названием уступает место списку игроков. */
+@media (max-height: 760px) {
+  .lb.is-narrow .lb-lead { display: none; }
+}
+
+/* ── Низкий экран в две колонки (телефон в альбоме) ──
+ * Шапка в одну строку без пояснения, колонки занимают остаток экрана, каждая прокручивается сама. */
+.lb.is-wide.is-fitted { min-height: 0; padding: env(safe-area-inset-top) calc(12px + env(safe-area-inset-right)) 0 calc(12px + env(safe-area-inset-left));
+  grid-template-columns: none; gap: 8px; }
+.lb.is-wide.is-fitted .lb-head { padding: 6px 0 0; align-items: center; gap: 12px; }
+.lb.is-wide.is-fitted .lb-title { display: flex; align-items: center; gap: 10px; }
+.lb.is-wide.is-fitted .lb-title h1 { min-width: 0; font-size: 20px; }
+.lb.is-wide.is-fitted .lb-lead, .lb.is-wide.is-fitted .lb-code { display: none; }
+.lb.is-wide.is-fitted .lb-back, .lb.is-wide.is-fitted .lb-secondary { min-height: 40px; }
+.lb.is-wide.is-fitted .lb-columns { min-height: 0; flex: 1 1 auto; align-items: stretch; gap: 10px; }
+.lb.is-wide.is-fitted .lb-players { min-height: 0; overflow-y: auto; padding: 10px 12px; gap: 8px; }
+.lb.is-wide.is-fitted .lb-chat-column { height: auto; min-height: 0; padding: 10px 12px; gap: 6px; }
+.lb.is-wide.is-fitted .lb-section-head h2, .lb.is-wide.is-fitted .lb-chat-title { font-size: 17px; }
+.lb.is-wide.is-fitted .lb-seats { gap: 6px; }
+.lb.is-wide.is-fitted .lb-seat { min-height: 50px; padding: 5px 10px; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 10px; }
+.lb.is-wide.is-fitted .lb-avatar { width: 34px; height: 34px; }
+.lb.is-wide.is-fitted .lb-launch { padding: 6px 0 calc(6px + env(safe-area-inset-bottom)); border-top: 0; }
+.lb.is-wide.is-fitted .lb-primary { min-height: 42px; padding: 8px 18px; }
+
+@media (max-width: 380px) {
+  .lb.is-narrow .lb-head { padding-inline: 10px; }
+  .lb-panel, .lb-tabs { padding-inline: 10px; }
+  .lb-seat { padding: 8px 10px; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 10px; }
+  .lb-avatar { width: 34px; height: 34px; }
+  .lb-chip { padding: 6px 10px; }
+  .lb.is-narrow .lb-code { display: none; }
+}
+@media (max-width: 899px) {
+  /* Выбор бота на телефоне — нижняя панель во всю ширину. */
+  .lb-sheet { width: 100%; max-width: none; margin: auto 0 0; border-radius: 16px 16px 0 0; padding-bottom: env(safe-area-inset-bottom); }
+}
+
+.lb-loading { display: grid; min-height: 100dvh; padding: 20px; align-content: start; gap: 18px; }
+.lb-loading p { color: var(--lb-muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .lb-spinner { animation: none; }
+}

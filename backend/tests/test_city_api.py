@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from app.city_api import get_room_service
+from app.http_middleware import limiter
 from app.main import app
 from city_rooms.repository import InMemoryRoomRepository
 from city_rooms.service import CityRoomService
@@ -434,5 +435,98 @@ def test_chat_rides_with_the_state_and_stays_out_of_the_journal() -> None:
         from city_rooms.views import room_journal
 
         assert "chat" not in room_journal(room) and "chat" not in room_journal(room)["game"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_chat_author_is_the_seat_key_retry_is_said_once_and_floods_are_cut() -> None:
+    """Everyone at the table knows the password, so the seat key — not the id in the request — says
+    who speaks. A retry with the same client id is one line, and a seat cannot flood the history."""
+    limiter._counts.clear()  # the per-IP safety net counts every earlier test in this process
+    service = CityRoomService(InMemoryRoomRepository())
+    app.dependency_overrides[get_room_service] = lambda: service
+    client = TestClient(app)
+    try:
+        created = client.post("/api/city/rooms", json={"name": "Keys", "password": "secret", "capacity": 2})
+        room_id = created.json()["id"]
+        for index, (name, token) in enumerate([("Oleg", "key-1"), ("Anna", "key-2")]):
+            client.post(
+                f"/api/city/rooms/{room_id}/join",
+                json={"password": "secret", "seat_index": index, "player_name": name, "seat_token": token},
+            )
+        chat = f"/api/city/rooms/{room_id}/chat"
+        # Anna knows the password but not Oleg's key: she cannot speak as him.
+        as_oleg = {"password": "secret", "player_id": "seat-1", "text": "hi"}
+        assert client.post(chat, json={**as_oleg, "seat_token": "key-2"}).status_code == 403
+        assert client.post(chat, json=as_oleg).status_code == 403
+
+        line = {**as_oleg, "text": "<b>hi</b>", "seat_token": "key-1", "client_id": "c-1"}
+        first = client.post(chat, json=line).json()
+        again = client.post(chat, json=line).json()
+        assert [m["text"] for m in again["chat"]] == ["<b>hi</b>"]
+        assert again["revision"] == first["revision"]
+
+        for n in range(4):
+            assert client.post(chat, json={**line, "client_id": f"c-{n + 2}"}).status_code == 200
+        assert client.post(chat, json={**line, "client_id": "c-9"}).status_code == 429
+        # The limit is per seat: Anna still speaks.
+        as_anna = {"password": "secret", "player_id": "seat-2", "text": "ok", "seat_token": "key-2"}
+        assert client.post(chat, json=as_anna).status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_undo_of_a_bot_clears_the_seat_only_while_the_bot_is_still_there() -> None:
+    limiter._counts.clear()
+    service = CityRoomService(InMemoryRoomRepository())
+    app.dependency_overrides[get_room_service] = lambda: service
+    client = TestClient(app)
+    try:
+        room_id = client.post(
+            "/api/city/rooms", json={"name": "Undo", "password": "secret", "capacity": 3, "owner_token": "host"}
+        ).json()["id"]
+        seats = f"/api/city/rooms/{room_id}/seats"
+        base = {"password": "secret", "seat_index": 1, "owner_token": "host"}
+        assert client.post(seats, json={**base, "kind": "bot", "difficulty": "ledger"}).status_code == 200
+        # A guest cannot undo the host's bot.
+        guest_undo = {**base, "kind": "empty", "owner_token": "guest", "expected_kind": "bot"}
+        assert client.post(seats, json=guest_undo).status_code == 403
+        # The seat is no longer a bot (the host freed it elsewhere): the stale undo must not touch it.
+        client.post(seats, json={**base, "kind": "empty"})
+        assert client.post(seats, json={**base, "kind": "empty", "expected_kind": "bot"}).status_code == 409
+        client.post(seats, json={**base, "kind": "bot", "difficulty": "oracle"})
+        undone = client.post(seats, json={**base, "kind": "empty", "expected_kind": "bot"})
+        assert undone.status_code == 200 and undone.json()["seats"][1]["kind"] == "empty"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_a_player_leaves_a_waiting_room_with_their_own_seat_key_only() -> None:
+    """Going back to the room list frees your seat; nobody else's, and not after the start."""
+    limiter._counts.clear()
+    service = CityRoomService(InMemoryRoomRepository())
+    app.dependency_overrides[get_room_service] = lambda: service
+    client = TestClient(app)
+    try:
+        created = client.post("/api/city/rooms", json={"name": "Leave", "password": "secret", "capacity": 3})
+        room_id = created.json()["id"]
+        for index, (name, token) in enumerate([("Oleg", "key-1"), ("Anna", "key-2")]):
+            client.post(
+                f"/api/city/rooms/{room_id}/join",
+                json={"password": "secret", "seat_index": index, "player_name": name, "seat_token": token},
+            )
+        leave = f"/api/city/rooms/{room_id}/leave"
+        anna_leaves = {"password": "secret", "seat_index": 1, "seat_token": "key-2"}
+        # Anna cannot free Oleg's seat with her own key.
+        assert client.post(leave, json={**anna_leaves, "seat_index": 0}).status_code == 403
+        left = client.post(leave, json=anna_leaves)
+        assert left.status_code == 200 and left.json()["seats"][1]["kind"] == "empty"
+        # The freed seat is open to anyone, and the old key no longer opens it.
+        assert client.post(leave, json=anna_leaves).status_code == 409
+
+        client.post(f"/api/city/rooms/{room_id}/seats", json={"password": "secret", "seat_index": 1, "kind": "bot"})
+        client.post(f"/api/city/rooms/{room_id}/start", json={"password": "secret", "seed": 3})
+        after = client.post(leave, json={"password": "secret", "seat_index": 0, "seat_token": "key-1"})
+        assert after.status_code == 422
     finally:
         app.dependency_overrides.clear()

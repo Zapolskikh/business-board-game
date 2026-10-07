@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { Suspense, lazy, useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { errorText } from "../i18n/errors";
 import { LanguagePicker } from "../i18n/LanguagePicker";
@@ -6,14 +6,19 @@ import { ApiError, cityApi } from "./api";
 import { newSecret, saveOwnerToken } from "./roomSecrets";
 import type { CityMeta, RoomSummary } from "./types";
 import { AboutDialog } from "./AboutDialog";
-import { SupportLinks } from "./SupportLinks";
 import { StudioLogo } from "./StudioMark";
 import { ResourceText } from "../ui/primitives/ResourceIcon";
 import { isPhoneScreen } from "../ui/lib/layout";
+import { CodeEntry } from "./home/CodeEntry";
+import { CreateRoomForm, EMPTY_DRAFT, nameKey, type CreateDraft } from "./home/CreateRoomForm";
+import { EnterDialog } from "./home/EnterDialog";
+import { RoomList } from "./home/RoomList";
+import { roomAction } from "./home/rooms";
+import "./home/home.css";
 
 interface Props {
   meta: CityMeta;
-  /** `joinAs` — имя, под которым игрок сразу сядет за стол (после создания или «случайной игры»). */
+  /** `joinAs` — имя, под которым игрок сразу сядет за стол (после создания или входа в комнату). */
   onOpen: (roomId: string, initialPassword?: string, joinAs?: string) => void;
   onFeedback: () => void;
   /** Обучение с проводником. */
@@ -21,8 +26,10 @@ interface Props {
 }
 
 const PLAYER_NAME_KEY = "city-player-name";
-// Названия сравниваются так, как их читает человек: без регистра и лишних пробелов — как на сервере.
-const nameKey = (value: string) => value.replace(/\s+/g, " ").trim().toLocaleLowerCase();
+/** С какой ширины главная — две колонки (о игре и панель). Уже — компактные экраны, как на телефоне. */
+const WIDE_QUERY = "(min-width: 981px)";
+/** Раунды по умолчанию — те же, что предлагает форма создания. */
+const DEFAULT_ROUNDS = 15;
 
 // Серые операции для карточки «Серая сторона» — названия из переводов игры, без модуля правил
 // доски: он тяжёлый, а главной нужны только пять подписей.
@@ -31,74 +38,55 @@ const GREY_OPERATIONS = ["smear", "crypto", "roof_break", "datacenter", "influen
 // Книга правил грузится по первому нажатию: со скриншотами и темой доски она тяжелее всей главной.
 const RulesBook = lazy(() => import("../ui/RulesBookEntry"));
 
+function useMedia(query: string): boolean {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const list = window.matchMedia(query);
+    const update = () => setMatches(list.matches);
+    update();
+    list.addEventListener("change", update);
+    return () => list.removeEventListener("change", update);
+  }, [query]);
+  return matches;
+}
+
+type MobileView = "home" | "create" | "rooms" | "code";
 
 export function RoomBrowser({ meta, onOpen, onFeedback, onTutorial }: Props) {
-  const { t, i18n } = useTranslation(["home", "common", "game", "tutorial"]);
+  const { t } = useTranslation(["home", "common", "game", "tutorial"]);
+  const wide = useMedia(WIDE_QUERY);
+  const narrowLanguage = useMedia("(max-width: 420px)");
   const [about, setAbout] = useState(false);
   const [rules, setRules] = useState(false);
-  const nameRef = useRef<HTMLInputElement>(null);
-  // На самых узких телефонах полное название языка не помещается рядом с меню — только код.
-  const [narrow, setNarrow] = useState(() => window.matchMedia("(max-width: 420px)").matches);
-  useEffect(() => {
-    const query = window.matchMedia("(max-width: 420px)");
-    const update = () => setNarrow(query.matches);
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
-  const [showPassword, setShowPassword] = useState(false);
+  const [menu, setMenu] = useState(false);
+
   const [playerName, setPlayerName] = useState(() => localStorage.getItem(PLAYER_NAME_KEY) ?? "");
-  const [isOpen, setIsOpen] = useState(false);
-  const [randomNote, setRandomNote] = useState("");
   const savePlayerName = (value: string) => {
     setPlayerName(value);
     localStorage.setItem(PLAYER_NAME_KEY, value);
-    if (value.trim()) setNameMissing(false);
   };
-  // Имя обязательно в обоих путях в игру — и при создании лобби, и в «случайной игре».
-  const playerNameOk = playerName.trim().length > 0;
-  // Имя обязательно: попытка войти без него подсвечивает поле, а не молча гасит кнопки.
-  const [nameMissing, setNameMissing] = useState(false);
-  const flagMissingName = () => {
-    setNameMissing(true);
-    const field = nameRef.current;
-    if (!field) return;
-    field.focus();
-    // Перезапуск встряхивания: и на первое, и на каждое следующее нажатие без имени.
-    field.classList.remove("field-shake");
-    void field.offsetWidth;
-    field.classList.add("field-shake");
-  };
-  const joinName = () => playerName.trim();
-  // Правая панель — одна на две вкладки: так главная помещается в экран без прокрутки.
-  const [tab, setTab] = useState<"create" | "rooms">("create");
-  // «Начать партию»: вкладка создания и сразу курсор в поле названия.
-  const startGame = () => {
-    setTab("create");
-    requestAnimationFrame(() => nameRef.current?.focus());
-  };
-  const updatedLabel = (value: string) => {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return t("rooms.updatedRecently");
-    return t("rooms.updated", { time: date.toLocaleTimeString(i18n.language, { hour: "2-digit", minute: "2-digit" }) });
-  };
+  const [draft, setDraft] = useState<CreateDraft>(EMPTY_DRAFT);
+  const patchDraft = useCallback((patch: Partial<CreateDraft>) => setDraft(current => ({ ...current, ...patch })), []);
+  const [code, setCode] = useState("");
+
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
-  const [name, setName] = useState("");
-  const [password, setPassword] = useState("");
-  const [capacity, setCapacity] = useState(4);
-  const [roundsInput, setRoundsInput] = useState("15");
-  const [rolePrice, setRolePrice] = useState(3);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<RoomSummary | null>(null);
   const [deletePassword, setDeletePassword] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [entering, setEntering] = useState<{ room: RoomSummary; returning: boolean } | null>(null);
 
-  const reload = async (visible = false) => {
-    if (visible) setRefreshing(true);
+  // ПК: правая панель — одна на две вкладки. Телефон: отдельные экраны с «Назад».
+  const [tab, setTab] = useState<"create" | "rooms">("create");
+  const [view, setView] = useState<MobileView>("home");
+  const sideRef = useRef<HTMLElement>(null);
+
+  const reload = async () => {
     try { setRooms(await cityApi.rooms()); setError(""); }
     catch (reason) { setError(errorText(reason, "loadRooms")); }
-    finally { if (visible) setRefreshing(false); }
+    finally { setLoaded(true); }
   };
   useEffect(() => {
     void reload();
@@ -106,53 +94,65 @@ export function RoomBrowser({ meta, onOpen, onFeedback, onTutorial }: Props) {
     return () => clearInterval(timer);
   }, []);
 
-  const parsedRounds = Number(roundsInput);
-  const roundsValid = /^\d+$/.test(roundsInput) && parsedRounds >= 5 && parsedRounds <= 30;
-  // Значение для кнопок «−/+»: пустое поле считается значением по умолчанию.
-  const roundsValue = roundsInput === "" ? 15 : parsedRounds;
-  const nameTaken = Boolean(name.trim()) && rooms.some(room => nameKey(room.name) === nameKey(name));
-  const passwordOk = isOpen || password.length >= 4;
-  // Всё, кроме имени: без имени кнопка остаётся нажимаемой и при нажатии показывает, что не так.
-  const roomReady = Boolean(name.trim() && !nameTaken && passwordOk && roundsValid && !busy);
-  const canCreate = playerNameOk && roomReady;
-  const waitingCount = useMemo(() => rooms.filter(room => room.status === "waiting").length, [rooms]);
-
-  const create = async () => {
-    if (!playerNameOk) return flagMissingName();
-    if (!canCreate) return;
-    setBusy(true); setError("");
-    try {
-      const roomPassword = isOpen ? "" : password;
-      // Ключ создателя придумывает браузер: с ним — и только с ним — можно убирать ботов и освобождать места.
-      const ownerToken = newSecret();
-      const room = await cityApi.create({ name: name.trim(), password: roomPassword, capacity, max_rounds: parsedRounds, role_price: rolePrice, open: isOpen, owner_token: ownerToken });
-      saveOwnerToken(room.id, ownerToken);
-      onOpen(room.id, roomPassword, joinName());
-    } catch (reason) { setError(errorText(reason, "createRoom")); }
-    finally { setBusy(false); }
+  /* Экраны телефона — в истории браузера: системная «назад» возвращает на главную, а не уводит с
+   * сайта. Поля формы при этом живут здесь, выше экранов, и возврат их не теряет. */
+  useEffect(() => {
+    const onPop = () => setView(((history.state as { home?: MobileView } | null)?.home) ?? "home");
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+  const go = (next: MobileView) => {
+    history.pushState({ home: next }, "");
+    setView(next);
+    window.scrollTo(0, 0);
+  };
+  const back = () => {
+    if ((history.state as { home?: MobileView } | null)?.home) history.back();
+    else setView("home");
   };
 
-  /* «Случайная игра»: любое открытое лобби, которое ещё ждёт игроков и где есть свободное место.
-   * Если таких нет — игрок сам открывает лобби с базовыми настройками и становится его хозяином:
-   * следующий, кто нажмёт «Случайная игра», попадёт уже к нему. */
-  const joinRandom = async () => {
-    if (!playerNameOk) return flagMissingName();
-    setBusy(true); setError(""); setRandomNote("");
+  // «Создать комнату» в титуле на ПК: вкладка создания и курсор в первое пустое поле.
+  const focusCreate = () => {
+    setTab("create");
+    requestAnimationFrame(() => sideRef.current?.querySelector<HTMLInputElement>("input")?.focus());
+  };
+
+  /* Вход в комнату. Открытая комната — сразу в лобби: лобби само посадит игрока на первое свободное
+   * место, а без имени спросит его. Комнате с паролем пароль нужен до лобби — его спрашивает окно. */
+  const enter = (room: RoomSummary) => {
+    const returning = roomAction(room) === "return";
+    if (room.open) {
+      onOpen(room.id, "", returning ? undefined : playerName.trim() || undefined);
+      return;
+    }
+    setEntering({ room, returning });
+  };
+  const confirmEnter = (name: string, password: string) => {
+    if (!entering) return;
+    if (name) savePlayerName(name);
+    onOpen(entering.room.id, password, entering.returning ? undefined : name);
+    setEntering(null);
+  };
+
+  /* «Войти в любую открытую комнату»: открытое лобби, которое ещё ждёт игроков и где есть свободное
+   * место. Если таких нет — игрок сам открывает лобби с базовыми настройками и становится его
+   * организатором: следующий, кто нажмёт эту кнопку, попадёт уже к нему. */
+  const joinAny = async () => {
+    setBusy(true); setError("");
     try {
       const fresh = await cityApi.rooms();
       setRooms(fresh);
       const candidates = fresh.filter(room => room.open && room.status === "waiting" && room.players < room.capacity);
+      const name = playerName.trim() || undefined;
       if (candidates.length) {
-        const pick = candidates[Math.floor(Math.random() * candidates.length)];
-        onOpen(pick.id, "", joinName());
+        onOpen(candidates[Math.floor(Math.random() * candidates.length)].id, "", name);
         return;
       }
       const room = await createQuickLobby(fresh);
-      onOpen(room.id, "", joinName());
+      onOpen(room.id, "", name);
     } catch (reason) { setError(errorText(reason, "createRoom")); }
     finally { setBusy(false); }
   };
-
   /* Название — первое свободное «lobbyN». Два игрока могут нажать одновременно и выбрать одно и то
    * же имя: сервер отклонит второе как занятое, и тогда берётся следующий номер. */
   const createQuickLobby = async (listed: RoomSummary[]) => {
@@ -162,7 +162,7 @@ export function RoomBrowser({ meta, onOpen, onFeedback, onTutorial }: Props) {
       while (taken.has(nameKey(`lobby${number}`))) number += 1;
       const ownerToken = newSecret();
       try {
-        const room = await cityApi.create({ name: `lobby${number}`, password: "", capacity: 4, max_rounds: 15, role_price: 3, open: true, owner_token: ownerToken });
+        const room = await cityApi.create({ name: `lobby${number}`, password: "", capacity: 4, max_rounds: DEFAULT_ROUNDS, role_price: 3, open: true, owner_token: ownerToken });
         saveOwnerToken(room.id, ownerToken);
         return room;
       } catch (reason) {
@@ -185,294 +185,54 @@ export function RoomBrowser({ meta, onOpen, onFeedback, onTutorial }: Props) {
     finally { setDeletingId(null); }
   };
 
-  return (
-    <main className="rooms-app room-browser home-screen" data-ui="room-browser">
-      {/* Фон всего экрана. Картинка — `--hero-art` в styles.css: слева текст, справа панель,
-        * поэтому смысловой центр картинки — между ними и правее. */}
-      <div className="hero-art" aria-hidden="true" />
-      <header className="rooms-topbar">
-        {/* В панели — студия: название игры и так крупно стоит ниже, в титуле. */}
-        <div className="rooms-wordmark home-studio"><StudioLogo /></div>
-        <div className="rooms-topbar-end">
-          <div className="rooms-presence">
-            <span className="presence-dot" />
-            {rooms.length ? t("presence.rooms", { count: rooms.length }) : t("presence.serverUp")}
-            <small>v{__GAME_VERSION__}</small>
-          </div>
-          <nav className="rooms-topnav" aria-label={t("nav.about")}>
-            <button type="button" className="rooms-button subtle" onClick={() => setRules(true)}>{t("nav.rules")}</button>
-            <button type="button" className="rooms-button subtle" onClick={() => setAbout(true)}>{t("nav.about")}</button>
-            <button type="button" className="rooms-button subtle" onClick={onFeedback}>{t("nav.feedback")}</button>
-            <SupportLinks />
-            <LanguagePicker className="rooms-language" compact={narrow} />
-          </nav>
-        </div>
-      </header>
+  // Своя комната, куда можно вернуться: её узнаёт ключ места в этом браузере, а не имя.
+  const resume = rooms.find(room => roomAction(room) === "return");
+  const resumeButton = resume && (
+    <button type="button" className="hm-resume" onClick={() => enter(resume)}>
+      <span>{t(resume.status === "playing" ? "home:home.resumeGame" : "home:home.resumeRoom", { name: resume.name })}</span>
+      <span aria-hidden="true">→</span>
+    </button>
+  );
+  // Обучение показывает места широкого стола; на телефоне у стола своя раскладка, и обучения для неё пока нет.
+  const tutorialCard = !isPhoneScreen() && (
+    <div className="hm-tutorial">
+      <span><b>{t("home:tutorialCard.title")}</b><small>{t("home:tutorialCard.text")}</small></span>
+      <button type="button" className="hm-link" onClick={onTutorial}>{t("home:tutorialCard.cta")}</button>
+    </div>
+  );
+  const roomList = (
+    <RoomList rooms={rooms} loaded={loaded} busy={busy} onEnter={enter} onRemove={room => { setDeleteTarget(room); setDeletePassword(""); }} />
+  );
+  const quickJoin = (
+    <div className="hm-quick">
+      <button type="button" className="hm-secondary" disabled={busy} onClick={() => void joinAny()}>{t("home:rooms.quick")}</button>
+      <p className="hm-hint">{t("home:rooms.quickHint")}</p>
+    </div>
+  );
+  const createForm = (compact: boolean) => (
+    <CreateRoomForm
+      draft={draft}
+      onDraft={patchDraft}
+      playerName={playerName}
+      onPlayerName={savePlayerName}
+      rooms={rooms}
+      compact={compact}
+      onCreated={(roomId, password, name) => onOpen(roomId, password, name)}
+    />
+  );
 
+  const overlays = (
+    <>
       {/* Цена роли — та, что выставлена в форме создания комнаты: книга описывает партию, которую вы создаёте. */}
       {rules && (
         <Suspense fallback={null}>
-          <RulesBook open onClose={() => setRules(false)} meta={meta} rolePrice={rolePrice} />
+          <RulesBook open onClose={() => setRules(false)} meta={meta} rolePrice={draft.rolePrice} />
         </Suspense>
       )}
       {about && <AboutDialog onClose={() => setAbout(false)} onFeedback={() => { setAbout(false); onFeedback(); }} />}
-
-      {/* Титульный экран в один экран: слева — что это за игра, справа — создание партии и
-        * открытые комнаты, чтобы игрок понял, куда попал, ещё до лобби. */}
-      <div className="home-main">
-      <section className="rooms-hero" data-ui="home-hero">
-        <div className="hero-copy">
-          <h1 className="hero-title">{t("brand.title")}</h1>
-          <span className="eyebrow">{t("hero.eyebrow")}</span>
-          <p className="hero-slogan">{t("hero.titleLine1")}<br /><em>{t("hero.titleLine2")}</em></p>
-          <p className="hero-lead">{t("hero.lead")}</p>
-          <p className="hero-hook">{t("hero.hook")}</p>
-          {/* Обучение — отдельной крупной кнопкой рядом с основными: новичку стоит начать с него.
-            * На телефоне его нет: подсказки обучения указывают на места широкого стола, а у
-            * мобильного своя раскладка — для него обучение будет отдельным. */}
-          <div className="hero-row">
-          {!isPhoneScreen() && (
-            <button type="button" className="hero-tutorial" onClick={onTutorial} title={t("menu.hint", { ns: "tutorial" })}>
-              <small>{t("menu.recommended", { ns: "tutorial" })}</small>
-              <b>{t("menu.cta", { ns: "tutorial" })}</b>
-            </button>
-          )}
-          <div className="hero-row-main">
-          <div className="hero-actions">
-            <button type="button" className="rooms-button primary hero-cta" onClick={startGame}>{t("hero.ctaPlay")}</button>
-            <button type="button" className="rooms-button hero-cta ghost" onClick={() => setRules(true)}>{t("hero.ctaRules")}</button>
-          </div>
-          <ul className="hero-facts">
-            <li><b>2–4</b><span>{t("hero.factPlayers")}</span></li>
-            <li><b>5–30</b><span>{t("hero.factRounds")}</span></li>
-            <li><b>3</b><span>{t("hero.factActions")}</span></li>
-            <li><b>{meta.assets.length}</b><span>{t("hero.factAssets")}</span></li>
-            <li><b>{meta.projects.length}</b><span>{t("hero.factProjects")}</span></li>
-          </ul>
-          </div>
-          </div>
-        </div>
-      </section>
-
-      <aside className="home-side">
-      <div className="home-tabs" role="tablist">
-        <button type="button" role="tab" aria-selected={tab === "create"} className={tab === "create" ? "active" : ""} onClick={() => setTab("create")}>{t("create.eyebrow")}</button>
-        <button type="button" role="tab" aria-selected={tab === "rooms"} className={tab === "rooms" ? "active" : ""} onClick={() => setTab("rooms")}>
-          {t("rooms.title")}{rooms.length > 0 && <span className="tab-count">{rooms.length}</span>}
-        </button>
-      </div>
-      {error && <p className="rooms-alert" role="alert">⚠ {error}</p>}
-
-        {tab === "rooms" && (
-        <section className="rooms-panel room-directory">
-          <div className="rooms-section-head">
-            <div>
-              <span className="eyebrow">{t("rooms.eyebrow")}</span>
-              <h2>{t("rooms.title")}</h2>
-            </div>
-            <div className="directory-actions">
-              {waitingCount > 0 && <span className="waiting-count">{t("rooms.waiting", { count: waitingCount })}</span>}
-              <button type="button" className="rooms-button subtle" onClick={() => void reload(true)} disabled={refreshing}>
-                {refreshing ? t("rooms.refreshing") : t("rooms.refresh")}
-              </button>
-            </div>
-          </div>
-
-          <div className="room-cards">
-            {!rooms.length ? (
-              <div className="rooms-empty">
-                <span>⌂</span>
-                <h3>{t("rooms.emptyTitle")}</h3>
-                <p>{t("rooms.emptyText")}</p>
-              </div>
-            ) : rooms.map(room => (
-              <article className={`room-card status-${room.status}`} data-ui="room-card" key={room.id}>
-                <button className="room-card-main" type="button" onClick={() => onOpen(room.id)}>
-                  <span className="room-card-title">
-                    <span className="room-status"><i />{t(`rooms.status.${room.status}`)}</span>
-                    <strong>{room.name}{room.open && <span className="open-badge">{t("rooms.openBadge")}</span>}</strong>
-                    <small>{updatedLabel(room.updated_at)}</small>
-                  </span>
-                  <span className="room-occupancy">
-                    <span className="seat-dots" aria-label={t("rooms.seatsLabel", { players: room.players, capacity: room.capacity })}>
-                      {Array.from({ length: room.capacity }).map((_, index) => (
-                        <i key={index} className={index < room.humans ? "human" : index < room.players ? "bot" : "empty"} />
-                      ))}
-                    </span>
-                    <b>{room.players}/{room.capacity}</b>
-                    <small>{t("rooms.humans", { count: room.humans })}</small>
-                  </span>
-                  <span className="room-enter">{t("rooms.open")} <b>→</b></span>
-                </button>
-                <button
-                  type="button"
-                  className="room-remove"
-                  onClick={() => { setDeleteTarget(room); setDeletePassword(""); }}
-                  title={t("rooms.remove")}
-                  aria-label={t("rooms.removeNamed", { name: room.name })}
-                >
-                  ⋯
-                </button>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        )}
-
-        {tab === "create" && (
-        <section className="rooms-panel create-room-card" data-ui="create-room">
-          <header className="create-head">
-            <h2>{t("create.heading")}</h2>
-            <span className="ornament-rule" aria-hidden="true" />
-            <p>{t("create.subheading")}</p>
-          </header>
-          <form onSubmit={event => { event.preventDefault(); void create(); }}>
-            <label className="room-field">
-              <span>{t("create.playerName")} <i className="required-mark" aria-hidden="true">*</i></span>
-              <input
-                ref={nameRef}
-                value={playerName}
-                maxLength={32}
-                placeholder={t("create.playerNamePlaceholder")}
-                aria-required="true"
-                aria-invalid={nameMissing}
-                aria-describedby={nameMissing ? "player-name-missing" : undefined}
-                onAnimationEnd={event => event.currentTarget.classList.remove("field-shake")}
-                onChange={event => savePlayerName(event.target.value)}
-              />
-              {nameMissing && <small id="player-name-missing" className="field-error" role="alert">{t("create.hintPlayerName")}</small>}
-            </label>
-            <label className="room-field">
-              <span>{t("create.name")}</span>
-              <input value={name} maxLength={48} placeholder={t("create.namePlaceholder")} aria-invalid={nameTaken} onChange={event => setName(event.target.value)} />
-              {nameTaken && <small className="field-error">{t("create.nameTaken")}</small>}
-            </label>
-
-            <label className="open-toggle">
-              <input type="checkbox" checked={isOpen} onChange={event => setIsOpen(event.target.checked)} />
-              <span className="switch" aria-hidden="true" />
-              <span><b>{t("create.openLobby")}</b><small>{t("create.openLobbyHint")}</small></span>
-            </label>
-
-            {!isOpen && (
-              <label className="room-field">
-                <span>{t("create.password")}</span>
-                <span className="input-with-action">
-                  <input type={showPassword ? "text" : "password"} value={password} maxLength={128} placeholder={t("create.passwordPlaceholder")} onChange={event => setPassword(event.target.value)} />
-                  <button
-                    type="button"
-                    className="input-action"
-                    aria-label={t(showPassword ? "create.hidePassword" : "create.showPassword")}
-                    aria-pressed={showPassword}
-                    onClick={() => setShowPassword(value => !value)}
-                  >
-                    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7">
-                      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" />
-                      {showPassword && <path d="M4 4l16 16" />}
-                    </svg>
-                  </button>
-                </span>
-              </label>
-            )}
-
-            <div className="quick-settings">
-              <div className="room-field">
-                <span>{t("create.players")}</span>
-                <div className="segmented" role="radiogroup" aria-label={t("create.players")}>
-                  {[2, 3, 4].map(value => (
-                    <button key={value} type="button" role="radio" aria-checked={capacity === value} className={capacity === value ? "active" : ""} onClick={() => setCapacity(value)}>{value}</button>
-                  ))}
-                </div>
-              </div>
-              <div className="room-field">
-                <span>{t("create.rounds")}</span>
-                <div className="stepper">
-                  <button type="button" aria-label={t("create.roundsLess")} disabled={roundsValue <= 5} onClick={() => setRoundsInput(String(Math.max(5, roundsValue - 1)))}>−</button>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={roundsInput}
-                    aria-label={t("create.rounds")}
-                    aria-invalid={roundsInput !== "" && !roundsValid}
-                    onChange={event => setRoundsInput(event.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, ""))}
-                    onBlur={() => {
-                      const value = Number(roundsInput);
-                      setRoundsInput(String(roundsInput === "" ? 15 : Math.min(30, Math.max(5, value))));
-                    }}
-                  />
-                  <button type="button" aria-label={t("create.roundsMore")} disabled={roundsValue >= 30} onClick={() => setRoundsInput(String(Math.min(30, roundsValue + 1)))}>+</button>
-                </div>
-              </div>
-            </div>
-
-            <details className="advanced-settings">
-              <summary>{t("create.advanced")} <span aria-hidden="true">⌄</span></summary>
-              <label className="room-field"><span>{t("create.rolePrice")}</span><input type="number" min={2} max={10} value={rolePrice} onChange={event => setRolePrice(Number(event.target.value))} /><small>{t("create.rolePriceHint")}</small></label>
-            </details>
-
-            <button className="rooms-button primary create-submit" type="submit" disabled={!roomReady}>
-              <span>{busy ? t("create.submitting") : t("create.submit")}</span><span aria-hidden="true">→</span>
-            </button>
-            <p className={`form-hint ${canCreate ? "" : "missing"}`}>
-              {canCreate ? t("create.hintReady") : !playerNameOk ? t("create.hintPlayerName") : !name.trim() ? t("create.hintName") : nameTaken ? t("create.nameTaken") : !passwordOk ? t("create.hintPassword") : t("create.hintReady")}
-            </p>
-
-            {/* Внизу панели — второй путь в игру: без своей комнаты, в любое открытое лобби. */}
-            <div className="random-join">
-              <span className="or-divider" aria-hidden="true"><i>{t("random.or")}</i></span>
-              <button type="button" className="rooms-button primary create-submit random-submit" disabled={busy} onClick={() => void joinRandom()}>
-                <span>{t("random.button")}</span><span aria-hidden="true">→</span>
-              </button>
-              <p className="form-hint">{randomNote || (playerNameOk ? t("random.hint") : t("create.hintPlayerName"))}</p>
-            </div>
-          </form>
-        </section>
-        )}
-      </aside>
-      <ul className="hero-pillars" aria-label={t("hero.pillarsLabel")}>
-        <li>
-          <span className="pillar-icon">🏙️</span>
-          <b>{t("hero.districtsTitle", { count: meta.districts.length })}</b>
-          <span>{t("hero.districtsText")}</span>
-          <ul className="pillar-chips">
-            {meta.districts.map(district => (
-              <li key={district.id} style={{ "--chip": district.color } as CSSProperties}>{district.icon} {district.title}</li>
-            ))}
-          </ul>
-        </li>
-        <li>
-          <span className="pillar-icon">🎭</span>
-          <b>{t("hero.rolesTitle", { count: meta.roles.length })}</b>
-          <span>{t("hero.rolesText")}</span>
-          <ul className="pillar-chips">
-            {meta.roles.map(role => (
-              <li key={role.id} style={{ "--chip": role.color } as CSSProperties}>{role.icon} {role.title}</li>
-            ))}
-          </ul>
-        </li>
-        <li>
-          <span className="pillar-icon">🏛️</span>
-          <b>{t("hero.projectsTitle")}</b>
-          <span>{t("hero.projectsText")}</span>
-          <ul className="pillar-chips plain">
-            {[...meta.projects].sort((a, b) => b.points - a.points).slice(0, 4).map(project => (
-              <li key={project.id}><ResourceText>{`★${project.points} ${project.title}`}</ResourceText></li>
-            ))}
-          </ul>
-        </li>
-        <li className="pillar-grey">
-          <span className="pillar-icon">🌒</span>
-          <b>{t("hero.greyTitle")}</b>
-          <span>{t("hero.greyText")}</span>
-          <ul className="pillar-chips grey">
-            {GREY_OPERATIONS.map(id => <li key={id}>{t(`game:grey.${id}.label`)}</li>)}
-          </ul>
-        </li>
-      </ul>
-      </div>
-
+      {entering && (
+        <EnterDialog room={entering.room} playerName={playerName} returning={entering.returning} onSubmit={confirmEnter} onClose={() => setEntering(null)} />
+      )}
       {deleteTarget && (
         <div className="rooms-dialog-backdrop" role="presentation" onMouseDown={event => event.target === event.currentTarget && setDeleteTarget(null)}>
           <section className="rooms-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-room-title" data-ui="delete-dialog">
@@ -487,6 +247,209 @@ export function RoomBrowser({ meta, onOpen, onFeedback, onTutorial }: Props) {
           </section>
         </div>
       )}
+    </>
+  );
+
+  if (!wide) {
+    return (
+      <main className="rooms-app hm-mobile" data-ui="room-browser">
+        <header className="hm-bar">
+          {view === "home"
+            ? <b className="hm-brand">{t("brand.title")}</b>
+            : <button type="button" className="hm-back" onClick={back}>{t("home:home.back")}</button>}
+          <button type="button" className="hm-icon hm-menu" aria-label={t("home:nav.menu")} aria-haspopup="dialog" onClick={() => setMenu(true)}>
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+          </button>
+        </header>
+        {error && <p className="hm-alert" role="alert">{error}</p>}
+
+        {view === "home" && (
+          <>
+            <div className="hm-home">
+            <section className="hm-hero" data-ui="home-hero">
+              <span className="hm-eyebrow">{t("hero.eyebrow")}</span>
+              <h1>{t("hero.titleLine1")} <em>{t("hero.titleLine2")}</em></h1>
+              <p>{t("hero.lead")}</p>
+            </section>
+            <div className="hm-actions">
+              {resumeButton}
+              <button type="button" className="hm-primary hm-wide" onClick={() => go("create")}>{t("hero.ctaPlay")} <span aria-hidden="true">→</span></button>
+              <button type="button" className="hm-secondary hm-wide" onClick={() => go("rooms")}>{t("home:home.findRoom")}</button>
+              <button type="button" className="hm-secondary hm-wide" onClick={() => go("code")}>{t("home:home.byCode")}</button>
+              {tutorialCard}
+              <p className="hm-facts">{t("hero.factsLine", { districts: meta.districts.length, roles: meta.roles.length, rounds: DEFAULT_ROUNDS })}</p>
+            </div>
+            </div>
+            <footer className="hm-footer">
+              <button type="button" onClick={() => setRules(true)}>{t("nav.rules")}</button>
+              <button type="button" onClick={() => setAbout(true)}>{t("nav.about")}</button>
+              <button type="button" onClick={onFeedback}>{t("nav.feedback")}</button>
+            </footer>
+          </>
+        )}
+        {view === "create" && (
+          <section className="hm-view">
+            <h1>{t("create.heading")}</h1>
+            <p className="hm-hint">{t("create.subheading")}</p>
+            <div className="home-side hm-form">{createForm(true)}</div>
+          </section>
+        )}
+        {view === "rooms" && (
+          <section className="hm-view">
+            <h1>{t("rooms.title")}</h1>
+            {roomList}
+            {quickJoin}
+          </section>
+        )}
+        {view === "code" && (
+          <section className="hm-view">
+            <h1>{t("code.title")}</h1>
+            <CodeEntry code={code} onCode={setCode} onFound={enter} />
+          </section>
+        )}
+
+        {menu && (
+          <MenuSheet onClose={() => setMenu(false)}>
+            <button type="button" onClick={() => { setMenu(false); setRules(true); }}>{t("nav.rules")}</button>
+            <button type="button" onClick={() => { setMenu(false); setAbout(true); }}>{t("nav.about")}</button>
+            <button type="button" onClick={() => { setMenu(false); onFeedback(); }}>{t("nav.feedback")}</button>
+            <div className="hm-menu-language"><span>{t("home:nav.language")}</span><LanguagePicker /></div>
+          </MenuSheet>
+        )}
+        {overlays}
+      </main>
+    );
+  }
+
+  return (
+    <main className="rooms-app room-browser home-screen" data-ui="room-browser">
+      {/* Фон всего экрана. Картинка — `--hero-art` в styles.css: слева текст, справа панель,
+        * поэтому смысловой центр картинки — между ними и правее. */}
+      <div className="hero-art" aria-hidden="true" />
+      <header className="rooms-topbar">
+        {/* В панели — студия, компактно: название игры и так крупно стоит ниже, в титуле. */}
+        <div className="rooms-wordmark home-studio"><StudioLogo /></div>
+        <div className="rooms-topbar-end">
+          <div className="rooms-presence">
+            <span className="presence-dot" />
+            {rooms.length ? t("presence.rooms", { count: rooms.length }) : t("presence.serverUp")}
+          </div>
+          <nav className="rooms-topnav" aria-label={t("home:nav.menu")}>
+            <button type="button" className="rooms-button subtle" onClick={() => setRules(true)}>{t("nav.rules")}</button>
+            <button type="button" className="rooms-button subtle" onClick={() => setAbout(true)}>{t("nav.about")}</button>
+            <button type="button" className="rooms-button subtle" onClick={onFeedback}>{t("nav.feedback")}</button>
+            <LanguagePicker className="rooms-language" compact={narrowLanguage} />
+          </nav>
+        </div>
+      </header>
+
+      {/* Титульный экран в один экран: слева — что это за игра, справа — создание комнаты и поиск,
+        * чтобы игрок понял, куда попал, ещё до лобби. */}
+      <div className="home-main">
+        <section className="rooms-hero" data-ui="home-hero">
+          <div className="hero-copy">
+            <h1 className="hero-title">{t("brand.title")}</h1>
+            <span className="eyebrow">{t("hero.eyebrow")}</span>
+            <p className="hero-slogan">{t("hero.titleLine1")}<br /><em>{t("hero.titleLine2")}</em></p>
+            <p className="hero-lead">{t("hero.lead")}</p>
+            <div className="hero-actions">
+              <button type="button" className="rooms-button primary hero-cta" onClick={focusCreate}>{t("hero.ctaPlay")}</button>
+              <button type="button" className="rooms-button hero-cta ghost" onClick={() => setRules(true)}>{t("hero.ctaRules")}</button>
+            </div>
+            {tutorialCard}
+            <ul className="hero-facts">
+              <li><b>2–4</b><span>{t("hero.factPlayers")}</span></li>
+              <li><b>5–30</b><span>{t("hero.factRounds")}</span></li>
+              <li><b>{meta.districts.length}</b><span>{t("hero.factDistricts")}</span></li>
+              <li><b>{meta.roles.length}</b><span>{t("hero.factRoles")}</span></li>
+            </ul>
+          </div>
+        </section>
+
+        <aside className="home-side" ref={sideRef}>
+          {resumeButton && <div className="hm-side-resume">{resumeButton}</div>}
+          <div className="home-tabs" role="tablist">
+            <button type="button" role="tab" aria-selected={tab === "create"} className={tab === "create" ? "active" : ""} onClick={() => setTab("create")}>{t("create.eyebrow")}</button>
+            <button type="button" role="tab" aria-selected={tab === "rooms"} className={tab === "rooms" ? "active" : ""} onClick={() => setTab("rooms")}>
+              {t("rooms.title")}{rooms.length > 0 && <span className="tab-count">{rooms.length}</span>}
+            </button>
+          </div>
+          {error && <p className="rooms-alert" role="alert">{error}</p>}
+          {tab === "create" ? createForm(false) : (
+            <section className="rooms-panel hm-directory">
+              <CodeEntry code={code} onCode={setCode} onFound={enter} />
+              {roomList}
+              {quickJoin}
+            </section>
+          )}
+        </aside>
+
+        <ul className="hero-pillars" aria-label={t("hero.pillarsLabel")}>
+          <li>
+            <span className="pillar-icon">🏙️</span>
+            <b>{t("hero.districtsTitle", { count: meta.districts.length })}</b>
+            <span>{t("hero.districtsText")}</span>
+            <ul className="pillar-chips">
+              {meta.districts.map(district => (
+                <li key={district.id} style={{ "--chip": district.color } as CSSProperties}>{district.icon} {district.title}</li>
+              ))}
+            </ul>
+          </li>
+          <li>
+            <span className="pillar-icon">🎭</span>
+            <b>{t("hero.rolesTitle", { count: meta.roles.length })}</b>
+            <span>{t("hero.rolesText")}</span>
+            <ul className="pillar-chips">
+              {meta.roles.map(role => (
+                <li key={role.id} style={{ "--chip": role.color } as CSSProperties}>{role.icon} {role.title}</li>
+              ))}
+            </ul>
+          </li>
+          <li>
+            <span className="pillar-icon">🏛️</span>
+            <b>{t("hero.projectsTitle")}</b>
+            <span>{t("hero.projectsText")}</span>
+            <ul className="pillar-chips plain">
+              {[...meta.projects].sort((a, b) => b.points - a.points).slice(0, 4).map(project => (
+                <li key={project.id}><ResourceText>{`★${project.points} ${project.title}`}</ResourceText></li>
+              ))}
+            </ul>
+          </li>
+          <li className="pillar-grey">
+            <span className="pillar-icon">🌒</span>
+            <b>{t("hero.greyTitle")}</b>
+            <span>{t("hero.greyText")}</span>
+            <ul className="pillar-chips grey">
+              {GREY_OPERATIONS.map(id => <li key={id}>{t(`game:grey.${id}.label`)}</li>)}
+            </ul>
+          </li>
+        </ul>
+      </div>
+      {overlays}
     </main>
+  );
+}
+
+/* Меню телефона: правила, «О проекте», обратная связь и язык — нижней панелью. */
+function MenuSheet({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+  const { t } = useTranslation("home");
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = ref.current;
+    if (dialog && !dialog.open) dialog.showModal();
+  }, []);
+  return (
+    <dialog ref={ref} className="hm-dialog hm-sheet" aria-label={t("nav.menu")} onClose={onClose}
+      onClick={event => { if (event.target === event.currentTarget) ref.current?.close(); }}>
+      <div className="hm-dialog-body hm-menu-list">
+        <div className="hm-sheet-head">
+          <b>{t("brand.title")}</b>
+          <button type="button" className="hm-icon" aria-label={t("nav.closeMenu")} onClick={() => ref.current?.close()}>
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
+          </button>
+        </div>
+        {children}
+      </div>
+    </dialog>
   );
 }

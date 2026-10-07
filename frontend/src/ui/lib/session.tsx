@@ -8,6 +8,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { ApiError, cityApi } from "../../online/api";
+import { newSecret, readRoomSecrets } from "../../online/roomSecrets";
 import type { ChatMessage, CityMeta, GameState, LegalAction, PlayerState, RoomView } from "../../online/types";
 
 /* Слой раздачи состояния.
@@ -158,7 +159,7 @@ export function useChat(): { chat: ChatMessage[]; send: ((text: string) => void)
   const chat = useRoom().data?.chat ?? NO_CHAT;
 
   const mutation = useMutation({
-    mutationFn: (text: string) => cityApi.chat(roomId, password, playerId, text),
+    mutationFn: (text: string) => cityApi.chat(roomId, password, playerId, text, readRoomSecrets(roomId).seat, newSecret()),
     // Ответ — полное состояние комнаты, как и на команду: реплика видна сразу, без ожидания опроса.
     onSuccess: room => client.setQueryData(key, room),
     onError: () => void client.invalidateQueries({ queryKey: key }),

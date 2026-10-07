@@ -56,6 +56,15 @@ class SeatRequest(BaseModel):
     difficulty: Literal["easy", "medium", "hard", "expert", "ledger", "oracle", "boris", "atlas", "raider", "builder"] = "expert"
     preferred_role: str | None = None
     owner_token: str = Field(default="", max_length=128)
+    # What the client believes sits there. «Undo» of a just-seated bot clears the seat only if a bot
+    # is still on it — never a player who sat down in between.
+    expected_kind: Literal["bot", "human", "empty"] | None = None
+
+
+class LeaveSeatRequest(BaseModel):
+    password: str = Field(default="", max_length=128)
+    seat_index: int = Field(ge=0, le=MAX_PLAYERS - 1)
+    seat_token: str = Field(min_length=1, max_length=128)
 
 
 class StartRoomRequest(BaseModel):
@@ -83,6 +92,11 @@ class ChatRequest(BaseModel):
     # Longer than the stored line on purpose: the service trims, a hard 422 on the 241st character
     # would lose what the player typed.
     text: str = Field(min_length=1, max_length=1000)
+    # The seat's own secret: the room password is shared by the whole table, so it cannot tell who
+    # is speaking. Seats taken without a key (old rooms, the tutorial) still speak by password.
+    seat_token: str = Field(default="", max_length=128)
+    # The client's id for the line, so that a retry after a lost response is not said twice.
+    client_id: str = Field(default="", max_length=64)
 
 
 @lru_cache(maxsize=1)
@@ -224,7 +238,13 @@ def get_room(
     service: CityRoomService = Depends(get_room_service),
 ) -> dict[str, Any]:
     room = service.get_room(room_id)
-    return {**room.public_summary(), "seats": [seat.to_dict() for seat in room.seats]}
+    # The settings are no secret — the lobby shows them before anyone has the password.
+    return {
+        **room.public_summary(),
+        "max_rounds": room.max_rounds,
+        "role_price": room.role_price,
+        "seats": [seat.to_dict() for seat in room.seats],
+    }
 
 
 @router.delete("/rooms/{room_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -261,6 +281,7 @@ def configure_seat(
             password=request.password,
             seat_index=request.seat_index,
             owner_token=request.owner_token,
+            expected_kind=request.expected_kind,
         )
     else:
         room = service.set_bot(
@@ -272,6 +293,15 @@ def configure_seat(
             owner_token=request.owner_token,
         )
     return room_view(room)
+
+
+@router.post("/rooms/{room_id}/leave")
+def leave_room(
+    room_id: str,
+    request: LeaveSeatRequest,
+    service: CityRoomService = Depends(get_room_service),
+) -> dict[str, Any]:
+    return room_view(service.leave(room_id, **request.model_dump()))
 
 
 @router.post("/rooms/{room_id}/start")
@@ -340,7 +370,13 @@ def post_chat(
     service: CityRoomService = Depends(get_room_service),
 ) -> dict[str, Any]:
     room = service.post_chat(
-        room_id, password=request.password, player_id=request.player_id, text=request.text, client=_client(http)
+        room_id,
+        password=request.password,
+        player_id=request.player_id,
+        text=request.text,
+        seat_token=request.seat_token,
+        client_id=request.client_id,
+        client=_client(http),
     )
     legal_actions = service.engine.legal_actions(room.game, request.player_id) if room.game is not None else []
     return room_view(room, request.player_id, legal_actions, _market_prices(service, room, request.player_id))

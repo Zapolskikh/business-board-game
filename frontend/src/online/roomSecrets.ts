@@ -48,3 +48,9 @@ export function seatToken(roomId: string): string {
 export function saveSeat(roomId: string, playerId: string): void {
   write(roomId, { playerId });
 }
+
+/** Место освобождено: браузер больше не за этим столом. Ключи создателя и места остаются. */
+export function forgetSeat(roomId: string): void {
+  const { playerId: _left, ...rest } = readRoomSecrets(roomId);
+  localStorage.setItem(key(roomId), JSON.stringify(rest));
+}

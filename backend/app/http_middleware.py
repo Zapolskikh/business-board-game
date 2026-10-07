@@ -75,6 +75,10 @@ def _rule_for(request: Request) -> tuple[str, RateRule] | None:
         return "journal-export", RateRule(20)
     if request.method == "POST" and request.url.path.endswith("/commands"):
         return "game-command", RateRule(120)
+    # Table talk has its own bucket: a lively chat must not use up the seats and the start button.
+    # The room itself holds each seat to a few lines per ten seconds.
+    if request.method == "POST" and request.url.path.endswith("/chat"):
+        return "room-chat", RateRule(60)
     if request.method == "DELETE":
         return "room-auth-write", RateRule(40)
     if request.method == "POST":
