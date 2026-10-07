@@ -1,0 +1,108 @@
+{
+ "started": "2026-10-06T22:36:37",
+ "finished": "2026-10-07T05:31:11",
+ "steps": {
+  "1": {
+   "name": "TOURNAMENT_fast",
+   "command": "-m simulation.tournament --games=768 --lineup=builder,raider,boris,ledger --forks=8 --seed=3101 --rotations=4 --workers=6 --output=TOURNAMENT_fast.md",
+   "started": "2026-10-06T22:36:37",
+   "attempts": 1,
+   "finished": "2026-10-07T00:35:46",
+   "minutes": 119.1,
+   "returncode": 0,
+   "ok": true
+  },
+  "2": {
+   "name": "TOURNAMENT_oracle",
+   "command": "-m simulation.tournament --games=384 --lineup=builder,raider,boris,oracle --forks=8 --seed=3101 --rotations=4 --workers=6 --output=TOURNAMENT_oracle.md",
+   "started": "2026-10-07T00:35:46",
+   "attempts": 1,
+   "finished": "2026-10-07T02:40:54",
+   "minutes": 125.1,
+   "returncode": 0,
+   "ok": true
+  },
+  "3": {
+   "name": "TOURNAMENT_pair_ledger",
+   "command": "-m simulation.tournament --games=384 --lineup=builder,raider,boris,ledger --forks=0 --seed=3101 --rotations=4 --workers=6 --output=TOURNAMENT_pair_ledger.md",
+   "started": "2026-10-07T02:40:54",
+   "attempts": 1,
+   "finished": "2026-10-07T02:59:43",
+   "minutes": 18.8,
+   "returncode": 0,
+   "ok": true
+  },
+  "4": {
+   "name": "TOURNAMENT_ctrl_raider",
+   "command": "-m simulation.tournament --games=240 --lineup=raider,raider,raider,raider --forks=0 --seed=3111 --rotations=4 --workers=6 --output=TOURNAMENT_ctrl_raider.md",
+   "started": "2026-10-07T02:59:43",
+   "attempts": 1,
+   "finished": "2026-10-07T03:02:28",
+   "minutes": 2.8,
+   "returncode": 0,
+   "ok": true
+  },
+  "5": {
+   "name": "TOURNAMENT_ctrl_builder",
+   "command": "-m simulation.tournament --games=240 --lineup=builder,builder,builder,builder --forks=0 --seed=3112 --rotations=4 --workers=6 --output=TOURNAMENT_ctrl_builder.md",
+   "started": "2026-10-07T03:02:28",
+   "attempts": 1,
+   "finished": "2026-10-07T03:03:38",
+   "minutes": 1.2,
+   "returncode": 0,
+   "ok": true
+  },
+  "6": {
+   "name": "TOURNAMENT_ctrl_boris",
+   "command": "-m simulation.tournament --games=240 --lineup=boris,boris,boris,boris --forks=0 --seed=3113 --rotations=4 --workers=6 --output=TOURNAMENT_ctrl_boris.md",
+   "started": "2026-10-07T03:03:38",
+   "attempts": 1,
+   "finished": "2026-10-07T03:05:35",
+   "minutes": 1.9,
+   "returncode": 0,
+   "ok": true
+  },
+  "7": {
+   "name": "TOURNAMENT_ctrl_ledger",
+   "command": "-m simulation.tournament --games=240 --lineup=ledger,ledger,ledger,ledger --forks=0 --seed=3114 --rotations=4 --workers=6 --output=TOURNAMENT_ctrl_ledger.md",
+   "started": "2026-10-07T03:05:35",
+   "attempts": 1,
+   "finished": "2026-10-07T03:45:08",
+   "minutes": 39.5,
+   "returncode": 0,
+   "ok": true
+  },
+  "8": {
+   "name": "TOURNAMENT_ctrl_oracle",
+   "command": "-m simulation.tournament --games=48 --lineup=oracle,oracle,oracle,oracle --forks=0 --seed=3115 --rotations=4 --workers=6 --output=TOURNAMENT_ctrl_oracle.md",
+   "started": "2026-10-07T03:45:08",
+   "attempts": 1,
+   "finished": "2026-10-07T04:33:02",
+   "minutes": 47.9,
+   "returncode": 0,
+   "ok": true
+  },
+  "9": {
+   "name": "suspects",
+   "command": "-m simulation.suspects TOURNAMENT_fast.json --output=suspects.txt",
+   "started": "2026-10-07T04:33:02",
+   "attempts": 1,
+   "finished": "2026-10-07T04:33:02",
+   "minutes": 0.0,
+   "returncode": 0,
+   "ok": true
+  },
+  "10": {
+   "name": "TOURNAMENT_focus",
+   "command": "-m simulation.tournament --games=96 --lineup=builder,raider,boris,ledger --forks=8 --fork-focus=suspects.txt --seed=3121 --rotations=4 --workers=6 --output=TOURNAMENT_focus.md",
+   "started": "2026-10-07T04:33:02",
+   "attempts": 1,
+   "finished": "2026-10-07T05:31:11",
+   "minutes": 58.2,
+   "returncode": 0,
+   "ok": true
+  }
+ },
+ "commit": "55a3cb204474ae25a5d910377aae0370aed0b208",
+ "workers": "6"
+}
