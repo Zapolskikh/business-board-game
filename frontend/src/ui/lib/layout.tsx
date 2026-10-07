@@ -234,6 +234,7 @@ export function useMobileViewport(active: boolean): void {
     document.body.style.overflow = "hidden";
 
     settle();
+    const stopProbe = viewportProbe(meta, () => zoom);
     window.addEventListener("orientationchange", settle);
     document.addEventListener("fullscreenchange", settle);
     document.addEventListener("webkitfullscreenchange", settle);
@@ -244,6 +245,7 @@ export function useMobileViewport(active: boolean): void {
     window.visualViewport?.addEventListener("resize", drift);
     window.visualViewport?.addEventListener("scroll", drift);
     return () => {
+      stopProbe();
       timers.forEach(timer => window.clearTimeout(timer));
       window.clearTimeout(retry);
       document.removeEventListener("focusout", released);
@@ -274,6 +276,40 @@ export function useMobileViewport(active: boolean): void {
  * Если за это время стол снова включился (телефон повернули обратно), поздний возврат meta не
  * трогает: её уже переписал стол. */
 let session = 0;
+
+/* Диагностика вьюпорта на чужом телефоне: `?vp` в адресе (запоминается до закрытия вкладки)
+ * показывает поверх стола, что браузер на самом деле дал странице. Временная — пока не
+ * разобрались с Chrome на Android, где стол рисуется крупнее, чем просит meta. */
+function viewportProbe(meta: HTMLMetaElement, zoom: () => number): () => void {
+  try {
+    if (new URLSearchParams(window.location.search).has("vp")) sessionStorage.setItem("vp", "1");
+    if (!sessionStorage.getItem("vp")) return () => {};
+  } catch {
+    return () => {};
+  }
+  const box = document.createElement("pre");
+  box.style.cssText =
+    "position:fixed;left:4px;bottom:4px;z-index:99999;margin:0;padding:6px 8px;max-width:60vw;white-space:pre-wrap;" +
+    "font:12px/1.35 monospace;color:#fff;background:rgba(0,0,0,.8);border-radius:6px;pointer-events:none";
+  document.body.appendChild(box);
+  const draw = () => {
+    const view = window.visualViewport;
+    const chrome = /Chrome\/([\d.]+)/.exec(navigator.userAgent)?.[1] ?? "—";
+    box.textContent = [
+      `screen ${window.screen.width}×${window.screen.height}  dpr ${window.devicePixelRatio}`,
+      `inner ${window.innerWidth}×${window.innerHeight}  client ${document.documentElement.clientWidth}×${document.documentElement.clientHeight}`,
+      `visual ${view ? `${Math.round(view.width)}×${Math.round(view.height)} scale ${view.scale.toFixed(3)}` : "—"}`,
+      `fix ${zoom().toFixed(3)}  chrome ${chrome}`,
+      `meta ${meta.getAttribute("content")}`,
+    ].join("\n");
+  };
+  draw();
+  const timer = window.setInterval(draw, 500);
+  return () => {
+    window.clearInterval(timer);
+    box.remove();
+  };
+}
 
 function release(meta: HTMLMetaElement, original: string): void {
   const mine = ++session;
