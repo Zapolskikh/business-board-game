@@ -4,6 +4,7 @@ import { cityApi } from "./api";
 import type { CityMeta, DomainEvent, LegalAction } from "./types";
 import { useRoom } from "../ui/lib/session";
 import { ResourceText } from "../ui/primitives/ResourceIcon";
+import { pageZoom } from "../ui/lib/layout";
 
 const GameScreen = lazy(() => import("../ui/GameScreen").then(module => ({ default: module.GameScreen })));
 
@@ -228,13 +229,21 @@ function Spotlight({ anchors }: { anchors: string[] }) {
       window.removeEventListener("resize", measure);
     };
   }, [anchors]);
+  const zoom = pageZoom();
   return (
     <>
       {boxes.map((box, index) => (
         <div
           key={index}
           className="tutorial-spotlight"
-          style={{ left: box.left - 6, top: box.top - 6, width: box.width + 12, height: box.height + 12 }}
+          /* Рамка меряется в точках экрана, а рисуется в точках страницы — под `zoom` корня
+            * (мобильный стол на Android) их надо перевести обратно. */
+          style={{
+            left: box.left / zoom - 6,
+            top: box.top / zoom - 6,
+            width: box.width / zoom + 12,
+            height: box.height / zoom + 12,
+          }}
         />
       ))}
     </>

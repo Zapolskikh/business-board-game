@@ -43,10 +43,10 @@ export function Modal({
         <Dialog.Content
           data-ui="modal"
           style={{
-            width: `min(${Math.round(width * (zoom ?? 1))}px, 94vw)`,
+            width: `min(${Math.round(width * (zoom ?? 1))}px, calc(var(--app-w) * 0.94))`,
             ...(area ? { top: area.top, height: area.height, maxHeight: "none", translate: "-50% 0" } : {}),
           }}
-          className={`ui-v2 fixed left-1/2 top-1/2 grid max-h-[88vh] -translate-x-1/2 -translate-y-1/2
+          className={`ui-v2 fixed left-1/2 top-1/2 grid max-h-[calc(var(--app-h)*0.88)] -translate-x-1/2 -translate-y-1/2
             grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-[12px] border border-line-2
             bg-panel font-sans text-ink ${nested ? "z-[56]" : "z-50"}`}
         >
@@ -150,8 +150,8 @@ export function DetailsModal({
         <Dialog.Overlay className="fixed inset-0 z-40 bg-[#0009]" />
         <Dialog.Content
           data-ui="details-modal"
-          style={{ width: `min(${Math.round(width * (zoom ?? 1))}px, 94vw)` }}
-          className="ui-v2 fixed left-1/2 top-1/2 z-50 grid max-h-[88vh] -translate-x-1/2 -translate-y-1/2
+          style={{ width: `min(${Math.round(width * (zoom ?? 1))}px, calc(var(--app-w) * 0.94))` }}
+          className="ui-v2 fixed left-1/2 top-1/2 z-50 grid max-h-[calc(var(--app-h)*0.88)] -translate-x-1/2 -translate-y-1/2
             grid-rows-[minmax(0,1fr)] overflow-auto rounded-[12px] border border-line-2 bg-panel
             font-sans text-xs leading-relaxed text-ink-muted [&>div>div:first-of-type]:pr-10"
         >

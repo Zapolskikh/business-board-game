@@ -89,7 +89,7 @@ export function RulesBook({
             if (event.key === "ArrowRight") turn(1);
             if (event.key === "ArrowLeft") turn(-1);
           }}
-          className="ui-v2 rules-book fixed outline-none left-1/2 top-1/2 z-50 grid h-[min(860px,92dvh)] w-[min(1240px,96vw)]
+          className="ui-v2 rules-book fixed outline-none left-1/2 top-1/2 z-50 grid h-[min(860px,calc(var(--app-h)*0.92))] w-[min(1240px,calc(var(--app-w)*0.96))]
             -translate-x-1/2 -translate-y-1/2 grid-cols-[minmax(0,270px)_minmax(0,1fr)] font-sans
             max-[760px]:grid-cols-1 max-[760px]:grid-rows-[auto_minmax(0,1fr)]"
         >

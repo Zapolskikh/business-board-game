@@ -262,7 +262,7 @@ export function MobileShell({ children }: { children: ReactNode }) {
         paddingRight: "env(safe-area-inset-right)",
         paddingBottom: "env(safe-area-inset-bottom)",
       }}
-      className="ui-v2 mobile-shell h-dvh w-dvw overflow-hidden bg-surface select-none"
+      className="ui-v2 mobile-shell h-[var(--app-h)] w-[var(--app-w)] overflow-hidden bg-surface select-none"
     >
       {children}
     </div>

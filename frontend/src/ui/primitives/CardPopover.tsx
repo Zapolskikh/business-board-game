@@ -49,8 +49,8 @@ export function CardPopover({
           <Dialog.Content
             data-ui="card-details"
             aria-describedby={undefined}
-            style={{ width: `min(94vw, ${Math.round(Math.max(width, 360) * MOBILE_DIALOG_ZOOM)}px)` }}
-            className="ui-v2 fixed left-1/2 top-1/2 z-[61] grid max-h-[85dvh]
+            style={{ width: `min(calc(var(--app-w) * 0.94), ${Math.round(Math.max(width, 360) * MOBILE_DIALOG_ZOOM)}px)` }}
+            className="ui-v2 fixed left-1/2 top-1/2 z-[61] grid max-h-[calc(var(--app-h)*0.85)]
               -translate-x-1/2 -translate-y-1/2 grid-rows-[minmax(0,1fr)_auto] overflow-hidden
               rounded-[12px] border border-line-2 bg-panel font-sans text-ink"
           >
