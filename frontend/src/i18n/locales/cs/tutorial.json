@@ -7,14 +7,7 @@
   },
   "defaultName": "Nováček",
   "narrator": {
-    "name": "Cizinec",
-    "look": {
-      "none": "Bez masky",
-      "capitalist": "Maska Kapitalisty",
-      "diplomat": "Maska Diplomata",
-      "fraudster": "Maska Podvodníka",
-      "mafia": "Maska Mafiána"
-    }
+    "name": "Cizinec"
   },
   "ui": {
     "next": "Dál",
@@ -29,17 +22,17 @@
     "step": "Krok {{current}} z {{total}}"
   },
   "steps": {
-    "intro": "Posaďte se. Ukážu vám základní tahy a pak si to zkusíte sami.\n\nUž jsem tu pracoval, vyjednával i kazil plány ostatním. Na každou příležitost mám vhodnou tvář — masky mám po ruce. Když mi něco pomůže vyhrát, využiju to.\n\nVaším cílem je získat za 15 kol nejvíc bodů. Přinášejí je podniky, projekty, role (+3, dokud ji držíte) a bonusové body — třeba za lobbing. Peníze a vliv vám k nim pomohou. Začneme.",
+    "intro": "Posaďte se. Ukážu vám základní tahy a pak si to zkusíte sami.\n\nUž jsem tu pracoval, vyjednával i kazil plány ostatním. Když mi něco pomůže vyhrát, využiju to.\n\nVaším cílem je získat za 15 kol nejvíc bodů. Přinášejí je podniky, projekty, role (+3, dokud ji držíte) a bonusové body — třeba za lobbing. Peníze a vliv vám k nim pomohou. Začneme.",
     "work": "Začneme něčím jednoduchým. Stiskněte vpravo „Zakázka“ a vyděláte 2$. Není to moc, ale někdy vám chybí právě tolik.",
     "workDone": "První peníze jsou doma. Jen si pamatujte: obvykle máte tři akce za tah. Zakázka pomůže, když vám trochu chybí na nákup, ale celou hru na ní nepostavíte.",
     "campaign": "Teď potřebujeme kontakty. Stiskněte „Výměna“ a dejte 5$ za 3◆. Budou se hodit, až samotné peníze nebudou stačit.",
     "buyObject": "Kupte na trhu „Lékárny za rohem“. Každé kolo vám přinesou příjem. Na konci hry podnik přidá i body: polovinu své ceny, zaokrouhlenou dolů.\n\nLidem léky, nám příjem. Takový obchod mi vyhovuje.",
-    "role": "Zkusíme jinou tvář. Každá role tu má svoje možnosti.\n\nOtevřete vpravo „Role“ a vezměte si Novináře. Jeho bonus i zvláštní schopnost platí, dokud roli držíte. Zkusíme nafouknout jednu aféru.",
+    "role": "Teď si vezmeme roli. Každá tu má svoje možnosti.\n\nOtevřete vpravo „Role“ a vezměte si Novináře. Jeho bonus i zvláštní schopnost platí, dokud roli držíte. Zkusíme nafouknout jednu aféru.",
     "power": "Viktor nám překáží. Už má čtyři skandály. Přidáme pátý a přijde o roli Kapitalisty.\n\nStiskněte „Nafouknout aféru“ a vyberte Viktora. Nejdřív bych mu nabídl dohodu, ale tohle vyjde levněji.",
-    "scandals": "Viktor přišel o roli. Jenže ta aféra přidala skandál i vám. O špinavých rukou jsem vás varoval.\n\n• Každý zbývající skandál vám na konci hry odečte 1 bod.\n• O roli se obvykle přichází při pěti skandálech. Váš Novinář má hranici šest.\n• Při překročení hranice vás zatknou: pokud jste na tahu, hned skončí, v příštím tahu vám zůstane jen jedna akce, skandály klesnou na tři a přijdete o jednu Ochranu.\n• Skandály sníží krizové PR a některé schopnosti rolí.\n• Bez role vám na začátku každého tahu jeden skandál sám zmizí.\n\nJakmile o Novináře přijdete, zase platí běžná hranice. Hlídejte si počítadlo.",
-    "cards": "Ještě mám něco v záloze. Soupeři nemusí vědět všechno, co chystáme.\n\nStiskněte „+ Líznout 2 karty“ nad ukončením tahu. Dvě akční karty stojí 4$ a 1◆.",
+    "scandals": "Viktor přišel o roli. Jenže ta aféra přidala skandál i vám. O špinavých rukou jsem vás varoval.\n\n• Každý zbývající skandál vám na konci hry odečte 1 bod.\n• O roli se obvykle přichází při pěti skandálech. Váš Novinář má hranici šest.\n• Při překročení hranice vás zatknou: pokud jste na tahu, hned skončí, v příštím tahu vám zůstane jen jedna akce, skandály klesnou na nulu a přijdete o roli i o jednu Ochranu.\n• Skandály sníží krizové PR a některé schopnosti rolí.\n• Bez role vám na konci každého kola jeden skandál sám zmizí.\n\nJakmile o Novináře přijdete, zase platí běžná hranice. Hlídejte si počítadlo.",
+    "cards": "Ještě mám něco v záloze. Soupeři nemusí vědět všechno, co chystáme.\n\nStiskněte „+ Líznout 2 karty“ nad ukončením tahu. Dvě akční karty stojí jednu akci, 4$ a 1◆.",
     "playCard": "To se bude hodit. Zahrajte z ruky „Všechny ruce na palubu“ a získáte jednu akci navíc. Samotné zahrání karty akci nespotřebuje.",
-    "charity": "I na dobré skutky mám vhodnou tvář. Vezměte „Charitativní fond“: nemá zvláštní podmínky, stačí zaplatit jeho cenu.\n\nMěsto dostane pomoc, vy body. To mi vyhovuje.",
+    "charity": "Najde se čas i na dobrý skutek. Vezměte „Charitativní fond“: nemá zvláštní podmínky, stačí zaplatit jeho cenu.\n\nMěsto dostane pomoc, vy body. To mi vyhovuje.",
     "terminal": "Teď chci „Říční přístav“, ale potřebujeme k němu podnik s logistikou. Poslouží „Pašerácký terminál“. Kupte ho na trhu.\n\nAno, pašerácký. Výhodný nákup si kvůli názvu ujít nenechám.",
     "port": "A přístav je dostupný. Vezměte projekt „Říční přístav“, než ho získá někdo jiný. Původ našeho terminálu můžeme ve slavnostním projevu vynechat.",
     "grey": "Terminál patří do Šedé zóny a zpřístupňuje šedé kšefty. Najděte je vpravo a spusťte „Pomluvy“ proti soupeřům.\n\nVýsledek závisí na kostce. Pro výuku jsem nám zařídil příznivý hod. U běžného stolu budete muset riskovat.",

@@ -21,8 +21,11 @@ SCHEMA_VERSION = 1
 # scandals are not cut by grey-scandal reductions; an arrest resets scandals to 0; the politician's
 # «Договоримся» and the card «Изменение зонирования» are gone; legendaries open in round 9 and come
 # out at most two a refill. 1.22.0: «Раздуть историю» is free again; the journalist's money needs
-# an object of the Деловой центр and pays 1$ a rival scandal.
-RULES_VERSION = "city-1.22.0"
+# an object of the Деловой центр and pays 1$ a rival scandal. 1.23.0: four fixes — «Общественная
+# инициатива» respects a veto, «Враждебное поглощение» pays what the victim actually lost, the grey
+# mark leaves with the mafia's seat, and selling an object that raised the Защита limit drops the
+# token above the new limit.
+RULES_VERSION = "city-1.23.0"
 
 # Bumped whenever the catalog changes, even if no rule moved: card texts are part of the agreement
 # too. 2026-09-30: removed the unsupported cash-exchange purchase payout. 2026-09-30b: «Судебный
@@ -39,7 +42,10 @@ RULES_VERSION = "city-1.22.0"
 # 2026-10-05: the racket takes influence always; «Изменение зонирования» removed; legendaries open in
 # round 9.
 # 2026-10-06: the journalist's texts — the story is free, the money needs a Деловой центр object.
-CONTENT_VERSION = "city-content-2026-10-06"
+# 2026-10-07: the card «Меценатство» is «Благотворительный взнос» (the name went to the 20$ → 5 points
+# action, formerly «Патронаж»); «Сеть наличных обменников» no longer promises a laundering action
+# that does not exist.
+CONTENT_VERSION = "city-content-2026-10-07"
 
 DISTRICT_IDS = (
     "residential",

@@ -84,7 +84,6 @@ export function PrintBook() {
                 <header className="tutorial-guide-head">
                   <div className="tutorial-narrator">
                     <strong>{tutorial("narrator.name")}</strong>
-                    <span>{tutorial(`narrator.look.${line.step.look}` as never) as string}</span>
                   </div>
                   <span className="tutorial-counter">
                     {tutorial("ui.step", { current: line.position + 1, total: TUTORIAL_STEPS.length })}

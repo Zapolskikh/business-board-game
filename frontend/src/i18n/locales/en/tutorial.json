@@ -7,14 +7,7 @@
   },
   "defaultName": "Newcomer",
   "narrator": {
-    "name": "The Stranger",
-    "look": {
-      "none": "Unmasked",
-      "capitalist": "The Capitalist's mask",
-      "diplomat": "The Diplomat's mask",
-      "fraudster": "The Hustler's mask",
-      "mafia": "The Mobster's mask"
-    }
+    "name": "The Stranger"
   },
   "ui": {
     "next": "Next",
@@ -29,17 +22,17 @@
     "step": "Step {{current}} of {{total}}"
   },
   "steps": {
-    "intro": "Take a seat. I'll show you the basic moves, then you can try things for yourself.\n\nI've done the work, made deals and messed up other people's plans. A different face for every job — I keep the masks handy. If something helps me win, I'll use it.\n\nYour goal is to score the most points in 15 rounds. They come from businesses, projects, your role (+3 while you hold it) and bonus points — from lobbying, for example. Money and influence will help you get there. Let's begin.",
+    "intro": "Take a seat. I'll show you the basic moves, then you can try things for yourself.\n\nI've done the work, made deals and messed up other people's plans. If something helps me win, I'll use it.\n\nYour goal is to score the most points in 15 rounds. They come from businesses, projects, your role (+3 while you hold it) and bonus points — from lobbying, for example. Money and influence will help you get there. Let's begin.",
     "work": "Let's start with something simple. Press “City job” on the right to earn 2$. Not much, but sometimes that's all you're short of.",
     "workDone": "There's your first payment. Remember, you usually have three actions per turn. A job helps when you're just short of a purchase, but it won't carry you through the whole game.",
     "campaign": "Now we need connections. Press “Exchange” and trade 5$ for 3◆. They'll come in handy when money alone isn't enough.",
     "buyObject": "Buy the “Corner Pharmacies” on the market. They'll pay income every round. At the end of the game, a business also earns points equal to half its price, rounded down.\n\nMedicine for the city, income for us. That arrangement suits me.",
-    "role": "Let's try on another face. Every role here has its own opportunities.\n\nOpen “Roles” on the right and take the Journalist. Its bonus and special power apply while you hold it. Let's try blowing up a story.",
+    "role": "Now let's take a role. Each one here has its own opportunities.\n\nOpen “Roles” on the right and take the Journalist. Its bonus and special power apply while you hold it. Let's try blowing up a story.",
     "power": "Victor is in our way. He already has four scandals. Add a fifth and he'll lose the Capitalist role.\n\nPress “Blow up a story” and choose Victor. I'd offer him a deal first, but this is cheaper.",
-    "scandals": "Victor lost his role. But that story gave you a scandal too. I did mention getting our hands dirty.\n\n• Each scandal left at the end costs you 1 point.\n• Most roles are lost at five scandals. Your Journalist's threshold is six.\n• Exceed the threshold and you're arrested: your turn ends at once if it's yours, you get just one action next turn, your scandals drop to three and you lose one Protection.\n• Crisis PR and some role powers can reduce scandals.\n• Without a role, one scandal fades at the start of each of your turns.\n\nOnce you lose the Journalist, the normal threshold applies again. Watch that counter.",
-    "cards": "I've got something else lined up. Our rivals don't need to know everything we're planning.\n\nPress “+ Draw 2 cards” above the end-turn button. Two action cards cost 4$ and 1◆.",
+    "scandals": "Victor lost his role. But that story gave you a scandal too. I did mention getting our hands dirty.\n\n• Each scandal left at the end costs you 1 point.\n• Most roles are lost at five scandals. Your Journalist's threshold is six.\n• Exceed the threshold and you're arrested: your turn ends at once if it's yours, you get just one action next turn, your scandals drop to zero, and you lose your role and one Protection.\n• Crisis PR and some role powers can reduce scandals.\n• Without a role, one scandal fades at the end of each round.\n\nOnce you lose the Journalist, the normal threshold applies again. Watch that counter.",
+    "cards": "I've got something else lined up. Our rivals don't need to know everything we're planning.\n\nPress “+ Draw 2 cards” above the end-turn button. Two action cards cost one action, 4$ and 1◆.",
     "playCard": "That'll come in handy. Play “All Hands” from your hand to gain one action. Playing the card doesn't spend an action itself.",
-    "charity": "I've got a suitable face for good deeds too. Take the “Charity Fund”: it has no special requirements, so you only need to pay its cost.\n\nThe city gets help, you get points. That works for me.",
+    "charity": "There's time for a good deed too. Take the “Charity Fund”: it has no special requirements, so you only need to pay its cost.\n\nThe city gets help, you get points. That works for me.",
     "terminal": "Now I want the “River Port”, but it requires a logistics business. The “Smuggling Terminal” will do. Buy it on the market.\n\nYes, smuggling. I'm not passing up a profitable purchase over its name.",
     "port": "That gives us access to the port. Take the “River Port” project before someone else does. We can leave the terminal's origins out of the opening speech.",
     "grey": "The terminal belongs to the Grey Sector and unlocks shady deals. Find them on the right and run “Dirty rumours” against your rivals.\n\nThe result depends on the die. I've arranged a good roll for this tutorial. At a regular table, you'll have to take your chances.",

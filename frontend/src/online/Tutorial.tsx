@@ -19,11 +19,8 @@ const GameScreen = lazy(() => import("../ui/GameScreen").then(module => ({ defau
  * поменяется и шаг станет невозможен, он упадёт раньше, чем новичок упрётся в серую кнопку.
  */
 
-type Look = "none" | "capitalist" | "diplomat" | "fraudster" | "mafia";
-
 interface Step {
   id: string;
-  look: Look;
   /** Метки data-tutorial, которые подсвечиваются на доске. */
   anchors: string[];
   /** Действие, которое шаг пропускает на доску. Без него шаг — просто текст с кнопкой «Дальше». */
@@ -45,32 +42,32 @@ const event = (type: string, data: Record<string, unknown> = {}) => (item: Domai
   item.type === type && item.actor_id === ME && Object.entries(data).every(([key, value]) => item.data[key] === value);
 
 const STEPS: Step[] = [
-  { id: "intro", look: "none", anchors: [] },
-  { id: "work", look: "capitalist", anchors: ["work"], allow: is("basic_action", { kind: "work" }), done: event("basic_action", { kind: "work" }), after: "workDone" },
-  { id: "campaign", look: "capitalist", anchors: ["campaign"], allow: is("basic_action", { kind: "campaign" }), done: event("basic_action", { kind: "campaign" }) },
-  { id: "buyObject", look: "capitalist", anchors: ["market-pharmacy_chain"], allow: is("buy_asset", { market_uid: "asset:pharmacy_chain" }), done: event("asset_bought", { asset_id: "pharmacy_chain" }) },
-  { id: "role", look: "diplomat", anchors: ["roles"], allow: is("claim_role", { role_id: "journalist" }), done: event("role_claimed", { role_id: "journalist" }) },
-  { id: "power", look: "mafia", anchors: ["power-journalist_inflate", `player-${VICTOR}`], allow: is("use_role_power", { power: "journalist_inflate", target_id: VICTOR }), done: event("role_power_used", { power: "journalist_inflate" }) },
-  { id: "scandals", look: "mafia", anchors: [`player-${VICTOR}`], info: true },
-  { id: "cards", look: "fraudster", anchors: ["draw-card"], allow: is("buy_action_card"), done: event("action_card_bought") },
+  { id: "intro", anchors: [] },
+  { id: "work", anchors: ["work"], allow: is("basic_action", { kind: "work" }), done: event("basic_action", { kind: "work" }), after: "workDone" },
+  { id: "campaign", anchors: ["campaign"], allow: is("basic_action", { kind: "campaign" }), done: event("basic_action", { kind: "campaign" }) },
+  { id: "buyObject", anchors: ["market-pharmacy_chain"], allow: is("buy_asset", { market_uid: "asset:pharmacy_chain" }), done: event("asset_bought", { asset_id: "pharmacy_chain" }) },
+  { id: "role", anchors: ["roles"], allow: is("claim_role", { role_id: "journalist" }), done: event("role_claimed", { role_id: "journalist" }) },
+  { id: "power", anchors: ["power-journalist_inflate", `player-${VICTOR}`], allow: is("use_role_power", { power: "journalist_inflate", target_id: VICTOR }), done: event("role_power_used", { power: "journalist_inflate" }) },
+  { id: "scandals", anchors: [`player-${VICTOR}`], info: true },
+  { id: "cards", anchors: ["draw-card"], allow: is("buy_action_card"), done: event("action_card_bought") },
   {
     id: "playCard",
-    look: "fraudster",
+   
     anchors: ["hand-mobilization"],
     allow: action => action.type === "play_action_card" && String(action.payload.card_uid).startsWith("card:mobilization:"),
     done: event("action_card_played", { card_id: "mobilization" }),
   },
-  { id: "charity", look: "diplomat", anchors: ["project-charity_fund"], allow: is("city_project", { project_id: "charity_fund" }), done: event("city_project_taken", { project_id: "charity_fund" }) },
-  { id: "terminal", look: "capitalist", anchors: ["market-smuggling", "project-river_port"], allow: is("buy_asset", { market_uid: "asset:smuggling" }), done: event("asset_bought", { asset_id: "smuggling" }) },
-  { id: "port", look: "mafia", anchors: ["project-river_port"], allow: is("city_project", { project_id: "river_port" }), done: event("city_project_taken", { project_id: "river_port" }) },
-  { id: "grey", look: "mafia", anchors: ["grey"], allow: is("grey_operation", { asset_id: "smear" }), done: event("grey_operation_resolved"), after: "greyDone" },
-  { id: "roof", look: "mafia", anchors: ["roof"], allow: is("buy_roof"), done: event("roof_bought") },
-  { id: "roofInfo", look: "mafia", anchors: [], info: true },
-  { id: "lobbying", look: "diplomat", anchors: ["lobbying"], allow: is("basic_action", { kind: "lobbying" }), done: event("basic_action", { kind: "lobbying" }) },
-  { id: "endTurn", look: "none", anchors: ["end-turn"], allow: is("end_turn"), done: item => item.type === "turn_started" && item.actor_id === ME && item.data.round_number === 2 },
-  { id: "roundEnd", look: "none", anchors: [] },
-  { id: "revenge", look: "none", anchors: [] },
-  { id: "finale", look: "none", anchors: [] },
+  { id: "charity", anchors: ["project-charity_fund"], allow: is("city_project", { project_id: "charity_fund" }), done: event("city_project_taken", { project_id: "charity_fund" }) },
+  { id: "terminal", anchors: ["market-smuggling", "project-river_port"], allow: is("buy_asset", { market_uid: "asset:smuggling" }), done: event("asset_bought", { asset_id: "smuggling" }) },
+  { id: "port", anchors: ["project-river_port"], allow: is("city_project", { project_id: "river_port" }), done: event("city_project_taken", { project_id: "river_port" }) },
+  { id: "grey", anchors: ["grey"], allow: is("grey_operation", { asset_id: "smear" }), done: event("grey_operation_resolved"), after: "greyDone" },
+  { id: "roof", anchors: ["roof"], allow: is("buy_roof"), done: event("roof_bought") },
+  { id: "roofInfo", anchors: [], info: true },
+  { id: "lobbying", anchors: ["lobbying"], allow: is("basic_action", { kind: "lobbying" }), done: event("basic_action", { kind: "lobbying" }) },
+  { id: "endTurn", anchors: ["end-turn"], allow: is("end_turn"), done: item => item.type === "turn_started" && item.actor_id === ME && item.data.round_number === 2 },
+  { id: "roundEnd", anchors: [] },
+  { id: "revenge", anchors: [] },
+  { id: "finale", anchors: [] },
 ];
 
 /** Сценарий целиком — для листа печати (`ui/dev/PrintBook`): те же шаги, что проходит игрок. */
@@ -169,7 +166,6 @@ function Guide({ step, position, onNext, onExit }: { step: Step; position: numbe
         <header className="tutorial-guide-head">
           <div className="tutorial-narrator">
             <strong id="tutorial-narrator">{t("narrator.name")}</strong>
-            <span>{t(`narrator.look.${step.look}` as never) as string}</span>
           </div>
           <span className="tutorial-counter">{t("ui.step", { current: position + 1, total: STEPS.length })}</span>
         </header>

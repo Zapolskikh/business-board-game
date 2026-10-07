@@ -1121,6 +1121,9 @@ class CityEngine:
             raise IllegalActionError("asset is not owned by the player")
         value = self.asset_refund(owned)
         self._drop_asset(player, owned)
+        # The limit may have left with the object («Завод-крепость»): the stack follows it, the
+        # same way it does when the mafia loses the seat (1.23.0).
+        player.roofs = min(player.roofs, self.roof_limit(player))
         player.money += value
         state.append_event(
             "asset_sold",
@@ -1319,6 +1322,10 @@ class CityEngine:
             project_id = self._payload_string(command, "project_id")
             if project_id not in state.project_board:
                 raise IllegalActionError("this card takes a project from the city board")
+            # The veto closes the project to everybody but the politician, whatever the route
+            # (1.23.0): the card used to walk straight through it.
+            if state.project_veto.get(project_id) not in (None, player.id):
+                raise IllegalActionError("this project is under a veto")
             if not self.project_requirement_met(player, self.project(project_id)):
                 raise IllegalActionError("the project condition is not met")
             if player.money < self.initiative_money(self.project(project_id), card):
@@ -1430,6 +1437,7 @@ class CityEngine:
             project = self.project(project_id)
             money = self.initiative_money(project, card)
             player.money -= money
+            state.project_veto.pop(project_id, None)
             state.project_board = [item for item in state.project_board if item != project_id]
             player.projects.append(project_id)
             self._refill_project_board(state)
@@ -1514,7 +1522,9 @@ class CityEngine:
             # What the victim loses, not a hardcoded 2: the two halves are scaled by the round from
             # the same figure, so «Враждебное поглощение» moves money instead of destroying a dollar
             # of it on every play. See the mirror in _apply_targeted_card_effect.
-            attacker.money += self._round_scaled(state, card.value)
+            # Capped by what the victim holds (1.23.0): paid in full against an empty wallet, the
+            # card printed the difference out of thin air.
+            attacker.money += min(target.money, self._round_scaled(state, card.value))
         elif card.kind == "double_scandal":
             self.add_scandal(state, attacker, 1)
         elif card.kind == "blackmail":
@@ -1800,6 +1810,10 @@ class CityEngine:
         for item in state.market:
             if item.claimed_by == player.id:
                 item.claimed_by = None
+            # The mafia's grey mark too (1.23.0): it used to outlive the seat that placed it.
+            if item.locked_by == player.id:
+                item.locked_by = None
+                item.locked_round = 0
         player.marked_card_id = None
         player.marked_market_uid = None
         state.project_veto = {

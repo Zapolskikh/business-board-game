@@ -334,7 +334,7 @@
       "title": "🏆 Skóre a příjem", "points": "{{count}} b.", "projects": "Projekty", "assets": "Podniky",
       "role": "Role", "bonus": "Karty a akce za body",
       "scandals": "Skandály", "total": "Celkem",
-      "leftover": "Peníze a vliv jsou zdroje, ne body: co vám na konci zbude, se nepočítá. Utraťte je, nebo je proměňte v body patronátem ({{patronageMoney}}$ → {{patronagePoints}} b.) a lobbingem ({{lobbyingInfluence}}◆ → {{lobbyingPoints}} b.).",
+      "leftover": "Peníze a vliv jsou zdroje, ne body: co vám na konci zbude, se nepočítá. Utraťte je, nebo je proměňte v body mecenášstvím ({{patronageMoney}}$ → {{patronagePoints}} b.) a lobbingem ({{lobbyingInfluence}}◆ → {{lobbyingPoints}} b.).",
       "income": "Příjem na konci kola",
       "lastRound": "Poslední kolo: na konci výplata nebude — utraťte peníze a vliv hned."
     },
@@ -561,7 +561,7 @@
       "modifierShift": "stěna se posouvá nahoru, nad 6 se počítá jako 6",
       "source": {
         "fraudster": "Podvodník +{{value}}",
-        "mafia": "Mafie +{{value}} za Šedou zónu",
+        "mafia": "Mafián +{{value}} za Šedou zónu",
         "card": "karta +{{value}}"
       },
       "row": {

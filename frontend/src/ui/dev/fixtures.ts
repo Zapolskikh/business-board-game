@@ -259,7 +259,7 @@ export function makeGame(overrides: Partial<GameState> = {}): GameState {
       dominant: { binary: false, met: false, have: 2, needed: 4 },
       social_housing: { binary: false, met: false, have: 1, needed: 3 },
     },
-    // Патронаж и публикация уже потрачены в этом ходу — полоска «уже потрачено» это покажет.
+    // Меценатство и публикация уже потрачены в этом ходу — полоска «уже потрачено» это покажет.
     turn_flags: { patronage: true, card_played: false },
     event_log: [
       { seq: 61, type: "city_project_taken", actor_id: "p-bot4", data: { project_id: "metro", points: 8 } },

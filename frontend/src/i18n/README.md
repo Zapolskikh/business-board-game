@@ -45,7 +45,7 @@
 | Рэкет | Racket | Výpalné |
 | Вето | Veto | Veto |
 | Обмен (деньги → влияние) | Exchange | Výměna |
-| Патронаж | Patronage | Mecenášství |
+| Меценатство | Patronage | Mecenášství |
 | Лоббирование | Lobbying | Lobbing |
 | Капиталист | Capitalist | Kapitalista |
 | Политик | Politician | Politik |

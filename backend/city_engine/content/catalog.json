@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "content_version": "city-content-2026-10-06",
+  "content_version": "city-content-2026-10-07",
   "districts": [
     {
       "id": "residential",
@@ -762,7 +762,7 @@
       "cost": 4,
       "income": 2,
       "influence": 0,
-      "text": "Открывает отмывание денег во влияние.",
+      "text": "Самый дешёвый объект Серого сектора: открывает серые операции.",
       "tags": [
         "grey"
       ]
@@ -1628,7 +1628,7 @@
     },
     {
       "id": "upgrade_subsidy",
-      "title": "Меценатство",
+      "title": "Благотворительный взнос",
       "tone": "deal",
       "text": "Заплатите 12$ и получите +4 очка в финальный счёт. Слот не нужен.",
       "kind": "buy_points",

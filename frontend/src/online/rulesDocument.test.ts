@@ -32,7 +32,7 @@ describe("buildRulesBook", () => {
     expect(book[0].html).toContain('class="rules-resource-icon"');
     expect(book[0].html).not.toContain("◆");
     expect(book[0].html).not.toContain("⚠");
-    expect(book[0].html).toContain(`Всего ${meta.assets.length} карточек`);
+    expect(book[0].html).toContain(`всего объектов в игре — ${meta.assets.length}`);
 
     const flow = book.find(chapter => chapter.id === "flow")!;
     // «действия» в тексте несут значок молнии и не отрываются от него при переносе.

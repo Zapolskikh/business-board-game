@@ -556,8 +556,8 @@
       "modifierCap": "never more than +{{cap}}",
       "modifierShift": "the face moves up, above 6 counts as 6",
       "source": {
-        "fraudster": "Fraudster +{{value}}",
-        "mafia": "Mafia +{{value}} for the Grey Sector",
+        "fraudster": "Hustler +{{value}}",
+        "mafia": "Mobster +{{value}} for the Grey Sector",
         "card": "card +{{value}}"
       },
       "row": {

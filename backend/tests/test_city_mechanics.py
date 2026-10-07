@@ -2792,3 +2792,67 @@ def test_the_final_settlement_washes_off_no_scandal() -> None:
     assert state.status == "finished"
     player = state.player_by_id(player.id)
     assert (player.scandals, player.roofs) == (3, 0)
+
+
+# --- 1.23.0: four fixes found while the rule book was checked against the engine ----------------
+
+
+def test_the_initiative_card_does_not_walk_through_a_veto() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    rival = next(other for other in state.players if other.id != player.id)
+    project_id = "charity_fund"
+    state.project_deck = [item for item in state.project_deck if item != project_id]
+    state.project_board = [project_id, *[item for item in state.project_board if item != project_id][:3]]
+    player.money = 30
+    give_card(state, player, "urban_project")
+    state.project_veto[project_id] = rival.id
+    card_uid = player.hand[-1].uid
+    assert not any(
+        action["type"] == "play_action_card" and action["payload"].get("project_id") == project_id
+        for action in engine.legal_actions(state, player.id)
+    )
+    # The politician's own card still takes the project, and the veto goes with it.
+    state.project_veto[project_id] = player.id
+    state = run(engine, state, "play_action_card", {"card_uid": card_uid, "project_id": project_id})
+    assert project_id in state.current_player.projects and project_id not in state.project_veto
+
+
+def test_hostile_takeover_pays_only_what_the_victim_had() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    rival = next(other for other in state.players if other.id != player.id)
+    give_card(state, player, "hostile")
+    rival.money, rival.roofs = 1, 0
+    before = player.money
+    state = run(engine, state, "play_action_card", {"card_uid": player.hand[-1].uid, "target_id": rival.id})
+    assert state.player_by_id(rival.id).money == 0
+    assert state.current_player.money == before + 1
+
+
+def test_the_grey_mark_leaves_with_the_mafia_seat() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    player.role, player.roofs = "mafia", 1
+    item = state.market[0]
+    state = run(engine, state, "use_role_power", {"power": "mafia_lock", "market_uid": item.uid})
+    assert state.market[0].locked_by == player.id
+    mafia = state.current_player
+    engine.add_scandal(state, mafia, engine.scandal_limit(mafia))
+    assert mafia.role is None
+    assert state.market[0].locked_by is None and state.market[0].locked_round == 0
+
+
+def test_selling_the_object_that_raised_the_roof_limit_drops_the_extra_token() -> None:
+    engine = CityEngine()
+    state = make_state()
+    player = state.current_player
+    give_asset(state, player, "fortress_factory")
+    player.roofs = engine.roof_limit(player)
+    assert player.roofs == 2
+    owned = next(asset for asset in player.assets if asset.card_id == "fortress_factory")
+    state = run(engine, state, "sell_asset", {"asset_uid": owned.uid})
+    assert state.current_player.roofs == 1
