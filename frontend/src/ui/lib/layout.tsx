@@ -141,9 +141,16 @@ export function useMobileViewport(active: boolean): void {
       const ratio = Math.min(Math.max(visible, screenRatio), screenRatio * 1.5);
       return Math.max(MOBILE_MIN_WIDTH, Math.round(MOBILE_HEIGHT * ratio));
     };
+    /* Масштаб браузера поверх нашего. Chrome на Android («Специальные возможности → Масштаб по
+     * умолчанию», по умолчанию — из системного размера шрифта; на Xiaomi он часто крупнее)
+     * делит заданную ширину на свой множитель: вместо 1300 точек стол получает ~1000, сетка в
+     * долях вписывается, а шрифты и отступы в пикселях наезжают друг на друга. Множитель меряем
+     * по факту — сколько точек браузер дал на самом деле — и просим в meta во столько раз больше. */
+    let zoom = 1;
     const content = (width: number, nudge: number) => {
-      const scale = (screenSides()!.long / width + nudge).toFixed(4);
-      return `width=${width}, initial-scale=${scale}, minimum-scale=${scale}, maximum-scale=${scale}, user-scalable=no, viewport-fit=cover`;
+      const asked = Math.round(width * zoom);
+      const scale = (screenSides()!.long / asked + nudge).toFixed(4);
+      return `width=${asked}, initial-scale=${scale}, minimum-scale=${scale}, maximum-scale=${scale}, user-scalable=no, viewport-fit=cover`;
     };
     /* Пока игрок печатает (чат), стол не трогаем: клавиатура сама сдвигает видимую область,
      * чтобы показать поле ввода, а возврат «на место» и перезапись meta увели бы поле обратно
@@ -183,6 +190,26 @@ export function useMobileViewport(active: boolean): void {
         home();
       });
       for (const delay of [60, 250, 600]) timers.push(window.setTimeout(home, delay));
+      timers.push(window.setTimeout(() => (sample = measure()), 600));
+      timers.push(window.setTimeout(correct, 1000));
+    };
+    /* Множитель браузера: сколько точек просили у meta на одну полученную. Мерим дважды с паузой и
+     * верим только совпавшим замерам: Safari досчитывает поворот с задержкой, и одиночный замер
+     * посреди пересчёта принял бы недосчитанную ширину за чужой зум. */
+    let sample = 0;
+    const measure = () => {
+      const seen = document.documentElement.clientWidth;
+      return seen > 0 && applied > 0 ? Math.round(applied * zoom) / seen : 0;
+    };
+    const correct = () => {
+      const now = measure();
+      const stable = sample > 0 && now > 0 && Math.abs(now - sample) / now < 0.01;
+      sample = 0;
+      if (typing() || !stable || now < 0.5 || now > 3) return;
+      if (Math.abs(now - zoom) / zoom < 0.03) return;
+      zoom = now;
+      last = 0;
+      settle();
     };
     // Панели браузера появились или спрятались — видимая область другой формы, стол пересчитывается.
     const resync = () => {
