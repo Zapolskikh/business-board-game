@@ -378,6 +378,43 @@ a.support-link:hover { border-color: var(--rooms-gold); }
 .feedback-done p { color: var(--rooms-muted); font-size: 13px; }
 .feedback-done .dialog-actions { width: min(360px, 100%); margin-top: 10px; }
 
+/* Обратная связь на телефоне: в один экран. Подзаголовок, вводный абзац и подвал студии уходят,
+ * три темы — одной строкой без подсказок (подсказку несёт текст в поле сообщения), поле ниже. */
+@media (max-width: 700px), (max-height: 560px) {
+  .rooms-app.feedback-page { padding-bottom: 16px; }
+  .feedback-page .rooms-topbar { min-height: 56px; }
+  .feedback-page .feedback-layout { margin-top: 14px; gap: 12px; }
+  .feedback-page .feedback-intro .eyebrow, .feedback-page .feedback-intro > p, .feedback-page .studio-footer { display: none; }
+  .feedback-page .feedback-intro h1 { font-size: 24px; }
+  .feedback-page .rooms-panel.feedback-card { padding: 14px; }
+  .feedback-page .feedback-card form { gap: 12px; }
+  .feedback-page .feedback-kinds { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .feedback-page .feedback-kinds legend { margin-bottom: 6px; }
+  .feedback-page .feedback-kinds label { min-height: 48px; padding: 8px; align-content: center; text-align: center; }
+  .feedback-page .feedback-kinds b { font-size: 13px; line-height: 1.25; }
+  .feedback-page .feedback-kinds small { display: none; }
+  .rooms-app.feedback-page .feedback-card .room-field textarea { min-height: 96px; }
+  .feedback-page .feedback-card .form-hint { font-size: 12px; }
+}
+/* В альбоме — на 15% мельче, как главная и лобби, и форма в две колонки: темы и контакт слева,
+ * сообщение справа во всю их высоту, отправка — под ними во всю ширину. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .rooms-app.feedback-page { zoom: .85; min-height: calc(100dvh / .85); padding-bottom: 8px; }
+  .feedback-page .rooms-topbar { min-height: 48px; }
+  .feedback-page .feedback-layout { margin-top: 6px; gap: 6px; }
+  .feedback-page .feedback-intro h1 { font-size: 20px; }
+  .feedback-page .rooms-panel.feedback-card { padding: 10px 12px; }
+  .feedback-page .feedback-card form { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "kinds message" "contact message" "alert alert" "send send" "hint hint"; gap: 8px 14px; }
+  .feedback-page .feedback-card form > .feedback-kinds { grid-area: kinds; }
+  .feedback-page .feedback-card form > .room-field:has(textarea) { grid-area: message; grid-template-rows: auto minmax(0, 1fr); }
+  .feedback-page .feedback-card form > .room-field:has(input) { grid-area: contact; }
+  .feedback-page .feedback-card form > .rooms-alert { grid-area: alert; }
+  .feedback-page .feedback-card form > .create-submit { grid-area: send; }
+  .feedback-page .feedback-card form > .form-hint { grid-area: hint; }
+  .rooms-app.feedback-page .feedback-card .room-field textarea { height: 100%; min-height: 0; }
+  .rooms-app.feedback-page .feedback-card .create-submit { min-height: 42px; }
+}
+
 @media (max-width: 980px) {
   .rooms-presence { display: none; }
   .feedback-layout { grid-template-columns: 1fr; gap: 22px; margin-top: 24px; }
@@ -398,6 +435,8 @@ a.support-link:hover { border-color: var(--rooms-gold); }
 .studio-footer .studio-logo { width: 190px; opacity: .92; transition: opacity .14s; }
 .studio-footer:hover .studio-logo { opacity: 1; }
 .about-dialog .about-logo { width: 170px; margin: -4px 0 2px -4px; }
+/* Низкий экран (телефон в альбоме): логотип студии уступает место тексту и кнопкам. */
+@media (max-height: 560px) { .about-dialog .about-logo { display: none; } .about-body { gap: 10px; padding-top: 18px; } }
 @media (max-width: 700px) {
   .studio-footer { margin-top: 32px; flex-direction: column; gap: 8px; }
   .studio-footer .studio-logo { width: 170px; }

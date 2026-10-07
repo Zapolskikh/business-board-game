@@ -475,7 +475,7 @@
       "title": "Kniha města", "subtitle": "Pravidla hry Město vlivu", "search": "Hledat v pravidlech", "clear": "Smazat hledání",
       "found_one": "Nalezeno: {{total}} v {{count}} kapitole", "found_few": "Nalezeno: {{total}} ve {{count}} kapitolách",
       "found_many": "Nalezeno: {{total}} v {{count}} kapitolách", "found_other": "Nalezeno: {{total}} v {{count}} kapitolách",
-      "nothing": "Nic nenalezeno", "chapter": "Kapitola {{number}}", "close": "Zavřít knihu"
+      "nothing": "Nic nenalezeno", "chapter": "Kapitola {{number}}", "close": "Zavřít knihu", "contents": "Kapitoly", "backToPage": "Zpět ke kapitole"
     },
     "chat": {"tab": "Chat", "logTab": "Log", "tabs": "Chat a log", "title": "Chat u stolu", "placeholder": "Napište ke stolu…", "send": "Odeslat", "empty": "Zatím je tu ticho. Napište první."},
     "mobile": {

@@ -15,7 +15,26 @@ import { ResourceText } from "../primitives/ResourceIcon";
  *
  * Поиск живёт над закладками: пока в нём есть запрос, вместо оглавления видны найденные места,
  * а в открытой главе совпадения подсвечены и первое из них прокручено в центр.
+ *
+ * Узкий или низкий экран (телефон вертикально и в альбоме): шестнадцать закладок в два ряда
+ * съедали экран, и на текст главы оставалась полоска. Там сверху одна строка — поиск и кнопка
+ * «Главы»; оглавление и найденное открываются на месте страницы и закрываются выбором главы.
  */
+const COMPACT_QUERY = "(max-width: 760px), (max-height: 560px)";
+
+function useCompact(): boolean {
+  const read = () => typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia(COMPACT_QUERY).matches;
+  const [compact, setCompact] = useState(read);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const list = window.matchMedia(COMPACT_QUERY);
+    const update = () => setCompact(list.matches);
+    update();
+    list.addEventListener("change", update);
+    return () => list.removeEventListener("change", update);
+  }, []);
+  return compact;
+}
 export function RulesBook({
   open,
   onClose,
@@ -57,6 +76,21 @@ export function RulesBook({
 
   const turn = (delta: number) => setPage(current => Math.max(0, Math.min(chapters.length - 1, current + delta)));
 
+  const compact = useCompact();
+  // Компактная книга: открыт ли список (оглавление или найденное) вместо страницы.
+  const [listOpen, setListOpen] = useState(false);
+  const showList = !compact || listOpen;
+  const choose = (index: number) => {
+    setPage(index);
+    setListOpen(false);
+  };
+  // Страница появилась снова после списка — как новая: к первому совпадению поиска или в начало.
+  useEffect(() => {
+    if (!compact || listOpen) return;
+    const first = searching ? body.current?.querySelector("mark.rules-hit") : null;
+    if (first) first.scrollIntoView({ block: "center" });
+  }, [compact, listOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <Dialog.Root open={open} onOpenChange={next => !next && onClose()}>
       <Dialog.Portal>
@@ -89,17 +123,21 @@ export function RulesBook({
             if (event.key === "ArrowRight") turn(1);
             if (event.key === "ArrowLeft") turn(-1);
           }}
-          className="ui-v2 rules-book fixed outline-none left-1/2 top-1/2 z-50 grid h-[min(860px,calc(var(--app-h)*0.92))] w-[min(1240px,calc(var(--app-w)*0.96))]
-            -translate-x-1/2 -translate-y-1/2 grid-cols-[minmax(0,270px)_minmax(0,1fr)] font-sans
-            max-[760px]:grid-cols-1 max-[760px]:grid-rows-[auto_minmax(0,1fr)]"
+          className={`ui-v2 rules-book fixed outline-none left-1/2 top-1/2 z-50 grid h-[min(860px,calc(var(--app-h)*0.92))] w-[min(1240px,calc(var(--app-w)*0.96))]
+            -translate-x-1/2 -translate-y-1/2 font-sans ${
+              compact
+                ? `is-compact grid-cols-1 ${listOpen ? "grid-rows-[minmax(0,1fr)]" : "grid-rows-[auto_minmax(0,1fr)]"}`
+                : "grid-cols-[minmax(0,270px)_minmax(0,1fr)]"
+            }`}
         >
           {/* Левая страница: титул, поиск и закладки глав — или найденные места. */}
-          <nav className="rules-book-toc grid min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden">
+          <nav className={`rules-book-toc grid min-h-0 overflow-hidden ${compact ? "grid-rows-[auto_minmax(0,1fr)]" : "grid-rows-[auto_auto_minmax(0,1fr)]"}`}>
             <header className="rules-book-title">
               <Dialog.Title className="card-serif text-[24px] leading-tight">{t("ui.book.title")}</Dialog.Title>
               <p>{t("ui.book.subtitle")}</p>
             </header>
 
+            <div className={compact ? "rules-book-searchbar" : "contents"}>
             <label className="rules-book-search">
               <span aria-hidden>⌕</span>
               <input
@@ -108,10 +146,13 @@ export function RulesBook({
                 value={query}
                 placeholder={t("ui.book.search")}
                 aria-label={t("ui.book.search")}
-                onChange={event => setQuery(event.target.value)}
+                onChange={event => {
+                  setQuery(event.target.value);
+                  if (compact && event.target.value.trim().length >= MIN_QUERY) setListOpen(true);
+                }}
                 onKeyDown={event => {
                   // Enter открывает первое найденное место.
-                  if (event.key === "Enter" && hits[0]) setPage(hits[0].chapter);
+                  if (event.key === "Enter" && hits[0]) choose(hits[0].chapter);
                 }}
               />
               {query && (
@@ -120,8 +161,19 @@ export function RulesBook({
                 </button>
               )}
             </label>
+            {compact && (
+              <button
+                type="button"
+                className="rules-book-contents"
+                aria-expanded={listOpen}
+                onClick={() => setListOpen(open => !open)}
+              >
+                {listOpen ? t("ui.book.backToPage") : t("ui.book.contents")}
+              </button>
+            )}
+            </div>
 
-            {searching ? (
+            {!showList ? null : searching ? (
               <div className="rules-book-results min-h-0 overflow-y-auto" aria-live="polite">
                 <p className="rules-book-results-count">
                   {total ? t("ui.book.found", { total, count: hits.length }) : t("ui.book.nothing")}
@@ -131,7 +183,7 @@ export function RulesBook({
                     key={hit.chapter}
                     type="button"
                     aria-current={hit.chapter === page ? "page" : undefined}
-                    onClick={() => setPage(hit.chapter)}
+                    onClick={() => choose(hit.chapter)}
                     className="rules-book-result"
                   >
                     <span className="rules-book-result-head">
@@ -150,13 +202,13 @@ export function RulesBook({
                 ))}
               </div>
             ) : (
-              <ol className="min-h-0 overflow-y-auto max-[760px]:flex max-[760px]:flex-wrap max-[760px]:gap-0.5">
+              <ol className="min-h-0 overflow-y-auto">
                 {chapters.map((item, index) => (
                   <li key={item.id}>
                     <button
                       type="button"
                       aria-current={index === page ? "page" : undefined}
-                      onClick={() => setPage(index)}
+                      onClick={() => choose(index)}
                       className="rules-book-tab"
                     >
                       <span className="rules-book-tab-num">{index + 1}</span>
@@ -170,7 +222,9 @@ export function RulesBook({
           </nav>
 
           {/* Правая страница: глава целиком, листается по одной. */}
-          <article className="rules-book-page grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto]">
+          {/* Компактная книга с открытым списком показывает только его: страница вернётся по выбору главы
+            * или по «К главе». Не `hidden` — класс раскладки сетки его перебивает. */}
+          {!(compact && listOpen) && <article className="rules-book-page grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto]">
             <header className="rules-book-chapter-head">
               <span>{t("ui.book.chapter", { number: page + 1 })}</span>
               <h2 className="card-serif">
@@ -196,7 +250,7 @@ export function RulesBook({
                 {page < chapters.length - 1 ? chapters[page + 1].title.split(" — ")[0] : ""} ›
               </button>
             </footer>
-          </article>
+          </article>}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

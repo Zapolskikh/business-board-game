@@ -473,7 +473,7 @@
     "book": {
       "title": "The City Book", "subtitle": "Rules of City of Influence", "search": "Search the rules", "clear": "Clear the search",
       "found_one": "Found: {{total}} in {{count}} chapter", "found_other": "Found: {{total}} in {{count}} chapters",
-      "nothing": "Nothing found", "chapter": "Chapter {{number}}", "close": "Close the book"
+      "nothing": "Nothing found", "chapter": "Chapter {{number}}", "close": "Close the book", "contents": "Chapters", "backToPage": "Back to the chapter"
     },
     "chat": {"tab": "Chat", "logTab": "Log", "tabs": "Chat and log", "title": "Table chat", "placeholder": "Say something to the table…", "send": "Send", "empty": "Quiet so far. Be the first to write."},
     "mobile": {
