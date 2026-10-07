@@ -125,7 +125,11 @@ export function useMobileViewport(active: boolean): void {
     if (!active || typeof document === "undefined") return;
     const meta = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
     if (!meta || !screenSides()) return;
-    const original = meta.getAttribute("content") ?? "width=device-width, initial-scale=1.0";
+    /* Исходную meta запоминаем один раз: если телефон повернули обратно, пока release ещё не
+     * вернул её, в атрибуте лежит временная, прижатая к единице. */
+    meta.dataset.original ??= meta.getAttribute("content") ?? "width=device-width, initial-scale=1.0";
+    const original = meta.dataset.original;
+    meta.dataset.board = "1";
     const timers: number[] = [];
 
     /* Пропорции берём у видимой области, а не у экрана: в браузере панели (шапка Safari в
@@ -252,9 +256,43 @@ export function useMobileViewport(active: boolean): void {
       root.style.overflow = previous.html;
       root.style.overscrollBehavior = previous.behavior;
       document.body.style.overflow = previous.body;
-      meta.setAttribute("content", original);
+      delete meta.dataset.board;
+      release(meta, original);
     };
   }, [active]);
+}
+
+/* Возврат к обычной ширине устройства — при повороте в вертикаль и при выходе из партии.
+ *
+ * Просто вернуть исходную meta мало: браузер оставляет прежний масштаб (стол был вписан
+ * множителем меньше единицы), пересчитывает его к новой ширине уже после поворота, и экран
+ * «поверните устройство» открывается в огромном увеличении — виден только угол фона. Поэтому
+ * масштаб сначала прижимается к единице и минимумом, и максимумом (тем же двойным переписыванием,
+ * что и в useMobileViewport: одинаковое значение Safari пропускает), страница возвращается в угол,
+ * и только когда поворот досчитан, meta становится исходной — с обычным зумом пальцами.
+ *
+ * Если за это время стол снова включился (телефон повернули обратно), поздний возврат meta не
+ * трогает: её уже переписал стол. */
+let session = 0;
+
+function release(meta: HTMLMetaElement, original: string): void {
+  const mine = ++session;
+  const pinned = (scale: string) =>
+    `width=device-width, initial-scale=${scale}, minimum-scale=${scale}, maximum-scale=${scale}, viewport-fit=cover`;
+  const ours = () => mine === session && !meta.dataset.board;
+  const home = () => {
+    if (ours() && (window.scrollX || window.scrollY)) window.scrollTo(0, 0);
+  };
+  meta.setAttribute("content", pinned("1.0001"));
+  requestAnimationFrame(() => {
+    if (!ours()) return;
+    meta.setAttribute("content", pinned("1"));
+    home();
+  });
+  for (const delay of [60, 250, 600]) window.setTimeout(home, delay);
+  window.setTimeout(() => {
+    if (ours()) meta.setAttribute("content", original);
+  }, 900);
 }
 
 /* Видимая часть экрана: без того, что закрыла экранная клавиатура.
