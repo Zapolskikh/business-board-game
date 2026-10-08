@@ -60,7 +60,7 @@ export function useBlockedHint(): {
           onCloseAutoFocus={event => event.preventDefault()}
           /* Выше окон карточек (z-61) и панели руки: недоступная кнопка бывает и внутри них. */
           className={`ui-v2 z-[70] rounded-md border border-bad/50 bg-panel px-2.5 py-1.5 font-sans leading-snug
-            text-ink shadow-[0_4px_14px_rgb(0_0_0/0.45)] ${mobile ? "max-w-[340px] text-[15px]" : "max-w-[280px] text-[12.5px]"}`}
+            text-ink shadow-[0_4px_14px_rgb(0_0_0/0.45)] ${mobile ? "max-w-[440px] px-3 py-2 text-[18px]" : "max-w-[280px] text-[12.5px]"}`}
         >
           <span aria-hidden="true" className="mr-1">⛔</span>
           <ResourceText>{message ?? ""}</ResourceText>

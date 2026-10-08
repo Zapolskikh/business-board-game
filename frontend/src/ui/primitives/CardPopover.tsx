@@ -2,7 +2,7 @@ import { tr } from "../../i18n";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Popover from "@radix-ui/react-popover";
 import { useState, type ReactNode } from "react";
-import { MOBILE_DIALOG_ZOOM, useIsMobile } from "../lib/layout";
+import { MOBILE_CLOSE_BUTTON, MOBILE_DIALOG_ZOOM, fitZoom, useFitZoom, useIsMobile } from "../lib/layout";
 import { ResourceText } from "./ResourceIcon";
 
 /* Обёртка поповера — единственное место, знающее про Radix.
@@ -31,6 +31,7 @@ export function CardPopover({
 }) {
   const mobile = useIsMobile();
   const [open, setOpen] = useState(false);
+  const fit = useFitZoom(MOBILE_DIALOG_ZOOM);
 
   if (mobile) {
     return (
@@ -44,25 +45,36 @@ export function CardPopover({
           {/* Выше панели руки (z-50), потому что открывается и поверх неё: подробности карты
             * в руке должны быть видны целиком. */}
           {/* Не кнопка: глобальный стиль кнопок лобби перебивает утилиты вне `.ui-v2` и красит
-            * затемнение непрозрачным. Закрыть можно Esc и кнопкой внизу окна. */}
+            * затемнение непрозрачным. Закрыть можно Esc и кнопкой у угла окна. */}
           {open && <div aria-hidden="true" onClick={() => setOpen(false)} className="fixed inset-0 z-[60] bg-[#000a]" />}
           <Dialog.Content
+            ref={fit}
             data-ui="card-details"
             aria-describedby={undefined}
-            style={{ width: `min(calc(var(--app-w) * 0.94), ${Math.round(Math.max(width, 360) * MOBILE_DIALOG_ZOOM)}px)` }}
-            className="ui-v2 fixed left-1/2 top-1/2 z-[61] grid max-h-[calc(var(--app-h)*0.85)]
-              -translate-x-1/2 -translate-y-1/2 grid-rows-[minmax(0,1fr)_auto] overflow-hidden
-              rounded-[12px] border border-line-2 bg-panel font-sans text-ink"
+            /* Шире, чем на ПК: в альбоме ширины с запасом, а высоты нет — в узком окне строки
+             * переносятся и содержимое уезжает под край. */
+            style={{ width: `min(calc(var(--app-w) * 0.86), calc(${Math.max(width, 440)}px * ${fitZoom(MOBILE_DIALOG_ZOOM)}))` }}
+            className="ui-v2 fixed left-1/2 top-1/2 z-[61] grid max-h-[calc(var(--app-h)*0.96)]
+              -translate-x-1/2 -translate-y-1/2 grid-rows-[minmax(0,1fr)] font-sans text-ink"
           >
             <Dialog.Title className="sr-only">{label ?? tr("game", "ui.common.details")}</Dialog.Title>
-            <div className="overflow-auto" style={{ zoom: MOBILE_DIALOG_ZOOM }}>{content}</div>
-            {/* Отдельная кнопка, а не только тап мимо окна: мимо окна на телефоне
-              * промахиваются в соседнюю карточку, и вместо закрытия открывается она. */}
-            <Dialog.Close
-              style={{ zoom: MOBILE_DIALOG_ZOOM }}
-              className="border-t border-line px-3 py-2.5 text-center text-xs text-ink-muted"
+            <div
+              data-fit-scroll
+              className="min-h-0 overflow-auto rounded-[12px] border border-line-2 bg-panel"
+              style={{ zoom: fitZoom(MOBILE_DIALOG_ZOOM) }}
             >
-              {tr("game", "ui.common.close")}
+              {content}
+            </div>
+            {/* Отдельная кнопка, а не только тап мимо окна: мимо окна на телефоне промахиваются в
+              * соседнюю карточку, и вместо закрытия открывается она. Стоит снаружи, у верхнего
+              * угла: внутри окна она отнимала строку высоты, и содержимое приходилось листать. */}
+            <Dialog.Close
+              data-ui="card-details-close"
+              aria-label={tr("game", "ui.common.close")}
+              style={{ zoom: fitZoom(MOBILE_DIALOG_ZOOM) }}
+              className={`absolute left-full top-0 ml-2 ${MOBILE_CLOSE_BUTTON}`}
+            >
+              ✕
             </Dialog.Close>
           </Dialog.Content>
         </Dialog.Portal>

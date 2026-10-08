@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 
 /* Какой раскладкой сейчас рисуется доска.
  *
@@ -97,8 +97,80 @@ export const MOBILE_MIN_WIDTH = 1200;
 /* Окна и подсказки на телефоне — крупнее стола. Стол плотный, потому что на нём видно всё сразу;
  * окно открыто одно, места вокруг него много, и его текст читают, а не окидывают взглядом.
  * Множитель применяется к содержимому окна (`zoom`), а не к самому окну: центрирование и рамка
- * остаются как есть, а текст, отступы и кнопки растут вместе — шрифт 11.5px становится ~14px. */
-export const MOBILE_DIALOG_ZOOM = 1.2;
+ * остаются как есть, а текст, отступы и кнопки растут вместе.
+ *
+ * Считать надо от экрана, а не от стола: стол на телефоне ужат примерно до 0.65, и при множителе
+ * 1.2 шрифт 11.5px выходил на экране в ~9px — не читался. С 1.5 это ~11px, подписи 10px — ~10px.
+ *
+ * У широких справочников (роли, серые операции) множитель меньше: они упираются в ширину экрана,
+ * и каждая десятая множителя отнимает у таблицы колонку. */
+export const MOBILE_DIALOG_ZOOM = 1.5;
+export const MOBILE_DETAILS_ZOOM = 1.4;
+/* Ниже этого окно не мельчим — это прежний множитель, с которым текст уже едва читался. */
+export const MOBILE_MIN_ZOOM = 1.2;
+
+/* Множитель окна подбирается под его содержимое: крупный текст не должен стоить прокрутки.
+ *
+ * Окно открывается с множителем `max`. Если содержимое при нём не помещается в высоту экрана,
+ * множитель опускается ровно настолько, чтобы прокрутка исчезла, но не ниже `min`. Если и при
+ * `min` не помещается (полный справочник ролей — три экрана), прокрутка всё равно останется, и
+ * тогда мельчить незачем: остаётся `max`.
+ *
+ * Множитель живёт в переменной `--win-zoom` на самом окне, а не в состоянии React: от неё считаются
+ * и `zoom` частей окна, и его ширина, и подбор идёт до отрисовки кадра, без промежуточного рендера.
+ * Прокручиваемая часть окна помечается `data-fit-scroll`; ею может быть и само окно. */
+export function useFitZoom(max: number, min = MOBILE_MIN_ZOOM): (node: HTMLElement | null) => void {
+  const mobile = useIsMobile();
+  const [win, setWin] = useState<HTMLElement | null>(null);
+
+  useLayoutEffect(() => {
+    if (!win || !mobile) return;
+    const scroller = win.matches("[data-fit-scroll]") ? win : win.querySelector<HTMLElement>("[data-fit-scroll]");
+    if (!scroller) return;
+
+    const set = (value: number) => win.style.setProperty("--win-zoom", String(value));
+    const overflows = () => scroller.scrollHeight > scroller.clientHeight + 1;
+    const fit = () => {
+      set(max);
+      if (!overflows()) return;
+      // Первая прикидка — по отношению высот, дальше мелкими шагами: шапка и подвал окна тоже
+      // масштабируются, и точного ответа одно деление не даёт.
+      let value = Math.min(max, Math.floor(((max * scroller.clientHeight) / scroller.scrollHeight) * 50) / 50);
+      while (value >= min) {
+        set(value);
+        if (!overflows()) return;
+        value = Math.round((value - 0.02) * 100) / 100;
+      }
+      set(max);
+    };
+
+    fit();
+    // Содержимое меняется и в открытом окне: вкладки серых операций, полный справочник ролей.
+    const resize = typeof ResizeObserver === "function" ? new ResizeObserver(fit) : null;
+    resize?.observe(win);
+    for (const child of scroller.children) resize?.observe(child);
+    const mutation = typeof MutationObserver === "function" ? new MutationObserver(fit) : null;
+    mutation?.observe(scroller, { childList: true, subtree: true, characterData: true });
+    window.addEventListener("resize", fit);
+    return () => {
+      resize?.disconnect();
+      mutation?.disconnect();
+      window.removeEventListener("resize", fit);
+    };
+  }, [win, mobile, max, min]);
+
+  return setWin;
+}
+
+/** `zoom` части окна: множитель, подобранный `useFitZoom`, а до подбора — `max`. */
+export function fitZoom(max: number): string {
+  return `var(--win-zoom, ${max})`;
+}
+
+/* Крестик окна на телефоне — кнопка с рамкой и фоном, а не серый значок в углу: по значку не
+ * попадали и не сразу его находили. */
+export const MOBILE_CLOSE_BUTTON =
+  "grid size-8 shrink-0 place-items-center rounded-md border border-line-2 bg-panel-3 text-[16px] font-bold leading-none text-ink active:bg-panel-2";
 
 /* Мобильный стол в логическом размере: MOBILE_HEIGHT точек в высоту, ширина — по пропорциям
  * экрана. Масштабируется страница целиком, а не контейнер доски: окна, поповеры и подсказки
